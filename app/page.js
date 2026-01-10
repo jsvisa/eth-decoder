@@ -94,9 +94,31 @@ export default function Home() {
     }
   }
 
+  // Custom JSON stringifier that prevents scientific notation for large numbers
+  const stringifyWithoutScientific = (obj, space = 2) => {
+    // First stringify with a marker for large numbers
+    const jsonStr = JSON.stringify(obj, (key, value) => {
+      if (typeof value === 'number') {
+        const str = value.toString()
+        // Check if it's in scientific notation
+        if (str.includes('e') || str.includes('E')) {
+          // Use a special marker that we'll replace later
+          return `__NUMBER__${value.toLocaleString('en-US', {
+            useGrouping: false,
+            maximumFractionDigits: 0
+          })}__NUMBER__`
+        }
+      }
+      return value
+    }, space)
+
+    // Remove quotes around our number markers to keep them as unquoted numbers
+    return jsonStr.replace(/"__NUMBER__(-?\d+)__NUMBER__"/g, '$1')
+  }
+
   const syntaxHighlight = (json) => {
     if (typeof json !== 'string') {
-      json = JSON.stringify(json, null, 2)
+      json = stringifyWithoutScientific(json, 2)
     }
 
     json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -267,11 +289,52 @@ export default function Home() {
     }
   }
 
+  // Convert large numbers in object to strings to preserve precision
+  const convertLargeNumbers = (obj) => {
+    if (obj === null || obj === undefined) return obj
+
+    if (typeof obj === 'number') {
+      const str = obj.toString()
+      if (str.includes('e') || str.includes('E')) {
+        // Convert to string representation without scientific notation
+        // For very large numbers, this preserves the value
+        return obj.toLocaleString('en-US', {
+          useGrouping: false,
+          maximumFractionDigits: 0
+        })
+      }
+      return obj
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map(convertLargeNumbers)
+    }
+
+    if (typeof obj === 'object') {
+      const converted = {}
+      for (const key in obj) {
+        converted[key] = convertLargeNumbers(obj[key])
+      }
+      return converted
+    }
+
+    return obj
+  }
+
   const handleCopy = async () => {
     try {
-      const textToCopy = isYaml
-        ? yaml.dump(result, { indent: 2 })
-        : JSON.stringify(result, null, 2)
+      let textToCopy
+      if (isYaml) {
+        // For YAML, convert the object first then dump
+        const converted = convertLargeNumbers(result)
+        textToCopy = yaml.dump(converted, {
+          indent: 2,
+          lineWidth: -1,
+          noRefs: true
+        })
+      } else {
+        textToCopy = stringifyWithoutScientific(result, 2)
+      }
 
       await navigator.clipboard.writeText(textToCopy)
       setCopied(true)
@@ -303,7 +366,12 @@ export default function Home() {
 
   const getDisplayContent = () => {
     if (isYaml) {
-      const yamlStr = yaml.dump(result, { indent: 2 })
+      const converted = convertLargeNumbers(result)
+      const yamlStr = yaml.dump(converted, {
+        indent: 2,
+        lineWidth: -1,
+        noRefs: true
+      })
       return syntaxHighlightYaml(yamlStr)
     }
     return syntaxHighlight(result)
