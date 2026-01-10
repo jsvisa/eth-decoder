@@ -327,11 +327,15 @@ export default function Home() {
       if (isYaml) {
         // For YAML, convert the object first then dump
         const converted = convertLargeNumbers(result)
-        textToCopy = yaml.dump(converted, {
+        let yamlStr = yaml.dump(converted, {
           indent: 2,
           lineWidth: -1,
           noRefs: true
         })
+        // Remove quotes around large number strings to display as numbers
+        yamlStr = yamlStr.replace(/'(\d{15,})'/g, '$1')
+        yamlStr = yamlStr.replace(/"(\d{15,})"/g, '$1')
+        textToCopy = yamlStr
       } else {
         textToCopy = stringifyWithoutScientific(result, 2)
       }
@@ -367,11 +371,14 @@ export default function Home() {
   const getDisplayContent = () => {
     if (isYaml) {
       const converted = convertLargeNumbers(result)
-      const yamlStr = yaml.dump(converted, {
+      let yamlStr = yaml.dump(converted, {
         indent: 2,
         lineWidth: -1,
         noRefs: true
       })
+      // Remove quotes around large number strings to display as numbers
+      yamlStr = yamlStr.replace(/'(\d{15,})'/g, '$1')
+      yamlStr = yamlStr.replace(/"(\d{15,})"/g, '$1')
       return syntaxHighlightYaml(yamlStr)
     }
     return syntaxHighlight(result)
