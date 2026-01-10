@@ -216,3 +216,109 @@
 .yamlPunctuation {
   color: #d4d4d4;
 }
+
+.historySection {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 2px solid #e7e7e7;
+}
+
+.historyHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.historyHeader h3 {
+  margin: 0;
+  color: #333;
+  font-size: 1.5rem;
+}
+
+.historyActions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.historyToggle,
+.historyClear {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background-color: white;
+  color: #333;
+}
+
+.historyToggle:hover {
+  background-color: #f5f5f5;
+  border-color: #0070f3;
+}
+
+.historyClear {
+  color: #c33;
+  border-color: #fcc;
+}
+
+.historyClear:hover {
+  background-color: #fee;
+  border-color: #c33;
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.historyItem {
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.historyItem:hover {
+  background-color: #e8f4ff;
+  border-color: #0070f3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 112, 243, 0.15);
+}
+
+.historyInput {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.875rem;
+  color: #333;
+  margin-bottom: 0.5rem;
+  word-break: break-all;
+}
+
+.historyMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.historyTime {
+  font-style: italic;
+}
+
+.historyOptions {
+  padding: 0.25rem 0.5rem;
+  background-color: #0070f3;
+  color: white;
+  border-radius: 3px;
+  font-weight: 600;
+  font-size: 0.7rem;
+  letter-spacing: 1px;
+}

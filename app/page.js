@@ -1,8 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import yaml from 'js-yaml'
 import styles from './page.module.css'
+
+const STORAGE_KEY = 'evm_decoder_history'
+const MAX_HISTORY_ITEMS = 100
 
 export default function Home() {
   const [inputData, setInputData] = useState('')
@@ -14,6 +17,61 @@ export default function Home() {
   const [withSign, setWithSign] = useState(false)
   const [isYaml, setIsYaml] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [history, setHistory] = useState([])
+  const [showHistory, setShowHistory] = useState(true)
+
+  // Load history from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (stored) {
+        setHistory(JSON.parse(stored))
+      }
+    } catch (err) {
+      console.error('Failed to load history:', err)
+    }
+  }, [])
+
+  // Save to history
+  const saveToHistory = (input, output, options) => {
+    const historyItem = {
+      id: Date.now(),
+      input: input,
+      output: output,
+      options: options,
+      timestamp: new Date().toISOString()
+    }
+
+    const newHistory = [historyItem, ...history.filter(item => item.input !== input)]
+      .slice(0, MAX_HISTORY_ITEMS)
+
+    setHistory(newHistory)
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory))
+    } catch (err) {
+      console.error('Failed to save history:', err)
+    }
+  }
+
+  // Load from history
+  const loadFromHistory = (item) => {
+    setInputData(item.input)
+    setResult(item.output)
+    setMulticall(item.options.multicall)
+    setWithAbi(item.options.withAbi)
+    setWithSign(item.options.withSign)
+    setError(null)
+  }
+
+  // Clear history
+  const clearHistory = () => {
+    setHistory([])
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch (err) {
+      console.error('Failed to clear history:', err)
+    }
+  }
 
   const syntaxHighlight = (json) => {
     if (typeof json !== 'string') {
@@ -162,15 +220,25 @@ export default function Home() {
       const data = await response.json()
 
       // Check if response has the expected structure
+      let resultToDisplay
       if (data.msg === 'ok' && Array.isArray(data.data) && data.data.length >= 1) {
         // Only display data[0]
-        setResult(data.data[0])
+        resultToDisplay = data.data[0]
       } else {
         // Display the full response
-        setResult(data)
+        resultToDisplay = data
       }
+
+      setResult(resultToDisplay)
       setIsYaml(false) // Reset to JSON format on new result
       setCopied(false) // Reset copied state
+
+      // Save to history
+      saveToHistory(inputData, resultToDisplay, {
+        multicall,
+        withAbi,
+        withSign
+      })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -287,6 +355,58 @@ export default function Home() {
               className={styles.json}
               dangerouslySetInnerHTML={{ __html: getDisplayContent() }}
             />
+          </div>
+        )}
+
+        {history.length > 0 && (
+          <div className={styles.historySection}>
+            <div className={styles.historyHeader}>
+              <h3>Recent Decodes ({history.length})</h3>
+              <div className={styles.historyActions}>
+                <button
+                  onClick={() => setShowHistory(!showHistory)}
+                  className={styles.historyToggle}
+                  type="button"
+                >
+                  {showHistory ? 'Hide' : 'Show'}
+                </button>
+                <button
+                  onClick={clearHistory}
+                  className={styles.historyClear}
+                  type="button"
+                >
+                  Clear All
+                </button>
+              </div>
+            </div>
+
+            {showHistory && (
+              <div className={styles.historyList}>
+                {history.map((item) => (
+                  <div
+                    key={item.id}
+                    className={styles.historyItem}
+                    onClick={() => loadFromHistory(item)}
+                  >
+                    <div className={styles.historyInput}>
+                      {item.input.slice(0, 20)}...{item.input.slice(-10)}
+                    </div>
+                    <div className={styles.historyMeta}>
+                      <span className={styles.historyTime}>
+                        {new Date(item.timestamp).toLocaleString()}
+                      </span>
+                      {(item.options.multicall || item.options.withAbi || item.options.withSign) && (
+                        <span className={styles.historyOptions}>
+                          {item.options.multicall && 'M'}
+                          {item.options.withAbi && 'A'}
+                          {item.options.withSign && 'S'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

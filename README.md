@@ -8,6 +8,8 @@ A simple single-page web application that decodes EVM transaction input data usi
 - Real-time decoding via proxied API
 - JSON and YAML formatted output with syntax highlighting
 - Copy to clipboard functionality
+- Recent decode history (stores up to 100 items in browser localStorage)
+- Click history items to quickly reload previous decodes
 - Clean, responsive UI
 - Backend endpoint hidden from frontend (security)
 - Support for multicall, ABI, and signature decoding options
