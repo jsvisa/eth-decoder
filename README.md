@@ -8,11 +8,28 @@ A simple single-page web application that decodes EVM transaction input data usi
 - Real-time decoding via proxied API
 - JSON and YAML formatted output with syntax highlighting
 - Copy to clipboard functionality
+- Shareable URLs - generate links to share decoded transactions
 - Recent decode history (stores up to 100 items in browser localStorage)
 - Click history items to quickly reload previous decodes
 - Clean, responsive UI
 - Backend endpoint hidden from frontend (security)
 - Support for multicall, ABI, and signature decoding options
+
+## URL Parameters
+
+You can share decode results by using URL parameters:
+
+```
+https://your-domain.vercel.app/?data=0x1234abcd...&multicall=true&with_abi=true&with_sign=true
+```
+
+Parameters:
+- `data` (required): Hex string to decode
+- `multicall` (optional): Set to `true` to enable multicall option
+- `with_abi` (optional): Set to `true` to enable ABI option
+- `with_sign` (optional): Set to `true` to enable signature option
+
+The app will automatically populate the input and trigger decoding when these parameters are present.
 
 ## Local Development
 

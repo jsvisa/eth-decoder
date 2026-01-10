@@ -17,6 +17,7 @@ export default function Home() {
   const [withSign, setWithSign] = useState(false)
   const [isYaml, setIsYaml] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [urlCopied, setUrlCopied] = useState(false)
   const [history, setHistory] = useState([])
   const [showHistory, setShowHistory] = useState(true)
 
@@ -29,6 +30,26 @@ export default function Home() {
       }
     } catch (err) {
       console.error('Failed to load history:', err)
+    }
+  }, [])
+
+  // Load from URL parameters on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const urlData = params.get('data')
+
+    if (urlData) {
+      setInputData(urlData)
+
+      // Set options from URL if provided
+      if (params.get('multicall') === 'true') setMulticall(true)
+      if (params.get('with_abi') === 'true') setWithAbi(true)
+      if (params.get('with_sign') === 'true') setWithSign(true)
+
+      // Auto-decode after a short delay to ensure state is set
+      setTimeout(() => {
+        document.querySelector('form')?.requestSubmit()
+      }, 100)
     }
   }, [])
 
@@ -260,6 +281,26 @@ export default function Home() {
     }
   }
 
+  const handleShareUrl = async () => {
+    try {
+      const params = new URLSearchParams({
+        data: inputData
+      })
+
+      if (multicall) params.append('multicall', 'true')
+      if (withAbi) params.append('with_abi', 'true')
+      if (withSign) params.append('with_sign', 'true')
+
+      const shareUrl = `${window.location.origin}${window.location.pathname}?${params}`
+
+      await navigator.clipboard.writeText(shareUrl)
+      setUrlCopied(true)
+      setTimeout(() => setUrlCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy share URL:', err)
+    }
+  }
+
   const getDisplayContent = () => {
     if (isYaml) {
       const yamlStr = yaml.dump(result, { indent: 2 })
@@ -315,13 +356,25 @@ export default function Home() {
             </label>
           </div>
 
-          <button
-            type="submit"
-            className={styles.button}
-            disabled={loading}
-          >
-            {loading ? 'Decoding...' : 'Decode'}
-          </button>
+          <div className={styles.buttonGroup}>
+            <button
+              type="submit"
+              className={styles.button}
+              disabled={loading}
+            >
+              {loading ? 'Decoding...' : 'Decode'}
+            </button>
+            {inputData && (
+              <button
+                type="button"
+                onClick={handleShareUrl}
+                className={styles.shareButton}
+                disabled={loading}
+              >
+                {urlCopied ? 'URL Copied!' : 'Share URL'}
+              </button>
+            )}
+          </div>
         </form>
 
         {error && (
