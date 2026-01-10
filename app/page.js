@@ -388,8 +388,15 @@ export default function Home() {
                     className={styles.historyItem}
                     onClick={() => loadFromHistory(item)}
                   >
-                    <div className={styles.historyInput}>
-                      {item.input.slice(0, 20)}...{item.input.slice(-10)}
+                    <div className={styles.historyTop}>
+                      <div className={styles.historyInput}>
+                        {item.input.slice(0, 20)}...{item.input.slice(-10)}
+                      </div>
+                      {item.output && item.output.func && (
+                        <div className={styles.historyFunc}>
+                          {item.output.func}
+                        </div>
+                      )}
                     </div>
                     <div className={styles.historyMeta}>
                       <span className={styles.historyTime}>
