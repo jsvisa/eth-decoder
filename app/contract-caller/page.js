@@ -140,7 +140,22 @@ export default function ContractCaller() {
   const [showFunctionList, setShowFunctionList] = useState(false)
   const [copiedItem, setCopiedItem] = useState(null) // 'selector' | 'signature' | null
   const [ethValue, setEthValue] = useState('') // ETH value for payable functions
-  const pendingArgsRef = useRef(null)
+  // Store pending args with context to handle race conditions when switching contracts
+  const pendingHistoryRef = useRef(null) // { functionName, args, address, timestamp }
+  // Track which address the current parsedAbi is for
+  const parsedAbiAddressRef = useRef(null)
+
+  // Clear stale pending history after 5 seconds
+  useEffect(() => {
+    if (pendingHistoryRef.current && pendingHistoryRef.current.timestamp) {
+      const timer = setTimeout(() => {
+        if (pendingHistoryRef.current && Date.now() - pendingHistoryRef.current.timestamp > 5000) {
+          pendingHistoryRef.current = null
+        }
+      }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [pendingHistoryRef.current?.timestamp])
 
   // Helper to check if function is read-only
   const isReadOnly = (func) => {
@@ -221,6 +236,9 @@ export default function ContractCaller() {
       setContractName(nameDisplay)
       setAbiSource(cached.isProxy ? `cached (proxy → ${cached.implAddress?.slice(0, 10)}...)` : 'cached')
     } else {
+      // Clear ABI when switching to uncached contract
+      setAbi('')
+      setParsedAbi(null)
       setAbiSource(null)
       setContractName(null)
     }
@@ -230,6 +248,7 @@ export default function ContractCaller() {
   useEffect(() => {
     if (!abi.trim()) {
       setParsedAbi(null)
+      parsedAbiAddressRef.current = null
       setFunctions([])
       setSelectedFunction('')
       return
@@ -238,6 +257,8 @@ export default function ContractCaller() {
     try {
       const parsed = JSON.parse(abi)
       setParsedAbi(parsed)
+      // Track which address this parsedAbi is for
+      parsedAbiAddressRef.current = address?.toLowerCase() || null
 
       // Get all functions (both read and write)
       const allFunctions = parsed.filter(
@@ -267,7 +288,10 @@ export default function ContractCaller() {
   // Update args when selected function changes
   useEffect(() => {
     if (!selectedFunction || !parsedAbi) {
-      setArgs([])
+      // Don't reset args if we have pending history waiting
+      if (!pendingHistoryRef.current) {
+        setArgs([])
+      }
       return
     }
 
@@ -275,27 +299,43 @@ export default function ContractCaller() {
       (item) => item.type === 'function' && item.name === selectedFunction
     )
 
-    const expectedInputs = func?.inputs?.length || 0
+    // If we have pending args from history, check if context matches
+    if (pendingHistoryRef.current !== null) {
+      const pending = pendingHistoryRef.current
 
-    // If we have pending args from history, validate length matches
-    if (pendingArgsRef.current !== null) {
-      const pendingArgs = pendingArgsRef.current
-      pendingArgsRef.current = null
+      // Check if function name and address match
+      const functionMatches = pending.functionName === selectedFunction
+      const addressMatches = !pending.address || pending.address.toLowerCase() === address.toLowerCase()
+      // CRITICAL: Check if parsedAbi is actually for the target address
+      const abiIsForCorrectAddress = !pending.address ||
+        (parsedAbiAddressRef.current && parsedAbiAddressRef.current === pending.address.toLowerCase())
 
-      // Only use pending args if length matches expected inputs
-      if (pendingArgs.length === expectedInputs) {
-        setArgs(pendingArgs)
-        return
+      if (functionMatches && addressMatches && abiIsForCorrectAddress) {
+        const pendingArgs = pending.args || []
+        const expectedInputs = func?.inputs?.length || 0
+
+        // Verify args length matches
+        if (pendingArgs.length === expectedInputs) {
+          pendingHistoryRef.current = null
+          setArgs(pendingArgs)
+          return
+        }
+        // Args length doesn't match - keep waiting
+        if (func) {
+          return
+        }
       }
-      // Otherwise fall through to reset args
+      // Context doesn't match yet or ABI is stale, keep waiting
+      return
     }
 
+    // No pending history - normal function switch, reset args
     if (func && func.inputs) {
       setArgs(func.inputs.map(() => ''))
     } else {
       setArgs([])
     }
-  }, [selectedFunction, parsedAbi])
+  }, [selectedFunction, parsedAbi, address])
 
   const fetchAbi = async (forceRefresh = false) => {
     if (!address.trim()) {
@@ -404,19 +444,31 @@ export default function ContractCaller() {
 
   const loadFromHistory = (item) => {
     const historyArgs = item.args || []
+    const sameContract = address && item.address && address.toLowerCase() === item.address.toLowerCase()
+    const sameFunction = selectedFunction === item.functionName
 
-    // If same function is already selected, directly set args (useEffect won't trigger)
-    if (selectedFunction === item.functionName) {
+    // If same contract and same function, directly set args
+    if (sameContract && sameFunction) {
       setArgs(historyArgs)
-    } else {
-      // Store pending args before changing function - the useEffect will pick them up
-      pendingArgsRef.current = historyArgs
-      setSelectedFunction(item.functionName)
+      setChain(item.chain)
+      setFromAddress(item.fromAddress || '')
+      setResult(item.output)
+      setError(null)
+      return
+    }
+
+    // Store pending history for the useEffect to handle after state updates
+    pendingHistoryRef.current = {
+      functionName: item.functionName,
+      args: historyArgs,
+      address: item.address,
+      timestamp: Date.now()
     }
 
     setChain(item.chain)
     setAddress(item.address)
     setFromAddress(item.fromAddress || '')
+    setSelectedFunction(item.functionName)
     setResult(item.output)
     setError(null)
   }
