@@ -1269,6 +1269,13 @@
 .traceContract {
   color: #4ec9b0;
   font-weight: 600;
+  cursor: help;
+  border-bottom: 1px dotted #4ec9b0;
+}
+
+.traceContract:hover {
+  color: #6ee7b7;
+  border-bottom-color: #6ee7b7;
 }
 
 .traceDot {

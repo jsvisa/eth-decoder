@@ -492,9 +492,14 @@ export default function ContractCaller() {
 
     // Build function signature: ContractName.functionName(param1=value1, param2=value2)
     const contractName = trace.toName || trace.to?.slice(0, 10) + '...'
+    const contractAddress = trace.to || ''
     const funcName = trace.functionName || trace.input?.slice(0, 10) || '()'
     const inputParams = trace.decodedInputs?.map(p => `${p.name}=${formatValue(p.value)}`).join(', ') || ''
-    const outputParams = trace.decodedOutputs?.map(p => `${p.name}=${formatValue(p.value)}`).join(', ') || ''
+    // For outputs: if name is empty or 'unknown', just show the value
+    const outputParams = trace.decodedOutputs?.map(p => {
+      const hasName = p.name && p.name !== 'unknown' && p.name !== ''
+      return hasName ? `${p.name}=${formatValue(p.value)}` : formatValue(p.value)
+    }).join(', ') || ''
 
     return (
       <div key={depth} className={styles.traceNode}>
@@ -502,7 +507,7 @@ export default function ContractCaller() {
         <div className={`${styles.traceCall} ${trace.error ? styles.traceCallError : ''}`}>
           <span className={styles.traceType}>{trace.type}</span>
           <span className={styles.traceSignature}>
-            <span className={styles.traceContract}>{contractName}</span>
+            <span className={styles.traceContract} title={contractAddress}>{contractName}</span>
             <span className={styles.traceDot}>.</span>
             <span className={styles.traceFuncName}>{funcName}</span>
             <span className={styles.traceParams}>({inputParams})</span>
