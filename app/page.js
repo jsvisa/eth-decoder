@@ -86,6 +86,9 @@ export default function Home() {
 
   // Clear history
   const clearHistory = () => {
+    if (!window.confirm('Are you sure you want to clear all history?')) {
+      return
+    }
     setHistory([])
     try {
       localStorage.removeItem(STORAGE_KEY)

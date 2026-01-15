@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import yaml from 'js-yaml'
 import styles from './page.module.css'
 
@@ -104,6 +104,7 @@ export default function ContractCaller() {
   })
   const [resultCollapsed, setResultCollapsed] = useState(false)
   const [hideTooltip, setHideTooltip] = useState(false)
+  const loadingFromHistoryRef = useRef(false)
 
   // Helper to check if function is read-only
   const isReadOnly = (func) => {
@@ -202,8 +203,13 @@ export default function ContractCaller() {
     }
   }, [abi])
 
-  // Update args when selected function changes
+  // Update args when selected function changes (skip if loading from history)
   useEffect(() => {
+    if (loadingFromHistoryRef.current) {
+      loadingFromHistoryRef.current = false
+      return
+    }
+
     if (!selectedFunction || !parsedAbi) {
       setArgs([])
       return
@@ -324,15 +330,22 @@ export default function ContractCaller() {
   }
 
   const loadFromHistory = (item) => {
+    loadingFromHistoryRef.current = true
     setChain(item.chain)
     setAddress(item.address)
     setSelectedFunction(item.functionName)
-    setArgs(item.args)
+    // Use setTimeout to set args after the useEffect has run
+    setTimeout(() => {
+      setArgs(item.args || [])
+    }, 0)
     setResult(item.output)
     setError(null)
   }
 
   const clearHistory = () => {
+    if (!window.confirm('Are you sure you want to clear all history?')) {
+      return
+    }
     setHistory([])
     try {
       localStorage.removeItem(STORAGE_KEY)
@@ -1068,22 +1081,27 @@ export default function ContractCaller() {
                         <span className={styles.assetType}>{change.type || 'TRANSFER'}</span>
                         <span className={styles.assetToken}>
                           {change.token_info?.symbol || change.token_info?.name || 'Unknown Token'}
+                          {change.token_info?.contract_address && (
+                            <span className={styles.assetTokenAddress}>({change.token_info.contract_address})</span>
+                          )}
                         </span>
                       </div>
                       <div className={styles.assetDetails}>
                         {change.from && (
-                          <div className={styles.assetFrom}>
-                            From: {change.from}
-                          </div>
+                          <span className={styles.assetFrom}>{change.from}</span>
+                        )}
+                        {change.from && change.to && (
+                          <span className={styles.assetArrow}>→</span>
                         )}
                         {change.to && (
-                          <div className={styles.assetTo}>
-                            To: {change.to}
-                          </div>
+                          <span className={styles.assetTo}>{change.to}</span>
                         )}
-                        <div className={styles.assetAmount}>
+                        <span className={styles.assetAmount}>
                           {change.amount || change.raw_amount}
-                        </div>
+                          {change.dollar_value && (
+                            <span className={styles.assetUsd}> (${Number(change.dollar_value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
+                          )}
+                        </span>
                       </div>
                     </div>
                   ))}
