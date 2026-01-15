@@ -103,7 +103,6 @@ export default function ContractCaller() {
     etherscan: '',
   })
   const [resultCollapsed, setResultCollapsed] = useState(false)
-  const [copiedTooltip, setCopiedTooltip] = useState(null)
   const [hideTooltip, setHideTooltip] = useState(false)
 
   // Helper to check if function is read-only
@@ -523,33 +522,35 @@ export default function ContractCaller() {
           <span className={styles.traceSignature}>
             <span className={styles.traceContractWrapper}>
               <span className={styles.traceContract}>{contractName}</span>
-              <span className={styles.traceTooltip}>
-                <span className={styles.traceTooltipContent}>{contractAddress}</span>
-                <button
-                  className={styles.traceTooltipCopy}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    copyTooltipContent(contractAddress, `contract-${depth}`)
-                  }}
-                >
-                  {copiedTooltip === `contract-${depth}` ? 'Copied!' : 'Copy'}
-                </button>
-              </span>
+              {!hideTooltip && (
+                <span className={styles.traceTooltip}>
+                  <span className={styles.traceTooltipContent}>{contractAddress}</span>
+                  <button
+                    className={styles.traceTooltipCopy}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      copyTooltipContent(contractAddress)
+                    }}
+                  >
+                    Copy
+                  </button>
+                </span>
+              )}
             </span>
             <span className={styles.traceDot}>.</span>
             <span className={styles.traceFuncWrapper}>
               <span className={styles.traceFuncName}>{funcName}</span>
-              {trace.input && (
+              {trace.input && !hideTooltip && (
                 <span className={styles.traceTooltip}>
                   <span className={styles.traceTooltipContent}>{trace.input}</span>
                   <button
                     className={styles.traceTooltipCopy}
                     onClick={(e) => {
                       e.stopPropagation()
-                      copyTooltipContent(trace.input, `input-${depth}`)
+                      copyTooltipContent(trace.input)
                     }}
                   >
-                    {copiedTooltip === `input-${depth}` ? 'Copied!' : 'Copy'}
+                    Copy
                   </button>
                 </span>
               )}
