@@ -140,6 +140,10 @@ export default function ContractCaller() {
   const [showFunctionList, setShowFunctionList] = useState(false)
   const [copiedItem, setCopiedItem] = useState(null) // 'selector' | 'signature' | null
   const [ethValue, setEthValue] = useState('') // ETH value for payable functions
+  const [testingEtherscan, setTestingEtherscan] = useState(false)
+  const [etherscanTestResult, setEtherscanTestResult] = useState(null) // 'success' | 'error' | null
+  const [testingTenderly, setTestingTenderly] = useState(false)
+  const [tenderlyTestResult, setTenderlyTestResult] = useState(null) // 'success' | 'error' | null
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null) // { functionName, args, timestamp }
 
@@ -495,6 +499,65 @@ export default function ContractCaller() {
     return !!apiKeys.etherscan
   }
 
+  const testEtherscanKey = async () => {
+    if (!apiKeys.etherscan) return
+
+    setTestingEtherscan(true)
+    setEtherscanTestResult(null)
+
+    try {
+      // Test with a simple balance check using Etherscan V2 API
+      const testAddress = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045'
+      const response = await fetch(
+        `https://api.etherscan.io/v2/api?chainid=1&module=account&action=balance&address=${testAddress}&tag=latest&apikey=${apiKeys.etherscan}`
+      )
+      const data = await response.json()
+
+      if (data.status === '1' || data.message === 'OK') {
+        setEtherscanTestResult('success')
+      } else {
+        setEtherscanTestResult('error')
+      }
+    } catch (err) {
+      setEtherscanTestResult('error')
+    } finally {
+      setTestingEtherscan(false)
+      // Clear result after 3 seconds
+      setTimeout(() => setEtherscanTestResult(null), 3000)
+    }
+  }
+
+  const testTenderlyKey = async () => {
+    if (!tenderlySettings.accessKey || !tenderlySettings.account || !tenderlySettings.project) return
+
+    setTestingTenderly(true)
+    setTenderlyTestResult(null)
+
+    try {
+      // Test by fetching project info
+      const response = await fetch(
+        `https://api.tenderly.co/api/v1/account/${tenderlySettings.account}/project/${tenderlySettings.project}`,
+        {
+          headers: {
+            'X-Access-Key': tenderlySettings.accessKey,
+          },
+        }
+      )
+
+      if (response.ok) {
+        setTenderlyTestResult('success')
+      } else {
+        setTenderlyTestResult('error')
+      }
+    } catch (err) {
+      setTenderlyTestResult('error')
+    } finally {
+      setTestingTenderly(false)
+      // Clear result after 3 seconds
+      setTimeout(() => setTenderlyTestResult(null), 3000)
+    }
+  }
+
   const handleCall = async () => {
     if (!address || !selectedFunction || !parsedAbi) {
       setError('Please fill in all required fields')
@@ -779,7 +842,7 @@ export default function ContractCaller() {
                     Etherscan
                   </a>
                 </p>
-                <div className={styles.settingsField}>
+                <div className={styles.settingsFieldWithTest}>
                   <input
                     type="password"
                     value={apiKeys.etherscan}
@@ -787,6 +850,13 @@ export default function ContractCaller() {
                     placeholder="Enter your Etherscan API key..."
                     className={styles.settingsInput}
                   />
+                  <button
+                    onClick={testEtherscanKey}
+                    disabled={!apiKeys.etherscan || testingEtherscan}
+                    className={`${styles.testButton} ${etherscanTestResult === 'success' ? styles.testSuccess : ''} ${etherscanTestResult === 'error' ? styles.testError : ''}`}
+                  >
+                    {testingEtherscan ? 'Testing...' : etherscanTestResult === 'success' ? '✓ Valid' : etherscanTestResult === 'error' ? '✗ Invalid' : 'Test'}
+                  </button>
                 </div>
               </div>
 
@@ -834,6 +904,14 @@ export default function ContractCaller() {
                     />
                   </div>
                 </div>
+                <button
+                  onClick={testTenderlyKey}
+                  disabled={!isTenderlyConfigured() || testingTenderly}
+                  className={`${styles.testButton} ${tenderlyTestResult === 'success' ? styles.testSuccess : ''} ${tenderlyTestResult === 'error' ? styles.testError : ''}`}
+                  style={{ marginTop: '1rem' }}
+                >
+                  {testingTenderly ? 'Testing...' : tenderlyTestResult === 'success' ? '✓ Valid' : tenderlyTestResult === 'error' ? '✗ Invalid' : 'Test Connection'}
+                </button>
               </div>
 
               <p className={styles.settingsNote}>

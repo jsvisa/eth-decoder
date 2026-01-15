@@ -146,6 +146,54 @@
   font-size: 0.8rem;
 }
 
+/* Settings field with test button */
+.settingsFieldWithTest {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.settingsFieldWithTest .settingsInput {
+  flex: 1;
+}
+
+.testButton {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #666;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.testButton:hover:not(:disabled) {
+  background-color: #e8e8e8;
+  border-color: #0070f3;
+  color: #0070f3;
+}
+
+.testButton:disabled {
+  background-color: #f5f5f5;
+  color: #aaa;
+  cursor: not-allowed;
+}
+
+.testButton.testSuccess {
+  background-color: #d1fae5;
+  border-color: #10b981;
+  color: #059669;
+}
+
+.testButton.testError {
+  background-color: #fee2e2;
+  border-color: #f87171;
+  color: #dc2626;
+}
+
 .form {
   display: flex;
   flex-direction: column;
