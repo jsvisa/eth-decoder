@@ -13,7 +13,33 @@ const CHAINS = [
 ]
 
 const STORAGE_KEY = 'contract_caller_history'
+const ABI_CACHE_PREFIX = 'abi-'
 const MAX_HISTORY_ITEMS = 50
+
+// Helper functions for ABI cache
+const getAbiCacheKey = (chain, address) => `${ABI_CACHE_PREFIX}${chain}-${address.toLowerCase()}`
+
+const getCachedAbi = (chain, address) => {
+  try {
+    const key = getAbiCacheKey(chain, address)
+    const cached = localStorage.getItem(key)
+    if (cached) {
+      return JSON.parse(cached)
+    }
+  } catch (err) {
+    console.error('Failed to load cached ABI:', err)
+  }
+  return null
+}
+
+const setCachedAbi = (chain, address, abi, isProxy = false, implAddress = null) => {
+  try {
+    const key = getAbiCacheKey(chain, address)
+    localStorage.setItem(key, JSON.stringify({ abi, isProxy, implAddress, timestamp: Date.now() }))
+  } catch (err) {
+    console.error('Failed to cache ABI:', err)
+  }
+}
 
 export default function ContractCaller() {
   const [chain, setChain] = useState('ethereum')
@@ -31,6 +57,7 @@ export default function ContractCaller() {
   const [copied, setCopied] = useState(false)
   const [history, setHistory] = useState([])
   const [showHistory, setShowHistory] = useState(true)
+  const [abiSource, setAbiSource] = useState(null) // 'cached', 'fetched', or null
 
   // Load history from localStorage on mount
   useEffect(() => {
@@ -43,6 +70,21 @@ export default function ContractCaller() {
       console.error('Failed to load history:', err)
     }
   }, [])
+
+  // Auto-load cached ABI when address or chain changes
+  useEffect(() => {
+    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      return
+    }
+
+    const cached = getCachedAbi(chain, address)
+    if (cached) {
+      setAbi(JSON.stringify(cached.abi, null, 2))
+      setAbiSource(cached.isProxy ? `cached (proxy → ${cached.implAddress?.slice(0, 10)}...)` : 'cached')
+    } else {
+      setAbiSource(null)
+    }
+  }, [chain, address])
 
   // Parse ABI when it changes
   useEffect(() => {
@@ -93,10 +135,20 @@ export default function ContractCaller() {
     }
   }, [selectedFunction, parsedAbi])
 
-  const fetchAbi = async () => {
+  const fetchAbi = async (forceRefresh = false) => {
     if (!address.trim()) {
       setError('Please enter a contract address')
       return
+    }
+
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cached = getCachedAbi(chain, address)
+      if (cached) {
+        setAbi(JSON.stringify(cached.abi, null, 2))
+        setAbiSource(cached.isProxy ? `cached (proxy → ${cached.implAddress?.slice(0, 10)}...)` : 'cached')
+        return
+      }
     }
 
     setFetchingAbi(true)
@@ -111,7 +163,11 @@ export default function ContractCaller() {
         throw new Error(data.error || 'Failed to fetch ABI')
       }
 
+      // Cache the fetched ABI
+      setCachedAbi(chain, address, data.abi, data.isProxy, data.implAddress)
+
       setAbi(JSON.stringify(data.abi, null, 2))
+      setAbiSource(data.isProxy ? `fetched (proxy → ${data.implAddress?.slice(0, 10)}...)` : 'fetched')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -297,10 +353,28 @@ export default function ContractCaller() {
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label}>ABI (JSON)</label>
+            <div className={styles.abiLabelRow}>
+              <label className={styles.label}>ABI (JSON)</label>
+              {abiSource && (
+                <span className={styles.abiSource}>
+                  {abiSource}
+                  <button
+                    onClick={() => fetchAbi(true)}
+                    className={styles.refreshButton}
+                    disabled={loading || fetchingAbi}
+                    title="Refresh ABI from explorer"
+                  >
+                    ↻
+                  </button>
+                </span>
+              )}
+            </div>
             <textarea
               value={abi}
-              onChange={(e) => setAbi(e.target.value)}
+              onChange={(e) => {
+                setAbi(e.target.value)
+                setAbiSource(null)
+              }}
               placeholder="Paste contract ABI here or use Fetch ABI button..."
               className={styles.textarea}
               disabled={loading}

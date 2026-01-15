@@ -117,6 +117,43 @@
   cursor: not-allowed;
 }
 
+.abiLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.abiSource {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: #666;
+  background-color: #f0f0f0;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.refreshButton {
+  background: none;
+  border: none;
+  color: #0070f3;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0 0.25rem;
+  transition: transform 0.2s;
+}
+
+.refreshButton:hover:not(:disabled) {
+  transform: rotate(180deg);
+}
+
+.refreshButton:disabled {
+  color: #ccc;
+  cursor: not-allowed;
+}
+
 .textarea {
   padding: 1rem;
   font-size: 0.9rem;
