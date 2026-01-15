@@ -305,6 +305,7 @@ export default function ContractCaller() {
       // Update existing item with new timestamp and output, move to top
       const updatedItem = {
         ...history[existingIndex],
+        fromAddress,
         output,
         isWrite,
         timestamp: new Date().toISOString(),
@@ -322,6 +323,7 @@ export default function ContractCaller() {
         address,
         functionName: selectedFunction,
         args: [...args],
+        fromAddress,
         output,
         contractName,
         isWrite,
@@ -344,6 +346,7 @@ export default function ContractCaller() {
     pendingArgsRef.current = item.args || []
     setChain(item.chain)
     setAddress(item.address)
+    setFromAddress(item.fromAddress || '')
     setSelectedFunction(item.functionName)
     setResult(item.output)
     setError(null)
