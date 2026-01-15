@@ -15,6 +15,7 @@ const CHAINS = [
 const STORAGE_KEY = 'contract_caller_history'
 const ABI_CACHE_PREFIX = 'abi-'
 const TENDERLY_SETTINGS_KEY = 'tenderly_settings'
+const API_KEYS_STORAGE_KEY = 'api_keys_settings'
 const MAX_HISTORY_ITEMS = 50
 
 // Helper functions for ABI cache
@@ -92,11 +93,14 @@ export default function ContractCaller() {
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false)
   const [addressFilter, setAddressFilter] = useState('')
   const [fromAddress, setFromAddress] = useState('')
-  const [showTenderlySettings, setShowTenderlySettings] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [tenderlySettings, setTenderlySettings] = useState({
     accessKey: '',
     account: '',
     project: '',
+  })
+  const [apiKeys, setApiKeys] = useState({
+    etherscan: '',
   })
 
   // Helper to check if function is read-only
@@ -125,6 +129,12 @@ export default function ContractCaller() {
       const savedTenderly = localStorage.getItem(TENDERLY_SETTINGS_KEY)
       if (savedTenderly) {
         setTenderlySettings(JSON.parse(savedTenderly))
+      }
+
+      // Load API keys
+      const savedApiKeys = localStorage.getItem(API_KEYS_STORAGE_KEY)
+      if (savedApiKeys) {
+        setApiKeys(JSON.parse(savedApiKeys))
       }
     } catch (err) {
       console.error('Failed to load history:', err)
@@ -233,6 +243,9 @@ export default function ContractCaller() {
 
     try {
       const params = new URLSearchParams({ address, chain })
+      if (apiKeys.etherscan) {
+        params.set('apiKey', apiKeys.etherscan)
+      }
       const response = await fetch(`/api/fetch-abi?${params}`)
       const data = await response.json()
 
@@ -333,8 +346,21 @@ export default function ContractCaller() {
     }
   }
 
+  const saveApiKeys = (keys) => {
+    setApiKeys(keys)
+    try {
+      localStorage.setItem(API_KEYS_STORAGE_KEY, JSON.stringify(keys))
+    } catch (err) {
+      console.error('Failed to save API keys:', err)
+    }
+  }
+
   const isTenderlyConfigured = () => {
     return tenderlySettings.accessKey && tenderlySettings.account && tenderlySettings.project
+  }
+
+  const isEtherscanConfigured = () => {
+    return !!apiKeys.etherscan
   }
 
   const handleCall = async () => {
@@ -349,7 +375,7 @@ export default function ContractCaller() {
     // Check Tenderly configuration for write functions
     if (isWrite && !isTenderlyConfigured()) {
       setError('Please configure Tenderly API settings to simulate write functions')
-      setShowTenderlySettings(true)
+      setShowSettings(true)
       return
     }
 
@@ -465,59 +491,91 @@ export default function ContractCaller() {
       <div className={styles.container}>
         <h1 className={styles.title}>Contract Caller</h1>
 
-        {/* Tenderly Settings Panel */}
+        {/* Settings Panel */}
         <div className={styles.settingsSection}>
           <button
-            onClick={() => setShowTenderlySettings(!showTenderlySettings)}
-            className={`${styles.settingsToggle} ${isTenderlyConfigured() ? styles.settingsConfigured : ''}`}
+            onClick={() => setShowSettings(!showSettings)}
+            className={`${styles.settingsToggle} ${isEtherscanConfigured() && isTenderlyConfigured() ? styles.settingsConfigured : ''}`}
             type="button"
           >
-            {isTenderlyConfigured() ? '✓ Tenderly Configured' : '⚙ Configure Tenderly'}
+            {isEtherscanConfigured() && isTenderlyConfigured()
+              ? '✓ API Keys Configured'
+              : `⚙ Settings ${isEtherscanConfigured() ? '(Etherscan ✓)' : ''} ${isTenderlyConfigured() ? '(Tenderly ✓)' : ''}`}
           </button>
 
-          {showTenderlySettings && (
+          {showSettings && (
             <div className={styles.settingsPanel}>
-              <h3 className={styles.settingsTitle}>Tenderly API Settings</h3>
-              <p className={styles.settingsDesc}>
-                Required for simulating write functions. Get your credentials from{' '}
-                <a href="https://dashboard.tenderly.co/account/authorization" target="_blank" rel="noopener noreferrer">
-                  Tenderly Dashboard
-                </a>
-              </p>
-              <div className={styles.settingsFields}>
+              {/* Etherscan API Key */}
+              <div className={styles.settingsGroup}>
+                <h3 className={styles.settingsTitle}>
+                  Etherscan API Key
+                  {isEtherscanConfigured() && <span className={styles.settingsCheck}>✓</span>}
+                </h3>
+                <p className={styles.settingsDesc}>
+                  Required for fetching contract ABIs. Get your free API key from{' '}
+                  <a href="https://etherscan.io/myapikey" target="_blank" rel="noopener noreferrer">
+                    Etherscan
+                  </a>
+                </p>
                 <div className={styles.settingsField}>
-                  <label className={styles.settingsLabel}>Access Key</label>
                   <input
                     type="password"
-                    value={tenderlySettings.accessKey}
-                    onChange={(e) => saveTenderlySettings({ ...tenderlySettings, accessKey: e.target.value })}
-                    placeholder="Enter your Tenderly access key..."
-                    className={styles.settingsInput}
-                  />
-                </div>
-                <div className={styles.settingsField}>
-                  <label className={styles.settingsLabel}>Account Slug</label>
-                  <input
-                    type="text"
-                    value={tenderlySettings.account}
-                    onChange={(e) => saveTenderlySettings({ ...tenderlySettings, account: e.target.value })}
-                    placeholder="Your account slug (from URL)"
-                    className={styles.settingsInput}
-                  />
-                </div>
-                <div className={styles.settingsField}>
-                  <label className={styles.settingsLabel}>Project Slug</label>
-                  <input
-                    type="text"
-                    value={tenderlySettings.project}
-                    onChange={(e) => saveTenderlySettings({ ...tenderlySettings, project: e.target.value })}
-                    placeholder="Your project slug (from URL)"
+                    value={apiKeys.etherscan}
+                    onChange={(e) => saveApiKeys({ ...apiKeys, etherscan: e.target.value })}
+                    placeholder="Enter your Etherscan API key..."
                     className={styles.settingsInput}
                   />
                 </div>
               </div>
+
+              {/* Tenderly Settings */}
+              <div className={styles.settingsGroup}>
+                <h3 className={styles.settingsTitle}>
+                  Tenderly API Settings
+                  {isTenderlyConfigured() && <span className={styles.settingsCheck}>✓</span>}
+                </h3>
+                <p className={styles.settingsDesc}>
+                  Required for simulating write functions. Get your credentials from{' '}
+                  <a href="https://dashboard.tenderly.co/account/authorization" target="_blank" rel="noopener noreferrer">
+                    Tenderly Dashboard
+                  </a>
+                </p>
+                <div className={styles.settingsFields}>
+                  <div className={styles.settingsField}>
+                    <label className={styles.settingsLabel}>Access Key</label>
+                    <input
+                      type="password"
+                      value={tenderlySettings.accessKey}
+                      onChange={(e) => saveTenderlySettings({ ...tenderlySettings, accessKey: e.target.value })}
+                      placeholder="Enter your Tenderly access key..."
+                      className={styles.settingsInput}
+                    />
+                  </div>
+                  <div className={styles.settingsField}>
+                    <label className={styles.settingsLabel}>Account Slug</label>
+                    <input
+                      type="text"
+                      value={tenderlySettings.account}
+                      onChange={(e) => saveTenderlySettings({ ...tenderlySettings, account: e.target.value })}
+                      placeholder="Your account slug (from URL)"
+                      className={styles.settingsInput}
+                    />
+                  </div>
+                  <div className={styles.settingsField}>
+                    <label className={styles.settingsLabel}>Project Slug</label>
+                    <input
+                      type="text"
+                      value={tenderlySettings.project}
+                      onChange={(e) => saveTenderlySettings({ ...tenderlySettings, project: e.target.value })}
+                      placeholder="Your project slug (from URL)"
+                      className={styles.settingsInput}
+                    />
+                  </div>
+                </div>
+              </div>
+
               <p className={styles.settingsNote}>
-                Settings are stored locally in your browser and never sent to our servers.
+                All settings are stored locally in your browser and never sent to our servers.
               </p>
             </div>
           )}

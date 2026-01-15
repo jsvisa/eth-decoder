@@ -203,7 +203,15 @@ export async function GET(request) {
       )
     }
 
-    const apiKey = process.env.ETHERSCAN_API_KEY || ''
+    // Get API key from query param (user-provided) or fall back to env var
+    const apiKey = searchParams.get('apiKey') || process.env.ETHERSCAN_API_KEY || ''
+
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'Etherscan API key not configured. Please add your API key in Settings.' },
+        { status: 400 }
+      )
+    }
 
     // Fetch the contract's ABI and name
     const proxyInfo = await fetchContractInfo(address, chainId, apiKey)
