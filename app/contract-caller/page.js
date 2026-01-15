@@ -46,6 +46,37 @@ const setCachedAbi = (chain, address, abi, isProxy = false, implAddress = null, 
   }
 }
 
+// Format ABI with compact inputs/outputs (one line if not nested)
+const formatAbiCompact = (abi) => {
+  const hasNestedComponents = (params) => {
+    return params?.some(p => p.components && p.components.length > 0)
+  }
+
+  const formatParams = (params) => {
+    if (!params || params.length === 0) return '[]'
+    if (hasNestedComponents(params)) {
+      return JSON.stringify(params, null, 2)
+    }
+    // Format each param on same line
+    return '[' + params.map(p => JSON.stringify(p)).join(', ') + ']'
+  }
+
+  return '[\n' + abi.map(item => {
+    if (item.type === 'function') {
+      const parts = [
+        `  "type": "function"`,
+        `  "name": "${item.name}"`,
+        `  "inputs": ${formatParams(item.inputs)}`,
+        `  "outputs": ${formatParams(item.outputs)}`,
+        `  "stateMutability": "${item.stateMutability || 'nonpayable'}"`
+      ]
+      return '  {\n  ' + parts.join(',\n  ') + '\n  }'
+    }
+    // For non-function items, use standard formatting
+    return '  ' + JSON.stringify(item, null, 2).split('\n').join('\n  ')
+  }).join(',\n') + '\n]'
+}
+
 // Get all cached contract addresses
 const getCachedAddresses = () => {
   const addresses = []
@@ -108,11 +139,17 @@ export default function ContractCaller() {
   const [functionFilter, setFunctionFilter] = useState('')
   const [showFunctionList, setShowFunctionList] = useState(false)
   const [copiedItem, setCopiedItem] = useState(null) // 'selector' | 'signature' | null
+  const [ethValue, setEthValue] = useState('') // ETH value for payable functions
   const pendingArgsRef = useRef(null)
 
   // Helper to check if function is read-only
   const isReadOnly = (func) => {
     return func?.stateMutability === 'view' || func?.stateMutability === 'pure'
+  }
+
+  // Helper to check if function is payable
+  const isPayable = (func) => {
+    return func?.stateMutability === 'payable'
   }
 
   // Get selected function object
@@ -177,7 +214,7 @@ export default function ContractCaller() {
 
     const cached = getCachedAbi(chain, address)
     if (cached) {
-      setAbi(JSON.stringify(cached.abi, null, 2))
+      setAbi(formatAbiCompact(cached.abi))
       const nameDisplay = cached.isProxy && cached.implContractName
         ? `${cached.contractName} → ${cached.implContractName}`
         : cached.contractName
@@ -270,7 +307,7 @@ export default function ContractCaller() {
     if (!forceRefresh) {
       const cached = getCachedAbi(chain, address)
       if (cached) {
-        setAbi(JSON.stringify(cached.abi, null, 2))
+        setAbi(formatAbiCompact(cached.abi))
         const nameDisplay = cached.isProxy && cached.implContractName
           ? `${cached.contractName} → ${cached.implContractName}`
           : cached.contractName
@@ -301,7 +338,7 @@ export default function ContractCaller() {
       // Update cached addresses list
       setCachedAddresses(getCachedAddresses())
 
-      setAbi(JSON.stringify(data.abi, null, 2))
+      setAbi(formatAbiCompact(data.abi))
       const nameDisplay = data.isProxy && data.implContractName
         ? `${data.contractName} → ${data.implContractName}`
         : data.contractName
@@ -460,6 +497,10 @@ export default function ContractCaller() {
         requestBody.tenderlyAccessKey = tenderlySettings.accessKey
         requestBody.tenderlyAccount = tenderlySettings.account
         requestBody.tenderlyProject = tenderlySettings.project
+        // Add ETH value for payable functions
+        if (ethValue && parseFloat(ethValue) > 0) {
+          requestBody.value = ethValue
+        }
       }
 
       const response = await fetch(apiEndpoint, {
@@ -672,10 +713,8 @@ export default function ContractCaller() {
   return (
     <main className={styles.main}>
       <div className={styles.container}>
-        <h1 className={styles.title}>Contract Caller</h1>
-
-        {/* Settings Panel */}
-        <div className={styles.settingsSection}>
+        <div className={styles.titleRow}>
+          <h1 className={styles.title}>Contract Caller</h1>
           <button
             onClick={() => setShowSettings(!showSettings)}
             className={`${styles.settingsToggle} ${isEtherscanConfigured() && isTenderlyConfigured() ? styles.settingsConfigured : ''}`}
@@ -685,6 +724,10 @@ export default function ContractCaller() {
               ? '✓ API Keys Configured'
               : `⚙ Settings ${isEtherscanConfigured() ? '(Etherscan ✓)' : ''} ${isTenderlyConfigured() ? '(Tenderly ✓)' : ''}`}
           </button>
+        </div>
+
+        {/* Settings Panel */}
+        <div className={styles.settingsSection}>
 
           {showSettings && (
             <div className={styles.settingsPanel}>
@@ -1007,6 +1050,23 @@ export default function ContractCaller() {
                     value={fromAddress}
                     onChange={(e) => setFromAddress(e.target.value)}
                     placeholder="0x... (sender address for simulation)"
+                    className={styles.input}
+                    disabled={loading}
+                  />
+                </div>
+              )}
+
+              {/* ETH Value for payable functions */}
+              {selectedFunction && getSelectedFunction() && isPayable(getSelectedFunction()) && (
+                <div className={styles.field}>
+                  <label className={styles.label}>
+                    ETH Value <span className={styles.payableBadge}>payable</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={ethValue}
+                    onChange={(e) => setEthValue(e.target.value)}
+                    placeholder="0.0 (ETH to send with transaction)"
                     className={styles.input}
                     disabled={loading}
                   />

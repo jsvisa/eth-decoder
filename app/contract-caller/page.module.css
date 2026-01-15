@@ -13,11 +13,17 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
-.title {
-  text-align: center;
-  color: #333;
+.titleRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 1.5rem;
+}
+
+.title {
+  color: #333;
   font-size: 2.5rem;
+  margin: 0;
 }
 
 /* Tenderly Settings */
@@ -339,6 +345,17 @@
   font-weight: 400;
   color: #888;
   font-size: 0.85rem;
+}
+
+.payableBadge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #7c3aed;
+  background-color: #ede9fe;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  margin-left: 0.5rem;
 }
 
 /* Function selector badge */

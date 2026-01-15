@@ -13,7 +13,7 @@ const TENDERLY_NETWORK_IDS = {
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { chain, address, functionName, args, abi, fromAddress, tenderlyAccessKey, tenderlyAccount, tenderlyProject } = body
+    const { chain, address, functionName, args, abi, fromAddress, tenderlyAccessKey, tenderlyAccount, tenderlyProject, value } = body
 
     if (!address || !functionName || !abi) {
       return NextResponse.json(
@@ -93,6 +93,13 @@ export async function POST(request) {
     // Default from address if not provided
     const sender = fromAddress || '0x0000000000000000000000000000000000000001'
 
+    // Convert ETH value to wei
+    let valueInWei = '0'
+    if (value && parseFloat(value) > 0) {
+      const { parseEther } = await import('viem')
+      valueInWei = parseEther(value).toString()
+    }
+
     // Build Tenderly simulation request
     const simulationRequest = {
       network_id: networkId,
@@ -101,7 +108,7 @@ export async function POST(request) {
       input: callData,
       gas: 8000000,
       gas_price: '0',
-      value: '0',
+      value: valueInWei,
       save: false,
       save_if_fails: false,
       simulation_type: 'full', // Full mode includes decoded call traces
