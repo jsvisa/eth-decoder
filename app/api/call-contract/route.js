@@ -132,9 +132,30 @@ export async function POST(request) {
       return value
     }
 
+    // Build decoded output with names and types
+    const outputs = functionAbi.outputs || []
+    let decodedOutputs = []
+
+    if (outputs.length === 1) {
+      // Single return value
+      decodedOutputs = [{
+        name: outputs[0].name || 'result',
+        type: outputs[0].type,
+        value: serializeResult(decoded),
+      }]
+    } else if (outputs.length > 1) {
+      // Multiple return values (tuple)
+      decodedOutputs = outputs.map((output, index) => ({
+        name: output.name || `output${index}`,
+        type: output.type,
+        value: serializeResult(Array.isArray(decoded) ? decoded[index] : decoded[output.name]),
+      }))
+    }
+
     return NextResponse.json({
+      rawData: result.data,
+      decoded: decodedOutputs,
       result: serializeResult(decoded),
-      outputs: functionAbi.outputs,
     })
   } catch (error) {
     console.error('Call contract error:', error)

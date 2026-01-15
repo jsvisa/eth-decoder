@@ -390,10 +390,43 @@ export default function ContractCaller() {
                 </button>
               </div>
             </div>
-            <pre
-              className={styles.json}
-              dangerouslySetInnerHTML={{ __html: getDisplayContent() }}
-            />
+
+            {/* Decoded outputs */}
+            {result.decoded && result.decoded.length > 0 && (
+              <div className={styles.decodedSection}>
+                <h3 className={styles.decodedTitle}>Decoded Output</h3>
+                {result.decoded.map((output, index) => (
+                  <div key={index} className={styles.decodedItem}>
+                    <div className={styles.decodedHeader}>
+                      <span className={styles.decodedName}>{output.name}</span>
+                      <span className={styles.decodedType}>{output.type}</span>
+                    </div>
+                    <div className={styles.decodedValue}>
+                      {typeof output.value === 'object'
+                        ? JSON.stringify(output.value, null, 2)
+                        : String(output.value)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Raw data */}
+            {result.rawData && (
+              <div className={styles.rawSection}>
+                <h3 className={styles.rawTitle}>Raw Response</h3>
+                <div className={styles.rawData}>{result.rawData}</div>
+              </div>
+            )}
+
+            {/* Full JSON/YAML output */}
+            <div className={styles.fullOutput}>
+              <h3 className={styles.fullOutputTitle}>Full Response</h3>
+              <pre
+                className={styles.json}
+                dangerouslySetInnerHTML={{ __html: getDisplayContent() }}
+              />
+            </div>
           </div>
         )}
 
