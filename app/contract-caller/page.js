@@ -507,9 +507,15 @@ export default function ContractCaller() {
         <div className={`${styles.traceCall} ${trace.error ? styles.traceCallError : ''}`}>
           <span className={styles.traceType}>{trace.type}</span>
           <span className={styles.traceSignature}>
-            <span className={styles.traceContract} title={contractAddress}>{contractName}</span>
+            <span className={styles.traceContractWrapper}>
+              <span className={styles.traceContract}>{contractName}</span>
+              <span className={styles.traceTooltip}>{contractAddress}</span>
+            </span>
             <span className={styles.traceDot}>.</span>
-            <span className={styles.traceFuncName}>{funcName}</span>
+            <span className={styles.traceFuncWrapper}>
+              <span className={styles.traceFuncName}>{funcName}</span>
+              {trace.input && <span className={styles.traceTooltip}>{trace.input}</span>}
+            </span>
             <span className={styles.traceParams}>({inputParams})</span>
             {outputParams && (
               <>
@@ -1027,18 +1033,18 @@ export default function ContractCaller() {
                       </div>
                       <div className={styles.assetDetails}>
                         {change.from && (
-                          <span className={styles.assetFrom}>
-                            From: {change.from.slice(0, 10)}...{change.from.slice(-6)}
-                          </span>
+                          <div className={styles.assetFrom}>
+                            From: {change.from}
+                          </div>
                         )}
                         {change.to && (
-                          <span className={styles.assetTo}>
-                            To: {change.to.slice(0, 10)}...{change.to.slice(-6)}
-                          </span>
+                          <div className={styles.assetTo}>
+                            To: {change.to}
+                          </div>
                         )}
-                        <span className={styles.assetAmount}>
+                        <div className={styles.assetAmount}>
                           {change.amount || change.raw_amount}
-                        </span>
+                        </div>
                       </div>
                     </div>
                   ))}

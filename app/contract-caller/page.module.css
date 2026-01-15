@@ -1189,17 +1189,20 @@
 
 .assetDetails {
   display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 0.25rem;
   font-size: 0.8rem;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
 }
 
 .assetFrom {
   color: #4ec9b0;
+  word-break: break-all;
 }
 
 .assetTo {
   color: #ce9178;
+  word-break: break-all;
 }
 
 .assetAmount {
@@ -1266,6 +1269,12 @@
   word-break: break-word;
 }
 
+.traceContractWrapper,
+.traceFuncWrapper {
+  position: relative;
+  display: inline;
+}
+
 .traceContract {
   color: #4ec9b0;
   font-weight: 600;
@@ -1285,6 +1294,38 @@
 .traceFuncName {
   color: #dcdcaa;
   font-weight: 600;
+  cursor: help;
+  border-bottom: 1px dotted #dcdcaa;
+}
+
+.traceFuncName:hover {
+  color: #f0e68c;
+  border-bottom-color: #f0e68c;
+}
+
+.traceTooltip {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  max-width: 500px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  border: 1px solid #444;
+  margin-bottom: 4px;
+}
+
+.traceContractWrapper:hover .traceTooltip,
+.traceFuncWrapper:hover .traceTooltip {
+  display: block;
 }
 
 .traceParams {
