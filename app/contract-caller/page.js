@@ -210,16 +210,24 @@ export default function ContractCaller() {
       return
     }
 
-    // If we have pending args from history, use them instead of resetting
-    if (pendingArgsRef.current !== null) {
-      setArgs(pendingArgsRef.current)
-      pendingArgsRef.current = null
-      return
-    }
-
     const func = parsedAbi.find(
       (item) => item.type === 'function' && item.name === selectedFunction
     )
+
+    const expectedInputs = func?.inputs?.length || 0
+
+    // If we have pending args from history, validate length matches
+    if (pendingArgsRef.current !== null) {
+      const pendingArgs = pendingArgsRef.current
+      pendingArgsRef.current = null
+
+      // Only use pending args if length matches expected inputs
+      if (pendingArgs.length === expectedInputs) {
+        setArgs(pendingArgs)
+        return
+      }
+      // Otherwise fall through to reset args
+    }
 
     if (func && func.inputs) {
       setArgs(func.inputs.map(() => ''))
@@ -1166,8 +1174,8 @@ export default function ContractCaller() {
               </div>
             )}
 
-            {/* Decoded outputs, Raw data, Full JSON/YAML - shown when Show Full is clicked */}
-            {showFullResponse && (
+            {/* Decoded outputs and Raw data - always show for Call, show on "Show Full" for Simulate */}
+            {(!result.simulated || showFullResponse) && (
               <>
                 {/* Decoded outputs */}
                 {result.decoded && result.decoded.length > 0 && (
@@ -1196,15 +1204,17 @@ export default function ContractCaller() {
                     <div className={styles.rawData}>{result.rawData}</div>
                   </div>
                 )}
-
-                {/* Full JSON/YAML output */}
-                <div className={styles.fullOutput}>
-                  <pre
-                    className={styles.json}
-                    dangerouslySetInnerHTML={{ __html: getDisplayContent() }}
-                  />
-                </div>
               </>
+            )}
+
+            {/* Full JSON/YAML output - only shown when Show Full is clicked */}
+            {showFullResponse && (
+              <div className={styles.fullOutput}>
+                <pre
+                  className={styles.json}
+                  dangerouslySetInnerHTML={{ __html: getDisplayContent() }}
+                />
+              </div>
             )}
             </>
             )}
