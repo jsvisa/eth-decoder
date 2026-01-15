@@ -104,7 +104,7 @@ export default function ContractCaller() {
   })
   const [resultCollapsed, setResultCollapsed] = useState(false)
   const [hideTooltip, setHideTooltip] = useState(false)
-  const loadingFromHistoryRef = useRef(false)
+  const pendingArgsRef = useRef(null)
 
   // Helper to check if function is read-only
   const isReadOnly = (func) => {
@@ -203,15 +203,17 @@ export default function ContractCaller() {
     }
   }, [abi])
 
-  // Update args when selected function changes (skip if loading from history)
+  // Update args when selected function changes
   useEffect(() => {
-    if (loadingFromHistoryRef.current) {
-      loadingFromHistoryRef.current = false
+    if (!selectedFunction || !parsedAbi) {
+      setArgs([])
       return
     }
 
-    if (!selectedFunction || !parsedAbi) {
-      setArgs([])
+    // If we have pending args from history, use them instead of resetting
+    if (pendingArgsRef.current !== null) {
+      setArgs(pendingArgsRef.current)
+      pendingArgsRef.current = null
       return
     }
 
@@ -330,14 +332,11 @@ export default function ContractCaller() {
   }
 
   const loadFromHistory = (item) => {
-    loadingFromHistoryRef.current = true
+    // Store pending args before changing function - the useEffect will pick them up
+    pendingArgsRef.current = item.args || []
     setChain(item.chain)
     setAddress(item.address)
     setSelectedFunction(item.functionName)
-    // Use setTimeout to set args after the useEffect has run
-    setTimeout(() => {
-      setArgs(item.args || [])
-    }, 0)
     setResult(item.output)
     setError(null)
   }
@@ -1004,11 +1003,54 @@ export default function ContractCaller() {
               </div>
             )}
 
-            {/* Gas used (simulation only) */}
-            {result.simulated && result.gasUsed && (
-              <div className={styles.gasSection}>
-                <h3 className={styles.gasTitle}>Gas Used</h3>
-                <div className={styles.gasValue}>{result.gasUsed.toLocaleString()}</div>
+            {/* Transaction Info (simulation only) */}
+            {result.simulated && (
+              <div className={styles.txInfoSection}>
+                <h3 className={styles.txInfoTitle}>Transaction Info</h3>
+                <div className={styles.txInfoGrid}>
+                  <div className={styles.txInfoRow}>
+                    <span className={styles.txInfoLabel}>From:</span>
+                    <span className={styles.txInfoValue}>{result.callTrace?.from || fromAddress || '0x0000000000000000000000000000000000000001'}</span>
+                  </div>
+                  <div className={styles.txInfoRow}>
+                    <span className={styles.txInfoLabel}>To:</span>
+                    <span className={styles.txInfoValue}>{result.callTrace?.to || address}</span>
+                  </div>
+                  {result.callTrace?.input && (
+                    <div className={styles.txInfoRow}>
+                      <span className={styles.txInfoLabel}>Input:</span>
+                      {result.callTrace.input.length > 40 ? (
+                        <span className={styles.txInfoInputWrapper}>
+                          <span className={styles.txInfoValueMono}>
+                            {result.callTrace.input.slice(0, 10)}...{result.callTrace.input.slice(-10)}
+                          </span>
+                          {!hideTooltip && (
+                            <span className={styles.txInfoTooltip}>
+                              <span className={styles.traceTooltipContent}>{result.callTrace.input}</span>
+                              <button
+                                className={styles.traceTooltipCopy}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  copyTooltipContent(result.callTrace.input)
+                                }}
+                              >
+                                Copy
+                              </button>
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className={styles.txInfoValueMono}>{result.callTrace.input}</span>
+                      )}
+                    </div>
+                  )}
+                  {result.gasUsed && (
+                    <div className={styles.txInfoRow}>
+                      <span className={styles.txInfoLabel}>Gas Used:</span>
+                      <span className={styles.txInfoValue}>{result.gasUsed.toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
