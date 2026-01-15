@@ -104,7 +104,7 @@ export async function POST(request) {
       value: '0',
       save: false,
       save_if_fails: false,
-      simulation_type: 'quick',
+      simulation_type: 'full', // Use full to get call traces
     }
 
     // Call Tenderly API
@@ -132,6 +132,20 @@ export async function POST(request) {
     const success = transaction?.status === true
     const rawOutput = transaction?.transaction_info?.call_trace?.output || '0x'
 
+    // Helper to serialize BigInt and complex objects for JSON
+    const serializeResult = (value) => {
+      if (typeof value === 'bigint') return value.toString()
+      if (Array.isArray(value)) return value.map(serializeResult)
+      if (value && typeof value === 'object') {
+        const serialized = {}
+        for (const key in value) {
+          serialized[key] = serializeResult(value[key])
+        }
+        return serialized
+      }
+      return value
+    }
+
     // Decode output if function has outputs
     let decodedOutputs = []
     if (success && functionAbi.outputs && functionAbi.outputs.length > 0 && rawOutput !== '0x') {
@@ -142,19 +156,6 @@ export async function POST(request) {
           functionName,
           data: rawOutput,
         })
-
-        const serializeResult = (value) => {
-          if (typeof value === 'bigint') return value.toString()
-          if (Array.isArray(value)) return value.map(serializeResult)
-          if (value && typeof value === 'object') {
-            const serialized = {}
-            for (const key in value) {
-              serialized[key] = serializeResult(value[key])
-            }
-            return serialized
-          }
-          return value
-        }
 
         if (functionAbi.outputs.length === 1) {
           decodedOutputs = [{
@@ -174,15 +175,84 @@ export async function POST(request) {
       }
     }
 
-    // Extract logs
+    // Extract and decode logs
     const logs = transaction?.transaction_info?.logs || []
-    const parsedLogs = logs.map(log => ({
-      address: log.raw?.address,
-      topics: log.raw?.topics || [],
-      data: log.raw?.data,
-      name: log.name,
-      inputs: log.inputs,
-    }))
+    const parsedLogs = logs.map(log => {
+      // Tenderly provides decoded event info when available
+      const decodedInputs = log.inputs?.map(input => ({
+        name: input.soltype?.name || input.name || 'unknown',
+        type: input.soltype?.type || input.type || 'unknown',
+        value: serializeResult(input.value),
+        indexed: input.soltype?.indexed || false,
+      })) || []
+
+      return {
+        address: log.raw?.address,
+        topics: log.raw?.topics || [],
+        data: log.raw?.data,
+        name: log.name || null,
+        decoded: decodedInputs.length > 0,
+        inputs: decodedInputs,
+      }
+    })
+
+    // Extract call traces recursively
+    const extractCallTrace = (trace, depth = 0) => {
+      if (!trace) return null
+
+      const traceItem = {
+        depth,
+        type: trace.call_type || 'CALL',
+        from: trace.from,
+        to: trace.to,
+        value: trace.value || '0',
+        gas: trace.gas,
+        gasUsed: trace.gas_used,
+        input: trace.input,
+        output: trace.output,
+        functionName: trace.function_name || trace.decoded_input?.method_name || null,
+        functionSelector: trace.input?.slice(0, 10) || null,
+        decodedInput: trace.decoded_input ? {
+          methodName: trace.decoded_input.method_name,
+          parameters: trace.decoded_input.parameters?.map(p => ({
+            name: p.soltype?.name || p.name,
+            type: p.soltype?.type || p.type,
+            value: serializeResult(p.value),
+          })) || [],
+        } : null,
+        decodedOutput: trace.decoded_output ?
+          trace.decoded_output.map(o => ({
+            name: o.soltype?.name || o.name || 'result',
+            type: o.soltype?.type || o.type,
+            value: serializeResult(o.value),
+          })) : null,
+        error: trace.error || null,
+        errorReason: trace.error_reason || null,
+        calls: [],
+      }
+
+      // Process nested calls
+      if (trace.calls && Array.isArray(trace.calls)) {
+        traceItem.calls = trace.calls.map(subTrace => extractCallTrace(subTrace, depth + 1)).filter(Boolean)
+      }
+
+      return traceItem
+    }
+
+    // Get the root call trace
+    const rootTrace = transaction?.transaction_info?.call_trace
+    const callTrace = extractCallTrace(rootTrace)
+
+    // Flatten call trace for easier display
+    const flattenTrace = (trace, result = []) => {
+      if (!trace) return result
+      result.push(trace)
+      if (trace.calls) {
+        trace.calls.forEach(subTrace => flattenTrace(subTrace, result))
+      }
+      return result
+    }
+    const flatCallTrace = flattenTrace(callTrace)
 
     // Extract state changes
     const stateDiff = simulation?.state_diff || []
@@ -201,6 +271,7 @@ export async function POST(request) {
       decoded: decodedOutputs,
       gasUsed,
       logs: parsedLogs,
+      callTrace: flatCallTrace,
       stateChanges,
       error: success ? null : (transaction?.error_message || 'Transaction reverted'),
     })

@@ -806,7 +806,9 @@ export default function ContractCaller() {
                       <div className={styles.logInputs}>
                         {log.inputs.map((input, i) => (
                           <div key={i} className={styles.logInput}>
-                            <span className={styles.logInputName}>{input.name || `arg${i}`}:</span>
+                            <span className={styles.logInputName}>{input.name || `arg${i}`}</span>
+                            <span className={styles.logInputType}>({input.type})</span>
+                            {input.indexed && <span className={styles.logIndexed}>indexed</span>}
                             <span className={styles.logInputValue}>
                               {typeof input.value === 'object'
                                 ? JSON.stringify(input.value)
@@ -833,6 +835,81 @@ export default function ContractCaller() {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Call Traces (simulation only) */}
+            {result.simulated && result.callTrace && result.callTrace.length > 0 && (
+              <div className={styles.traceSection}>
+                <h3 className={styles.traceTitle}>Call Trace ({result.callTrace.length} calls)</h3>
+                <div className={styles.traceList}>
+                  {result.callTrace.map((trace, index) => (
+                    <div
+                      key={index}
+                      className={`${styles.traceItem} ${trace.error ? styles.traceError : ''}`}
+                      style={{ marginLeft: `${trace.depth * 1.5}rem` }}
+                    >
+                      <div className={styles.traceHeader}>
+                        <span className={styles.traceType}>{trace.type}</span>
+                        <span className={styles.traceFunction}>
+                          {trace.functionName || trace.functionSelector || '(unknown)'}
+                        </span>
+                        {trace.gasUsed && (
+                          <span className={styles.traceGas}>{trace.gasUsed.toLocaleString()} gas</span>
+                        )}
+                      </div>
+                      <div className={styles.traceAddresses}>
+                        <span className={styles.traceFrom}>
+                          {trace.from?.slice(0, 10)}...{trace.from?.slice(-6)}
+                        </span>
+                        <span className={styles.traceArrow}>→</span>
+                        <span className={styles.traceTo}>
+                          {trace.to?.slice(0, 10)}...{trace.to?.slice(-6)}
+                        </span>
+                        {trace.value && trace.value !== '0' && (
+                          <span className={styles.traceValue}>{trace.value} wei</span>
+                        )}
+                      </div>
+                      {trace.decodedInput && trace.decodedInput.parameters?.length > 0 && (
+                        <div className={styles.traceParams}>
+                          <div className={styles.traceParamsLabel}>Input:</div>
+                          {trace.decodedInput.parameters.map((param, i) => (
+                            <div key={i} className={styles.traceParam}>
+                              <span className={styles.traceParamName}>{param.name}</span>
+                              <span className={styles.traceParamType}>({param.type})</span>
+                              <span className={styles.traceParamValue}>
+                                {typeof param.value === 'object'
+                                  ? JSON.stringify(param.value)
+                                  : String(param.value)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {trace.decodedOutput && trace.decodedOutput.length > 0 && (
+                        <div className={styles.traceOutput}>
+                          <div className={styles.traceOutputLabel}>Output:</div>
+                          {trace.decodedOutput.map((out, i) => (
+                            <div key={i} className={styles.traceOutputItem}>
+                              <span className={styles.traceParamName}>{out.name}</span>
+                              <span className={styles.traceParamType}>({out.type})</span>
+                              <span className={styles.traceOutputValue}>
+                                {typeof out.value === 'object'
+                                  ? JSON.stringify(out.value)
+                                  : String(out.value)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {trace.error && (
+                        <div className={styles.traceErrorMsg}>
+                          {trace.errorReason || trace.error}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
