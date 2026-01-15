@@ -21,7 +21,7 @@ const RPC_URLS = {
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { chain, address, functionName, args, abi } = body
+    const { chain, address, functionName, args, abi, fromAddress, simulate } = body
 
     if (!address || !functionName || !abi) {
       return NextResponse.json(
@@ -34,6 +34,14 @@ export async function POST(request) {
     if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
       return NextResponse.json(
         { error: 'Invalid address format' },
+        { status: 400 }
+      )
+    }
+
+    // Validate fromAddress if provided
+    if (fromAddress && !/^0x[a-fA-F0-9]{40}$/.test(fromAddress)) {
+      return NextResponse.json(
+        { error: 'Invalid from address format' },
         { status: 400 }
       )
     }
@@ -101,11 +109,18 @@ export async function POST(request) {
       args: parsedArgs,
     })
 
-    // Make the call
-    const result = await client.call({
+    // Make the call (works for both read and simulate)
+    const callParams = {
       to: address,
       data,
-    })
+    }
+
+    // Add from address if provided (useful for simulating write functions)
+    if (fromAddress) {
+      callParams.account = fromAddress
+    }
+
+    const result = await client.call(callParams)
 
     // Decode the result
     const decoded = decodeFunctionResult({
@@ -156,6 +171,7 @@ export async function POST(request) {
       rawData: result.data,
       decoded: decodedOutputs,
       result: serializeResult(decoded),
+      simulated: simulate || false,
     })
   } catch (error) {
     console.error('Call contract error:', error)

@@ -183,6 +183,38 @@
   cursor: not-allowed;
 }
 
+.functionLabelRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.readBadge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #059669;
+  background-color: #d1fae5;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.writeBadge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #d97706;
+  background-color: #fef3c7;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.optional {
+  font-weight: 400;
+  color: #888;
+  font-size: 0.85rem;
+}
+
 .abiLabelRow {
   display: flex;
   align-items: center;
@@ -284,6 +316,14 @@
   cursor: not-allowed;
 }
 
+.simulateButton {
+  background-color: #d97706;
+}
+
+.simulateButton:hover:not(:disabled) {
+  background-color: #b45309;
+}
+
 .error {
   padding: 1.25rem;
   background-color: #fee;
@@ -311,10 +351,26 @@
   gap: 1rem;
 }
 
+.resultTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .result h2 {
   margin: 0;
   color: #d4d4d4;
   font-size: 1.5rem;
+}
+
+.simulatedBadge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #d97706;
+  background-color: #fef3c7;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
 }
 
 .resultActions {

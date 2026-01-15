@@ -90,6 +90,20 @@ export default function ContractCaller() {
   const [cachedAddresses, setCachedAddresses] = useState([])
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false)
   const [addressFilter, setAddressFilter] = useState('')
+  const [fromAddress, setFromAddress] = useState('')
+
+  // Helper to check if function is read-only
+  const isReadOnly = (func) => {
+    return func?.stateMutability === 'view' || func?.stateMutability === 'pure'
+  }
+
+  // Get selected function object
+  const getSelectedFunction = () => {
+    if (!selectedFunction || !parsedAbi) return null
+    return parsedAbi.find(
+      (item) => item.type === 'function' && item.name === selectedFunction
+    )
+  }
 
   // Load history and cached addresses on mount
   useEffect(() => {
@@ -138,14 +152,21 @@ export default function ContractCaller() {
       const parsed = JSON.parse(abi)
       setParsedAbi(parsed)
 
-      // Filter for read-only functions (view/pure)
-      const readFunctions = parsed.filter(
-        (item) =>
-          item.type === 'function' &&
-          (item.stateMutability === 'view' || item.stateMutability === 'pure')
+      // Get all functions (both read and write)
+      const allFunctions = parsed.filter(
+        (item) => item.type === 'function'
       )
 
-      setFunctions(readFunctions)
+      // Sort: view/pure first, then others
+      allFunctions.sort((a, b) => {
+        const aIsRead = a.stateMutability === 'view' || a.stateMutability === 'pure'
+        const bIsRead = b.stateMutability === 'view' || b.stateMutability === 'pure'
+        if (aIsRead && !bIsRead) return -1
+        if (!aIsRead && bIsRead) return 1
+        return a.name.localeCompare(b.name)
+      })
+
+      setFunctions(allFunctions)
       setSelectedFunction('')
       setArgs([])
       setError(null)
@@ -296,6 +317,9 @@ export default function ContractCaller() {
       return
     }
 
+    const selectedFunc = getSelectedFunction()
+    const isWrite = !isReadOnly(selectedFunc)
+
     setLoading(true)
     setError(null)
     setResult(null)
@@ -310,6 +334,8 @@ export default function ContractCaller() {
           functionName: selectedFunction,
           args,
           abi: parsedAbi,
+          fromAddress: isWrite ? (fromAddress || undefined) : undefined,
+          simulate: isWrite,
         }),
       })
 
@@ -504,7 +530,14 @@ export default function ContractCaller() {
           {functions.length > 0 && (
             <>
               <div className={styles.field}>
-                <label className={styles.label}>Function</label>
+                <div className={styles.functionLabelRow}>
+                  <label className={styles.label}>Function</label>
+                  {selectedFunction && getSelectedFunction() && (
+                    <span className={isReadOnly(getSelectedFunction()) ? styles.readBadge : styles.writeBadge}>
+                      {isReadOnly(getSelectedFunction()) ? 'read' : 'write'}
+                    </span>
+                  )}
+                </div>
                 <select
                   value={selectedFunction}
                   onChange={(e) => setSelectedFunction(e.target.value)}
@@ -514,11 +547,28 @@ export default function ContractCaller() {
                   <option value="">Select a function...</option>
                   {functions.map((func) => (
                     <option key={func.name} value={func.name}>
-                      {func.name}({func.inputs.map((i) => `${i.type} ${i.name}`).join(', ')})
+                      [{isReadOnly(func) ? 'R' : 'W'}] {func.name}({func.inputs.map((i) => `${i.type} ${i.name}`).join(', ')})
                     </option>
                   ))}
                 </select>
               </div>
+
+              {/* From Address for write functions (optional) */}
+              {selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) && (
+                <div className={styles.field}>
+                  <label className={styles.label}>
+                    From Address <span className={styles.optional}>(optional, for simulation)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={fromAddress}
+                    onChange={(e) => setFromAddress(e.target.value)}
+                    placeholder="0x... (sender address for simulation)"
+                    className={styles.input}
+                    disabled={loading}
+                  />
+                </div>
+              )}
 
               {selectedFunction && getSelectedFunctionInputs().length > 0 && (
                 <div className={styles.argsSection}>
@@ -549,10 +599,13 @@ export default function ContractCaller() {
 
           <button
             onClick={handleCall}
-            className={styles.button}
+            className={`${styles.button} ${selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? styles.simulateButton : ''}`}
             disabled={loading || !selectedFunction}
           >
-            {loading ? 'Calling...' : 'Call Contract'}
+            {loading
+              ? (selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? 'Simulating...' : 'Calling...')
+              : (selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? 'Simulate Call' : 'Call Contract')
+            }
           </button>
         </div>
 
@@ -565,7 +618,12 @@ export default function ContractCaller() {
         {result && (
           <div className={styles.result}>
             <div className={styles.resultHeader}>
-              <h2>Result:</h2>
+              <div className={styles.resultTitle}>
+                <h2>Result:</h2>
+                {result.simulated && (
+                  <span className={styles.simulatedBadge}>Simulated</span>
+                )}
+              </div>
               <div className={styles.resultActions}>
                 <button
                   onClick={() => setShowFullResponse(!showFullResponse)}
