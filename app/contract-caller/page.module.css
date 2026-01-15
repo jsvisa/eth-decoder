@@ -1026,6 +1026,116 @@
   margin-right: 0.5rem;
 }
 
+/* Internal Transactions (Parity traces) section styles */
+.internalTxSection {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #333;
+}
+
+.internalTxTitle {
+  color: #9cdcfe;
+  font-size: 1rem;
+  margin: 0 0 1rem 0;
+  font-weight: 600;
+}
+
+.internalTxList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.internalTxItem {
+  background-color: #2d2d2d;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid #6b7280;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.85rem;
+}
+
+.internalTxError {
+  border-left-color: #f14c4c;
+  background-color: #3d2d2d;
+}
+
+.internalTxHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.internalTxIndex {
+  color: #808080;
+  font-size: 0.75rem;
+}
+
+.internalTxType {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: white;
+  background-color: #6b7280;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.internalTxGas {
+  color: #808080;
+  font-size: 0.75rem;
+  margin-left: auto;
+}
+
+.internalTxAddresses {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.internalTxFrom {
+  color: #4ec9b0;
+}
+
+.internalTxArrow {
+  color: #808080;
+}
+
+.internalTxTo {
+  color: #ce9178;
+}
+
+.internalTxValue {
+  color: #b5cea8;
+  font-size: 0.8rem;
+  background-color: #1e1e1e;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+}
+
+.internalTxData {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.internalTxDataLabel {
+  color: #808080;
+  margin-right: 0.5rem;
+}
+
+.internalTxDataValue {
+  color: #ce9178;
+  word-break: break-all;
+}
+
+.internalTxErrorMsg {
+  margin-top: 0.5rem;
+  color: #f14c4c;
+  font-weight: 500;
+}
+
 /* Call Trace section styles */
 .traceSection {
   margin-bottom: 1.5rem;

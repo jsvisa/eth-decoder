@@ -997,6 +997,49 @@ export default function ContractCaller() {
               </div>
             )}
 
+            {/* Internal Transactions - Parity style traces (simulation only) */}
+            {result.simulated && result.internalTransactions && result.internalTransactions.length > 0 && (
+              <div className={styles.internalTxSection}>
+                <h3 className={styles.internalTxTitle}>Internal Transactions ({result.internalTransactions.length})</h3>
+                <div className={styles.internalTxList}>
+                  {result.internalTransactions.map((tx, index) => (
+                    <div key={index} className={`${styles.internalTxItem} ${tx.error ? styles.internalTxError : ''}`}>
+                      <div className={styles.internalTxHeader}>
+                        <span className={styles.internalTxIndex}>#{tx.index}</span>
+                        <span className={styles.internalTxType}>{tx.type}</span>
+                        {tx.gasUsed && (
+                          <span className={styles.internalTxGas}>{tx.gasUsed.toLocaleString()} gas</span>
+                        )}
+                      </div>
+                      <div className={styles.internalTxAddresses}>
+                        <span className={styles.internalTxFrom}>
+                          {tx.from?.slice(0, 10)}...{tx.from?.slice(-6)}
+                        </span>
+                        <span className={styles.internalTxArrow}>→</span>
+                        <span className={styles.internalTxTo}>
+                          {tx.to?.slice(0, 10)}...{tx.to?.slice(-6)}
+                        </span>
+                        {tx.value && tx.value !== '0' && (
+                          <span className={styles.internalTxValue}>{tx.value} wei</span>
+                        )}
+                      </div>
+                      {tx.input && tx.input !== '0x' && (
+                        <div className={styles.internalTxData}>
+                          <span className={styles.internalTxDataLabel}>Input:</span>
+                          <span className={styles.internalTxDataValue}>
+                            {tx.input.length > 66 ? `${tx.input.slice(0, 66)}...` : tx.input}
+                          </span>
+                        </div>
+                      )}
+                      {tx.error && (
+                        <div className={styles.internalTxErrorMsg}>{tx.error}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* State changes (simulation only) */}
             {result.simulated && result.stateChanges && result.stateChanges.length > 0 && (
               <div className={styles.stateSection}>

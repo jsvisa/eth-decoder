@@ -104,7 +104,9 @@ export async function POST(request) {
       value: '0',
       save: false,
       save_if_fails: false,
-      simulation_type: 'full', // Use full to get call traces
+      simulation_type: 'full',
+      // Use parity-style call traces
+      generate_access_list: true,
     }
 
     // Call Tenderly API
@@ -254,12 +256,30 @@ export async function POST(request) {
     }
     const flatCallTrace = flattenTrace(callTrace)
 
+    // Extract parity-style internal transactions (traces)
+    const internalTxs = transaction?.transaction_info?.internal_transactions || []
+    const internalTransactions = internalTxs.map((tx, index) => ({
+      index,
+      type: tx.type || tx.call_type || 'CALL',
+      from: tx.from,
+      to: tx.to,
+      value: tx.value || '0',
+      gas: tx.gas,
+      gasUsed: tx.gas_used,
+      input: tx.input,
+      output: tx.output,
+      error: tx.error || null,
+    }))
+
     // Extract state changes
     const stateDiff = simulation?.state_diff || []
     const stateChanges = stateDiff.map(diff => ({
       address: diff.address,
       changes: diff.state || [],
     }))
+
+    // Extract access list if available
+    const accessList = result.access_list || []
 
     // Gas info
     const gasUsed = transaction?.gas_used
@@ -270,6 +290,8 @@ export async function POST(request) {
       rawData: rawOutput,
       decoded: decodedOutputs,
       gasUsed,
+      internalTransactions,
+      accessList,
       logs: parsedLogs,
       callTrace: flatCallTrace,
       stateChanges,
