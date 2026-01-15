@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { toFunctionSelector } from 'viem'
 import yaml from 'js-yaml'
 import styles from './page.module.css'
 
@@ -104,6 +105,8 @@ export default function ContractCaller() {
   })
   const [resultCollapsed, setResultCollapsed] = useState(false)
   const [hideTooltip, setHideTooltip] = useState(false)
+  const [functionFilter, setFunctionFilter] = useState('')
+  const [showFunctionList, setShowFunctionList] = useState(false)
   const pendingArgsRef = useRef(null)
 
   // Helper to check if function is read-only
@@ -116,6 +119,26 @@ export default function ContractCaller() {
     if (!selectedFunction || !parsedAbi) return null
     return parsedAbi.find(
       (item) => item.type === 'function' && item.name === selectedFunction
+    )
+  }
+
+  // Get function selector (4-byte signature)
+  const getFunctionSelector = (func) => {
+    if (!func) return null
+    try {
+      return toFunctionSelector(func)
+    } catch (e) {
+      return null
+    }
+  }
+
+  // Filter functions by search term
+  const getFilteredFunctions = () => {
+    if (!functionFilter.trim()) return functions
+    const search = functionFilter.toLowerCase()
+    return functions.filter(func =>
+      func.name.toLowerCase().includes(search) ||
+      func.inputs?.some(input => input.name?.toLowerCase().includes(search) || input.type?.toLowerCase().includes(search))
     )
   }
 
@@ -859,24 +882,113 @@ export default function ContractCaller() {
                 <div className={styles.functionLabelRow}>
                   <label className={styles.label}>Function</label>
                   {selectedFunction && getSelectedFunction() && (
-                    <span className={isReadOnly(getSelectedFunction()) ? styles.readBadge : styles.writeBadge}>
-                      {isReadOnly(getSelectedFunction()) ? 'read' : 'write'}
-                    </span>
+                    <>
+                      <span className={isReadOnly(getSelectedFunction()) ? styles.readBadge : styles.writeBadge}>
+                        {isReadOnly(getSelectedFunction()) ? 'read' : 'write'}
+                      </span>
+                      {getFunctionSelector(getSelectedFunction()) && (
+                        <span
+                          className={styles.funcSelector}
+                          onClick={async () => {
+                            const selector = getFunctionSelector(getSelectedFunction())
+                            if (selector) {
+                              await navigator.clipboard.writeText(selector)
+                            }
+                          }}
+                          title="Click to copy selector"
+                        >
+                          {getFunctionSelector(getSelectedFunction())}
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
-                <select
-                  value={selectedFunction}
-                  onChange={(e) => setSelectedFunction(e.target.value)}
-                  className={styles.select}
-                  disabled={loading}
-                >
-                  <option value="">Select a function...</option>
-                  {functions.map((func) => (
-                    <option key={func.name} value={func.name}>
-                      [{isReadOnly(func) ? 'R' : 'W'}] {func.name}({func.inputs.map((i) => `${i.type} ${i.name}`).join(', ')})
-                    </option>
-                  ))}
-                </select>
+                <div className={styles.functionSelectWrapper}>
+                  {selectedFunction && getSelectedFunction() ? (
+                    <div className={styles.selectedFunctionDisplay}>
+                      <span
+                        className={styles.selectedFunctionText}
+                        onClick={async () => {
+                          const func = getSelectedFunction()
+                          const sig = `${selectedFunction}(${func.inputs.map(i => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})`
+                          await navigator.clipboard.writeText(sig)
+                        }}
+                        title="Click to copy function signature"
+                      >
+                        {selectedFunction}({getSelectedFunction().inputs.map(i => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})
+                      </span>
+                      <button
+                        className={styles.clearFunctionBtn}
+                        onClick={() => {
+                          setSelectedFunction('')
+                          setFunctionFilter('')
+                        }}
+                        title="Clear selection"
+                      >
+                        ×
+                      </button>
+                      <button
+                        className={styles.changeFunctionBtn}
+                        onClick={() => setShowFunctionList(!showFunctionList)}
+                        title="Change function"
+                      >
+                        ▼
+                      </button>
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={functionFilter}
+                      onChange={(e) => {
+                        setFunctionFilter(e.target.value)
+                        setShowFunctionList(true)
+                      }}
+                      onFocus={() => setShowFunctionList(true)}
+                      onBlur={() => setTimeout(() => setShowFunctionList(false), 200)}
+                      placeholder="Search or select a function..."
+                      className={styles.input}
+                      disabled={loading}
+                    />
+                  )}
+                  {showFunctionList && (
+                    <div className={styles.functionList}>
+                      {selectedFunction && (
+                        <div className={styles.functionListSearch}>
+                          <input
+                            type="text"
+                            value={functionFilter}
+                            onChange={(e) => setFunctionFilter(e.target.value)}
+                            placeholder="Search functions..."
+                            className={styles.functionSearchInput}
+                            autoFocus
+                          />
+                        </div>
+                      )}
+                      {getFilteredFunctions().map((func) => (
+                        <div
+                          key={func.name}
+                          className={`${styles.functionItem} ${selectedFunction === func.name ? styles.functionItemSelected : ''}`}
+                          onClick={() => {
+                            setSelectedFunction(func.name)
+                            setFunctionFilter('')
+                            setShowFunctionList(false)
+                          }}
+                        >
+                          <span className={isReadOnly(func) ? styles.funcReadTag : styles.funcWriteTag}>
+                            {isReadOnly(func) ? 'R' : 'W'}
+                          </span>
+                          <span className={styles.funcName}>{func.name}</span>
+                          <span className={styles.funcParams}>
+                            ({func.inputs.map((i) => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})
+                          </span>
+                        </div>
+                      ))}
+                      {getFilteredFunctions().length === 0 && (
+                        <div className={styles.functionItemEmpty}>No matching functions</div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* From Address for write functions (optional) */}
