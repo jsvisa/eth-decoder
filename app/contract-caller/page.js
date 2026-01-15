@@ -32,13 +32,40 @@ const getCachedAbi = (chain, address) => {
   return null
 }
 
-const setCachedAbi = (chain, address, abi, isProxy = false, implAddress = null) => {
+const setCachedAbi = (chain, address, abi, isProxy = false, implAddress = null, contractName = null, implContractName = null) => {
   try {
     const key = getAbiCacheKey(chain, address)
-    localStorage.setItem(key, JSON.stringify({ abi, isProxy, implAddress, timestamp: Date.now() }))
+    localStorage.setItem(key, JSON.stringify({
+      abi, isProxy, implAddress, contractName, implContractName, timestamp: Date.now()
+    }))
   } catch (err) {
     console.error('Failed to cache ABI:', err)
   }
+}
+
+// Get all cached contract addresses
+const getCachedAddresses = () => {
+  const addresses = []
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith(ABI_CACHE_PREFIX)) {
+        const [, chainAndAddress] = key.split(ABI_CACHE_PREFIX)
+        const [chain, address] = chainAndAddress.split('-')
+        const cached = JSON.parse(localStorage.getItem(key))
+        addresses.push({
+          chain,
+          address,
+          contractName: cached.contractName,
+          implContractName: cached.implContractName,
+          isProxy: cached.isProxy,
+        })
+      }
+    }
+  } catch (err) {
+    console.error('Failed to get cached addresses:', err)
+  }
+  return addresses
 }
 
 export default function ContractCaller() {
@@ -58,14 +85,20 @@ export default function ContractCaller() {
   const [history, setHistory] = useState([])
   const [showHistory, setShowHistory] = useState(true)
   const [abiSource, setAbiSource] = useState(null) // 'cached', 'fetched', or null
+  const [contractName, setContractName] = useState(null)
+  const [showFullResponse, setShowFullResponse] = useState(false)
+  const [cachedAddresses, setCachedAddresses] = useState([])
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false)
+  const [addressFilter, setAddressFilter] = useState('')
 
-  // Load history from localStorage on mount
+  // Load history and cached addresses on mount
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
         setHistory(JSON.parse(stored))
       }
+      setCachedAddresses(getCachedAddresses())
     } catch (err) {
       console.error('Failed to load history:', err)
     }
@@ -74,15 +107,21 @@ export default function ContractCaller() {
   // Auto-load cached ABI when address or chain changes
   useEffect(() => {
     if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      setContractName(null)
       return
     }
 
     const cached = getCachedAbi(chain, address)
     if (cached) {
       setAbi(JSON.stringify(cached.abi, null, 2))
+      const nameDisplay = cached.isProxy && cached.implContractName
+        ? `${cached.contractName} → ${cached.implContractName}`
+        : cached.contractName
+      setContractName(nameDisplay)
       setAbiSource(cached.isProxy ? `cached (proxy → ${cached.implAddress?.slice(0, 10)}...)` : 'cached')
     } else {
       setAbiSource(null)
+      setContractName(null)
     }
   }, [chain, address])
 
@@ -146,6 +185,10 @@ export default function ContractCaller() {
       const cached = getCachedAbi(chain, address)
       if (cached) {
         setAbi(JSON.stringify(cached.abi, null, 2))
+        const nameDisplay = cached.isProxy && cached.implContractName
+          ? `${cached.contractName} → ${cached.implContractName}`
+          : cached.contractName
+        setContractName(nameDisplay)
         setAbiSource(cached.isProxy ? `cached (proxy → ${cached.implAddress?.slice(0, 10)}...)` : 'cached')
         return
       }
@@ -164,9 +207,16 @@ export default function ContractCaller() {
       }
 
       // Cache the fetched ABI
-      setCachedAbi(chain, address, data.abi, data.isProxy, data.implAddress)
+      setCachedAbi(chain, address, data.abi, data.isProxy, data.implAddress, data.contractName, data.implContractName)
+
+      // Update cached addresses list
+      setCachedAddresses(getCachedAddresses())
 
       setAbi(JSON.stringify(data.abi, null, 2))
+      const nameDisplay = data.isProxy && data.implContractName
+        ? `${data.contractName} → ${data.implContractName}`
+        : data.contractName
+      setContractName(nameDisplay)
       setAbiSource(data.isProxy ? `fetched (proxy → ${data.implAddress?.slice(0, 10)}...)` : 'fetched')
     } catch (err) {
       setError(err.message)
@@ -176,17 +226,43 @@ export default function ContractCaller() {
   }
 
   const saveToHistory = (callData, output) => {
-    const historyItem = {
-      id: Date.now(),
-      chain,
-      address,
-      functionName: selectedFunction,
-      args: [...args],
-      output,
-      timestamp: new Date().toISOString(),
+    // Create unique key for dedup (chain + address + function + args)
+    const callKey = `${chain}-${address.toLowerCase()}-${selectedFunction}-${JSON.stringify(args)}`
+
+    // Check if same call exists and update timestamp, or add new
+    const existingIndex = history.findIndex(item => {
+      const itemKey = `${item.chain}-${item.address.toLowerCase()}-${item.functionName}-${JSON.stringify(item.args)}`
+      return itemKey === callKey
+    })
+
+    let newHistory
+    if (existingIndex !== -1) {
+      // Update existing item with new timestamp and output, move to top
+      const updatedItem = {
+        ...history[existingIndex],
+        output,
+        timestamp: new Date().toISOString(),
+      }
+      newHistory = [
+        updatedItem,
+        ...history.slice(0, existingIndex),
+        ...history.slice(existingIndex + 1)
+      ]
+    } else {
+      // Add new item
+      const historyItem = {
+        id: Date.now(),
+        chain,
+        address,
+        functionName: selectedFunction,
+        args: [...args],
+        output,
+        contractName,
+        timestamp: new Date().toISOString(),
+      }
+      newHistory = [historyItem, ...history].slice(0, MAX_HISTORY_ITEMS)
     }
 
-    const newHistory = [historyItem, ...history].slice(0, MAX_HISTORY_ITEMS)
     setHistory(newHistory)
 
     try {
@@ -331,18 +407,61 @@ export default function ContractCaller() {
             </div>
 
             <div className={styles.field} style={{ flex: 2 }}>
-              <label className={styles.label}>Contract Address</label>
+              <div className={styles.addressLabelRow}>
+                <label className={styles.label}>Contract Address</label>
+                {contractName && (
+                  <span className={styles.contractName}>{contractName}</span>
+                )}
+              </div>
               <div className={styles.addressRow}>
-                <input
-                  type="text"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="0x..."
-                  className={styles.input}
-                  disabled={loading}
-                />
+                <div className={styles.addressInputWrapper}>
+                  <input
+                    type="text"
+                    value={address}
+                    onChange={(e) => {
+                      setAddress(e.target.value)
+                      setAddressFilter(e.target.value)
+                      setShowAddressSuggestions(true)
+                    }}
+                    onFocus={() => setShowAddressSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowAddressSuggestions(false), 200)}
+                    placeholder="0x..."
+                    className={styles.input}
+                    disabled={loading}
+                  />
+                  {showAddressSuggestions && cachedAddresses.length > 0 && (
+                    <div className={styles.addressSuggestions}>
+                      {cachedAddresses
+                        .filter(item =>
+                          item.chain === chain &&
+                          (addressFilter === '' ||
+                           item.address.toLowerCase().includes(addressFilter.toLowerCase()) ||
+                           (item.contractName && item.contractName.toLowerCase().includes(addressFilter.toLowerCase())))
+                        )
+                        .slice(0, 10)
+                        .map((item, idx) => (
+                          <div
+                            key={idx}
+                            className={styles.addressSuggestionItem}
+                            onClick={() => {
+                              setAddress(item.address)
+                              setShowAddressSuggestions(false)
+                            }}
+                          >
+                            <span className={styles.suggestionName}>
+                              {item.contractName || 'Unknown'}
+                              {item.isProxy && item.implContractName && ` → ${item.implContractName}`}
+                            </span>
+                            <span className={styles.suggestionAddress}>
+                              {item.address.slice(0, 10)}...{item.address.slice(-8)}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
                 <button
-                  onClick={fetchAbi}
+                  onClick={() => fetchAbi(false)}
                   className={styles.fetchButton}
                   disabled={loading || fetchingAbi}
                 >
@@ -449,19 +568,30 @@ export default function ContractCaller() {
               <h2>Result:</h2>
               <div className={styles.resultActions}>
                 <button
-                  onClick={() => setIsYaml(!isYaml)}
-                  className={styles.actionButton}
+                  onClick={() => setShowFullResponse(!showFullResponse)}
+                  className={`${styles.actionButton} ${showFullResponse ? styles.actionButtonActive : ''}`}
                   type="button"
                 >
-                  {isYaml ? 'Convert to JSON' : 'Convert to YAML'}
+                  {showFullResponse ? 'Hide Full' : 'Show Full'}
                 </button>
-                <button
-                  onClick={handleCopy}
-                  className={styles.actionButton}
-                  type="button"
-                >
-                  {copied ? 'Copied!' : `Copy ${isYaml ? 'YAML' : 'JSON'}`}
-                </button>
+                {showFullResponse && (
+                  <>
+                    <button
+                      onClick={() => setIsYaml(!isYaml)}
+                      className={styles.actionButton}
+                      type="button"
+                    >
+                      {isYaml ? 'JSON' : 'YAML'}
+                    </button>
+                    <button
+                      onClick={handleCopy}
+                      className={styles.actionButton}
+                      type="button"
+                    >
+                      {copied ? 'Copied!' : 'Copy'}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -493,14 +623,15 @@ export default function ContractCaller() {
               </div>
             )}
 
-            {/* Full JSON/YAML output */}
-            <div className={styles.fullOutput}>
-              <h3 className={styles.fullOutputTitle}>Full Response</h3>
-              <pre
-                className={styles.json}
-                dangerouslySetInnerHTML={{ __html: getDisplayContent() }}
-              />
-            </div>
+            {/* Full JSON/YAML output - collapsible */}
+            {showFullResponse && (
+              <div className={styles.fullOutput}>
+                <pre
+                  className={styles.json}
+                  dangerouslySetInnerHTML={{ __html: getDisplayContent() }}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -538,8 +669,8 @@ export default function ContractCaller() {
                       <div className={styles.historyChain}>{item.chain}</div>
                       <div className={styles.historyFunc}>{item.functionName}</div>
                     </div>
-                    <div className={styles.historyAddress}>
-                      {item.address.slice(0, 10)}...{item.address.slice(-8)}
+                    <div className={styles.historyContract}>
+                      {item.contractName || `${item.address.slice(0, 10)}...${item.address.slice(-8)}`}
                     </div>
                     <div className={styles.historyTime}>
                       {new Date(item.timestamp).toLocaleString()}

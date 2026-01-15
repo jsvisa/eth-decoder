@@ -36,12 +36,12 @@ const EIP1967_BEACON_SLOT = '0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6
 // OpenZeppelin legacy implementation slot
 const OZ_IMPL_SLOT = '0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3'
 
-// Fetch ABI from Etherscan
-async function fetchAbiFromExplorer(address, chainId, apiKey) {
+// Fetch ABI and contract name from Etherscan
+async function fetchContractInfo(address, chainId, apiKey) {
   const params = new URLSearchParams({
     chainid: chainId,
     module: 'contract',
-    action: 'getabi',
+    action: 'getsourcecode',
     address: address,
     apikey: apiKey,
   })
@@ -54,11 +54,19 @@ async function fetchAbiFromExplorer(address, chainId, apiKey) {
 
   const data = await response.json()
 
-  if (data.status !== '1') {
+  if (data.status !== '1' || !data.result || !data.result[0]) {
     return null
   }
 
-  return JSON.parse(data.result)
+  const result = data.result[0]
+  const abi = result.ABI && result.ABI !== 'Contract source code not verified'
+    ? JSON.parse(result.ABI)
+    : null
+
+  return {
+    abi,
+    contractName: result.ContractName || null,
+  }
 }
 
 // Get implementation address from proxy
@@ -197,10 +205,10 @@ export async function GET(request) {
 
     const apiKey = process.env.ETHERSCAN_API_KEY || ''
 
-    // Fetch the contract's ABI
-    const proxyAbi = await fetchAbiFromExplorer(address, chainId, apiKey)
+    // Fetch the contract's ABI and name
+    const proxyInfo = await fetchContractInfo(address, chainId, apiKey)
 
-    if (!proxyAbi) {
+    if (!proxyInfo || !proxyInfo.abi) {
       return NextResponse.json(
         { error: 'Failed to fetch ABI. Contract may not be verified.' },
         { status: 400 }
@@ -218,12 +226,14 @@ export async function GET(request) {
 
     if (implAddress) {
       // It's a proxy! Fetch implementation ABI and merge
-      const implAbi = await fetchAbiFromExplorer(implAddress, chainId, apiKey)
+      const implInfo = await fetchContractInfo(implAddress, chainId, apiKey)
 
-      if (implAbi) {
-        const mergedAbi = mergeAbis(proxyAbi, implAbi)
+      if (implInfo && implInfo.abi) {
+        const mergedAbi = mergeAbis(proxyInfo.abi, implInfo.abi)
         return NextResponse.json({
           abi: mergedAbi,
+          contractName: proxyInfo.contractName,
+          implContractName: implInfo.contractName,
           isProxy: true,
           implAddress: implAddress,
         })
@@ -232,7 +242,8 @@ export async function GET(request) {
 
     // Not a proxy or couldn't fetch implementation ABI
     return NextResponse.json({
-      abi: proxyAbi,
+      abi: proxyInfo.abi,
+      contractName: proxyInfo.contractName,
       isProxy: false,
     })
   } catch (error) {

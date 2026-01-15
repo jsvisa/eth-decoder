@@ -83,13 +83,79 @@
   cursor: not-allowed;
 }
 
+.addressLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.contractName {
+  font-size: 0.85rem;
+  color: #0070f3;
+  font-weight: 600;
+  background-color: #e8f4ff;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+}
+
 .addressRow {
   display: flex;
   gap: 0.75rem;
 }
 
-.addressRow .input {
+.addressInputWrapper {
   flex: 1;
+  position: relative;
+}
+
+.addressInputWrapper .input {
+  width: 100%;
+}
+
+.addressSuggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.addressSuggestionItem {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.addressSuggestionItem:last-child {
+  border-bottom: none;
+}
+
+.addressSuggestionItem:hover {
+  background-color: #f8f9fa;
+}
+
+.suggestionName {
+  font-weight: 500;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.suggestionAddress {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.8rem;
+  color: #666;
 }
 
 .fetchButton {
@@ -273,6 +339,16 @@
   border-color: #0070f3;
 }
 
+.actionButtonActive {
+  background-color: #0070f3;
+  border-color: #0070f3;
+  color: white;
+}
+
+.actionButtonActive:hover {
+  background-color: #0051cc;
+}
+
 .json {
   background-color: #1e1e1e;
   padding: 1.5rem;
@@ -412,6 +488,15 @@
   font-size: 0.85rem;
   color: #666;
   margin-bottom: 0.25rem;
+}
+
+.historyContract {
+  font-size: 0.85rem;
+  color: #333;
+  margin-bottom: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .historyTime {
