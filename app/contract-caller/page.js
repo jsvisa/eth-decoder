@@ -342,12 +342,20 @@ export default function ContractCaller() {
   }
 
   const loadFromHistory = (item) => {
-    // Store pending args before changing function - the useEffect will pick them up
-    pendingArgsRef.current = item.args || []
+    const historyArgs = item.args || []
+
+    // If same function is already selected, directly set args (useEffect won't trigger)
+    if (selectedFunction === item.functionName) {
+      setArgs(historyArgs)
+    } else {
+      // Store pending args before changing function - the useEffect will pick them up
+      pendingArgsRef.current = historyArgs
+      setSelectedFunction(item.functionName)
+    }
+
     setChain(item.chain)
     setAddress(item.address)
     setFromAddress(item.fromAddress || '')
-    setSelectedFunction(item.functionName)
     setResult(item.output)
     setError(null)
   }
@@ -1259,7 +1267,27 @@ export default function ContractCaller() {
                       <span className={item.isWrite ? styles.historyWriteBadge : styles.historyReadBadge}>
                         {item.isWrite ? 'W' : 'R'}
                       </span>
-                      <div className={styles.historyFunc}>{item.functionName}</div>
+                      <div className={styles.historyFunc} title={(() => {
+                        const argsStr = (item.args || []).join(', ')
+                        const funcCall = `${item.functionName}(${argsStr})`
+                        const decoded = item.output?.decoded || []
+                        const outputStr = decoded.length > 0
+                          ? `(${decoded.map(d => d.value).join(', ')})`
+                          : ''
+                        return outputStr ? `${funcCall} -> ${outputStr}` : funcCall
+                      })()}>
+                        {(() => {
+                          const argsStr = (item.args || []).join(', ')
+                          const funcCall = `${item.functionName}(${argsStr})`
+                          const decoded = item.output?.decoded || []
+                          const outputStr = decoded.length > 0
+                            ? `(${decoded.map(d => d.value).join(', ')})`
+                            : ''
+                          const fullStr = outputStr ? `${funcCall} -> ${outputStr}` : funcCall
+                          const maxLen = 90
+                          return fullStr.length > maxLen ? fullStr.slice(0, maxLen) + '...' : fullStr
+                        })()}
+                      </div>
                     </div>
                     <div className={styles.historyContract}>
                       {item.contractName || 'Unknown Contract'}
