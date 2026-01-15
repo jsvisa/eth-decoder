@@ -102,6 +102,7 @@ export default function ContractCaller() {
   const [apiKeys, setApiKeys] = useState({
     etherscan: '',
   })
+  const [resultCollapsed, setResultCollapsed] = useState(false)
 
   // Helper to check if function is read-only
   const isReadOnly = (func) => {
@@ -272,7 +273,7 @@ export default function ContractCaller() {
     }
   }
 
-  const saveToHistory = (callData, output) => {
+  const saveToHistory = (callData, output, isWrite) => {
     // Create unique key for dedup (chain + address + function + args)
     const callKey = `${chain}-${address.toLowerCase()}-${selectedFunction}-${JSON.stringify(args)}`
 
@@ -288,6 +289,7 @@ export default function ContractCaller() {
       const updatedItem = {
         ...history[existingIndex],
         output,
+        isWrite,
         timestamp: new Date().toISOString(),
       }
       newHistory = [
@@ -305,6 +307,7 @@ export default function ContractCaller() {
         args: [...args],
         output,
         contractName,
+        isWrite,
         timestamp: new Date().toISOString(),
       }
       newHistory = [historyItem, ...history].slice(0, MAX_HISTORY_ITEMS)
@@ -423,7 +426,7 @@ export default function ContractCaller() {
         setResult(data)
       }
 
-      saveToHistory({ chain, address, selectedFunction, args }, data)
+      saveToHistory({ chain, address, selectedFunction, args }, data, isWrite)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -786,40 +789,63 @@ export default function ContractCaller() {
           <div className={styles.result}>
             <div className={styles.resultHeader}>
               <div className={styles.resultTitle}>
+                <button
+                  onClick={() => setResultCollapsed(!resultCollapsed)}
+                  className={styles.collapseButton}
+                  type="button"
+                >
+                  {resultCollapsed ? '▶' : '▼'}
+                </button>
                 <h2>Result:</h2>
                 {result.simulated && (
                   <span className={styles.simulatedBadge}>Simulated</span>
                 )}
+                {result.success === false && (
+                  <span className={styles.failedBadge}>Failed</span>
+                )}
               </div>
               <div className={styles.resultActions}>
                 <button
-                  onClick={() => setShowFullResponse(!showFullResponse)}
-                  className={`${styles.actionButton} ${showFullResponse ? styles.actionButtonActive : ''}`}
+                  onClick={() => setResultCollapsed(!resultCollapsed)}
+                  className={styles.actionButton}
                   type="button"
                 >
-                  {showFullResponse ? 'Hide Full' : 'Show Full'}
+                  {resultCollapsed ? 'Expand' : 'Collapse'}
                 </button>
-                {showFullResponse && (
+                {!resultCollapsed && (
                   <>
                     <button
-                      onClick={() => setIsYaml(!isYaml)}
-                      className={styles.actionButton}
+                      onClick={() => setShowFullResponse(!showFullResponse)}
+                      className={`${styles.actionButton} ${showFullResponse ? styles.actionButtonActive : ''}`}
                       type="button"
                     >
-                      {isYaml ? 'JSON' : 'YAML'}
+                      {showFullResponse ? 'Hide Full' : 'Show Full'}
                     </button>
-                    <button
-                      onClick={handleCopy}
-                      className={styles.actionButton}
-                      type="button"
-                    >
-                      {copied ? 'Copied!' : 'Copy'}
-                    </button>
+                    {showFullResponse && (
+                      <>
+                        <button
+                          onClick={() => setIsYaml(!isYaml)}
+                          className={styles.actionButton}
+                          type="button"
+                        >
+                          {isYaml ? 'JSON' : 'YAML'}
+                        </button>
+                        <button
+                          onClick={handleCopy}
+                          className={styles.actionButton}
+                          type="button"
+                        >
+                          {copied ? 'Copied!' : 'Copy'}
+                        </button>
+                      </>
+                    )}
                   </>
                 )}
               </div>
             </div>
 
+            {!resultCollapsed && (
+            <>
             {/* Decoded outputs */}
             {result.decoded && result.decoded.length > 0 && (
               <div className={styles.decodedSection}>
@@ -1023,6 +1049,8 @@ export default function ContractCaller() {
                 />
               </div>
             )}
+            </>
+            )}
           </div>
         )}
 
@@ -1058,10 +1086,16 @@ export default function ContractCaller() {
                   >
                     <div className={styles.historyTop}>
                       <div className={styles.historyChain}>{item.chain}</div>
+                      <span className={item.isWrite ? styles.historyWriteBadge : styles.historyReadBadge}>
+                        {item.isWrite ? 'W' : 'R'}
+                      </span>
                       <div className={styles.historyFunc}>{item.functionName}</div>
                     </div>
                     <div className={styles.historyContract}>
-                      {item.contractName || `${item.address.slice(0, 10)}...${item.address.slice(-8)}`}
+                      {item.contractName || 'Unknown Contract'}
+                    </div>
+                    <div className={styles.historyAddress}>
+                      {item.address}
                     </div>
                     <div className={styles.historyTime}>
                       {new Date(item.timestamp).toLocaleString()}

@@ -493,6 +493,31 @@
   text-transform: uppercase;
 }
 
+.failedBadge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #dc2626;
+  background-color: #fee2e2;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.collapseButton {
+  background: none;
+  border: none;
+  color: #d4d4d4;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  margin-right: 0.5rem;
+  transition: color 0.2s;
+}
+
+.collapseButton:hover {
+  color: #0070f3;
+}
+
 .resultActions {
   display: flex;
   gap: 0.75rem;
@@ -657,6 +682,26 @@
   font-size: 0.9rem;
   color: #0070f3;
   font-weight: 600;
+  flex: 1;
+}
+
+.historyReadBadge,
+.historyWriteBadge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.15rem 0.35rem;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.historyReadBadge {
+  color: #059669;
+  background-color: #d1fae5;
+}
+
+.historyWriteBadge {
+  color: #d97706;
+  background-color: #fef3c7;
 }
 
 .historyAddress {
