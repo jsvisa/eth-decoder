@@ -107,6 +107,7 @@ export default function ContractCaller() {
   const [hideTooltip, setHideTooltip] = useState(false)
   const [functionFilter, setFunctionFilter] = useState('')
   const [showFunctionList, setShowFunctionList] = useState(false)
+  const [copiedItem, setCopiedItem] = useState(null) // 'selector' | 'signature' | null
   const pendingArgsRef = useRef(null)
 
   // Helper to check if function is read-only
@@ -888,16 +889,18 @@ export default function ContractCaller() {
                       </span>
                       {getFunctionSelector(getSelectedFunction()) && (
                         <span
-                          className={styles.funcSelector}
+                          className={`${styles.funcSelector} ${copiedItem === 'selector' ? styles.copied : ''}`}
                           onClick={async () => {
                             const selector = getFunctionSelector(getSelectedFunction())
                             if (selector) {
                               await navigator.clipboard.writeText(selector)
+                              setCopiedItem('selector')
+                              setTimeout(() => setCopiedItem(null), 1500)
                             }
                           }}
                           title="Click to copy selector"
                         >
-                          {getFunctionSelector(getSelectedFunction())}
+                          {copiedItem === 'selector' ? 'Copied!' : getFunctionSelector(getSelectedFunction())}
                         </span>
                       )}
                     </>
@@ -907,15 +910,17 @@ export default function ContractCaller() {
                   {selectedFunction && getSelectedFunction() ? (
                     <div className={styles.selectedFunctionDisplay}>
                       <span
-                        className={styles.selectedFunctionText}
+                        className={`${styles.selectedFunctionText} ${copiedItem === 'signature' ? styles.copiedText : ''}`}
                         onClick={async () => {
                           const func = getSelectedFunction()
                           const sig = `${selectedFunction}(${func.inputs.map(i => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})`
                           await navigator.clipboard.writeText(sig)
+                          setCopiedItem('signature')
+                          setTimeout(() => setCopiedItem(null), 1500)
                         }}
                         title="Click to copy function signature"
                       >
-                        {selectedFunction}({getSelectedFunction().inputs.map(i => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})
+                        {copiedItem === 'signature' ? '✓ Copied!' : `${selectedFunction}(${getSelectedFunction().inputs.map(i => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})`}
                       </span>
                       <button
                         className={styles.clearFunctionBtn}

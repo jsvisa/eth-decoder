@@ -359,6 +359,11 @@
   color: #4338ca;
 }
 
+.funcSelector.copied {
+  background-color: #d1fae5;
+  color: #059669;
+}
+
 /* Function searchable dropdown */
 .functionSelectWrapper {
   position: relative;
@@ -391,6 +396,10 @@
 
 .selectedFunctionText:hover {
   color: #0070f3;
+}
+
+.selectedFunctionText.copiedText {
+  color: #059669;
 }
 
 .clearFunctionBtn {
