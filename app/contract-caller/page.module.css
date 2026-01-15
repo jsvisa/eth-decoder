@@ -1272,7 +1272,7 @@
 .traceContractWrapper,
 .traceFuncWrapper {
   position: relative;
-  display: inline;
+  display: inline-block;
 }
 
 .traceContract {
@@ -1306,25 +1306,62 @@
 .traceTooltip {
   display: none;
   position: absolute;
-  bottom: 100%;
+  top: 100%;
   left: 0;
   background-color: #1e1e1e;
   color: #d4d4d4;
-  padding: 0.5rem 0.75rem;
+  padding: 0.5rem;
   border-radius: 4px;
   font-size: 0.75rem;
-  white-space: nowrap;
-  max-width: 500px;
-  overflow: hidden;
-  text-overflow: ellipsis;
   z-index: 1000;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   border: 1px solid #444;
-  margin-bottom: 4px;
+  min-width: 200px;
+  max-width: 600px;
 }
 
-.traceContractWrapper:hover .traceTooltip,
-.traceFuncWrapper:hover .traceTooltip {
+/* Bridge to prevent tooltip from disappearing when moving mouse */
+.traceTooltip::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 0;
+  right: 0;
+  height: 10px;
+}
+
+.traceTooltipContent {
+  display: block;
+  word-break: break-all;
+  white-space: pre-wrap;
+  max-height: 150px;
+  overflow-y: auto;
+  margin-bottom: 0.5rem;
+  padding: 0.25rem;
+  background-color: #2d2d2d;
+  border-radius: 3px;
+}
+
+.traceTooltipCopy {
+  display: block;
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #d4d4d4;
+  background-color: #0070f3;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.traceTooltipCopy:hover {
+  background-color: #0051cc;
+}
+
+.traceContractWrapper:hover > .traceTooltip,
+.traceFuncWrapper:hover > .traceTooltip {
   display: block;
 }
 

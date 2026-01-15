@@ -103,6 +103,8 @@ export default function ContractCaller() {
     etherscan: '',
   })
   const [resultCollapsed, setResultCollapsed] = useState(false)
+  const [copiedTooltip, setCopiedTooltip] = useState(null)
+  const [hideTooltip, setHideTooltip] = useState(false)
 
   // Helper to check if function is read-only
   const isReadOnly = (func) => {
@@ -475,6 +477,18 @@ export default function ContractCaller() {
     return syntaxHighlight(result)
   }
 
+  // Copy tooltip content to clipboard
+  const copyTooltipContent = async (content) => {
+    try {
+      await navigator.clipboard.writeText(content)
+      setHideTooltip(true)
+      // Reset hide state after a short delay so tooltip can show again on next hover
+      setTimeout(() => setHideTooltip(false), 300)
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+  }
+
   // Format a value for display (truncate long strings, format arrays)
   const formatValue = (value) => {
     if (value === null || value === undefined) return 'null'
@@ -509,12 +523,36 @@ export default function ContractCaller() {
           <span className={styles.traceSignature}>
             <span className={styles.traceContractWrapper}>
               <span className={styles.traceContract}>{contractName}</span>
-              <span className={styles.traceTooltip}>{contractAddress}</span>
+              <span className={styles.traceTooltip}>
+                <span className={styles.traceTooltipContent}>{contractAddress}</span>
+                <button
+                  className={styles.traceTooltipCopy}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    copyTooltipContent(contractAddress, `contract-${depth}`)
+                  }}
+                >
+                  {copiedTooltip === `contract-${depth}` ? 'Copied!' : 'Copy'}
+                </button>
+              </span>
             </span>
             <span className={styles.traceDot}>.</span>
             <span className={styles.traceFuncWrapper}>
               <span className={styles.traceFuncName}>{funcName}</span>
-              {trace.input && <span className={styles.traceTooltip}>{trace.input}</span>}
+              {trace.input && (
+                <span className={styles.traceTooltip}>
+                  <span className={styles.traceTooltipContent}>{trace.input}</span>
+                  <button
+                    className={styles.traceTooltipCopy}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      copyTooltipContent(trace.input, `input-${depth}`)
+                    }}
+                  >
+                    {copiedTooltip === `input-${depth}` ? 'Copied!' : 'Copy'}
+                  </button>
+                </span>
+              )}
             </span>
             <span className={styles.traceParams}>({inputParams})</span>
             {outputParams && (
