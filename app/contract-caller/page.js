@@ -14,6 +14,7 @@ const CHAINS = [
 
 const STORAGE_KEY = 'contract_caller_history'
 const ABI_CACHE_PREFIX = 'abi-'
+const TENDERLY_SETTINGS_KEY = 'tenderly_settings'
 const MAX_HISTORY_ITEMS = 50
 
 // Helper functions for ABI cache
@@ -91,6 +92,12 @@ export default function ContractCaller() {
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false)
   const [addressFilter, setAddressFilter] = useState('')
   const [fromAddress, setFromAddress] = useState('')
+  const [showTenderlySettings, setShowTenderlySettings] = useState(false)
+  const [tenderlySettings, setTenderlySettings] = useState({
+    accessKey: '',
+    account: '',
+    project: '',
+  })
 
   // Helper to check if function is read-only
   const isReadOnly = (func) => {
@@ -105,7 +112,7 @@ export default function ContractCaller() {
     )
   }
 
-  // Load history and cached addresses on mount
+  // Load history, cached addresses, and Tenderly settings on mount
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
@@ -113,6 +120,12 @@ export default function ContractCaller() {
         setHistory(JSON.parse(stored))
       }
       setCachedAddresses(getCachedAddresses())
+
+      // Load Tenderly settings
+      const savedTenderly = localStorage.getItem(TENDERLY_SETTINGS_KEY)
+      if (savedTenderly) {
+        setTenderlySettings(JSON.parse(savedTenderly))
+      }
     } catch (err) {
       console.error('Failed to load history:', err)
     }
@@ -311,6 +324,19 @@ export default function ContractCaller() {
     }
   }
 
+  const saveTenderlySettings = (settings) => {
+    setTenderlySettings(settings)
+    try {
+      localStorage.setItem(TENDERLY_SETTINGS_KEY, JSON.stringify(settings))
+    } catch (err) {
+      console.error('Failed to save Tenderly settings:', err)
+    }
+  }
+
+  const isTenderlyConfigured = () => {
+    return tenderlySettings.accessKey && tenderlySettings.account && tenderlySettings.project
+  }
+
   const handleCall = async () => {
     if (!address || !selectedFunction || !parsedAbi) {
       setError('Please fill in all required fields')
@@ -320,23 +346,41 @@ export default function ContractCaller() {
     const selectedFunc = getSelectedFunction()
     const isWrite = !isReadOnly(selectedFunc)
 
+    // Check Tenderly configuration for write functions
+    if (isWrite && !isTenderlyConfigured()) {
+      setError('Please configure Tenderly API settings to simulate write functions')
+      setShowTenderlySettings(true)
+      return
+    }
+
     setLoading(true)
     setError(null)
     setResult(null)
 
     try {
-      const response = await fetch('/api/call-contract', {
+      // Use different API for read vs write functions
+      const apiEndpoint = isWrite ? '/api/simulate' : '/api/call-contract'
+
+      const requestBody = {
+        chain,
+        address,
+        functionName: selectedFunction,
+        args,
+        abi: parsedAbi,
+      }
+
+      // Add Tenderly credentials for write functions
+      if (isWrite) {
+        requestBody.fromAddress = fromAddress || undefined
+        requestBody.tenderlyAccessKey = tenderlySettings.accessKey
+        requestBody.tenderlyAccount = tenderlySettings.account
+        requestBody.tenderlyProject = tenderlySettings.project
+      }
+
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chain,
-          address,
-          functionName: selectedFunction,
-          args,
-          abi: parsedAbi,
-          fromAddress: isWrite ? (fromAddress || undefined) : undefined,
-          simulate: isWrite,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       const data = await response.json()
@@ -345,7 +389,14 @@ export default function ContractCaller() {
         throw new Error(data.error || 'Failed to call contract')
       }
 
-      setResult(data)
+      // For simulation, check if it was successful
+      if (isWrite && data.success === false) {
+        setError(data.error || 'Simulation failed: transaction would revert')
+        setResult(data) // Still show result for debugging
+      } else {
+        setResult(data)
+      }
+
       saveToHistory({ chain, address, selectedFunction, args }, data)
     } catch (err) {
       setError(err.message)
@@ -413,6 +464,64 @@ export default function ContractCaller() {
     <main className={styles.main}>
       <div className={styles.container}>
         <h1 className={styles.title}>Contract Caller</h1>
+
+        {/* Tenderly Settings Panel */}
+        <div className={styles.settingsSection}>
+          <button
+            onClick={() => setShowTenderlySettings(!showTenderlySettings)}
+            className={`${styles.settingsToggle} ${isTenderlyConfigured() ? styles.settingsConfigured : ''}`}
+            type="button"
+          >
+            {isTenderlyConfigured() ? '✓ Tenderly Configured' : '⚙ Configure Tenderly'}
+          </button>
+
+          {showTenderlySettings && (
+            <div className={styles.settingsPanel}>
+              <h3 className={styles.settingsTitle}>Tenderly API Settings</h3>
+              <p className={styles.settingsDesc}>
+                Required for simulating write functions. Get your credentials from{' '}
+                <a href="https://dashboard.tenderly.co/account/authorization" target="_blank" rel="noopener noreferrer">
+                  Tenderly Dashboard
+                </a>
+              </p>
+              <div className={styles.settingsFields}>
+                <div className={styles.settingsField}>
+                  <label className={styles.settingsLabel}>Access Key</label>
+                  <input
+                    type="password"
+                    value={tenderlySettings.accessKey}
+                    onChange={(e) => saveTenderlySettings({ ...tenderlySettings, accessKey: e.target.value })}
+                    placeholder="Enter your Tenderly access key..."
+                    className={styles.settingsInput}
+                  />
+                </div>
+                <div className={styles.settingsField}>
+                  <label className={styles.settingsLabel}>Account Slug</label>
+                  <input
+                    type="text"
+                    value={tenderlySettings.account}
+                    onChange={(e) => saveTenderlySettings({ ...tenderlySettings, account: e.target.value })}
+                    placeholder="Your account slug (from URL)"
+                    className={styles.settingsInput}
+                  />
+                </div>
+                <div className={styles.settingsField}>
+                  <label className={styles.settingsLabel}>Project Slug</label>
+                  <input
+                    type="text"
+                    value={tenderlySettings.project}
+                    onChange={(e) => saveTenderlySettings({ ...tenderlySettings, project: e.target.value })}
+                    placeholder="Your project slug (from URL)"
+                    className={styles.settingsInput}
+                  />
+                </div>
+              </div>
+              <p className={styles.settingsNote}>
+                Settings are stored locally in your browser and never sent to our servers.
+              </p>
+            </div>
+          )}
+        </div>
 
         <div className={styles.form}>
           <div className={styles.row}>
@@ -668,6 +777,95 @@ export default function ContractCaller() {
                         ? JSON.stringify(output.value, null, 2)
                         : String(output.value)}
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Gas used (simulation only) */}
+            {result.simulated && result.gasUsed && (
+              <div className={styles.gasSection}>
+                <h3 className={styles.gasTitle}>Gas Used</h3>
+                <div className={styles.gasValue}>{result.gasUsed.toLocaleString()}</div>
+              </div>
+            )}
+
+            {/* Event logs (simulation only) */}
+            {result.simulated && result.logs && result.logs.length > 0 && (
+              <div className={styles.logsSection}>
+                <h3 className={styles.logsTitle}>Event Logs ({result.logs.length})</h3>
+                {result.logs.map((log, index) => (
+                  <div key={index} className={styles.logItem}>
+                    <div className={styles.logHeader}>
+                      <span className={styles.logName}>{log.name || 'Unknown Event'}</span>
+                      <span className={styles.logAddress}>
+                        {log.address?.slice(0, 10)}...{log.address?.slice(-8)}
+                      </span>
+                    </div>
+                    {log.inputs && log.inputs.length > 0 && (
+                      <div className={styles.logInputs}>
+                        {log.inputs.map((input, i) => (
+                          <div key={i} className={styles.logInput}>
+                            <span className={styles.logInputName}>{input.name || `arg${i}`}:</span>
+                            <span className={styles.logInputValue}>
+                              {typeof input.value === 'object'
+                                ? JSON.stringify(input.value)
+                                : String(input.value)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {(!log.inputs || log.inputs.length === 0) && log.topics && log.topics.length > 0 && (
+                      <div className={styles.logTopics}>
+                        <div className={styles.logTopicsLabel}>Topics:</div>
+                        {log.topics.map((topic, i) => (
+                          <div key={i} className={styles.logTopic}>
+                            [{i}] {topic}
+                          </div>
+                        ))}
+                        {log.data && log.data !== '0x' && (
+                          <div className={styles.logData}>
+                            <span className={styles.logDataLabel}>Data:</span> {log.data}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* State changes (simulation only) */}
+            {result.simulated && result.stateChanges && result.stateChanges.length > 0 && (
+              <div className={styles.stateSection}>
+                <h3 className={styles.stateTitle}>State Changes ({result.stateChanges.length})</h3>
+                {result.stateChanges.map((change, index) => (
+                  <div key={index} className={styles.stateItem}>
+                    <div className={styles.stateAddress}>
+                      {change.address?.slice(0, 10)}...{change.address?.slice(-8)}
+                    </div>
+                    {change.changes && change.changes.length > 0 && (
+                      <div className={styles.stateChanges}>
+                        {change.changes.map((c, i) => (
+                          <div key={i} className={styles.stateChange}>
+                            <div className={styles.stateSlot}>
+                              <span className={styles.stateSlotLabel}>Slot:</span> {c.key || c.slot}
+                            </div>
+                            {c.original !== undefined && (
+                              <div className={styles.stateOriginal}>
+                                <span className={styles.stateLabel}>Before:</span> {c.original}
+                              </div>
+                            )}
+                            {c.dirty !== undefined && (
+                              <div className={styles.stateDirty}>
+                                <span className={styles.stateLabel}>After:</span> {c.dirty}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
