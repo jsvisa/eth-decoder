@@ -1,0 +1,402 @@
+.main {
+  min-height: 100vh;
+  padding: 2rem;
+  background: linear-gradient(to bottom, #f7f7f7, #e7e7e7);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  background: white;
+  padding: 3rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.title {
+  text-align: center;
+  color: #333;
+  margin-bottom: 2.5rem;
+  font-size: 2.5rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.row {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.label {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.input {
+  padding: 0.875rem 1rem;
+  font-size: 1rem;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  transition: border-color 0.3s;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #0070f3;
+}
+
+.input:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.select {
+  padding: 0.875rem 1rem;
+  font-size: 1rem;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  background-color: white;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.select:focus {
+  outline: none;
+  border-color: #0070f3;
+}
+
+.select:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.addressRow {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.addressRow .input {
+  flex: 1;
+}
+
+.fetchButton {
+  padding: 0.875rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0070f3;
+  background-color: white;
+  border: 2px solid #0070f3;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.fetchButton:hover:not(:disabled) {
+  background-color: #0070f3;
+  color: white;
+}
+
+.fetchButton:disabled {
+  background-color: #f5f5f5;
+  border-color: #ccc;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.textarea {
+  padding: 1rem;
+  font-size: 0.9rem;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  resize: vertical;
+  min-height: 120px;
+  transition: border-color 0.3s;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: #0070f3;
+}
+
+.textarea:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.argsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.argField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.argLabel {
+  font-size: 0.875rem;
+  color: #555;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+.button {
+  padding: 1rem 2rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: white;
+  background-color: #0070f3;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.button:hover:not(:disabled) {
+  background-color: #0051cc;
+}
+
+.button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.error {
+  padding: 1.25rem;
+  background-color: #fee;
+  border: 1px solid #fcc;
+  border-radius: 6px;
+  color: #c33;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+.result {
+  padding: 1.5rem;
+  background-color: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+
+.resultHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.result h2 {
+  margin: 0;
+  color: #d4d4d4;
+  font-size: 1.5rem;
+}
+
+.resultActions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.actionButton {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #d4d4d4;
+  background-color: #2d2d2d;
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.actionButton:hover {
+  background-color: #3d3d3d;
+  border-color: #0070f3;
+}
+
+.json {
+  background-color: #1e1e1e;
+  padding: 1.5rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0;
+  color: #d4d4d4;
+  white-space: pre-wrap;
+}
+
+.jsonKey {
+  color: #9cdcfe;
+}
+
+.jsonString {
+  color: #ce9178;
+}
+
+.jsonNumber {
+  color: #b5cea8;
+}
+
+.jsonBoolean {
+  color: #569cd6;
+}
+
+.jsonNull {
+  color: #569cd6;
+}
+
+.historySection {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 2px solid #e7e7e7;
+}
+
+.historyHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.historyHeader h3 {
+  margin: 0;
+  color: #333;
+  font-size: 1.5rem;
+}
+
+.historyActions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.historyToggle,
+.historyClear {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background-color: white;
+  color: #333;
+}
+
+.historyToggle:hover {
+  background-color: #f5f5f5;
+  border-color: #0070f3;
+}
+
+.historyClear {
+  color: #c33;
+  border-color: #fcc;
+}
+
+.historyClear:hover {
+  background-color: #fee;
+  border-color: #c33;
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.historyItem {
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.historyItem:hover {
+  background-color: #e8f4ff;
+  border-color: #0070f3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 112, 243, 0.15);
+}
+
+.historyTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.historyChain {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: white;
+  background-color: #0070f3;
+  padding: 0.25rem 0.5rem;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.historyFunc {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.9rem;
+  color: #0070f3;
+  font-weight: 600;
+}
+
+.historyAddress {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 0.25rem;
+}
+
+.historyTime {
+  font-size: 0.75rem;
+  color: #999;
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .row {
+    flex-direction: column;
+  }
+
+  .addressRow {
+    flex-direction: column;
+  }
+
+  .container {
+    padding: 1.5rem;
+  }
+
+  .title {
+    font-size: 1.75rem;
+  }
+}

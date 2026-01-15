@@ -1,14 +1,18 @@
 import './globals.css'
+import Nav from './components/Nav'
 
 export const metadata = {
-  title: 'EVM Tx.input Decoder App',
-  description: 'Decode EVM transaction input data',
+  title: 'EVM Tools',
+  description: 'EVM transaction decoder and contract caller',
 }
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <Nav />
+        {children}
+      </body>
     </html>
   )
 }
