@@ -157,6 +157,12 @@
   flex-direction: column;
   gap: 0.5rem;
   flex: 1;
+  width: 100%;
+}
+
+.field .input,
+.field .select {
+  width: 100%;
 }
 
 .label {
@@ -356,6 +362,10 @@
 /* Function searchable dropdown */
 .functionSelectWrapper {
   position: relative;
+  width: 100%;
+}
+
+.functionSelectWrapper .input {
   width: 100%;
 }
 
