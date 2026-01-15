@@ -475,6 +475,81 @@ export default function ContractCaller() {
     return syntaxHighlight(result)
   }
 
+  // Format a value for display (truncate long strings, format arrays)
+  const formatValue = (value) => {
+    if (value === null || value === undefined) return 'null'
+    if (typeof value === 'object') {
+      const str = JSON.stringify(value)
+      return str.length > 60 ? str.slice(0, 60) + '...' : str
+    }
+    const str = String(value)
+    return str.length > 60 ? str.slice(0, 30) + '...' + str.slice(-20) : str
+  }
+
+  // Render call trace node recursively as a tree
+  const renderCallTraceNode = (trace, depth) => {
+    if (!trace) return null
+
+    // Build function signature: ContractName.functionName(param1=value1, param2=value2)
+    const contractName = trace.toName || trace.to?.slice(0, 10) + '...'
+    const funcName = trace.functionName || trace.input?.slice(0, 10) || '()'
+    const inputParams = trace.decodedInputs?.map(p => `${p.name}=${formatValue(p.value)}`).join(', ') || ''
+    const outputParams = trace.decodedOutputs?.map(p => `${p.name}=${formatValue(p.value)}`).join(', ') || ''
+
+    return (
+      <div key={depth} className={styles.traceNode}>
+        {/* Main call line */}
+        <div className={`${styles.traceCall} ${trace.error ? styles.traceCallError : ''}`}>
+          <span className={styles.traceType}>{trace.type}</span>
+          <span className={styles.traceSignature}>
+            <span className={styles.traceContract}>{contractName}</span>
+            <span className={styles.traceDot}>.</span>
+            <span className={styles.traceFuncName}>{funcName}</span>
+            <span className={styles.traceParams}>({inputParams})</span>
+            {outputParams && (
+              <>
+                <span className={styles.traceArrow}> → </span>
+                <span className={styles.traceOutput}>({outputParams})</span>
+              </>
+            )}
+          </span>
+          {trace.gasUsed && (
+            <span className={styles.traceGas}>{Number(trace.gasUsed).toLocaleString()} gas</span>
+          )}
+        </div>
+
+        {/* Error message if any */}
+        {trace.error && (
+          <div className={styles.traceErrorMsg}>
+            Error: {trace.errorReason || trace.error}
+          </div>
+        )}
+
+        {/* Logs emitted during this call */}
+        {trace.logs && trace.logs.length > 0 && (
+          <div className={styles.traceLogsList}>
+            {trace.logs.map((log, i) => (
+              <div key={i} className={styles.traceLog}>
+                <span className={styles.traceLogIcon}>📝</span>
+                <span className={styles.traceLogName}>{log.name}</span>
+                <span className={styles.traceLogParams}>
+                  ({log.inputs?.map(p => `${p.name}=${formatValue(p.value)}`).join(', ')})
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Nested calls */}
+        {trace.calls && trace.calls.length > 0 && (
+          <div className={styles.traceChildren}>
+            {trace.calls.map((child, i) => renderCallTraceNode(child, `${depth}-${i}`))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const handleCopy = async () => {
     try {
       const text = isYaml
@@ -922,118 +997,44 @@ export default function ContractCaller() {
               </div>
             )}
 
-            {/* Call Traces (simulation only) */}
-            {result.simulated && result.callTrace && result.callTrace.length > 0 && (
+            {/* Call Trace Tree (simulation only) */}
+            {result.simulated && result.callTrace && (
               <div className={styles.traceSection}>
-                <h3 className={styles.traceTitle}>Call Trace ({result.callTrace.length} calls)</h3>
-                <div className={styles.traceList}>
-                  {result.callTrace.map((trace, index) => (
-                    <div
-                      key={index}
-                      className={`${styles.traceItem} ${trace.error ? styles.traceError : ''}`}
-                      style={{ marginLeft: `${trace.depth * 1.5}rem` }}
-                    >
-                      <div className={styles.traceHeader}>
-                        <span className={styles.traceType}>{trace.type}</span>
-                        <span className={styles.traceFunction}>
-                          {trace.functionName || trace.functionSelector || '(unknown)'}
-                        </span>
-                        {trace.gasUsed && (
-                          <span className={styles.traceGas}>{trace.gasUsed.toLocaleString()} gas</span>
-                        )}
-                      </div>
-                      <div className={styles.traceAddresses}>
-                        <span className={styles.traceFrom}>
-                          {trace.from?.slice(0, 10)}...{trace.from?.slice(-6)}
-                        </span>
-                        <span className={styles.traceArrow}>→</span>
-                        <span className={styles.traceTo}>
-                          {trace.to?.slice(0, 10)}...{trace.to?.slice(-6)}
-                        </span>
-                        {trace.value && trace.value !== '0' && (
-                          <span className={styles.traceValue}>{trace.value} wei</span>
-                        )}
-                      </div>
-                      {trace.decodedInput && trace.decodedInput.parameters?.length > 0 && (
-                        <div className={styles.traceParams}>
-                          <div className={styles.traceParamsLabel}>Input:</div>
-                          {trace.decodedInput.parameters.map((param, i) => (
-                            <div key={i} className={styles.traceParam}>
-                              <span className={styles.traceParamName}>{param.name}</span>
-                              <span className={styles.traceParamType}>({param.type})</span>
-                              <span className={styles.traceParamValue}>
-                                {typeof param.value === 'object'
-                                  ? JSON.stringify(param.value)
-                                  : String(param.value)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {trace.decodedOutput && trace.decodedOutput.length > 0 && (
-                        <div className={styles.traceOutput}>
-                          <div className={styles.traceOutputLabel}>Output:</div>
-                          {trace.decodedOutput.map((out, i) => (
-                            <div key={i} className={styles.traceOutputItem}>
-                              <span className={styles.traceParamName}>{out.name}</span>
-                              <span className={styles.traceParamType}>({out.type})</span>
-                              <span className={styles.traceOutputValue}>
-                                {typeof out.value === 'object'
-                                  ? JSON.stringify(out.value)
-                                  : String(out.value)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {trace.error && (
-                        <div className={styles.traceErrorMsg}>
-                          {trace.errorReason || trace.error}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <h3 className={styles.traceTitle}>Call Trace</h3>
+                <div className={styles.traceTree}>
+                  {renderCallTraceNode(result.callTrace, 0)}
                 </div>
               </div>
             )}
 
-            {/* Internal Transactions - Parity style traces (simulation only) */}
-            {result.simulated && result.internalTransactions && result.internalTransactions.length > 0 && (
-              <div className={styles.internalTxSection}>
-                <h3 className={styles.internalTxTitle}>Internal Transactions ({result.internalTransactions.length})</h3>
-                <div className={styles.internalTxList}>
-                  {result.internalTransactions.map((tx, index) => (
-                    <div key={index} className={`${styles.internalTxItem} ${tx.error ? styles.internalTxError : ''}`}>
-                      <div className={styles.internalTxHeader}>
-                        <span className={styles.internalTxIndex}>#{tx.index}</span>
-                        <span className={styles.internalTxType}>{tx.type}</span>
-                        {tx.gasUsed && (
-                          <span className={styles.internalTxGas}>{tx.gasUsed.toLocaleString()} gas</span>
-                        )}
-                      </div>
-                      <div className={styles.internalTxAddresses}>
-                        <span className={styles.internalTxFrom}>
-                          {tx.from?.slice(0, 10)}...{tx.from?.slice(-6)}
+            {/* Asset Changes (simulation only) */}
+            {result.simulated && result.assetChanges && result.assetChanges.length > 0 && (
+              <div className={styles.assetSection}>
+                <h3 className={styles.assetTitle}>Asset Changes ({result.assetChanges.length})</h3>
+                <div className={styles.assetList}>
+                  {result.assetChanges.map((change, index) => (
+                    <div key={index} className={styles.assetItem}>
+                      <div className={styles.assetHeader}>
+                        <span className={styles.assetType}>{change.type || 'TRANSFER'}</span>
+                        <span className={styles.assetToken}>
+                          {change.token_info?.symbol || change.token_info?.name || 'Unknown Token'}
                         </span>
-                        <span className={styles.internalTxArrow}>→</span>
-                        <span className={styles.internalTxTo}>
-                          {tx.to?.slice(0, 10)}...{tx.to?.slice(-6)}
-                        </span>
-                        {tx.value && tx.value !== '0' && (
-                          <span className={styles.internalTxValue}>{tx.value} wei</span>
-                        )}
                       </div>
-                      {tx.input && tx.input !== '0x' && (
-                        <div className={styles.internalTxData}>
-                          <span className={styles.internalTxDataLabel}>Input:</span>
-                          <span className={styles.internalTxDataValue}>
-                            {tx.input.length > 66 ? `${tx.input.slice(0, 66)}...` : tx.input}
+                      <div className={styles.assetDetails}>
+                        {change.from && (
+                          <span className={styles.assetFrom}>
+                            From: {change.from.slice(0, 10)}...{change.from.slice(-6)}
                           </span>
-                        </div>
-                      )}
-                      {tx.error && (
-                        <div className={styles.internalTxErrorMsg}>{tx.error}</div>
-                      )}
+                        )}
+                        {change.to && (
+                          <span className={styles.assetTo}>
+                            To: {change.to.slice(0, 10)}...{change.to.slice(-6)}
+                          </span>
+                        )}
+                        <span className={styles.assetAmount}>
+                          {change.amount || change.raw_amount}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>

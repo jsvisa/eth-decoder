@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { encodeFunctionData } from 'viem'
 
-// Tenderly network IDs
+// Tenderly network IDs for simulation API
 const TENDERLY_NETWORK_IDS = {
   ethereum: '1',
   arbitrum: '42161',
@@ -104,12 +104,10 @@ export async function POST(request) {
       value: '0',
       save: false,
       save_if_fails: false,
-      simulation_type: 'full',
-      // Use parity-style call traces
-      generate_access_list: true,
+      simulation_type: 'full', // Full mode includes decoded call traces
     }
 
-    // Call Tenderly API
+    // Call Tenderly Simulation API for decoded outputs, logs, state changes
     const tenderlyUrl = `https://api.tenderly.co/api/v1/account/${tenderlyAccount}/project/${tenderlyProject}/simulate`
 
     const response = await fetch(tenderlyUrl, {
@@ -198,78 +196,145 @@ export async function POST(request) {
       }
     })
 
-    // Extract call traces recursively
-    const extractCallTrace = (trace, depth = 0) => {
+    // Cross-contract call types we want to display (not internal opcodes)
+    const CROSS_CONTRACT_CALLS = ['CALL', 'DELEGATECALL', 'STATICCALL', 'CALLCODE', 'CREATE', 'CREATE2']
+
+    // Extract call trace tree from transaction.transaction_info.call_trace
+    // Only includes cross-contract calls, not internal opcodes like SLOAD, SSTORE, JUMPDEST
+    // Returns an array of contract calls found at this level or nested within
+    const extractContractCalls = (trace, logsArray = []) => {
+      if (!trace) return []
+
+      const callType = (trace.call_type || '').toUpperCase()
+      const isContractCall = CROSS_CONTRACT_CALLS.includes(callType)
+
+      // Recursively collect contract calls from children
+      let nestedCalls = []
+      if (trace.calls && Array.isArray(trace.calls)) {
+        for (const child of trace.calls) {
+          nestedCalls.push(...extractContractCalls(child, logsArray))
+        }
+      }
+
+      // If this is a contract call, create a node for it with nested calls as children
+      if (isContractCall) {
+        // Find logs that belong to this call (by matching address)
+        const callLogs = logsArray.filter(log =>
+          log.raw?.address?.toLowerCase() === trace.to?.toLowerCase()
+        ).map(log => ({
+          name: log.name || 'Unknown Event',
+          address: log.raw?.address,
+          inputs: log.inputs?.map(input => ({
+            name: input.soltype?.name || input.name || 'unknown',
+            type: input.soltype?.type || input.type || 'unknown',
+            value: serializeResult(input.value),
+            indexed: input.soltype?.indexed || false,
+          })) || [],
+        }))
+
+        // Extract decoded inputs
+        const decodedInputs = trace.decoded_input?.map(input => ({
+          name: input.soltype?.name || input.name || 'unknown',
+          type: input.soltype?.type || input.type || 'unknown',
+          value: serializeResult(input.value),
+        })) || []
+
+        // Extract decoded outputs
+        const decodedOutputs = trace.decoded_output?.map(output => ({
+          name: output.soltype?.name || output.name || 'unknown',
+          type: output.soltype?.type || output.type || 'unknown',
+          value: serializeResult(output.value),
+        })) || []
+
+        return [{
+          type: callType,
+          from: trace.from,
+          to: trace.to,
+          toName: trace.contract_name || null,
+          functionName: trace.function_name || null,
+          value: trace.value || '0',
+          gas: trace.gas,
+          gasUsed: trace.gas_used,
+          input: trace.input,
+          output: trace.output,
+          decodedInputs,
+          decodedOutputs,
+          error: trace.error || null,
+          errorReason: trace.error_reason || null,
+          logs: callLogs,
+          calls: nestedCalls,
+        }]
+      }
+
+      // Not a contract call, promote nested calls up
+      return nestedCalls
+    }
+
+    // Build call trace tree starting from root
+    const buildCallTraceTree = (trace, logsArray = []) => {
       if (!trace) return null
 
-      const traceItem = {
-        depth,
-        type: trace.call_type || 'CALL',
+      // Get the root call info
+      const callLogs = logsArray.filter(log =>
+        log.raw?.address?.toLowerCase() === trace.to?.toLowerCase()
+      ).map(log => ({
+        name: log.name || 'Unknown Event',
+        address: log.raw?.address,
+        inputs: log.inputs?.map(input => ({
+          name: input.soltype?.name || input.name || 'unknown',
+          type: input.soltype?.type || input.type || 'unknown',
+          value: serializeResult(input.value),
+          indexed: input.soltype?.indexed || false,
+        })) || [],
+      }))
+
+      const decodedInputs = trace.decoded_input?.map(input => ({
+        name: input.soltype?.name || input.name || 'unknown',
+        type: input.soltype?.type || input.type || 'unknown',
+        value: serializeResult(input.value),
+      })) || []
+
+      const decodedOutputs = trace.decoded_output?.map(output => ({
+        name: output.soltype?.name || output.name || 'unknown',
+        type: output.soltype?.type || output.type || 'unknown',
+        value: serializeResult(output.value),
+      })) || []
+
+      // Collect all contract calls from children
+      let childContractCalls = []
+      if (trace.calls && Array.isArray(trace.calls)) {
+        for (const child of trace.calls) {
+          childContractCalls.push(...extractContractCalls(child, logsArray))
+        }
+      }
+
+      return {
+        type: (trace.call_type || 'CALL').toUpperCase(),
         from: trace.from,
         to: trace.to,
+        toName: trace.contract_name || null,
+        functionName: trace.function_name || null,
         value: trace.value || '0',
         gas: trace.gas,
         gasUsed: trace.gas_used,
         input: trace.input,
         output: trace.output,
-        functionName: trace.function_name || trace.decoded_input?.method_name || null,
-        functionSelector: trace.input?.slice(0, 10) || null,
-        decodedInput: trace.decoded_input ? {
-          methodName: trace.decoded_input.method_name,
-          parameters: trace.decoded_input.parameters?.map(p => ({
-            name: p.soltype?.name || p.name,
-            type: p.soltype?.type || p.type,
-            value: serializeResult(p.value),
-          })) || [],
-        } : null,
-        decodedOutput: trace.decoded_output ?
-          trace.decoded_output.map(o => ({
-            name: o.soltype?.name || o.name || 'result',
-            type: o.soltype?.type || o.type,
-            value: serializeResult(o.value),
-          })) : null,
+        decodedInputs,
+        decodedOutputs,
         error: trace.error || null,
         errorReason: trace.error_reason || null,
-        calls: [],
+        logs: callLogs,
+        calls: childContractCalls,
       }
-
-      // Process nested calls
-      if (trace.calls && Array.isArray(trace.calls)) {
-        traceItem.calls = trace.calls.map(subTrace => extractCallTrace(subTrace, depth + 1)).filter(Boolean)
-      }
-
-      return traceItem
     }
 
-    // Get the root call trace
-    const rootTrace = transaction?.transaction_info?.call_trace
-    const callTrace = extractCallTrace(rootTrace)
+    // Build call trace tree
+    const rawCallTrace = transaction?.transaction_info?.call_trace
+    const callTraceTree = buildCallTraceTree(rawCallTrace, logs)
 
-    // Flatten call trace for easier display
-    const flattenTrace = (trace, result = []) => {
-      if (!trace) return result
-      result.push(trace)
-      if (trace.calls) {
-        trace.calls.forEach(subTrace => flattenTrace(subTrace, result))
-      }
-      return result
-    }
-    const flatCallTrace = flattenTrace(callTrace)
-
-    // Extract parity-style internal transactions (traces)
-    const internalTxs = transaction?.transaction_info?.internal_transactions || []
-    const internalTransactions = internalTxs.map((tx, index) => ({
-      index,
-      type: tx.type || tx.call_type || 'CALL',
-      from: tx.from,
-      to: tx.to,
-      value: tx.value || '0',
-      gas: tx.gas,
-      gasUsed: tx.gas_used,
-      input: tx.input,
-      output: tx.output,
-      error: tx.error || null,
-    }))
+    // Extract asset changes and balance changes
+    const assetChanges = transaction?.transaction_info?.asset_changes || []
+    const balanceChanges = transaction?.transaction_info?.balance_changes || []
 
     // Extract state changes
     const stateDiff = simulation?.state_diff || []
@@ -290,10 +355,10 @@ export async function POST(request) {
       rawData: rawOutput,
       decoded: decodedOutputs,
       gasUsed,
-      internalTransactions,
-      accessList,
+      assetChanges,
+      balanceChanges,
       logs: parsedLogs,
-      callTrace: flatCallTrace,
+      callTrace: callTraceTree,
       stateChanges,
       error: success ? null : (transaction?.error_message || 'Transaction reverted'),
     })
