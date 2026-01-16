@@ -1,8 +1,10 @@
-# EVM Tx.input Decoder App
+# EVM Tx.input Decoder & Contract Caller
 
-A simple single-page web application that decodes EVM transaction input data using a backend API. Built with Next.js and designed for deployment on Vercel.
+A web application for decoding EVM transaction input data and interacting with smart contracts. Built with Next.js and designed for deployment on Vercel.
 
 ## Features
+
+### Transaction Decoder
 
 - Hex string validation and input field for EVM transaction data
 - Real-time decoding via proxied API
@@ -11,9 +13,33 @@ A simple single-page web application that decodes EVM transaction input data usi
 - Shareable URLs - generate links to share decoded transactions
 - Recent decode history (stores up to 100 items in browser localStorage)
 - Click history items to quickly reload previous decodes
-- Clean, responsive UI
-- Backend endpoint hidden from frontend (security)
 - Support for multicall, ABI, and signature decoding options
+
+### Contract Caller
+
+- **Multi-chain support**: Ethereum, Arbitrum, Base, Polygon, BSC
+- **ABI Management**:
+  - Auto-fetch ABI from block explorers (Etherscan, etc.)
+  - Automatic proxy contract detection and implementation ABI fetching
+  - ABI caching in localStorage for faster subsequent loads
+  - Contract address autocomplete from cached ABIs
+  - Compact ABI display format
+- **Function Interaction**:
+  - Searchable function dropdown with R/W badges
+  - Function selector (4-byte signature) display with copy functionality
+  - Full function signature display with copy functionality
+  - Support for all Solidity types including arrays and tuples
+  - ETH value input for payable functions
+- **Read Functions**: Direct RPC calls to read contract state
+- **Write Functions (Simulation)**:
+  - Tenderly integration for transaction simulation
+  - Decoded event logs with parameter names and types
+  - Call trace tree visualization with nested contract calls
+  - Asset/balance changes display
+  - State changes (storage diff) display
+  - Gas usage estimation
+- **History**: Recent calls saved with function name, args, and decoded output
+- **API Key Validation**: Test buttons to verify Etherscan and Tenderly API keys
 
 ## URL Parameters
 
@@ -48,6 +74,22 @@ npm run dev
 ```
 
 4. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+## API Keys Configuration
+
+The app requires API keys for full functionality:
+
+### Etherscan API Key
+- Required for fetching contract ABIs from block explorers
+- Get your free API key from [Etherscan](https://etherscan.io/myapikey)
+- Works across all supported chains (Etherscan, Arbiscan, Basescan, etc.)
+
+### Tenderly API Settings
+- Required for simulating write functions
+- Get your credentials from [Tenderly Dashboard](https://dashboard.tenderly.co/account/authorization)
+- Required fields: Access Key, Account Slug, Project Slug
+
+All API keys are stored locally in your browser and never sent to our servers.
 
 ## Deploy to Vercel
 
@@ -87,31 +129,35 @@ vercel --prod
 
 4. Deploy
 
-### Method 3: Deploy Button (One-Click)
-
-Click the button below to deploy:
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/YOUR_USERNAME/YOUR_REPO&env=BACKEND_URL&envDescription=Backend%20API%20endpoint&envLink=https://github.com/YOUR_USERNAME/YOUR_REPO)
-
 ## Environment Variables
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `BACKEND_URL` | Backend API endpoint URL | Yes |
+| `BACKEND_URL` | Backend API endpoint URL for transaction decoding | Yes |
 
 ## How It Works
 
-1. User enters data in the input field
+### Transaction Decoder
+1. User enters transaction data in the input field
 2. Frontend sends request to `/api/decode` (Next.js API route)
 3. API route proxies the request to the backend endpoint (hidden from frontend)
 4. Response is returned and displayed to the user
 
-This architecture keeps the backend endpoint secure and hidden from the client-side code.
+### Contract Caller
+1. User enters contract address and selects chain
+2. ABI is fetched from block explorer or loaded from cache
+3. User selects function and enters arguments
+4. For read functions: Direct RPC call via `/api/call-contract`
+5. For write functions: Simulation via Tenderly API through `/api/simulate`
+6. Results displayed with decoded outputs, logs, and call traces
+
+This architecture keeps the backend endpoints secure and hidden from the client-side code.
 
 ## Tech Stack
 
 - **Framework**: Next.js 14 (App Router)
 - **Runtime**: React 18
+- **Blockchain**: viem (for ABI encoding/decoding)
 - **Deployment**: Vercel
 - **Styling**: CSS Modules
 
@@ -121,16 +167,28 @@ This architecture keeps the backend endpoint secure and hidden from the client-s
 decoder/
 ├── app/
 │   ├── api/
-│   │   └── decode/
-│   │       └── route.js       # API proxy endpoint
-│   ├── layout.js              # Root layout
-│   ├── page.js                # Main page component
-│   ├── page.module.css        # Page styles
-│   └── globals.css            # Global styles
-├── .env.local                 # Local environment variables (not committed)
-├── .env.example               # Example environment variables
-├── package.json               # Dependencies
-└── README.md                  # This file
+│   │   ├── decode/
+│   │   │   └── route.js           # Transaction decode API proxy
+│   │   ├── call-contract/
+│   │   │   └── route.js           # Contract read function calls
+│   │   ├── fetch-abi/
+│   │   │   └── route.js           # ABI fetching from explorers
+│   │   └── simulate/
+│   │       └── route.js           # Tenderly simulation API
+│   ├── components/
+│   │   ├── Nav.js                 # Navigation component
+│   │   └── Nav.module.css         # Navigation styles
+│   ├── contract-caller/
+│   │   ├── page.js                # Contract Caller page
+│   │   └── page.module.css        # Contract Caller styles
+│   ├── layout.js                  # Root layout
+│   ├── page.js                    # Main decoder page
+│   ├── page.module.css            # Decoder page styles
+│   └── globals.css                # Global styles
+├── .env.local                     # Local environment variables (not committed)
+├── .env.example                   # Example environment variables
+├── package.json                   # Dependencies
+└── README.md                      # This file
 ```
 
 ## License
