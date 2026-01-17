@@ -194,6 +194,57 @@
   color: #dc2626;
 }
 
+/* Configured RPC list */
+.configuredRpcList {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.configuredRpcItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  margin-top: 0.5rem;
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.configuredRpcChain {
+  font-weight: 500;
+  color: #333;
+  min-width: 80px;
+}
+
+.configuredRpcUrl {
+  flex: 1;
+  color: #666;
+  font-family: monospace;
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.removeRpcButton {
+  padding: 0.25rem 0.5rem;
+  font-size: 1rem;
+  color: #999;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.removeRpcButton:hover {
+  color: #dc2626;
+  background-color: #fee2e2;
+}
+
 .form {
   display: flex;
   flex-direction: column;

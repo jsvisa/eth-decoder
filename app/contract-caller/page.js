@@ -17,7 +17,17 @@ const STORAGE_KEY = 'contract_caller_history'
 const ABI_CACHE_PREFIX = 'abi-'
 const TENDERLY_SETTINGS_KEY = 'tenderly_settings'
 const API_KEYS_STORAGE_KEY = 'api_keys_settings'
+const RPC_SETTINGS_KEY = 'rpc_settings'
 const MAX_HISTORY_ITEMS = 50
+
+// Expected chain IDs for validation
+const CHAIN_IDS = {
+  ethereum: 1,
+  arbitrum: 42161,
+  base: 8453,
+  polygon: 137,
+  bsc: 56,
+}
 
 // Helper functions for ABI cache
 const getAbiCacheKey = (chain, address) => `${ABI_CACHE_PREFIX}${chain}-${address.toLowerCase()}`
@@ -134,6 +144,13 @@ export default function ContractCaller() {
   const [apiKeys, setApiKeys] = useState({
     etherscan: '',
   })
+  const [rpcSettings, setRpcSettings] = useState({
+    ethereum: '',
+    arbitrum: '',
+    base: '',
+    polygon: '',
+    bsc: '',
+  })
   const [resultCollapsed, setResultCollapsed] = useState(false)
   const [hideTooltip, setHideTooltip] = useState(false)
   const [functionFilter, setFunctionFilter] = useState('')
@@ -144,6 +161,9 @@ export default function ContractCaller() {
   const [etherscanTestResult, setEtherscanTestResult] = useState(null) // 'success' | 'error' | null
   const [testingTenderly, setTestingTenderly] = useState(false)
   const [tenderlyTestResult, setTenderlyTestResult] = useState(null) // 'success' | 'error' | null
+  const [testingRpc, setTestingRpc] = useState({}) // { [chain]: boolean }
+  const [rpcTestResult, setRpcTestResult] = useState({}) // { [chain]: 'success' | 'error' | null }
+  const [selectedRpcChain, setSelectedRpcChain] = useState('ethereum') // For RPC settings dropdown
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null) // { functionName, args, timestamp }
 
@@ -216,6 +236,12 @@ export default function ContractCaller() {
       const savedApiKeys = localStorage.getItem(API_KEYS_STORAGE_KEY)
       if (savedApiKeys) {
         setApiKeys(JSON.parse(savedApiKeys))
+      }
+
+      // Load RPC settings
+      const savedRpcSettings = localStorage.getItem(RPC_SETTINGS_KEY)
+      if (savedRpcSettings) {
+        setRpcSettings(JSON.parse(savedRpcSettings))
       }
     } catch (err) {
       console.error('Failed to load history:', err)
@@ -354,6 +380,10 @@ export default function ContractCaller() {
       if (apiKeys.etherscan) {
         params.set('apiKey', apiKeys.etherscan)
       }
+      // Pass custom RPC if configured for this chain
+      if (rpcSettings[chain]) {
+        params.set('rpcUrl', rpcSettings[chain])
+      }
       const response = await fetch(`/api/fetch-abi?${params}`)
       const data = await response.json()
 
@@ -491,6 +521,15 @@ export default function ContractCaller() {
     }
   }
 
+  const saveRpcSettings = (settings) => {
+    setRpcSettings(settings)
+    try {
+      localStorage.setItem(RPC_SETTINGS_KEY, JSON.stringify(settings))
+    } catch (err) {
+      console.error('Failed to save RPC settings:', err)
+    }
+  }
+
   const isTenderlyConfigured = () => {
     return tenderlySettings.accessKey && tenderlySettings.account && tenderlySettings.project
   }
@@ -558,6 +597,56 @@ export default function ContractCaller() {
     }
   }
 
+  const testRpcEndpoint = async (chainId) => {
+    const rpcUrl = rpcSettings[chainId]
+    if (!rpcUrl) return
+
+    setTestingRpc(prev => ({ ...prev, [chainId]: true }))
+    setRpcTestResult(prev => ({ ...prev, [chainId]: null }))
+
+    try {
+      // Call eth_chainId to validate the RPC endpoint
+      const response = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'eth_chainId',
+          params: [],
+          id: 1,
+        }),
+      })
+
+      if (!response.ok) {
+        setRpcTestResult(prev => ({ ...prev, [chainId]: 'error' }))
+        return
+      }
+
+      const data = await response.json()
+
+      if (data.error) {
+        setRpcTestResult(prev => ({ ...prev, [chainId]: 'error' }))
+        return
+      }
+
+      // Validate chain ID matches expected
+      const returnedChainId = parseInt(data.result, 16)
+      const expectedChainId = CHAIN_IDS[chainId]
+
+      if (returnedChainId === expectedChainId) {
+        setRpcTestResult(prev => ({ ...prev, [chainId]: 'success' }))
+      } else {
+        setRpcTestResult(prev => ({ ...prev, [chainId]: 'mismatch' }))
+      }
+    } catch (err) {
+      setRpcTestResult(prev => ({ ...prev, [chainId]: 'error' }))
+    } finally {
+      setTestingRpc(prev => ({ ...prev, [chainId]: false }))
+      // Clear result after 3 seconds
+      setTimeout(() => setRpcTestResult(prev => ({ ...prev, [chainId]: null })), 3000)
+    }
+  }
+
   const handleCall = async () => {
     if (!address || !selectedFunction || !parsedAbi) {
       setError('Please fill in all required fields')
@@ -588,6 +677,11 @@ export default function ContractCaller() {
         functionName: selectedFunction,
         args,
         abi: parsedAbi,
+      }
+
+      // Add custom RPC if configured for this chain
+      if (rpcSettings[chain]) {
+        requestBody.rpcUrl = rpcSettings[chain]
       }
 
       // Add Tenderly credentials for write functions
@@ -912,6 +1006,77 @@ export default function ContractCaller() {
                 >
                   {testingTenderly ? 'Testing...' : tenderlyTestResult === 'success' ? '✓ Valid' : tenderlyTestResult === 'error' ? '✗ Invalid' : 'Test Connection'}
                 </button>
+              </div>
+
+              {/* Custom RPC Settings */}
+              <div className={styles.settingsGroup}>
+                <h3 className={styles.settingsTitle}>
+                  Custom RPC Endpoints
+                  <span className={styles.optional}>(optional)</span>
+                </h3>
+                <p className={styles.settingsDesc}>
+                  Configure custom RPC endpoints for each chain. If not set, default public RPCs will be used.
+                </p>
+                <div className={styles.settingsFields}>
+                  <div className={styles.settingsField}>
+                    <label className={styles.settingsLabel}>Chain</label>
+                    <select
+                      value={selectedRpcChain}
+                      onChange={(e) => setSelectedRpcChain(e.target.value)}
+                      className={styles.select}
+                    >
+                      {CHAINS.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {rpcSettings[c.id] ? '✓' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={styles.settingsField}>
+                    <label className={styles.settingsLabel}>RPC URL</label>
+                    <div className={styles.settingsFieldWithTest}>
+                      <input
+                        type="text"
+                        value={rpcSettings[selectedRpcChain] || ''}
+                        onChange={(e) => saveRpcSettings({ ...rpcSettings, [selectedRpcChain]: e.target.value })}
+                        placeholder={`Custom RPC URL for ${CHAINS.find(c => c.id === selectedRpcChain)?.name}...`}
+                        className={styles.settingsInput}
+                      />
+                      <button
+                        onClick={() => testRpcEndpoint(selectedRpcChain)}
+                        disabled={!rpcSettings[selectedRpcChain] || testingRpc[selectedRpcChain]}
+                        className={`${styles.testButton} ${rpcTestResult[selectedRpcChain] === 'success' ? styles.testSuccess : ''} ${rpcTestResult[selectedRpcChain] === 'error' || rpcTestResult[selectedRpcChain] === 'mismatch' ? styles.testError : ''}`}
+                      >
+                        {testingRpc[selectedRpcChain] ? 'Testing...' : rpcTestResult[selectedRpcChain] === 'success' ? '✓ Valid' : rpcTestResult[selectedRpcChain] === 'mismatch' ? '✗ Wrong Chain' : rpcTestResult[selectedRpcChain] === 'error' ? '✗ Failed' : 'Test'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                {/* Show configured RPCs */}
+                {Object.entries(rpcSettings).filter(([_, url]) => url).length > 0 && (
+                  <div className={styles.configuredRpcList}>
+                    <label className={styles.settingsLabel} style={{ marginTop: '1rem' }}>Configured RPCs:</label>
+                    {Object.entries(rpcSettings)
+                      .filter(([_, url]) => url)
+                      .map(([chainId, url]) => (
+                        <div key={chainId} className={styles.configuredRpcItem}>
+                          <span className={styles.configuredRpcChain}>
+                            {CHAINS.find(c => c.id === chainId)?.name || chainId}
+                          </span>
+                          <span className={styles.configuredRpcUrl} title={url}>
+                            {url.length > 40 ? url.slice(0, 40) + '...' : url}
+                          </span>
+                          <button
+                            className={styles.removeRpcButton}
+                            onClick={() => saveRpcSettings({ ...rpcSettings, [chainId]: '' })}
+                            title="Remove"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                )}
               </div>
 
               <p className={styles.settingsNote}>

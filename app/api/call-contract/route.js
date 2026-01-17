@@ -21,7 +21,7 @@ const RPC_URLS = {
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { chain, address, functionName, args, abi, fromAddress, simulate } = body
+    const { chain, address, functionName, args, abi, fromAddress, simulate, rpcUrl: customRpcUrl } = body
 
     if (!address || !functionName || !abi) {
       return NextResponse.json(
@@ -47,7 +47,8 @@ export async function POST(request) {
     }
 
     const chainConfig = CHAINS[chain]
-    const rpcUrl = RPC_URLS[chain]
+    // Use custom RPC if provided, otherwise use default
+    const rpcUrl = customRpcUrl || RPC_URLS[chain]
 
     if (!chainConfig || !rpcUrl) {
       return NextResponse.json(

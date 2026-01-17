@@ -194,7 +194,9 @@ export async function GET(request) {
 
     const chainId = CHAIN_IDS[chain]
     const chainConfig = CHAINS[chain]
-    const rpcUrl = RPC_URLS[chain]
+    // Use custom RPC if provided, otherwise use default
+    const customRpcUrl = searchParams.get('rpcUrl')
+    const rpcUrl = customRpcUrl || RPC_URLS[chain]
 
     if (!chainId || !chainConfig) {
       return NextResponse.json(
