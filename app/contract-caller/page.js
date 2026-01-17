@@ -6,11 +6,11 @@ import yaml from 'js-yaml'
 import styles from './page.module.css'
 
 const CHAINS = [
-  { id: 'ethereum', name: 'Ethereum' },
-  { id: 'arbitrum', name: 'Arbitrum' },
-  { id: 'base', name: 'Base' },
-  { id: 'polygon', name: 'Polygon' },
-  { id: 'bsc', name: 'BSC' },
+  { id: 'ethereum', name: 'Ethereum', icon: 'https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg' },
+  { id: 'arbitrum', name: 'Arbitrum', icon: 'https://icons.llamao.fi/icons/chains/rsz_arbitrum.jpg' },
+  { id: 'base', name: 'Base', icon: 'https://icons.llamao.fi/icons/chains/rsz_base.jpg' },
+  { id: 'polygon', name: 'Polygon', icon: 'https://icons.llamao.fi/icons/chains/rsz_polygon.jpg' },
+  { id: 'bsc', name: 'BSC', icon: 'https://icons.llamao.fi/icons/chains/rsz_binance.jpg' },
 ]
 
 const STORAGE_KEY = 'contract_caller_history'
@@ -1020,17 +1020,24 @@ export default function ContractCaller() {
                 <div className={styles.settingsFields}>
                   <div className={styles.settingsField}>
                     <label className={styles.settingsLabel}>Chain</label>
-                    <select
-                      value={selectedRpcChain}
-                      onChange={(e) => setSelectedRpcChain(e.target.value)}
-                      className={styles.select}
-                    >
-                      {CHAINS.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} {rpcSettings[c.id] ? '✓' : ''}
-                        </option>
-                      ))}
-                    </select>
+                    <div className={styles.chainSelectWithIcon}>
+                      <img
+                        src={CHAINS.find(c => c.id === selectedRpcChain)?.icon}
+                        alt=""
+                        className={styles.chainIconSmall}
+                      />
+                      <select
+                        value={selectedRpcChain}
+                        onChange={(e) => setSelectedRpcChain(e.target.value)}
+                        className={styles.select}
+                      >
+                        {CHAINS.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} {rpcSettings[c.id] ? '✓' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                   <div className={styles.settingsField}>
                     <label className={styles.settingsLabel}>RPC URL</label>
@@ -1058,23 +1065,29 @@ export default function ContractCaller() {
                     <label className={styles.settingsLabel} style={{ marginTop: '1rem' }}>Configured RPCs:</label>
                     {Object.entries(rpcSettings)
                       .filter(([_, url]) => url)
-                      .map(([chainId, url]) => (
-                        <div key={chainId} className={styles.configuredRpcItem}>
-                          <span className={styles.configuredRpcChain}>
-                            {CHAINS.find(c => c.id === chainId)?.name || chainId}
-                          </span>
-                          <span className={styles.configuredRpcUrl} title={url}>
-                            {url.length > 40 ? url.slice(0, 40) + '...' : url}
-                          </span>
-                          <button
-                            className={styles.removeRpcButton}
-                            onClick={() => saveRpcSettings({ ...rpcSettings, [chainId]: '' })}
-                            title="Remove"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
+                      .map(([chainId, url]) => {
+                        const chainInfo = CHAINS.find(c => c.id === chainId)
+                        return (
+                          <div key={chainId} className={styles.configuredRpcItem}>
+                            {chainInfo?.icon && (
+                              <img src={chainInfo.icon} alt="" className={styles.chainIconTiny} />
+                            )}
+                            <span className={styles.configuredRpcChain}>
+                              {chainInfo?.name || chainId}
+                            </span>
+                            <span className={styles.configuredRpcUrl} title={url}>
+                              {url.length > 40 ? url.slice(0, 40) + '...' : url}
+                            </span>
+                            <button
+                              className={styles.removeRpcButton}
+                              onClick={() => saveRpcSettings({ ...rpcSettings, [chainId]: '' })}
+                              title="Remove"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        )
+                      })}
                   </div>
                 )}
               </div>
@@ -1090,18 +1103,25 @@ export default function ContractCaller() {
           <div className={styles.row}>
             <div className={styles.field}>
               <label className={styles.label}>Network</label>
-              <select
-                value={chain}
-                onChange={(e) => setChain(e.target.value)}
-                className={styles.select}
-                disabled={loading}
-              >
-                {CHAINS.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <div className={styles.chainSelectWithIcon}>
+                <img
+                  src={CHAINS.find(c => c.id === chain)?.icon}
+                  alt=""
+                  className={styles.chainIconSmall}
+                />
+                <select
+                  value={chain}
+                  onChange={(e) => setChain(e.target.value)}
+                  className={styles.select}
+                  disabled={loading}
+                >
+                  {CHAINS.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className={styles.field} style={{ flex: 2 }}>

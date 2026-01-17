@@ -194,6 +194,31 @@
   color: #dc2626;
 }
 
+/* Chain select with icon */
+.chainSelectWithIcon {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chainSelectWithIcon .select {
+  flex: 1;
+}
+
+.chainIconSmall {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.chainIconTiny {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 /* Configured RPC list */
 .configuredRpcList {
   margin-top: 1rem;
