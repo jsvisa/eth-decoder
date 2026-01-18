@@ -2018,6 +2018,104 @@
   background-color: #fee2e2;
 }
 
+/* Address argument input with picker */
+.addressArgWrapper {
+  position: relative;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.addressArgWrapper .input {
+  flex: 1;
+}
+
+.addressBookPickerButton {
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  color: #f59e0b;
+  background-color: #fffbeb;
+  border: 2px solid #fcd34d;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1;
+}
+
+.addressBookPickerButton:hover:not(:disabled) {
+  background-color: #fef3c7;
+  border-color: #f59e0b;
+}
+
+.addressBookPickerButton:disabled {
+  color: #ccc;
+  background-color: #f5f5f5;
+  border-color: #ddd;
+  cursor: not-allowed;
+}
+
+.addressArgDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-height: 250px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.addressArgItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.15s;
+}
+
+.addressArgItem:last-child {
+  border-bottom: none;
+}
+
+.addressArgItem:hover {
+  background-color: #f8f9fa;
+}
+
+.addressArgStar {
+  color: #f59e0b;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.addressArgLabel {
+  font-weight: 500;
+  color: #333;
+  font-size: 0.9rem;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.addressArgAddr {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.8rem;
+  color: #666;
+  flex-shrink: 0;
+}
+
+.addressArgEmpty {
+  padding: 1rem;
+  text-align: center;
+  color: #999;
+  font-size: 0.9rem;
+}
+
 /* Button group for Call + Share */
 .buttonGroup {
   display: flex;

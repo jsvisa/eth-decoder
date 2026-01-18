@@ -119,6 +119,78 @@ const getCachedAddresses = () => {
   return addresses
 }
 
+// Component for address-type argument input with address book picker
+function AddressArgInput({ value, onChange, addressBook, disabled, placeholder }) {
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [filter, setFilter] = useState('')
+
+  const filteredAddresses = addressBook.filter(item => {
+    if (!filter.trim()) return true
+    const search = filter.toLowerCase()
+    return (
+      item.address.toLowerCase().includes(search) ||
+      (item.label && item.label.toLowerCase().includes(search)) ||
+      (item.contractName && item.contractName.toLowerCase().includes(search))
+    )
+  })
+
+  const handleSelect = (address) => {
+    onChange(address)
+    setShowDropdown(false)
+    setFilter('')
+  }
+
+  return (
+    <div className={styles.addressArgWrapper}>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value)
+          setFilter(e.target.value)
+        }}
+        onFocus={() => setShowDropdown(true)}
+        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+        placeholder={placeholder}
+        className={styles.input}
+        disabled={disabled}
+      />
+      <button
+        type="button"
+        className={styles.addressBookPickerButton}
+        onClick={() => setShowDropdown(!showDropdown)}
+        disabled={disabled || addressBook.length === 0}
+        title="Select from address book"
+      >
+        ★
+      </button>
+      {showDropdown && addressBook.length > 0 && (
+        <div className={styles.addressArgDropdown}>
+          {filteredAddresses.length === 0 ? (
+            <div className={styles.addressArgEmpty}>No matching addresses</div>
+          ) : (
+            filteredAddresses.slice(0, 8).map((item) => (
+              <div
+                key={item.id}
+                className={styles.addressArgItem}
+                onClick={() => handleSelect(item.address)}
+              >
+                <span className={styles.addressArgStar}>★</span>
+                <span className={styles.addressArgLabel}>
+                  {item.label || item.contractName || 'Unnamed'}
+                </span>
+                <span className={styles.addressArgAddr}>
+                  {item.address.slice(0, 8)}...{item.address.slice(-6)}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ContractCaller() {
   const [chain, setChain] = useState('ethereum')
   const [address, setAddress] = useState('')
@@ -1631,18 +1703,32 @@ export default function ContractCaller() {
                       <label className={styles.argLabel}>
                         {input.name || `arg${index}`} ({input.type})
                       </label>
-                      <input
-                        type="text"
-                        value={args[index] || ''}
-                        onChange={(e) => {
-                          const newArgs = [...args]
-                          newArgs[index] = e.target.value
-                          setArgs(newArgs)
-                        }}
-                        placeholder={`Enter ${input.type}...`}
-                        className={styles.input}
-                        disabled={loading}
-                      />
+                      {input.type === 'address' ? (
+                        <AddressArgInput
+                          value={args[index] || ''}
+                          onChange={(value) => {
+                            const newArgs = [...args]
+                            newArgs[index] = value
+                            setArgs(newArgs)
+                          }}
+                          addressBook={addressBook}
+                          disabled={loading}
+                          placeholder={`Enter ${input.type}...`}
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={args[index] || ''}
+                          onChange={(e) => {
+                            const newArgs = [...args]
+                            newArgs[index] = e.target.value
+                            setArgs(newArgs)
+                          }}
+                          placeholder={`Enter ${input.type}...`}
+                          className={styles.input}
+                          disabled={loading}
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
