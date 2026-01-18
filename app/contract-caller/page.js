@@ -121,10 +121,13 @@ const getCachedAddresses = () => {
   return addresses
 }
 
-// Component for address-type argument input with address book picker
-function AddressArgInput({ value, onChange, addressBook, disabled, placeholder }) {
+// Component for address-type argument input with address book picker and add/remove support
+function AddressArgInput({ value, onChange, addressBook, disabled, placeholder, onAddToBook, onRemoveFromBook }) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [filter, setFilter] = useState('')
+
+  const isValidAddress = value && /^0x[a-fA-F0-9]{40}$/.test(value)
+  const isBookmarked = isValidAddress && addressBook.some(item => item.address.toLowerCase() === value.toLowerCase())
 
   const filteredAddresses = addressBook.filter(item => {
     if (!filter.trim()) return true
@@ -142,6 +145,17 @@ function AddressArgInput({ value, onChange, addressBook, disabled, placeholder }
     setFilter('')
   }
 
+  const handleBookmarkClick = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!isValidAddress) return
+    if (isBookmarked && onRemoveFromBook) {
+      onRemoveFromBook(value)
+    } else if (!isBookmarked && onAddToBook) {
+      onAddToBook(value)
+    }
+  }
+
   return (
     <div className={styles.addressArgWrapper}>
       <input
@@ -157,6 +171,16 @@ function AddressArgInput({ value, onChange, addressBook, disabled, placeholder }
         className={styles.input}
         disabled={disabled}
       />
+      {isValidAddress && (onAddToBook || onRemoveFromBook) && (
+        <button
+          type="button"
+          className={`${styles.addressBookToggleButton} ${isBookmarked ? styles.bookmarked : ''}`}
+          onClick={handleBookmarkClick}
+          title={isBookmarked ? 'Remove from address book' : 'Add to address book'}
+        >
+          {isBookmarked ? '★' : '☆'}
+        </button>
+      )}
       <button
         type="button"
         className={styles.addressBookPickerButton}
@@ -164,7 +188,7 @@ function AddressArgInput({ value, onChange, addressBook, disabled, placeholder }
         disabled={disabled || addressBook.length === 0}
         title="Select from address book"
       >
-        ★
+        📖
       </button>
       {showDropdown && addressBook.length > 0 && (
         <div className={styles.addressArgDropdown}>
@@ -252,14 +276,15 @@ export default function ContractCaller() {
   const [bookmarkNotes, setBookmarkNotes] = useState('') // Notes for new bookmark
   const [selectedRpcChain, setSelectedRpcChain] = useState('ethereum') // For RPC settings dropdown
   // Simulation settings
-  const [useLocalSimulation, setUseLocalSimulation] = useState(false) // Use browser-based Tevm simulation
+  const [useLocalSimulation, setUseLocalSimulation] = useState(true) // Use browser-based Tevm simulation (default)
   const [forkBlockNumber, setForkBlockNumber] = useState('') // Block number to fork from (empty = latest)
+  const [readBlockNumber, setReadBlockNumber] = useState('') // Block number for read-only eth_call (empty = latest)
   const [cheatcodes, setCheatcodes] = useState({
     deal: { enabled: false, address: '', amount: '' },
     prank: { enabled: false, address: '' },
     warp: { enabled: false, timestamp: '' },
   })
-  const [abiCollapsed, setAbiCollapsed] = useState(false) // Collapse ABI JSON textarea
+  const [abiCollapsed, setAbiCollapsed] = useState(true) // Collapse ABI JSON textarea (default collapsed)
   const [simOptionsExpanded, setSimOptionsExpanded] = useState(false) // Expand simulation options
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null) // { functionName, args, timestamp }
@@ -339,6 +364,15 @@ export default function ContractCaller() {
       const savedRpcSettings = localStorage.getItem(RPC_SETTINGS_KEY)
       if (savedRpcSettings) {
         setRpcSettings(JSON.parse(savedRpcSettings))
+      }
+
+      // Load simulation settings
+      const savedSimSettings = localStorage.getItem(SIMULATION_SETTINGS_KEY)
+      if (savedSimSettings) {
+        const parsed = JSON.parse(savedSimSettings)
+        if (typeof parsed.useLocalSimulation === 'boolean') {
+          setUseLocalSimulation(parsed.useLocalSimulation)
+        }
       }
 
       // Load address book
@@ -562,6 +596,8 @@ export default function ContractCaller() {
         : data.contractName
       setContractName(nameDisplay)
       setAbiSource(data.isProxy ? `fetched (proxy → ${data.implAddress?.slice(0, 10)}...)` : 'fetched')
+      // Expand ABI when first fetched from remote
+      setAbiCollapsed(false)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -877,6 +913,11 @@ export default function ContractCaller() {
         // Add custom RPC if configured for this chain
         if (rpcSettings[chain]) {
           requestBody.rpcUrl = rpcSettings[chain]
+        }
+
+        // Add block number for read-only calls
+        if (!isWrite && readBlockNumber) {
+          requestBody.blockNumber = readBlockNumber
         }
 
         // Add Tenderly credentials for write functions
@@ -1239,6 +1280,28 @@ export default function ContractCaller() {
       setAddressBook(updatedBook)
     }
     setShowBookmarkModal(false)
+  }
+
+  // Quick add any address to address book (for address inputs)
+  const handleQuickAddToBook = (addr) => {
+    if (!addr || !/^0x[a-fA-F0-9]{40}$/.test(addr)) return
+    const updatedBook = addToAddressBook({
+      address: addr,
+      label: '',
+      contractName: '',
+      notes: '',
+    })
+    setAddressBook(updatedBook)
+  }
+
+  // Quick remove any address from address book (for address inputs)
+  const handleQuickRemoveFromBook = (addr) => {
+    if (!addr) return
+    const existing = getBookmarkedAddress(addr)
+    if (existing) {
+      const updatedBook = removeFromAddressBook(existing.id)
+      setAddressBook(updatedBook)
+    }
   }
 
   // Get combined suggestions (bookmarked addresses + cached addresses)
@@ -1784,14 +1847,17 @@ export default function ContractCaller() {
                           disabled={loading}
                         />
                       )}
-                      <input
-                        type="text"
-                        value={fromAddress}
-                        onChange={(e) => setFromAddress(e.target.value)}
-                        placeholder="From Address"
-                        className={styles.simOptionInput}
-                        disabled={loading}
-                      />
+                      <div className={styles.simOptionFromAddress}>
+                        <AddressArgInput
+                          value={fromAddress}
+                          onChange={(value) => setFromAddress(value)}
+                          addressBook={addressBook}
+                          disabled={loading}
+                          placeholder="From Address"
+                          onAddToBook={handleQuickAddToBook}
+                          onRemoveFromBook={handleQuickRemoveFromBook}
+                        />
+                      </div>
                       {useLocalSimulation && (
                         <div className={styles.cheatcodesInline}>
                           <label className={styles.cheatcodeInlineItem} title="vm.deal - Set ETH balance">
@@ -1872,6 +1938,22 @@ export default function ContractCaller() {
                 </div>
               )}
 
+              {/* Block number for read-only functions */}
+              {selectedFunction && getSelectedFunction() && isReadOnly(getSelectedFunction()) && (
+                <div className={styles.readBlockSection}>
+                  <label className={styles.readBlockLabel}>Block Number</label>
+                  <input
+                    type="text"
+                    value={readBlockNumber}
+                    onChange={(e) => setReadBlockNumber(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="latest"
+                    className={styles.readBlockInput}
+                    disabled={loading}
+                  />
+                  <span className={styles.readBlockHint}>Leave empty for latest block</span>
+                </div>
+              )}
+
               {selectedFunction && getSelectedFunctionInputs().length > 0 && (
                 <div className={styles.argsSection}>
                   <label className={styles.label}>Arguments</label>
@@ -1891,6 +1973,8 @@ export default function ContractCaller() {
                           addressBook={addressBook}
                           disabled={loading}
                           placeholder={`Enter ${input.type}...`}
+                          onAddToBook={handleQuickAddToBook}
+                          onRemoveFromBook={handleQuickRemoveFromBook}
                         />
                       ) : (
                         <input
@@ -2164,15 +2248,42 @@ export default function ContractCaller() {
               </div>
             )}
 
-            {/* State changes (simulation only) */}
+            {/* Balance changes (simulation only) */}
+            {result.simulated && result.balanceChanges && result.balanceChanges.length > 0 && (
+              <div className={styles.balanceSection}>
+                <h3 className={styles.balanceTitle}>Balance Changes ({result.balanceChanges.length})</h3>
+                {result.balanceChanges.map((change, index) => (
+                  <div key={index} className={styles.balanceItem}>
+                    <div className={styles.balanceAddress}>
+                      {change.address?.slice(0, 10)}...{change.address?.slice(-8)}
+                    </div>
+                    <div className={styles.balanceValues}>
+                      <span className={styles.balanceBefore}>
+                        {(BigInt(change.before) / BigInt(10 ** 18)).toString()} ETH
+                      </span>
+                      <span className={styles.balanceArrow}>→</span>
+                      <span className={styles.balanceAfter}>
+                        {(BigInt(change.after) / BigInt(10 ** 18)).toString()} ETH
+                      </span>
+                      <span className={`${styles.balanceDiff} ${BigInt(change.diff) >= 0n ? styles.balanceDiffPositive : styles.balanceDiffNegative}`}>
+                        ({BigInt(change.diff) >= 0n ? '+' : ''}{(BigInt(change.diff) / BigInt(10 ** 18)).toString()} ETH)
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* State/Storage changes (simulation only) */}
             {result.simulated && result.stateChanges && result.stateChanges.length > 0 && (
               <div className={styles.stateSection}>
-                <h3 className={styles.stateTitle}>State Changes ({result.stateChanges.length})</h3>
+                <h3 className={styles.stateTitle}>Storage Access ({result.stateChanges.length})</h3>
                 {result.stateChanges.map((change, index) => (
                   <div key={index} className={styles.stateItem}>
                     <div className={styles.stateAddress}>
                       {change.address?.slice(0, 10)}...{change.address?.slice(-8)}
                     </div>
+                    {/* Tenderly format: change.changes */}
                     {change.changes && change.changes.length > 0 && (
                       <div className={styles.stateChanges}>
                         {change.changes.map((c, i) => (
@@ -2190,6 +2301,21 @@ export default function ContractCaller() {
                                 <span className={styles.stateLabel}>After:</span> {c.dirty}
                               </div>
                             )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Tevm format: change.storage */}
+                    {change.storage && change.storage.length > 0 && (
+                      <div className={styles.stateChanges}>
+                        {change.storage.map((s, i) => (
+                          <div key={i} className={styles.stateChange}>
+                            <div className={styles.stateSlot}>
+                              <span className={styles.stateSlotLabel}>Slot:</span> {s.slot}
+                            </div>
+                            <div className={styles.stateDirty}>
+                              <span className={styles.stateLabel}>Value:</span> {s.value}
+                            </div>
                           </div>
                         ))}
                       </div>

@@ -21,7 +21,7 @@ const RPC_URLS = {
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { chain, address, functionName, args, abi, fromAddress, simulate, rpcUrl: customRpcUrl } = body
+    const { chain, address, functionName, args, abi, fromAddress, simulate, rpcUrl: customRpcUrl, blockNumber } = body
 
     if (!address || !functionName || !abi) {
       return NextResponse.json(
@@ -119,6 +119,11 @@ export async function POST(request) {
     // Add from address if provided (useful for simulating write functions)
     if (fromAddress) {
       callParams.account = fromAddress
+    }
+
+    // Add block number if provided (for historical state queries)
+    if (blockNumber) {
+      callParams.blockNumber = BigInt(blockNumber)
     }
 
     const result = await client.call(callParams)

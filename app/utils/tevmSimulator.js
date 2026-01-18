@@ -317,7 +317,7 @@ export async function simulateWithTevm({
     // Get gas used
     const gasUsed = callResult.executionGasUsed ? Number(callResult.executionGasUsed) : 0
 
-    // Access list if available (ensure it's an array)
+    // Access list if available
     const accessList = Array.isArray(callResult.accessList) ? callResult.accessList : []
 
     return {

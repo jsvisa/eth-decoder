@@ -1351,6 +1351,69 @@
   color: #808080;
 }
 
+/* Balance changes section styles */
+.balanceSection {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #333;
+}
+
+.balanceTitle {
+  color: #4ade80;
+  font-size: 1rem;
+  margin: 0 0 1rem 0;
+  font-weight: 600;
+}
+
+.balanceItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background-color: rgba(74, 222, 128, 0.05);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  border: 1px solid rgba(74, 222, 128, 0.2);
+}
+
+.balanceAddress {
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 0.85rem;
+  color: #a78bfa;
+}
+
+.balanceValues {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 0.85rem;
+}
+
+.balanceBefore {
+  color: #9ca3af;
+}
+
+.balanceArrow {
+  color: #6b7280;
+}
+
+.balanceAfter {
+  color: #e5e7eb;
+}
+
+.balanceDiff {
+  font-weight: 600;
+}
+
+.balanceDiffPositive {
+  color: #4ade80;
+}
+
+.balanceDiffNegative {
+  color: #f87171;
+}
+
 /* State changes section styles */
 .stateSection {
   margin-bottom: 1.5rem;
@@ -2058,6 +2121,36 @@
   cursor: not-allowed;
 }
 
+.addressBookToggleButton {
+  padding: 0.5rem 0.6rem;
+  font-size: 1rem;
+  color: #9ca3af;
+  background-color: transparent;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1;
+}
+
+.addressBookToggleButton:hover {
+  color: #f59e0b;
+  border-color: #f59e0b;
+  background-color: #fffbeb;
+}
+
+.addressBookToggleButton.bookmarked {
+  color: #f59e0b;
+  border-color: #fcd34d;
+  background-color: #fffbeb;
+}
+
+.addressBookToggleButton.bookmarked:hover {
+  color: #dc2626;
+  border-color: #dc2626;
+  background-color: #fef2f2;
+}
+
 .addressArgDropdown {
   position: absolute;
   top: 100%;
@@ -2317,7 +2410,7 @@
   align-items: center;
   gap: 0.5rem;
   flex: 1;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .simOptionInput {
@@ -2371,6 +2464,8 @@
   padding: 0.25rem 0.5rem;
   background: rgba(99, 102, 241, 0.1);
   border-radius: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .cheatcodeInlineItem {
@@ -2445,6 +2540,72 @@
   background: rgba(124, 58, 237, 0.1);
 }
 
+/* From Address wrapper in simulation options */
+.simOptionFromAddress {
+  flex: 1;
+  min-width: 200px;
+}
+
+.simOptionFromAddress input {
+  border: 1px solid rgba(139, 92, 246, 0.3) !important;
+  border-radius: 6px !important;
+}
+
+.simOptionFromAddress input:focus {
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15) !important;
+}
+
+.simOptionFromAddress input::placeholder {
+  color: #a78bfa !important;
+}
+
+/* Read Block Number Section */
+.readBlockSection {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.6rem 1rem;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 8px;
+}
+
+.readBlockLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #059669;
+  white-space: nowrap;
+}
+
+.readBlockInput {
+  width: 120px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.readBlockInput:focus {
+  outline: none;
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.readBlockInput::placeholder {
+  color: #6ee7b7;
+}
+
+.readBlockHint {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-style: italic;
+}
+
 @media (max-width: 768px) {
   .row {
     flex-direction: column;
@@ -2493,5 +2654,19 @@
   .cheatcodeExpandedRow {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .simOptionFromAddress {
+    max-width: none;
+    width: 100%;
+  }
+
+  .readBlockSection {
+    flex-wrap: wrap;
+  }
+
+  .readBlockHint {
+    width: 100%;
+    margin-top: 0.25rem;
   }
 }
