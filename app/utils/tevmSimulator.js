@@ -1,5 +1,5 @@
 import { createMemoryClient, http } from 'tevm'
-import { encodeFunctionData, decodeFunctionResult, parseEther } from 'viem'
+import { encodeFunctionData, decodeFunctionResult, parseEther, decodeEventLog } from 'viem'
 
 // Chain configurations for forking
 const CHAIN_CONFIGS = {
@@ -243,15 +243,52 @@ export async function simulateWithTevm({
       }
     }
 
-    // Parse logs from execution
-    const parsedLogs = (Array.isArray(callResult.logs) ? callResult.logs : []).map(log => ({
-      address: log.address,
-      topics: log.topics || [],
-      data: log.data,
-      name: null,
-      decoded: false,
-      inputs: [],
-    }))
+    // Parse logs from execution and try to decode using ABI events
+    const eventAbis = abi.filter(item => item.type === 'event')
+    const parsedLogs = (Array.isArray(callResult.logs) ? callResult.logs : []).map(log => {
+      const topics = log.topics || []
+      const data = log.data || '0x'
+
+      // Try to decode the log using ABI events
+      for (const eventAbi of eventAbis) {
+        try {
+          const decoded = decodeEventLog({
+            abi: [eventAbi],
+            data,
+            topics,
+          })
+
+          // Successfully decoded
+          const inputs = eventAbi.inputs.map((input, index) => ({
+            name: input.name || `arg${index}`,
+            type: input.type,
+            value: serializeValue(decoded.args[input.name] ?? decoded.args[index]),
+            indexed: input.indexed || false,
+          }))
+
+          return {
+            address: log.address,
+            topics,
+            data,
+            name: decoded.eventName,
+            decoded: true,
+            inputs,
+          }
+        } catch {
+          // This event ABI doesn't match, try next
+        }
+      }
+
+      // Could not decode - return raw log
+      return {
+        address: log.address,
+        topics,
+        data,
+        name: null,
+        decoded: false,
+        inputs: [],
+      }
+    })
 
     // Build a simple call trace
     const callTraceTree = {

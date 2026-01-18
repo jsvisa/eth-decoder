@@ -259,6 +259,8 @@ export default function ContractCaller() {
     prank: { enabled: false, address: '' },
     warp: { enabled: false, timestamp: '' },
   })
+  const [abiCollapsed, setAbiCollapsed] = useState(false) // Collapse ABI JSON textarea
+  const [simOptionsExpanded, setSimOptionsExpanded] = useState(false) // Expand simulation options
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null) // { functionName, args, timestamp }
 
@@ -1587,6 +1589,13 @@ export default function ContractCaller() {
           <div className={styles.field}>
             <div className={styles.abiLabelRow}>
               <label className={styles.label}>ABI (JSON)</label>
+              <button
+                onClick={() => setAbiCollapsed(!abiCollapsed)}
+                className={styles.abiCollapseBtn}
+                type="button"
+              >
+                {abiCollapsed ? '▶ Expand' : '▼ Collapse'}
+              </button>
               {abiSource && (
                 <span className={styles.abiSource}>
                   {abiSource}
@@ -1601,17 +1610,19 @@ export default function ContractCaller() {
                 </span>
               )}
             </div>
-            <textarea
-              value={abi}
-              onChange={(e) => {
-                setAbi(e.target.value)
-                setAbiSource(null)
-              }}
-              placeholder="Paste contract ABI here or use Fetch ABI button..."
-              className={styles.textarea}
-              disabled={loading}
-              rows={6}
-            />
+            {!abiCollapsed && (
+              <textarea
+                value={abi}
+                onChange={(e) => {
+                  setAbi(e.target.value)
+                  setAbiSource(null)
+                }}
+                placeholder="Paste contract ABI here or use Fetch ABI button..."
+                className={styles.textarea}
+                disabled={loading}
+                rows={6}
+              />
+            )}
           </div>
 
           {functions.length > 0 && (
@@ -1733,23 +1744,6 @@ export default function ContractCaller() {
                 </div>
               </div>
 
-              {/* From Address for write functions (optional) */}
-              {selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) && (
-                <div className={styles.field}>
-                  <label className={styles.label}>
-                    From Address <span className={styles.optional}>(optional, for simulation)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={fromAddress}
-                    onChange={(e) => setFromAddress(e.target.value)}
-                    placeholder="0x... (sender address for simulation)"
-                    className={styles.input}
-                    disabled={loading}
-                  />
-                </div>
-              )}
-
               {/* ETH Value for payable functions */}
               {selectedFunction && getSelectedFunction() && isPayable(getSelectedFunction()) && (
                 <div className={styles.field}>
@@ -1767,93 +1761,114 @@ export default function ContractCaller() {
                 </div>
               )}
 
-              {/* Fork Block Number - only for local simulation */}
-              {selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) && useLocalSimulation && (
-                <div className={styles.field}>
-                  <label className={styles.label}>
-                    Fork Block <span className={styles.optional}>(optional)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={forkBlockNumber}
-                    onChange={(e) => setForkBlockNumber(e.target.value.replace(/[^0-9]/g, ''))}
-                    placeholder="latest"
-                    className={styles.input}
-                    disabled={loading}
-                  />
-                </div>
-              )}
-
-              {/* Cheatcodes - only for local simulation */}
-              {selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) && useLocalSimulation && (
-                <div className={styles.cheatcodesSection}>
-                  <label className={styles.label}>Cheatcodes <span className={styles.optional}>(optional)</span></label>
-                  <div className={styles.cheatcodesList}>
-                    <label className={styles.cheatcodeItem}>
+              {/* Simulation Options - From Address, Fork Block, Cheatcodes in one row */}
+              {selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) && (
+                <div className={styles.simOptionsSection}>
+                  <div className={styles.simOptionsHeader}>
+                    <span className={styles.simOptionsLabel}>Simulation Options</span>
+                    <button
+                      onClick={() => setSimOptionsExpanded(!simOptionsExpanded)}
+                      className={styles.simOptionsToggle}
+                      type="button"
+                    >
+                      {simOptionsExpanded ? '▼' : '▶'}
+                    </button>
+                    <div className={styles.simOptionsInline}>
+                      {useLocalSimulation && (
+                        <input
+                          type="text"
+                          value={forkBlockNumber}
+                          onChange={(e) => setForkBlockNumber(e.target.value.replace(/[^0-9]/g, ''))}
+                          placeholder="Fork Block"
+                          className={styles.simOptionInputSmall}
+                          disabled={loading}
+                        />
+                      )}
                       <input
-                        type="checkbox"
-                        checked={cheatcodes.deal.enabled}
-                        onChange={(e) => setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, enabled: e.target.checked } }))}
+                        type="text"
+                        value={fromAddress}
+                        onChange={(e) => setFromAddress(e.target.value)}
+                        placeholder="From Address"
+                        className={styles.simOptionInput}
+                        disabled={loading}
                       />
-                      <span>vm.deal</span>
-                    </label>
-                    {cheatcodes.deal.enabled && (
-                      <div className={styles.cheatcodeInputs}>
-                        <input
-                          type="text"
-                          value={cheatcodes.deal.address}
-                          onChange={(e) => setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, address: e.target.value } }))}
-                          placeholder="Address"
-                          className={styles.input}
-                        />
-                        <input
-                          type="text"
-                          value={cheatcodes.deal.amount}
-                          onChange={(e) => setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, amount: e.target.value } }))}
-                          placeholder="ETH Amount"
-                          className={styles.input}
-                        />
-                      </div>
-                    )}
-                    <label className={styles.cheatcodeItem}>
-                      <input
-                        type="checkbox"
-                        checked={cheatcodes.prank.enabled}
-                        onChange={(e) => setCheatcodes(prev => ({ ...prev, prank: { ...prev.prank, enabled: e.target.checked } }))}
-                      />
-                      <span>vm.prank</span>
-                    </label>
-                    {cheatcodes.prank.enabled && (
-                      <div className={styles.cheatcodeInputs}>
-                        <input
-                          type="text"
-                          value={cheatcodes.prank.address}
-                          onChange={(e) => setCheatcodes(prev => ({ ...prev, prank: { ...prev.prank, address: e.target.value } }))}
-                          placeholder="Impersonate Address"
-                          className={styles.input}
-                        />
-                      </div>
-                    )}
-                    <label className={styles.cheatcodeItem}>
-                      <input
-                        type="checkbox"
-                        checked={cheatcodes.warp.enabled}
-                        onChange={(e) => setCheatcodes(prev => ({ ...prev, warp: { ...prev.warp, enabled: e.target.checked } }))}
-                      />
-                      <span>vm.warp</span>
-                    </label>
-                    {cheatcodes.warp.enabled && (
-                      <div className={styles.cheatcodeInputs}>
-                        <input
-                          type="text"
-                          value={cheatcodes.warp.timestamp}
-                          onChange={(e) => setCheatcodes(prev => ({ ...prev, warp: { ...prev.warp, timestamp: e.target.value } }))}
-                          placeholder="Unix Timestamp"
-                          className={styles.input}
-                        />
-                      </div>
-                    )}
+                      {useLocalSimulation && (
+                        <div className={styles.cheatcodesInline}>
+                          <label className={styles.cheatcodeInlineItem} title="vm.deal - Set ETH balance">
+                            <input
+                              type="checkbox"
+                              checked={cheatcodes.deal.enabled}
+                              onChange={(e) => setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, enabled: e.target.checked } }))}
+                            />
+                            <span>deal</span>
+                          </label>
+                          <label className={styles.cheatcodeInlineItem} title="vm.prank - Impersonate address">
+                            <input
+                              type="checkbox"
+                              checked={cheatcodes.prank.enabled}
+                              onChange={(e) => setCheatcodes(prev => ({ ...prev, prank: { ...prev.prank, enabled: e.target.checked } }))}
+                            />
+                            <span>prank</span>
+                          </label>
+                          <label className={styles.cheatcodeInlineItem} title="vm.warp - Set timestamp">
+                            <input
+                              type="checkbox"
+                              checked={cheatcodes.warp.enabled}
+                              onChange={(e) => setCheatcodes(prev => ({ ...prev, warp: { ...prev.warp, enabled: e.target.checked } }))}
+                            />
+                            <span>warp</span>
+                          </label>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                  {simOptionsExpanded && (cheatcodes.deal.enabled || cheatcodes.prank.enabled || cheatcodes.warp.enabled) && (
+                    <div className={styles.simOptionsExpanded}>
+                      {cheatcodes.deal.enabled && (
+                        <div className={styles.cheatcodeExpandedRow}>
+                          <span className={styles.cheatcodeLabel}>vm.deal:</span>
+                          <input
+                            type="text"
+                            value={cheatcodes.deal.address}
+                            onChange={(e) => setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, address: e.target.value } }))}
+                            placeholder="Address"
+                            className={styles.simOptionInput}
+                          />
+                          <input
+                            type="text"
+                            value={cheatcodes.deal.amount}
+                            onChange={(e) => setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, amount: e.target.value } }))}
+                            placeholder="ETH Amount"
+                            className={styles.simOptionInputSmall}
+                          />
+                        </div>
+                      )}
+                      {cheatcodes.prank.enabled && (
+                        <div className={styles.cheatcodeExpandedRow}>
+                          <span className={styles.cheatcodeLabel}>vm.prank:</span>
+                          <input
+                            type="text"
+                            value={cheatcodes.prank.address}
+                            onChange={(e) => setCheatcodes(prev => ({ ...prev, prank: { ...prev.prank, address: e.target.value } }))}
+                            placeholder="Impersonate Address"
+                            className={styles.simOptionInput}
+                          />
+                        </div>
+                      )}
+                      {cheatcodes.warp.enabled && (
+                        <div className={styles.cheatcodeExpandedRow}>
+                          <span className={styles.cheatcodeLabel}>vm.warp:</span>
+                          <input
+                            type="text"
+                            value={cheatcodes.warp.timestamp}
+                            onChange={(e) => setCheatcodes(prev => ({ ...prev, warp: { ...prev.warp, timestamp: e.target.value } }))}
+                            placeholder="Unix Timestamp"
+                            className={styles.simOptionInputSmall}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
