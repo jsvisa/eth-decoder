@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { toFunctionSelector } from 'viem'
+import { toFunctionSelector, encodeFunctionData } from 'viem'
 import yaml from 'js-yaml'
 import styles from './page.module.css'
 
@@ -158,6 +158,7 @@ export default function ContractCaller() {
   const [copiedItem, setCopiedItem] = useState(null) // 'selector' | 'signature' | null
   const [ethValue, setEthValue] = useState('') // ETH value for payable functions
   const [urlCopied, setUrlCopied] = useState(false) // For share URL feedback
+  const [calldataCopied, setCalldataCopied] = useState(false) // For copy calldata feedback
   const [testingEtherscan, setTestingEtherscan] = useState(false)
   const [etherscanTestResult, setEtherscanTestResult] = useState(null) // 'success' | 'error' | null
   const [testingTenderly, setTestingTenderly] = useState(false)
@@ -996,6 +997,69 @@ export default function ContractCaller() {
     }
   }
 
+  const handleCopyCalldata = async () => {
+    if (!selectedFunction || !parsedAbi) {
+      setError('Please select a function first')
+      return
+    }
+
+    try {
+      const func = getSelectedFunction()
+      if (!func) {
+        setError('Function not found in ABI')
+        return
+      }
+
+      // Parse args based on their types
+      const parsedArgs = func.inputs.map((input, index) => {
+        const value = args[index] || ''
+
+        // Handle array types
+        if (input.type.includes('[]')) {
+          try {
+            return JSON.parse(value)
+          } catch {
+            return value.split(',').map(v => v.trim())
+          }
+        }
+
+        // Handle tuple types
+        if (input.type === 'tuple' || input.type.startsWith('tuple')) {
+          try {
+            return JSON.parse(value)
+          } catch {
+            return value
+          }
+        }
+
+        // Handle boolean
+        if (input.type === 'bool') {
+          return value.toLowerCase() === 'true' || value === '1'
+        }
+
+        // Handle numbers - keep as string for BigInt compatibility
+        if (input.type.startsWith('uint') || input.type.startsWith('int')) {
+          return value
+        }
+
+        return value
+      })
+
+      const calldata = encodeFunctionData({
+        abi: parsedAbi,
+        functionName: selectedFunction,
+        args: parsedArgs,
+      })
+
+      await navigator.clipboard.writeText(calldata)
+      setCalldataCopied(true)
+      setTimeout(() => setCalldataCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to encode calldata:', err)
+      setError(`Failed to encode calldata: ${err.message}`)
+    }
+  }
+
   return (
     <main className={styles.main}>
       <div className={styles.container}>
@@ -1505,14 +1569,24 @@ export default function ContractCaller() {
               }
             </button>
             {address && selectedFunction && (
-              <button
-                onClick={handleShareUrl}
-                className={styles.shareButton}
-                disabled={loading}
-                type="button"
-              >
-                {urlCopied ? 'URL Copied!' : 'Share URL'}
-              </button>
+              <>
+                <button
+                  onClick={handleCopyCalldata}
+                  className={styles.calldataButton}
+                  disabled={loading}
+                  type="button"
+                >
+                  {calldataCopied ? 'Copied!' : 'Copy Calldata'}
+                </button>
+                <button
+                  onClick={handleShareUrl}
+                  className={styles.shareButton}
+                  disabled={loading}
+                  type="button"
+                >
+                  {urlCopied ? 'Copied!' : 'Share URL'}
+                </button>
+              </>
             )}
           </div>
         </div>
