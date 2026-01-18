@@ -2425,8 +2425,15 @@ export default function ContractCaller() {
       {showBookmarkModal && (() => {
         const modalAddr = bookmarkAddress || address
         const isBookmarked = modalAddr && getBookmarkedAddress(modalAddr)
+        const closeModal = () => { setShowBookmarkModal(false); setBookmarkAddress(''); }
         return (
-        <div className={styles.modalOverlay} onClick={() => { setShowBookmarkModal(false); setBookmarkAddress(''); }}>
+        <div
+          className={styles.modalOverlay}
+          onClick={closeModal}
+          onKeyDown={(e) => { if (e.key === 'Escape') closeModal(); }}
+          tabIndex={-1}
+          ref={(el) => el?.focus()}
+        >
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h3 className={styles.modalTitle}>
               {isBookmarked ? 'Edit Bookmark' : 'Add to Address Book'}
@@ -2469,7 +2476,7 @@ export default function ContractCaller() {
                 </button>
               )}
               <button
-                onClick={() => { setShowBookmarkModal(false); setBookmarkAddress(''); }}
+                onClick={closeModal}
                 className={styles.modalCancelButton}
                 type="button"
               >
