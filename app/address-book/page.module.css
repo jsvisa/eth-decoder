@@ -1,0 +1,564 @@
+.main {
+  min-height: 100vh;
+  padding: 2rem;
+  background: linear-gradient(to bottom, #f7f7f7, #e7e7e7);
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.title {
+  color: #333;
+  font-size: 2rem;
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.addButton {
+  padding: 0.625rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: white;
+  background-color: #0070f3;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.addButton:hover {
+  background-color: #0051cc;
+}
+
+.importButton,
+.exportButton {
+  padding: 0.625rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #666;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.importButton:hover,
+.exportButton:hover {
+  background-color: #e8e8e8;
+  border-color: #ccc;
+}
+
+.exportButton:disabled {
+  color: #999;
+  cursor: not-allowed;
+}
+
+.error,
+.success {
+  padding: 1rem 1.25rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.error {
+  background-color: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+.success {
+  background-color: #d1fae5;
+  border: 1px solid #a7f3d0;
+  color: #059669;
+}
+
+.dismissButton {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.7;
+  padding: 0 0.25rem;
+}
+
+.dismissButton:hover {
+  opacity: 1;
+}
+
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.searchInput {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  transition: border-color 0.2s;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: #0070f3;
+}
+
+.count {
+  color: #666;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #666;
+}
+
+.emptyIcon {
+  font-size: 3rem;
+  color: #ddd;
+  margin-bottom: 1rem;
+}
+
+.emptyState h2 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+}
+
+.emptyState p {
+  margin: 0;
+}
+
+.addressList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.addressItem {
+  padding: 1.25rem;
+  background-color: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  transition: border-color 0.2s;
+}
+
+.addressItem:hover {
+  border-color: #0070f3;
+}
+
+.addressHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.star {
+  color: #f59e0b;
+  font-size: 1rem;
+}
+
+.label {
+  font-weight: 600;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.contractName {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.address {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.9rem;
+  color: #0070f3;
+  background-color: #e8f4ff;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  word-break: break-all;
+}
+
+.address:hover {
+  background-color: #d1e8ff;
+}
+
+.notes {
+  margin-top: 0.75rem;
+  color: #666;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.meta {
+  margin-top: 0.75rem;
+}
+
+.date {
+  font-size: 0.8rem;
+  color: #999;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.useButton {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #0070f3;
+  background-color: white;
+  border: 1px solid #0070f3;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.useButton:hover {
+  background-color: #e8f4ff;
+}
+
+.editButton {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #666;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.editButton:hover {
+  background-color: #f5f5f5;
+  border-color: #ccc;
+}
+
+.deleteButton {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #dc2626;
+  background-color: white;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.deleteButton:hover {
+  background-color: #fee2e2;
+  border-color: #dc2626;
+}
+
+/* Edit form */
+.editForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.editField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.editLabel {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #666;
+}
+
+.editInput {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.editInput:focus {
+  outline: none;
+  border-color: #0070f3;
+}
+
+.editTextarea {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  resize: vertical;
+}
+
+.editTextarea:focus {
+  outline: none;
+  border-color: #0070f3;
+}
+
+.editActions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.cancelButton {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  color: #666;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cancelButton:hover {
+  background-color: #e8e8e8;
+}
+
+.saveButton {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: white;
+  background-color: #0070f3;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.saveButton:hover {
+  background-color: #0051cc;
+}
+
+/* Modal styles */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.modalTitle {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.25rem;
+  color: #333;
+}
+
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modalField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.modalLabel {
+  font-weight: 500;
+  color: #555;
+  font-size: 0.875rem;
+}
+
+.modalInput {
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  transition: border-color 0.2s;
+}
+
+.modalInput:focus {
+  outline: none;
+  border-color: #0070f3;
+}
+
+.modalTextarea {
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  resize: vertical;
+  min-height: 60px;
+  transition: border-color 0.2s;
+}
+
+.modalTextarea:focus {
+  outline: none;
+  border-color: #0070f3;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.modalCancelButton {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #666;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modalCancelButton:hover {
+  background-color: #e8e8e8;
+}
+
+.modalSaveButton {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: white;
+  background-color: #0070f3;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.modalSaveButton:hover {
+  background-color: #0051cc;
+}
+
+/* Import modal specific styles */
+.importInfo {
+  margin: 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.csvFormat {
+  display: block;
+  padding: 0.75rem 1rem;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: #333;
+}
+
+.importNote {
+  margin: 0;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #555;
+  cursor: pointer;
+}
+
+.checkboxLabel input {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+.fileInput {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 1.5rem;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .headerActions {
+    width: 100%;
+  }
+
+  .addButton,
+  .importButton,
+  .exportButton {
+    flex: 1;
+  }
+
+  .searchRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .count {
+    text-align: right;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .useButton,
+  .editButton,
+  .deleteButton {
+    width: 100%;
+    text-align: center;
+  }
+}

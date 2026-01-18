@@ -4,6 +4,13 @@ import { useState, useEffect, useRef } from 'react'
 import { toFunctionSelector, encodeFunctionData } from 'viem'
 import yaml from 'js-yaml'
 import styles from './page.module.css'
+import {
+  getAddressBook,
+  addToAddressBook,
+  removeFromAddressBook,
+  isAddressBookmarked,
+  getBookmarkedAddress,
+} from '../utils/addressBook'
 
 const CHAINS = [
   { id: 'ethereum', name: 'Ethereum', icon: 'https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg' },
@@ -165,6 +172,10 @@ export default function ContractCaller() {
   const [tenderlyTestResult, setTenderlyTestResult] = useState(null) // 'success' | 'error' | null
   const [testingRpc, setTestingRpc] = useState({}) // { [chain]: boolean }
   const [rpcTestResult, setRpcTestResult] = useState({}) // { [chain]: 'success' | 'error' | null }
+  const [addressBook, setAddressBook] = useState([]) // Address book entries
+  const [showBookmarkModal, setShowBookmarkModal] = useState(false) // Show save to address book modal
+  const [bookmarkLabel, setBookmarkLabel] = useState('') // Label for new bookmark
+  const [bookmarkNotes, setBookmarkNotes] = useState('') // Notes for new bookmark
   const [selectedRpcChain, setSelectedRpcChain] = useState('ethereum') // For RPC settings dropdown
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null) // { functionName, args, timestamp }
@@ -245,6 +256,9 @@ export default function ContractCaller() {
       if (savedRpcSettings) {
         setRpcSettings(JSON.parse(savedRpcSettings))
       }
+
+      // Load address book
+      setAddressBook(getAddressBook())
     } catch (err) {
       console.error('Failed to load history:', err)
     }
@@ -1060,6 +1074,69 @@ export default function ContractCaller() {
     }
   }
 
+  // Check if current address is bookmarked
+  const isCurrentAddressBookmarked = () => {
+    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) return false
+    return isAddressBookmarked(address)
+  }
+
+  // Open bookmark modal
+  const handleOpenBookmarkModal = () => {
+    const existing = getBookmarkedAddress(address)
+    if (existing) {
+      setBookmarkLabel(existing.label || '')
+      setBookmarkNotes(existing.notes || '')
+    } else {
+      setBookmarkLabel(contractName || '')
+      setBookmarkNotes('')
+    }
+    setShowBookmarkModal(true)
+  }
+
+  // Save bookmark
+  const handleSaveBookmark = () => {
+    if (!address) return
+
+    const updatedBook = addToAddressBook({
+      address,
+      label: bookmarkLabel,
+      contractName: contractName || '',
+      notes: bookmarkNotes,
+    })
+
+    setAddressBook(updatedBook)
+    setShowBookmarkModal(false)
+    setBookmarkLabel('')
+    setBookmarkNotes('')
+  }
+
+  // Remove bookmark
+  const handleRemoveBookmark = () => {
+    const existing = getBookmarkedAddress(address)
+    if (existing) {
+      const updatedBook = removeFromAddressBook(existing.id)
+      setAddressBook(updatedBook)
+    }
+    setShowBookmarkModal(false)
+  }
+
+  // Get combined suggestions (bookmarked addresses + cached addresses)
+  const getCombinedSuggestions = () => {
+    const bookmarked = addressBook.map(item => ({
+      ...item,
+      isBookmarked: true,
+    }))
+
+    const cached = cachedAddresses
+      .filter(item => !addressBook.some(b => b.address.toLowerCase() === item.address.toLowerCase()))
+      .map(item => ({
+        ...item,
+        isBookmarked: false,
+      }))
+
+    return [...bookmarked, ...cached]
+  }
+
   return (
     <main className={styles.main}>
       <div className={styles.container}>
@@ -1304,15 +1381,19 @@ export default function ContractCaller() {
                     className={styles.input}
                     disabled={loading}
                   />
-                  {showAddressSuggestions && cachedAddresses.length > 0 && (
+                  {showAddressSuggestions && getCombinedSuggestions().length > 0 && (
                     <div className={styles.addressSuggestions}>
-                      {cachedAddresses
-                        .filter(item =>
-                          item.chain === chain &&
-                          (addressFilter === '' ||
-                           item.address.toLowerCase().includes(addressFilter.toLowerCase()) ||
-                           (item.contractName && item.contractName.toLowerCase().includes(addressFilter.toLowerCase())))
-                        )
+                      {getCombinedSuggestions()
+                        .filter(item => {
+                          // For bookmarked items, show across all chains
+                          // For cached items, filter by current chain
+                          const chainMatch = item.isBookmarked || item.chain === chain
+                          const textMatch = addressFilter === '' ||
+                            item.address.toLowerCase().includes(addressFilter.toLowerCase()) ||
+                            (item.label && item.label.toLowerCase().includes(addressFilter.toLowerCase())) ||
+                            (item.contractName && item.contractName.toLowerCase().includes(addressFilter.toLowerCase()))
+                          return chainMatch && textMatch
+                        })
                         .slice(0, 10)
                         .map((item, idx) => (
                           <div
@@ -1323,8 +1404,11 @@ export default function ContractCaller() {
                               setShowAddressSuggestions(false)
                             }}
                           >
+                            {item.isBookmarked && (
+                              <span className={styles.bookmarkStar}>★</span>
+                            )}
                             <span className={styles.suggestionName}>
-                              {item.contractName || 'Unknown'}
+                              {item.label || item.contractName || 'Unknown'}
                               {item.isProxy && item.implContractName && ` → ${item.implContractName}`}
                             </span>
                             <span className={styles.suggestionAddress}>
@@ -1335,6 +1419,15 @@ export default function ContractCaller() {
                     </div>
                   )}
                 </div>
+                <button
+                  onClick={handleOpenBookmarkModal}
+                  className={`${styles.bookmarkButton} ${isCurrentAddressBookmarked() ? styles.bookmarked : ''}`}
+                  disabled={loading || !address || !/^0x[a-fA-F0-9]{40}$/.test(address)}
+                  type="button"
+                  title={isCurrentAddressBookmarked() ? 'Edit bookmark' : 'Add to address book'}
+                >
+                  {isCurrentAddressBookmarked() ? '★' : '☆'}
+                </button>
                 <button
                   onClick={() => fetchAbi(false)}
                   className={styles.fetchButton}
@@ -1961,6 +2054,69 @@ export default function ContractCaller() {
           </div>
         )}
       </div>
+
+      {/* Bookmark Modal */}
+      {showBookmarkModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowBookmarkModal(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.modalTitle}>
+              {isCurrentAddressBookmarked() ? 'Edit Bookmark' : 'Add to Address Book'}
+            </h3>
+            <div className={styles.modalBody}>
+              <div className={styles.modalField}>
+                <label className={styles.modalLabel}>Address</label>
+                <div className={styles.modalAddress}>{address}</div>
+              </div>
+              <div className={styles.modalField}>
+                <label className={styles.modalLabel}>Label</label>
+                <input
+                  type="text"
+                  value={bookmarkLabel}
+                  onChange={(e) => setBookmarkLabel(e.target.value)}
+                  placeholder="e.g., USDC Token, Uniswap Router..."
+                  className={styles.modalInput}
+                  autoFocus
+                />
+              </div>
+              <div className={styles.modalField}>
+                <label className={styles.modalLabel}>Notes (optional)</label>
+                <textarea
+                  value={bookmarkNotes}
+                  onChange={(e) => setBookmarkNotes(e.target.value)}
+                  placeholder="Add any notes..."
+                  className={styles.modalTextarea}
+                  rows={3}
+                />
+              </div>
+            </div>
+            <div className={styles.modalActions}>
+              {isCurrentAddressBookmarked() && (
+                <button
+                  onClick={handleRemoveBookmark}
+                  className={styles.modalDeleteButton}
+                  type="button"
+                >
+                  Remove
+                </button>
+              )}
+              <button
+                onClick={() => setShowBookmarkModal(false)}
+                className={styles.modalCancelButton}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveBookmark}
+                className={styles.modalSaveButton}
+                type="button"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

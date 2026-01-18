@@ -1841,6 +1841,183 @@
   margin-left: 0.5rem;
 }
 
+/* Bookmark button */
+.bookmarkButton {
+  padding: 0.875rem 1rem;
+  font-size: 1.25rem;
+  color: #999;
+  background-color: white;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1;
+}
+
+.bookmarkButton:hover:not(:disabled) {
+  color: #f59e0b;
+  border-color: #f59e0b;
+}
+
+.bookmarkButton:disabled {
+  color: #ccc;
+  border-color: #eee;
+  cursor: not-allowed;
+}
+
+.bookmarkButton.bookmarked {
+  color: #f59e0b;
+  border-color: #f59e0b;
+  background-color: #fffbeb;
+}
+
+.bookmarkStar {
+  color: #f59e0b;
+  margin-right: 0.5rem;
+  font-size: 0.9rem;
+}
+
+/* Modal styles */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.modalTitle {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.25rem;
+  color: #333;
+}
+
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modalField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.modalLabel {
+  font-weight: 500;
+  color: #555;
+  font-size: 0.875rem;
+}
+
+.modalAddress {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.85rem;
+  color: #666;
+  background-color: #f5f5f5;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.modalInput {
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  transition: border-color 0.2s;
+}
+
+.modalInput:focus {
+  outline: none;
+  border-color: #0070f3;
+}
+
+.modalTextarea {
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  resize: vertical;
+  min-height: 60px;
+  transition: border-color 0.2s;
+}
+
+.modalTextarea:focus {
+  outline: none;
+  border-color: #0070f3;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.modalCancelButton {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #666;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modalCancelButton:hover {
+  background-color: #e8e8e8;
+}
+
+.modalSaveButton {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: white;
+  background-color: #0070f3;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.modalSaveButton:hover {
+  background-color: #0051cc;
+}
+
+.modalDeleteButton {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #dc2626;
+  background-color: white;
+  border: 1px solid #dc2626;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-right: auto;
+}
+
+.modalDeleteButton:hover {
+  background-color: #fee2e2;
+}
+
 /* Button group for Call + Share */
 .buttonGroup {
   display: flex;

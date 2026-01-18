@@ -23,6 +23,12 @@ export default function Nav() {
           >
             Contract Caller
           </Link>
+          <Link
+            href="/address-book"
+            className={`${styles.link} ${pathname === '/address-book' ? styles.active : ''}`}
+          >
+            Address Book
+          </Link>
         </div>
       </div>
     </nav>
