@@ -11,6 +11,7 @@ import {
   isAddressBookmarked,
   getBookmarkedAddress,
 } from '../utils/addressBook'
+import { simulateWithTevm } from '../utils/tevmSimulator'
 
 const CHAINS = [
   { id: 'ethereum', name: 'Ethereum', icon: 'https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg' },
@@ -25,6 +26,7 @@ const ABI_CACHE_PREFIX = 'abi-'
 const TENDERLY_SETTINGS_KEY = 'tenderly_settings'
 const API_KEYS_STORAGE_KEY = 'api_keys_settings'
 const RPC_SETTINGS_KEY = 'rpc_settings'
+const SIMULATION_SETTINGS_KEY = 'simulation_settings'
 const MAX_HISTORY_ITEMS = 50
 
 // Expected chain IDs for validation
@@ -249,6 +251,14 @@ export default function ContractCaller() {
   const [bookmarkLabel, setBookmarkLabel] = useState('') // Label for new bookmark
   const [bookmarkNotes, setBookmarkNotes] = useState('') // Notes for new bookmark
   const [selectedRpcChain, setSelectedRpcChain] = useState('ethereum') // For RPC settings dropdown
+  // Simulation settings
+  const [useLocalSimulation, setUseLocalSimulation] = useState(false) // Use browser-based Tevm simulation
+  const [forkBlockNumber, setForkBlockNumber] = useState('') // Block number to fork from (empty = latest)
+  const [cheatcodes, setCheatcodes] = useState({
+    deal: { enabled: false, address: '', amount: '' },
+    prank: { enabled: false, address: '' },
+    warp: { enabled: false, timestamp: '' },
+  })
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null) // { functionName, args, timestamp }
 
@@ -803,9 +813,9 @@ export default function ContractCaller() {
     const selectedFunc = getSelectedFunction()
     const isWrite = !isReadOnly(selectedFunc)
 
-    // Check Tenderly configuration for write functions
-    if (isWrite && !isTenderlyConfigured()) {
-      setError('Please configure Tenderly API settings to simulate write functions')
+    // Check simulation configuration for write functions
+    if (isWrite && !useLocalSimulation && !isTenderlyConfigured()) {
+      setError('Please configure Tenderly API settings or enable Local Simulation to simulate write functions')
       setShowSettings(true)
       return
     }
@@ -815,44 +825,81 @@ export default function ContractCaller() {
     setResult(null)
 
     try {
-      // Use different API for read vs write functions
-      const apiEndpoint = isWrite ? '/api/simulate' : '/api/call-contract'
+      let data
 
-      const requestBody = {
-        chain,
-        address,
-        functionName: selectedFunction,
-        args,
-        abi: parsedAbi,
-      }
-
-      // Add custom RPC if configured for this chain
-      if (rpcSettings[chain]) {
-        requestBody.rpcUrl = rpcSettings[chain]
-      }
-
-      // Add Tenderly credentials for write functions
-      if (isWrite) {
-        requestBody.fromAddress = fromAddress || undefined
-        requestBody.tenderlyAccessKey = tenderlySettings.accessKey
-        requestBody.tenderlyAccount = tenderlySettings.account
-        requestBody.tenderlyProject = tenderlySettings.project
-        // Add ETH value for payable functions
-        if (ethValue && parseFloat(ethValue) > 0) {
-          requestBody.value = ethValue
+      // Use local Tevm simulation for write functions if enabled
+      if (isWrite && useLocalSimulation) {
+        // Build cheatcodes object
+        const activeCheatcodes = {}
+        if (cheatcodes.deal.enabled && cheatcodes.deal.address && cheatcodes.deal.amount) {
+          activeCheatcodes.deal = {
+            address: cheatcodes.deal.address,
+            amount: cheatcodes.deal.amount,
+          }
         }
-      }
+        if (cheatcodes.prank.enabled && cheatcodes.prank.address) {
+          activeCheatcodes.prank = {
+            address: cheatcodes.prank.address,
+          }
+        }
+        if (cheatcodes.warp.enabled && cheatcodes.warp.timestamp) {
+          activeCheatcodes.warp = {
+            timestamp: parseInt(cheatcodes.warp.timestamp),
+          }
+        }
 
-      const response = await fetch(apiEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      })
+        data = await simulateWithTevm({
+          chain,
+          address,
+          functionName: selectedFunction,
+          args,
+          abi: parsedAbi,
+          fromAddress: fromAddress || undefined,
+          value: ethValue && parseFloat(ethValue) > 0 ? ethValue : undefined,
+          rpcUrl: rpcSettings[chain] || undefined,
+          blockNumber: forkBlockNumber || 'latest',
+          cheatcodes: activeCheatcodes,
+        })
+      } else {
+        // Use API for read functions or Tenderly for write functions
+        const apiEndpoint = isWrite ? '/api/simulate' : '/api/call-contract'
 
-      const data = await response.json()
+        const requestBody = {
+          chain,
+          address,
+          functionName: selectedFunction,
+          args,
+          abi: parsedAbi,
+        }
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to call contract')
+        // Add custom RPC if configured for this chain
+        if (rpcSettings[chain]) {
+          requestBody.rpcUrl = rpcSettings[chain]
+        }
+
+        // Add Tenderly credentials for write functions
+        if (isWrite) {
+          requestBody.fromAddress = fromAddress || undefined
+          requestBody.tenderlyAccessKey = tenderlySettings.accessKey
+          requestBody.tenderlyAccount = tenderlySettings.account
+          requestBody.tenderlyProject = tenderlySettings.project
+          // Add ETH value for payable functions
+          if (ethValue && parseFloat(ethValue) > 0) {
+            requestBody.value = ethValue
+          }
+        }
+
+        const response = await fetch(apiEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        })
+
+        data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to call contract')
+        }
       }
 
       // For simulation, check if it was successful
@@ -1260,6 +1307,31 @@ export default function ContractCaller() {
                 </div>
               </div>
 
+              {/* Simulation Mode */}
+              <div className={styles.settingsGroup}>
+                <h3 className={styles.settingsTitle}>
+                  Simulation Mode
+                  {useLocalSimulation && <span className={styles.settingsCheck}>✓ Local</span>}
+                </h3>
+                <p className={styles.settingsDesc}>
+                  Choose between local browser-based simulation (Tevm) or Tenderly API.
+                </p>
+                <div className={styles.settingsFields}>
+                  <label className={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={useLocalSimulation}
+                      onChange={(e) => {
+                        const useLocal = e.target.checked
+                        setUseLocalSimulation(useLocal)
+                        localStorage.setItem(SIMULATION_SETTINGS_KEY, JSON.stringify({ useLocalSimulation: useLocal }))
+                      }}
+                    />
+                    <span>Use Local Simulation (Tevm - no API keys required)</span>
+                  </label>
+                </div>
+              </div>
+
               {/* Tenderly Settings */}
               <div className={styles.settingsGroup}>
                 <h3 className={styles.settingsTitle}>
@@ -1267,7 +1339,7 @@ export default function ContractCaller() {
                   {isTenderlyConfigured() && <span className={styles.settingsCheck}>✓</span>}
                 </h3>
                 <p className={styles.settingsDesc}>
-                  Required for simulating write functions. Get your credentials from{' '}
+                  {useLocalSimulation ? 'Optional when using Local Simulation.' : 'Required for simulating write functions.'} Get your credentials from{' '}
                   <a href="https://dashboard.tenderly.co/account/authorization" target="_blank" rel="noopener noreferrer">
                     Tenderly Dashboard
                   </a>
@@ -1695,6 +1767,96 @@ export default function ContractCaller() {
                 </div>
               )}
 
+              {/* Fork Block Number - only for local simulation */}
+              {selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) && useLocalSimulation && (
+                <div className={styles.field}>
+                  <label className={styles.label}>
+                    Fork Block <span className={styles.optional}>(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={forkBlockNumber}
+                    onChange={(e) => setForkBlockNumber(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="latest"
+                    className={styles.input}
+                    disabled={loading}
+                  />
+                </div>
+              )}
+
+              {/* Cheatcodes - only for local simulation */}
+              {selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) && useLocalSimulation && (
+                <div className={styles.cheatcodesSection}>
+                  <label className={styles.label}>Cheatcodes <span className={styles.optional}>(optional)</span></label>
+                  <div className={styles.cheatcodesList}>
+                    <label className={styles.cheatcodeItem}>
+                      <input
+                        type="checkbox"
+                        checked={cheatcodes.deal.enabled}
+                        onChange={(e) => setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, enabled: e.target.checked } }))}
+                      />
+                      <span>vm.deal</span>
+                    </label>
+                    {cheatcodes.deal.enabled && (
+                      <div className={styles.cheatcodeInputs}>
+                        <input
+                          type="text"
+                          value={cheatcodes.deal.address}
+                          onChange={(e) => setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, address: e.target.value } }))}
+                          placeholder="Address"
+                          className={styles.input}
+                        />
+                        <input
+                          type="text"
+                          value={cheatcodes.deal.amount}
+                          onChange={(e) => setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, amount: e.target.value } }))}
+                          placeholder="ETH Amount"
+                          className={styles.input}
+                        />
+                      </div>
+                    )}
+                    <label className={styles.cheatcodeItem}>
+                      <input
+                        type="checkbox"
+                        checked={cheatcodes.prank.enabled}
+                        onChange={(e) => setCheatcodes(prev => ({ ...prev, prank: { ...prev.prank, enabled: e.target.checked } }))}
+                      />
+                      <span>vm.prank</span>
+                    </label>
+                    {cheatcodes.prank.enabled && (
+                      <div className={styles.cheatcodeInputs}>
+                        <input
+                          type="text"
+                          value={cheatcodes.prank.address}
+                          onChange={(e) => setCheatcodes(prev => ({ ...prev, prank: { ...prev.prank, address: e.target.value } }))}
+                          placeholder="Impersonate Address"
+                          className={styles.input}
+                        />
+                      </div>
+                    )}
+                    <label className={styles.cheatcodeItem}>
+                      <input
+                        type="checkbox"
+                        checked={cheatcodes.warp.enabled}
+                        onChange={(e) => setCheatcodes(prev => ({ ...prev, warp: { ...prev.warp, enabled: e.target.checked } }))}
+                      />
+                      <span>vm.warp</span>
+                    </label>
+                    {cheatcodes.warp.enabled && (
+                      <div className={styles.cheatcodeInputs}>
+                        <input
+                          type="text"
+                          value={cheatcodes.warp.timestamp}
+                          onChange={(e) => setCheatcodes(prev => ({ ...prev, warp: { ...prev.warp, timestamp: e.target.value } }))}
+                          placeholder="Unix Timestamp"
+                          className={styles.input}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {selectedFunction && getSelectedFunctionInputs().length > 0 && (
                 <div className={styles.argsSection}>
                   <label className={styles.label}>Arguments</label>
@@ -1744,7 +1906,9 @@ export default function ContractCaller() {
             >
               {loading
                 ? (selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? 'Simulating...' : 'Calling...')
-                : (selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? 'Simulate Call' : 'Call Contract')
+                : (selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction())
+                    ? <>Simulate Call <span className={styles.simModeTag}>{useLocalSimulation ? 'L' : 'T'}</span></>
+                    : 'Call Contract')
               }
             </button>
             {address && selectedFunction && (

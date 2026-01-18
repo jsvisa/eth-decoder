@@ -2182,6 +2182,77 @@
   cursor: not-allowed;
 }
 
+/* Simulation Mode Tag */
+.simModeTag {
+  display: inline-block;
+  padding: 0.15rem 0.4rem;
+  margin-left: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+/* Cheatcodes Section */
+.cheatcodesSection {
+  margin-bottom: 1rem;
+}
+
+.cheatcodesList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+}
+
+.cheatcodeItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.cheatcodeItem input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+.cheatcodeInputs {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: 1.5rem;
+  margin-top: 0.25rem;
+}
+
+.cheatcodeInputs .input {
+  flex: 1;
+  padding: 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* Checkbox Label for Settings */
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.checkboxLabel input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
 @media (max-width: 768px) {
   .row {
     flex-direction: column;
@@ -2207,5 +2278,9 @@
   .buttonGroup .calldataButton,
   .buttonGroup .shareButton {
     width: 100%;
+  }
+
+  .cheatcodeInputs {
+    flex-direction: column;
   }
 }
