@@ -157,6 +157,7 @@ export default function ContractCaller() {
   const [showFunctionList, setShowFunctionList] = useState(false)
   const [copiedItem, setCopiedItem] = useState(null) // 'selector' | 'signature' | null
   const [ethValue, setEthValue] = useState('') // ETH value for payable functions
+  const [urlCopied, setUrlCopied] = useState(false) // For share URL feedback
   const [testingEtherscan, setTestingEtherscan] = useState(false)
   const [etherscanTestResult, setEtherscanTestResult] = useState(null) // 'success' | 'error' | null
   const [testingTenderly, setTestingTenderly] = useState(false)
@@ -245,6 +246,65 @@ export default function ContractCaller() {
       }
     } catch (err) {
       console.error('Failed to load history:', err)
+    }
+  }, [])
+
+  // Load from URL parameters on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const urlChain = params.get('chain')
+    const urlAddress = params.get('address')
+    const urlFunction = params.get('function')
+    const urlArgs = params.get('args')
+    const urlFrom = params.get('from')
+    const urlValue = params.get('value')
+
+    if (urlAddress) {
+      // Set chain first if provided
+      if (urlChain && CHAINS.some(c => c.id === urlChain)) {
+        setChain(urlChain)
+      }
+
+      setAddress(urlAddress)
+
+      // Store pending args to be applied after ABI loads
+      if (urlFunction) {
+        let parsedArgs = []
+        if (urlArgs) {
+          try {
+            parsedArgs = JSON.parse(urlArgs)
+          } catch (e) {
+            console.error('Failed to parse URL args:', e)
+          }
+        }
+
+        pendingHistoryRef.current = {
+          functionName: urlFunction,
+          args: parsedArgs,
+          timestamp: Date.now()
+        }
+
+        // Set selected function (will be applied after ABI loads)
+        setTimeout(() => {
+          setSelectedFunction(urlFunction)
+        }, 100)
+      }
+
+      if (urlFrom) {
+        setFromAddress(urlFrom)
+      }
+
+      if (urlValue) {
+        setEthValue(urlValue)
+      }
+
+      // Auto-fetch ABI after a short delay
+      setTimeout(() => {
+        const fetchButton = document.querySelector('[data-fetch-abi]')
+        if (fetchButton) {
+          fetchButton.click()
+        }
+      }, 200)
     }
   }, [])
 
@@ -903,6 +963,39 @@ export default function ContractCaller() {
     }
   }
 
+  const handleShareUrl = async () => {
+    try {
+      const params = new URLSearchParams()
+      params.set('chain', chain)
+      params.set('address', address)
+
+      if (selectedFunction) {
+        params.set('function', selectedFunction)
+      }
+
+      // Encode args as JSON if there are any non-empty args
+      if (args.length > 0 && args.some(a => a !== '')) {
+        params.set('args', JSON.stringify(args))
+      }
+
+      if (fromAddress) {
+        params.set('from', fromAddress)
+      }
+
+      if (ethValue) {
+        params.set('value', ethValue)
+      }
+
+      const shareUrl = `${window.location.origin}${window.location.pathname}?${params}`
+
+      await navigator.clipboard.writeText(shareUrl)
+      setUrlCopied(true)
+      setTimeout(() => setUrlCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy share URL:', err)
+    }
+  }
+
   return (
     <main className={styles.main}>
       <div className={styles.container}>
@@ -1182,6 +1275,7 @@ export default function ContractCaller() {
                   onClick={() => fetchAbi(false)}
                   className={styles.fetchButton}
                   disabled={loading || fetchingAbi}
+                  data-fetch-abi="true"
                 >
                   {fetchingAbi ? 'Fetching...' : 'Fetch ABI'}
                 </button>
@@ -1399,16 +1493,28 @@ export default function ContractCaller() {
             </>
           )}
 
-          <button
-            onClick={handleCall}
-            className={`${styles.button} ${selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? styles.simulateButton : ''}`}
-            disabled={loading || !selectedFunction}
-          >
-            {loading
-              ? (selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? 'Simulating...' : 'Calling...')
-              : (selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? 'Simulate Call' : 'Call Contract')
-            }
-          </button>
+          <div className={styles.buttonGroup}>
+            <button
+              onClick={handleCall}
+              className={`${styles.button} ${selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? styles.simulateButton : ''}`}
+              disabled={loading || !selectedFunction}
+            >
+              {loading
+                ? (selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? 'Simulating...' : 'Calling...')
+                : (selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? 'Simulate Call' : 'Call Contract')
+              }
+            </button>
+            {address && selectedFunction && (
+              <button
+                onClick={handleShareUrl}
+                className={styles.shareButton}
+                disabled={loading}
+                type="button"
+              >
+                {urlCopied ? 'URL Copied!' : 'Share URL'}
+              </button>
+            )}
+          </div>
         </div>
 
         {error && (
