@@ -485,6 +485,66 @@
   margin-left: 0.5rem;
 }
 
+/* ETH Value with unit toggle */
+.ethValueWrapper {
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+}
+
+.ethValueInput {
+  flex: 1;
+  padding: 0.875rem 1rem;
+  font-size: 1rem;
+  border: 2px solid var(--border-primary);
+  border-radius: 6px 0 0 6px;
+  border-right: none;
+  transition: border-color 0.3s;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.ethValueInput:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.ethValueInput:disabled {
+  background-color: var(--bg-hover);
+  cursor: not-allowed;
+}
+
+.ethValueUnitToggle {
+  display: flex;
+  border: 2px solid var(--border-primary);
+  border-radius: 0 6px 6px 0;
+  overflow: hidden;
+}
+
+.ethValueUnitBtn {
+  padding: 0.875rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background-color: var(--bg-hover);
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ethValueUnitBtn:first-child {
+  border-right: 1px solid var(--border-primary);
+}
+
+.ethValueUnitBtn:hover {
+  background-color: var(--bg-secondary);
+}
+
+.ethValueUnitBtn.active {
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  color: white;
+}
+
 /* Function selector badge */
 .funcSelector {
   font-family: 'Menlo', 'Consolas', 'Monaco', 'Courier New', monospace;

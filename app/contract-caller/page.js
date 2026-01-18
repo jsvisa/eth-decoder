@@ -250,6 +250,7 @@ export default function ContractCaller() {
   const [showFunctionList, setShowFunctionList] = useState(false)
   const [copiedItem, setCopiedItem] = useState(null) // 'selector' | 'signature' | null
   const [ethValue, setEthValue] = useState('') // ETH value for payable functions
+  const [ethValueUnit, setEthValueUnit] = useState('ETH') // 'ETH' or 'Wei'
   const [urlCopied, setUrlCopied] = useState(false) // For share URL feedback
   const [calldataCopied, setCalldataCopied] = useState(false) // For copy calldata feedback
   const [testingEtherscan, setTestingEtherscan] = useState(false)
@@ -831,6 +832,22 @@ export default function ContractCaller() {
     }
   }
 
+  // Helper to get ETH value with unit info
+  const getEthValueWithUnit = () => {
+    if (!ethValue || ethValue.trim() === '') return { value: undefined, unit: 'ETH' }
+    // Validate the value is a valid number
+    try {
+      if (ethValueUnit === 'Wei') {
+        BigInt(ethValue) // Validate it's a valid integer for Wei
+      } else {
+        parseFloat(ethValue) // Validate it's a valid number for ETH
+      }
+    } catch {
+      return { value: undefined, unit: ethValueUnit }
+    }
+    return { value: ethValue, unit: ethValueUnit }
+  }
+
   const handleCall = async () => {
     if (!address || !selectedFunction || !parsedAbi) {
       setError('Please fill in all required fields')
@@ -875,6 +892,7 @@ export default function ContractCaller() {
           }
         }
 
+        const ethValueInfo = getEthValueWithUnit()
         data = await simulateWithTevm({
           chain,
           address,
@@ -882,7 +900,8 @@ export default function ContractCaller() {
           args,
           abi: parsedAbi,
           fromAddress: fromAddress || undefined,
-          value: ethValue && parseFloat(ethValue) > 0 ? ethValue : undefined,
+          value: ethValueInfo.value,
+          valueUnit: ethValueInfo.unit,
           rpcUrl: rpcSettings[chain] || undefined,
           blockNumber: forkBlockNumber || 'latest',
           cheatcodes: activeCheatcodes,
@@ -916,8 +935,10 @@ export default function ContractCaller() {
           requestBody.tenderlyAccount = tenderlySettings.account
           requestBody.tenderlyProject = tenderlySettings.project
           // Add ETH value for payable functions
-          if (ethValue && parseFloat(ethValue) > 0) {
-            requestBody.value = ethValue
+          const ethValueInfo = getEthValueWithUnit()
+          if (ethValueInfo.value) {
+            requestBody.value = ethValueInfo.value
+            requestBody.valueUnit = ethValueInfo.unit
           }
         }
 
@@ -1784,23 +1805,6 @@ export default function ContractCaller() {
                 </div>
               </div>
 
-              {/* ETH Value for payable functions */}
-              {selectedFunction && getSelectedFunction() && isPayable(getSelectedFunction()) && (
-                <div className={styles.field}>
-                  <label className={styles.label}>
-                    ETH Value <span className={styles.payableBadge}>payable</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={ethValue}
-                    onChange={(e) => setEthValue(e.target.value)}
-                    placeholder="0.0 (ETH to send with transaction)"
-                    className={styles.input}
-                    disabled={loading}
-                  />
-                </div>
-              )}
-
               {/* Simulation Options - From Address, Fork Block, Cheatcodes in one row */}
               {selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) && (
                 <div className={styles.simOptionsSection}>
@@ -1911,6 +1915,41 @@ export default function ContractCaller() {
                       )}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* ETH Value for payable functions */}
+              {selectedFunction && getSelectedFunction() && isPayable(getSelectedFunction()) && (
+                <div className={styles.field}>
+                  <label className={styles.label}>
+                    ETH Value <span className={styles.payableBadge}>payable</span>
+                  </label>
+                  <div className={styles.ethValueWrapper}>
+                    <input
+                      type="text"
+                      value={ethValue}
+                      onChange={(e) => setEthValue(e.target.value)}
+                      placeholder={ethValueUnit === 'ETH' ? '0.0' : '0'}
+                      className={styles.ethValueInput}
+                      disabled={loading}
+                    />
+                    <div className={styles.ethValueUnitToggle}>
+                      <button
+                        type="button"
+                        className={`${styles.ethValueUnitBtn} ${ethValueUnit === 'Wei' ? styles.active : ''}`}
+                        onClick={() => setEthValueUnit('Wei')}
+                      >
+                        Wei
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.ethValueUnitBtn} ${ethValueUnit === 'ETH' ? styles.active : ''}`}
+                        onClick={() => setEthValueUnit('ETH')}
+                      >
+                        ETH
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
 

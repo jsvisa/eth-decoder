@@ -117,6 +117,7 @@ export async function simulateWithTevm({
   abi,
   fromAddress,
   value,
+  valueUnit = 'ETH',
   rpcUrl,
   blockNumber = 'latest',
   cheatcodes = {},
@@ -195,10 +196,22 @@ export async function simulateWithTevm({
       args: parsedArgs,
     })
 
-    // Convert ETH value to wei
+    // Convert value to wei based on unit
     let valueInWei = 0n
-    if (value && parseFloat(value) > 0) {
-      valueInWei = parseEther(value)
+    if (value) {
+      try {
+        if (valueUnit === 'Wei') {
+          // Value is already in Wei
+          valueInWei = BigInt(value)
+        } else {
+          // Value is in ETH, convert to Wei
+          if (parseFloat(value) > 0) {
+            valueInWei = parseEther(value)
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to parse value:', e.message)
+      }
     }
 
     // Execute the call using tevmCall for full trace
