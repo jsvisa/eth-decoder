@@ -2273,15 +2273,17 @@ export default function ContractCaller() {
                     </div>
                     <div className={styles.balanceValues}>
                       <span className={styles.balanceBefore}>
-                        {(BigInt(change.before) / BigInt(10 ** 18)).toString()} ETH
+                        {change.before != null ? (BigInt(change.before) / BigInt(10 ** 18)).toString() : '?'} ETH
                       </span>
                       <span className={styles.balanceArrow}>→</span>
                       <span className={styles.balanceAfter}>
-                        {(BigInt(change.after) / BigInt(10 ** 18)).toString()} ETH
+                        {change.after != null ? (BigInt(change.after) / BigInt(10 ** 18)).toString() : '?'} ETH
                       </span>
-                      <span className={`${styles.balanceDiff} ${BigInt(change.diff) >= 0n ? styles.balanceDiffPositive : styles.balanceDiffNegative}`}>
-                        ({BigInt(change.diff) >= 0n ? '+' : ''}{(BigInt(change.diff) / BigInt(10 ** 18)).toString()} ETH)
-                      </span>
+                      {change.diff != null && (
+                        <span className={`${styles.balanceDiff} ${BigInt(change.diff) >= 0n ? styles.balanceDiffPositive : styles.balanceDiffNegative}`}>
+                          ({BigInt(change.diff) >= 0n ? '+' : ''}{(BigInt(change.diff) / BigInt(10 ** 18)).toString()} ETH)
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
