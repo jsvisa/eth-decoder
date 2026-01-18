@@ -121,8 +121,8 @@ const getCachedAddresses = () => {
   return addresses
 }
 
-// Component for address-type argument input with address book picker and add/remove support
-function AddressArgInput({ value, onChange, addressBook, disabled, placeholder, onAddToBook, onRemoveFromBook }) {
+// Component for address-type argument input with address book support
+function AddressArgInput({ value, onChange, addressBook, disabled, placeholder, onBookmarkClick }) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [filter, setFilter] = useState('')
 
@@ -139,21 +139,18 @@ function AddressArgInput({ value, onChange, addressBook, disabled, placeholder, 
     )
   })
 
-  const handleSelect = (address) => {
-    onChange(address)
+  const handleSelect = (addr) => {
+    onChange(addr)
     setShowDropdown(false)
     setFilter('')
   }
 
-  const handleBookmarkClick = (e) => {
+  const handleStarClick = (e) => {
     e.preventDefault()
     e.stopPropagation()
-    if (!isValidAddress) return
-    if (isBookmarked && onRemoveFromBook) {
-      onRemoveFromBook(value)
-    } else if (!isBookmarked && onAddToBook) {
-      onAddToBook(value)
-    }
+    if (!isValidAddress || !onBookmarkClick) return
+    // Always open the modal - for both adding and editing/removing
+    onBookmarkClick(value)
   }
 
   return (
@@ -171,25 +168,16 @@ function AddressArgInput({ value, onChange, addressBook, disabled, placeholder, 
         className={styles.input}
         disabled={disabled}
       />
-      {isValidAddress && (onAddToBook || onRemoveFromBook) && (
+      {isValidAddress && onBookmarkClick && (
         <button
           type="button"
           className={`${styles.addressBookToggleButton} ${isBookmarked ? styles.bookmarked : ''}`}
-          onClick={handleBookmarkClick}
-          title={isBookmarked ? 'Remove from address book' : 'Add to address book'}
+          onClick={handleStarClick}
+          title={isBookmarked ? 'Edit bookmark' : 'Add to address book'}
         >
           {isBookmarked ? '★' : '☆'}
         </button>
       )}
-      <button
-        type="button"
-        className={styles.addressBookPickerButton}
-        onClick={() => setShowDropdown(!showDropdown)}
-        disabled={disabled || addressBook.length === 0}
-        title="Select from address book"
-      >
-        📖
-      </button>
       {showDropdown && addressBook.length > 0 && (
         <div className={styles.addressArgDropdown}>
           {filteredAddresses.length === 0 ? (
@@ -272,6 +260,7 @@ export default function ContractCaller() {
   const [rpcTestResult, setRpcTestResult] = useState({}) // { [chain]: 'success' | 'error' | null }
   const [addressBook, setAddressBook] = useState([]) // Address book entries
   const [showBookmarkModal, setShowBookmarkModal] = useState(false) // Show save to address book modal
+  const [bookmarkAddress, setBookmarkAddress] = useState('') // Address being bookmarked (empty = main contract address)
   const [bookmarkLabel, setBookmarkLabel] = useState('') // Label for new bookmark
   const [bookmarkNotes, setBookmarkNotes] = useState('') // Notes for new bookmark
   const [selectedRpcChain, setSelectedRpcChain] = useState('ethereum') // For RPC settings dropdown
@@ -1242,66 +1231,54 @@ export default function ContractCaller() {
     return isAddressBookmarked(address)
   }
 
-  // Open bookmark modal
-  const handleOpenBookmarkModal = () => {
-    const existing = getBookmarkedAddress(address)
+  // Open bookmark modal (for main contract or any address)
+  const handleOpenBookmarkModal = (addr) => {
+    const targetAddr = addr || address
+    if (!targetAddr || !/^0x[a-fA-F0-9]{40}$/.test(targetAddr)) return
+
+    const existing = getBookmarkedAddress(targetAddr)
     if (existing) {
       setBookmarkLabel(existing.label || '')
       setBookmarkNotes(existing.notes || '')
     } else {
-      setBookmarkLabel(contractName || '')
+      // Only use contractName for main contract (when addr is not provided)
+      setBookmarkLabel(addr ? '' : (contractName || ''))
       setBookmarkNotes('')
     }
+
+    setBookmarkAddress(addr || '') // Empty string means main contract
     setShowBookmarkModal(true)
   }
 
   // Save bookmark
   const handleSaveBookmark = () => {
-    if (!address) return
+    const addrToSave = bookmarkAddress || address
+    if (!addrToSave) return
 
     const updatedBook = addToAddressBook({
-      address,
+      address: addrToSave,
       label: bookmarkLabel,
-      contractName: contractName || '',
+      contractName: bookmarkAddress ? '' : (contractName || ''), // Only use contractName for main contract
       notes: bookmarkNotes,
     })
 
     setAddressBook(updatedBook)
     setShowBookmarkModal(false)
+    setBookmarkAddress('')
     setBookmarkLabel('')
     setBookmarkNotes('')
   }
 
-  // Remove bookmark
+  // Remove bookmark (for main contract or modal)
   const handleRemoveBookmark = () => {
-    const existing = getBookmarkedAddress(address)
+    const addrToRemove = bookmarkAddress || address
+    const existing = getBookmarkedAddress(addrToRemove)
     if (existing) {
       const updatedBook = removeFromAddressBook(existing.id)
       setAddressBook(updatedBook)
     }
     setShowBookmarkModal(false)
-  }
-
-  // Quick add any address to address book (for address inputs)
-  const handleQuickAddToBook = (addr) => {
-    if (!addr || !/^0x[a-fA-F0-9]{40}$/.test(addr)) return
-    const updatedBook = addToAddressBook({
-      address: addr,
-      label: '',
-      contractName: '',
-      notes: '',
-    })
-    setAddressBook(updatedBook)
-  }
-
-  // Quick remove any address from address book (for address inputs)
-  const handleQuickRemoveFromBook = (addr) => {
-    if (!addr) return
-    const existing = getBookmarkedAddress(addr)
-    if (existing) {
-      const updatedBook = removeFromAddressBook(existing.id)
-      setAddressBook(updatedBook)
-    }
+    setBookmarkAddress('')
   }
 
   // Get combined suggestions (bookmarked addresses + cached addresses)
@@ -1629,7 +1606,7 @@ export default function ContractCaller() {
                   )}
                 </div>
                 <button
-                  onClick={handleOpenBookmarkModal}
+                  onClick={() => handleOpenBookmarkModal()}
                   className={`${styles.bookmarkButton} ${isCurrentAddressBookmarked() ? styles.bookmarked : ''}`}
                   disabled={loading || !address || !/^0x[a-fA-F0-9]{40}$/.test(address)}
                   type="button"
@@ -1854,8 +1831,7 @@ export default function ContractCaller() {
                           addressBook={addressBook}
                           disabled={loading}
                           placeholder="From Address"
-                          onAddToBook={handleQuickAddToBook}
-                          onRemoveFromBook={handleQuickRemoveFromBook}
+                          onBookmarkClick={handleOpenBookmarkModal}
                         />
                       </div>
                       {useLocalSimulation && (
@@ -1973,8 +1949,7 @@ export default function ContractCaller() {
                           addressBook={addressBook}
                           disabled={loading}
                           placeholder={`Enter ${input.type}...`}
-                          onAddToBook={handleQuickAddToBook}
-                          onRemoveFromBook={handleQuickRemoveFromBook}
+                          onBookmarkClick={handleOpenBookmarkModal}
                         />
                       ) : (
                         <input
@@ -2447,16 +2422,19 @@ export default function ContractCaller() {
       </div>
 
       {/* Bookmark Modal */}
-      {showBookmarkModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowBookmarkModal(false)}>
+      {showBookmarkModal && (() => {
+        const modalAddr = bookmarkAddress || address
+        const isBookmarked = modalAddr && getBookmarkedAddress(modalAddr)
+        return (
+        <div className={styles.modalOverlay} onClick={() => { setShowBookmarkModal(false); setBookmarkAddress(''); }}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h3 className={styles.modalTitle}>
-              {isCurrentAddressBookmarked() ? 'Edit Bookmark' : 'Add to Address Book'}
+              {isBookmarked ? 'Edit Bookmark' : 'Add to Address Book'}
             </h3>
             <div className={styles.modalBody}>
               <div className={styles.modalField}>
                 <label className={styles.modalLabel}>Address</label>
-                <div className={styles.modalAddress}>{address}</div>
+                <div className={styles.modalAddress}>{modalAddr}</div>
               </div>
               <div className={styles.modalField}>
                 <label className={styles.modalLabel}>Label</label>
@@ -2481,7 +2459,7 @@ export default function ContractCaller() {
               </div>
             </div>
             <div className={styles.modalActions}>
-              {isCurrentAddressBookmarked() && (
+              {isBookmarked && (
                 <button
                   onClick={handleRemoveBookmark}
                   className={styles.modalDeleteButton}
@@ -2491,7 +2469,7 @@ export default function ContractCaller() {
                 </button>
               )}
               <button
-                onClick={() => setShowBookmarkModal(false)}
+                onClick={() => { setShowBookmarkModal(false); setBookmarkAddress(''); }}
                 className={styles.modalCancelButton}
                 type="button"
               >
@@ -2507,7 +2485,8 @@ export default function ContractCaller() {
             </div>
           </div>
         </div>
-      )}
+        )
+      })()}
     </main>
   )
 }
