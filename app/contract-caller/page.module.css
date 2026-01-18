@@ -1,16 +1,16 @@
 .main {
   min-height: 100vh;
   padding: 2rem;
-  background: linear-gradient(to bottom, #f7f7f7, #e7e7e7);
+  background: linear-gradient(to bottom, var(--bg-primary), var(--bg-secondary));
 }
 
 .container {
   max-width: 1200px;
   margin: 0 auto;
-  background: white;
+  background: var(--bg-card);
   padding: 3rem;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow);
 }
 
 .titleRow {
@@ -21,7 +21,7 @@
 }
 
 .title {
-  color: #333;
+  color: var(--text-primary);
   font-size: 2.5rem;
   margin: 0;
 }
@@ -35,53 +35,53 @@
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #666;
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
+  color: var(--text-secondary);
+  background-color: var(--bg-hover);
+  border: 1px solid var(--border-primary);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .settingsToggle:hover {
-  background-color: #e8e8e8;
-  border-color: #ccc;
+  background-color: var(--bg-secondary);
+  border-color: var(--border-secondary);
 }
 
 .settingsConfigured {
-  color: #059669;
-  background-color: #d1fae5;
-  border-color: #a7f3d0;
+  color: var(--accent-green);
+  background-color: var(--accent-green-light);
+  border-color: var(--accent-green);
 }
 
 .settingsConfigured:hover {
-  background-color: #a7f3d0;
-  border-color: #6ee7b7;
+  background-color: var(--accent-green-light);
+  border-color: var(--accent-green);
 }
 
 .settingsPanel {
   margin-top: 1rem;
   padding: 1.5rem;
-  background-color: #f8f9fa;
-  border: 1px solid #e0e0e0;
+  background-color: var(--bg-code);
+  border: 1px solid var(--border-secondary);
   border-radius: 8px;
 }
 
 .settingsTitle {
   margin: 0 0 0.5rem 0;
-  color: #333;
+  color: var(--text-primary);
   font-size: 1.1rem;
 }
 
 .settingsDesc {
   margin: 0 0 1.25rem 0;
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.9rem;
   line-height: 1.5;
 }
 
 .settingsDesc a {
-  color: #0070f3;
+  color: var(--accent-blue);
   text-decoration: none;
 }
 
@@ -297,45 +297,48 @@
 
 .label {
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
   font-size: 0.95rem;
 }
 
 .input {
   padding: 0.875rem 1rem;
   font-size: 1rem;
-  border: 2px solid #ddd;
+  border: 2px solid var(--border-primary);
   border-radius: 6px;
   transition: border-color 0.3s;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
 }
 
 .input:focus {
   outline: none;
-  border-color: #0070f3;
+  border-color: var(--border-focus);
 }
 
 .input:disabled {
-  background-color: #f5f5f5;
+  background-color: var(--bg-hover);
   cursor: not-allowed;
 }
 
 .select {
   padding: 0.875rem 1rem;
   font-size: 1rem;
-  border: 2px solid #ddd;
+  border: 2px solid var(--border-primary);
   border-radius: 6px;
-  background-color: white;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
   cursor: pointer;
   transition: border-color 0.3s;
 }
 
 .select:focus {
   outline: none;
-  border-color: #0070f3;
+  border-color: var(--border-focus);
 }
 
 .select:disabled {
-  background-color: #f5f5f5;
+  background-color: var(--bg-hover);
   cursor: not-allowed;
 }
 
@@ -709,20 +712,22 @@
   padding: 1rem;
   font-size: 0.9rem;
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  border: 2px solid #ddd;
+  border: 2px solid var(--border-primary);
   border-radius: 6px;
   resize: vertical;
   min-height: 120px;
   transition: border-color 0.3s;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
 }
 
 .textarea:focus {
   outline: none;
-  border-color: #0070f3;
+  border-color: var(--border-focus);
 }
 
 .textarea:disabled {
-  background-color: #f5f5f5;
+  background-color: var(--bg-hover);
   cursor: not-allowed;
 }
 
@@ -731,9 +736,9 @@
   flex-direction: column;
   gap: 1rem;
   padding: 1.25rem;
-  background-color: #f8f9fa;
+  background-color: var(--bg-code);
   border-radius: 8px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-secondary);
 }
 
 .argField {
@@ -744,7 +749,7 @@
 
 .argLabel {
   font-size: 0.875rem;
-  color: #555;
+  color: var(--text-secondary);
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
 }
 
@@ -753,7 +758,7 @@
   font-size: 1.125rem;
   font-weight: 600;
   color: white;
-  background-color: #0070f3;
+  background-color: var(--accent-blue);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -761,16 +766,16 @@
 }
 
 .button:hover:not(:disabled) {
-  background-color: #0051cc;
+  background-color: var(--accent-blue-hover);
 }
 
 .button:disabled {
-  background-color: #ccc;
+  background-color: var(--border-primary);
   cursor: not-allowed;
 }
 
 .simulateButton {
-  background-color: #d97706;
+  background-color: var(--accent-orange);
 }
 
 .simulateButton:hover:not(:disabled) {
@@ -779,10 +784,10 @@
 
 .error {
   padding: 1.25rem;
-  background-color: #fee;
-  border: 1px solid #fcc;
+  background-color: var(--accent-red-light);
+  border: 1px solid var(--accent-red);
   border-radius: 6px;
-  color: #c33;
+  color: var(--accent-red);
   font-size: 1rem;
   margin-bottom: 1rem;
 }
@@ -919,7 +924,7 @@
 .historySection {
   margin-top: 3rem;
   padding-top: 2rem;
-  border-top: 2px solid #e7e7e7;
+  border-top: 2px solid var(--border-secondary);
 }
 
 .historyHeader {
@@ -931,7 +936,7 @@
 
 .historyHeader h3 {
   margin: 0;
-  color: #333;
+  color: var(--text-primary);
   font-size: 1.5rem;
 }
 
@@ -978,18 +983,18 @@
 
 .historyItem {
   padding: 1rem;
-  background-color: #f8f9fa;
-  border: 1px solid #e0e0e0;
+  background-color: var(--bg-code);
+  border: 1px solid var(--border-secondary);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .historyItem:hover {
-  background-color: #e8f4ff;
-  border-color: #0070f3;
+  background-color: var(--accent-blue-light);
+  border-color: var(--accent-blue);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 112, 243, 0.15);
+  box-shadow: var(--shadow-sm);
 }
 
 .historyTop {

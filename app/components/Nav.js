@@ -2,10 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useTheme } from '../contexts/ThemeContext'
 import styles from './Nav.module.css'
 
 export default function Nav() {
   const pathname = usePathname()
+  const { theme, toggleTheme } = useTheme()
 
   return (
     <nav className={styles.nav}>
@@ -30,6 +32,13 @@ export default function Nav() {
             Address Book
           </Link>
         </div>
+        <button
+          onClick={toggleTheme}
+          className={styles.themeToggle}
+          title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+        >
+          {theme === 'light' ? '🌙' : '☀️'}
+        </button>
       </div>
     </nav>
   )

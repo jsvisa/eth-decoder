@@ -1,21 +1,21 @@
 .main {
   min-height: 100vh;
   padding: 2rem;
-  background: linear-gradient(to bottom, #f7f7f7, #e7e7e7);
+  background: linear-gradient(to bottom, var(--bg-primary), var(--bg-secondary));
 }
 
 .container {
   max-width: 1200px;
   margin: 0 auto;
-  background: white;
+  background: var(--bg-card);
   padding: 3rem;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow);
 }
 
 .title {
   text-align: center;
-  color: #333;
+  color: var(--text-primary);
   margin-bottom: 2.5rem;
   font-size: 2.5rem;
 }
@@ -30,19 +30,21 @@
 .input {
   padding: 1.25rem 1.5rem;
   font-size: 1.25rem;
-  border: 2px solid #ddd;
+  border: 2px solid var(--border-primary);
   border-radius: 6px;
   transition: border-color 0.3s;
   min-height: 60px;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
 }
 
 .input:focus {
   outline: none;
-  border-color: #0070f3;
+  border-color: var(--border-focus);
 }
 
 .input:disabled {
-  background-color: #f5f5f5;
+  background-color: var(--bg-hover);
   cursor: not-allowed;
 }
 
@@ -58,7 +60,7 @@
   gap: 0.5rem;
   cursor: pointer;
   font-size: 1rem;
-  color: #333;
+  color: var(--text-primary);
   user-select: none;
 }
 
