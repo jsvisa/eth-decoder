@@ -60,6 +60,83 @@ const isValidPositiveInteger = (value) => {
   return /^\d+$/.test(value)
 }
 
+// Recursively validate all addresses in an argument (handles tuples, arrays, nested structures)
+const validateAddressesInArg = (argValue, input, errors, argIndex, argErrors, path = '') => {
+  const type = input.type
+
+  // Handle address type
+  if (type === 'address') {
+    if (!argValue || !isValidEthAddress(argValue)) {
+      errors[`arg_${argIndex}`] = true
+      const fieldName = path || input.name || `Argument ${argIndex + 1}`
+      argErrors.push(`${fieldName} must be a valid Ethereum address`)
+      return false
+    }
+    return true
+  }
+
+  // Handle address[] type
+  if (type === 'address[]') {
+    if (!argValue) return true // Empty array is ok
+    try {
+      const addresses = typeof argValue === 'string' ? JSON.parse(argValue) : argValue
+      if (Array.isArray(addresses)) {
+        let valid = true
+        addresses.forEach((addr, i) => {
+          if (!isValidEthAddress(addr)) {
+            errors[`arg_${argIndex}`] = true
+            const fieldName = path || input.name || `Argument ${argIndex + 1}`
+            argErrors.push(`${fieldName}[${i}] must be a valid Ethereum address`)
+            valid = false
+          }
+        })
+        return valid
+      }
+    } catch {
+      // JSON parse error - will be caught later
+    }
+    return true
+  }
+
+  // Handle tuple type - recursively validate components
+  if (type === 'tuple' && input.components) {
+    if (!argValue) return true
+    const tupleValue = Array.isArray(argValue) ? argValue : []
+    let valid = true
+    input.components.forEach((component, i) => {
+      const componentPath = path ? `${path}.${component.name || i}` : `${input.name || `Argument ${argIndex + 1}`}.${component.name || i}`
+      if (!validateAddressesInArg(tupleValue[i], component, errors, argIndex, argErrors, componentPath)) {
+        valid = false
+      }
+    })
+    return valid
+  }
+
+  // Handle tuple[] type
+  if (type === 'tuple[]' && input.components) {
+    if (!argValue) return true
+    try {
+      const tupleArray = typeof argValue === 'string' ? JSON.parse(argValue) : argValue
+      if (Array.isArray(tupleArray)) {
+        let valid = true
+        tupleArray.forEach((tuple, i) => {
+          const tuplePath = path ? `${path}[${i}]` : `${input.name || `Argument ${argIndex + 1}`}[${i}]`
+          const tupleInput = { ...input, type: 'tuple' }
+          if (!validateAddressesInArg(tuple, tupleInput, errors, argIndex, argErrors, tuplePath)) {
+            valid = false
+          }
+        })
+        return valid
+      }
+    } catch {
+      // JSON parse error
+    }
+    return true
+  }
+
+  return true
+}
+
 // Helper functions for ABI cache
 const getAbiCacheKey = (chain, address) => `${ABI_CACHE_PREFIX}${chain}-${address.toLowerCase()}`
 
@@ -1130,34 +1207,12 @@ export default function ContractCaller() {
       }
     }
 
-    // Validate function arguments (especially address types)
+    // Validate function arguments (addresses in all types including tuples)
     if (selectedFunc && selectedFunc.inputs) {
       const argErrors = []
       selectedFunc.inputs.forEach((input, index) => {
-        const argValue = args[index] || ''
-        // Validate address type arguments - must be a valid address (not empty)
-        if (input.type === 'address') {
-          if (!argValue || !isValidEthAddress(argValue)) {
-            errors[`arg_${index}`] = true
-            argErrors.push(`${input.name || `Argument ${index + 1}`} must be a valid Ethereum address`)
-          }
-        }
-        // Validate address[] type arguments
-        if (input.type === 'address[]' && argValue) {
-          try {
-            const addresses = typeof argValue === 'string' ? JSON.parse(argValue) : argValue
-            if (Array.isArray(addresses)) {
-              addresses.forEach((addr, i) => {
-                if (!isValidEthAddress(addr)) {
-                  errors[`arg_${index}`] = true
-                  argErrors.push(`${input.name || `Argument ${index + 1}`}[${i}] must be a valid Ethereum address`)
-                }
-              })
-            }
-          } catch {
-            // JSON parse error will be caught later
-          }
-        }
+        const argValue = args[index]
+        validateAddressesInArg(argValue, input, errors, index, argErrors)
       })
       if (argErrors.length > 0) {
         errors.argErrors = argErrors
