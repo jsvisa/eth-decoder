@@ -1,3 +1,5 @@
+import { isValidEthAddress } from './validation'
+
 const STORAGE_KEY = 'address_book'
 
 export const getAddressBook = () => {
@@ -139,7 +141,7 @@ export const importFromCSV = (csvContent) => {
     })
 
     // Validate address format
-    if (!/^0x[a-fA-F0-9]{40}$/.test(entry.address)) {
+    if (!isValidEthAddress(entry.address)) {
       throw new Error(`Invalid address format at row ${i + 1}: ${entry.address}`)
     }
 

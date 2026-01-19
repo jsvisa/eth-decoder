@@ -12,6 +12,7 @@ import {
   getBookmarkedAddress,
 } from '../utils/addressBook'
 import { simulateWithTevm } from '../utils/tevmSimulator'
+import { isValidEthAddress, isValidForkBlock, isValidNumber, isValidPositiveInteger } from '../utils/validation'
 
 const CHAINS = [
   { id: 'ethereum', name: 'Ethereum', icon: 'https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg' },
@@ -36,6 +37,83 @@ const CHAIN_IDS = {
   base: 8453,
   polygon: 137,
   bsc: 56,
+}
+
+// Recursively validate all addresses in an argument (handles tuples, arrays, nested structures)
+const validateAddressesInArg = (argValue, input, errors, argIndex, argErrors, path = '') => {
+  const type = input.type
+
+  // Handle address type
+  if (type === 'address') {
+    if (!argValue || !isValidEthAddress(argValue)) {
+      errors[`arg_${argIndex}`] = true
+      const fieldName = path || input.name || `Argument ${argIndex + 1}`
+      argErrors.push(`${fieldName} must be a valid Ethereum address`)
+      return false
+    }
+    return true
+  }
+
+  // Handle address[] type
+  if (type === 'address[]') {
+    if (!argValue) return true // Empty array is ok
+    try {
+      const addresses = typeof argValue === 'string' ? JSON.parse(argValue) : argValue
+      if (Array.isArray(addresses)) {
+        let valid = true
+        addresses.forEach((addr, i) => {
+          if (!isValidEthAddress(addr)) {
+            errors[`arg_${argIndex}`] = true
+            const fieldName = path || input.name || `Argument ${argIndex + 1}`
+            argErrors.push(`${fieldName}[${i}] must be a valid Ethereum address`)
+            valid = false
+          }
+        })
+        return valid
+      }
+    } catch {
+      // JSON parse error - will be caught later
+    }
+    return true
+  }
+
+  // Handle tuple type - recursively validate components
+  if (type === 'tuple' && input.components) {
+    if (!argValue) return true
+    const tupleValue = Array.isArray(argValue) ? argValue : []
+    let valid = true
+    input.components.forEach((component, i) => {
+      const componentPath = path ? `${path}.${component.name || i}` : `${input.name || `Argument ${argIndex + 1}`}.${component.name || i}`
+      if (!validateAddressesInArg(tupleValue[i], component, errors, argIndex, argErrors, componentPath)) {
+        valid = false
+      }
+    })
+    return valid
+  }
+
+  // Handle tuple[] type
+  if (type === 'tuple[]' && input.components) {
+    if (!argValue) return true
+    try {
+      const tupleArray = typeof argValue === 'string' ? JSON.parse(argValue) : argValue
+      if (Array.isArray(tupleArray)) {
+        let valid = true
+        tupleArray.forEach((tuple, i) => {
+          const tuplePath = path ? `${path}[${i}]` : `${input.name || `Argument ${argIndex + 1}`}[${i}]`
+          const tupleInput = { ...input, type: 'tuple' }
+          if (!validateAddressesInArg(tuple, tupleInput, errors, argIndex, argErrors, tuplePath)) {
+            valid = false
+          }
+        })
+        return valid
+      }
+    } catch {
+      // JSON parse error
+    }
+    return true
+  }
+
+  return true
 }
 
 // Helper functions for ABI cache
@@ -122,11 +200,11 @@ const getCachedAddresses = () => {
 }
 
 // Component for address-type argument input with address book support
-function AddressArgInput({ value, onChange, addressBook, disabled, placeholder, onBookmarkClick }) {
+function AddressArgInput({ value, onChange, addressBook, disabled, placeholder, onBookmarkClick, error }) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [filter, setFilter] = useState('')
 
-  const isValidAddress = value && /^0x[a-fA-F0-9]{40}$/.test(value)
+  const isValidAddress = isValidEthAddress(value)
   const isBookmarked = isValidAddress && addressBook.some(item => item.address.toLowerCase() === value.toLowerCase())
 
   const filteredAddresses = addressBook.filter(item => {
@@ -165,7 +243,7 @@ function AddressArgInput({ value, onChange, addressBook, disabled, placeholder, 
         onFocus={() => setShowDropdown(true)}
         onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
         placeholder={placeholder}
-        className={styles.input}
+        className={`${styles.input} ${error ? styles.inputError : ''}`}
         disabled={disabled}
       />
       {isValidAddress && onBookmarkClick && (
@@ -206,7 +284,7 @@ function AddressArgInput({ value, onChange, addressBook, disabled, placeholder, 
 }
 
 // Recursive argument input component for complex types
-function ArgInput({ input, value, onChange, addressBook, disabled, onBookmarkClick, depth = 0 }) {
+function ArgInput({ input, value, onChange, addressBook, disabled, onBookmarkClick, depth = 0, error }) {
   const type = input.type
 
   // Handle address type
@@ -219,6 +297,7 @@ function ArgInput({ input, value, onChange, addressBook, disabled, onBookmarkCli
         disabled={disabled}
         placeholder={`Enter ${type}...`}
         onBookmarkClick={onBookmarkClick}
+        error={error}
       />
     )
   }
@@ -234,6 +313,7 @@ function ArgInput({ input, value, onChange, addressBook, disabled, onBookmarkCli
         disabled={disabled}
         onBookmarkClick={onBookmarkClick}
         depth={depth}
+        error={error}
       />
     )
   }
@@ -249,6 +329,7 @@ function ArgInput({ input, value, onChange, addressBook, disabled, onBookmarkCli
         disabled={disabled}
         onBookmarkClick={onBookmarkClick}
         depth={depth}
+        error={error}
       />
     )
   }
@@ -260,7 +341,7 @@ function ArgInput({ input, value, onChange, addressBook, disabled, onBookmarkCli
       value={value || ''}
       onChange={(e) => onChange(e.target.value)}
       placeholder={`Enter ${type}...`}
-      className={styles.input}
+      className={`${styles.input} ${error ? styles.inputError : ''}`}
       disabled={disabled}
     />
   )
@@ -445,6 +526,7 @@ export default function ContractCaller() {
   })
   const [abiCollapsed, setAbiCollapsed] = useState(true) // Collapse ABI JSON textarea (default collapsed)
   const [simOptionsExpanded, setSimOptionsExpanded] = useState(false) // Expand simulation options
+  const [fieldErrors, setFieldErrors] = useState({}) // Track validation errors for fields
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null) // { functionName, args, timestamp }
   const bookmarkInputRef = useRef(null)
@@ -626,7 +708,7 @@ export default function ContractCaller() {
 
   // Auto-load cached ABI when address or chain changes
   useEffect(() => {
-    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    if (!isValidEthAddress(address)) {
       setContractName(null)
       return
     }
@@ -1042,7 +1124,13 @@ export default function ContractCaller() {
   }
 
   const handleCall = async () => {
+    // Clear previous field errors
+    setFieldErrors({})
+
     if (!address || !selectedFunction || !parsedAbi) {
+      const errors = {}
+      if (!address || !isValidEthAddress(address)) errors.address = true
+      setFieldErrors(errors)
       setError('Please fill in all required fields')
       return
     }
@@ -1054,6 +1142,75 @@ export default function ContractCaller() {
     if (isWrite && !useLocalSimulation && !isTenderlyConfigured()) {
       setError('Please configure Tenderly API settings or enable Local Simulation to simulate write functions')
       setShowSettings(true)
+      return
+    }
+
+    // Validate all input fields
+    const errors = {}
+
+    // Contract address validation
+    if (!isValidEthAddress(address)) {
+      errors.address = true
+    }
+
+    // From address validation for write functions
+    if (isWrite && !isValidEthAddress(fromAddress)) {
+      errors.fromAddress = true
+    }
+
+    // Fork block validation for local simulation
+    if (isWrite && useLocalSimulation && !isValidForkBlock(forkBlockNumber)) {
+      errors.forkBlockNumber = true
+    }
+
+    // ETH value validation for payable functions
+    if (selectedFunc && isPayable(selectedFunc) && ethValue && !isValidNumber(ethValue)) {
+      errors.ethValue = true
+    }
+
+    // Cheatcode validation for local simulation
+    if (isWrite && useLocalSimulation) {
+      if (cheatcodes.deal.enabled) {
+        if (cheatcodes.deal.address && !isValidEthAddress(cheatcodes.deal.address)) {
+          errors.dealAddress = true
+        }
+        if (cheatcodes.deal.amount && !isValidNumber(cheatcodes.deal.amount)) {
+          errors.dealAmount = true
+        }
+      }
+      if (cheatcodes.prank.enabled && cheatcodes.prank.address && !isValidEthAddress(cheatcodes.prank.address)) {
+        errors.prankAddress = true
+      }
+      if (cheatcodes.warp.enabled && cheatcodes.warp.timestamp && !isValidPositiveInteger(cheatcodes.warp.timestamp)) {
+        errors.warpTimestamp = true
+      }
+    }
+
+    // Validate function arguments (addresses in all types including tuples)
+    if (selectedFunc && selectedFunc.inputs) {
+      const argErrors = []
+      selectedFunc.inputs.forEach((input, index) => {
+        const argValue = args[index]
+        validateAddressesInArg(argValue, input, errors, index, argErrors)
+      })
+      if (argErrors.length > 0) {
+        errors.argErrors = argErrors
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      const errorMessages = []
+      if (errors.address) errorMessages.push('Contract Address must be a valid Ethereum address')
+      if (errors.fromAddress) errorMessages.push('From Address must be a valid Ethereum address')
+      if (errors.forkBlockNumber) errorMessages.push('Fork Block must be empty, "latest", or a valid block number')
+      if (errors.ethValue) errorMessages.push('ETH Value must be a valid number')
+      if (errors.dealAddress) errorMessages.push('Deal address must be a valid Ethereum address')
+      if (errors.dealAmount) errorMessages.push('Deal amount must be a valid number')
+      if (errors.prankAddress) errorMessages.push('Prank address must be a valid Ethereum address')
+      if (errors.warpTimestamp) errorMessages.push('Warp timestamp must be a valid positive integer')
+      if (errors.argErrors) errorMessages.push(...errors.argErrors)
+      setError(errorMessages.join('; '))
       return
     }
 
@@ -1441,14 +1598,14 @@ export default function ContractCaller() {
 
   // Check if current address is bookmarked
   const isCurrentAddressBookmarked = () => {
-    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) return false
+    if (!isValidEthAddress(address)) return false
     return isAddressBookmarked(address)
   }
 
   // Open bookmark modal (for main contract or any address)
   const handleOpenBookmarkModal = (addr) => {
     const targetAddr = addr || address
-    if (!targetAddr || !/^0x[a-fA-F0-9]{40}$/.test(targetAddr)) return
+    if (!isValidEthAddress(targetAddr)) return
 
     const existing = getBookmarkedAddress(targetAddr)
     if (existing) {
@@ -1774,11 +1931,14 @@ export default function ContractCaller() {
                       setAddress(e.target.value)
                       setAddressFilter(e.target.value)
                       setShowAddressSuggestions(true)
+                      if (fieldErrors.address) {
+                        setFieldErrors(prev => ({ ...prev, address: false }))
+                      }
                     }}
                     onFocus={() => setShowAddressSuggestions(true)}
                     onBlur={() => setTimeout(() => setShowAddressSuggestions(false), 200)}
                     placeholder="0x..."
-                    className={styles.input}
+                    className={`${styles.input} ${fieldErrors.address ? styles.inputError : ''}`}
                     disabled={loading}
                   />
                   {showAddressSuggestions && getCombinedSuggestions().length > 0 && (
@@ -1822,7 +1982,7 @@ export default function ContractCaller() {
                 <button
                   onClick={() => handleOpenBookmarkModal()}
                   className={`${styles.bookmarkButton} ${isCurrentAddressBookmarked() ? styles.bookmarked : ''}`}
-                  disabled={loading || !address || !/^0x[a-fA-F0-9]{40}$/.test(address)}
+                  disabled={loading || !isValidEthAddress(address)}
                   type="button"
                   title={isCurrentAddressBookmarked() ? 'Edit bookmark' : 'Add to address book'}
                 >
@@ -2015,20 +2175,31 @@ export default function ContractCaller() {
                         <input
                           type="text"
                           value={forkBlockNumber}
-                          onChange={(e) => setForkBlockNumber(e.target.value.replace(/[^0-9]/g, ''))}
-                          placeholder="Fork Block"
-                          className={styles.simOptionInputSmall}
+                          onChange={(e) => {
+                            setForkBlockNumber(e.target.value)
+                            if (fieldErrors.forkBlockNumber) {
+                              setFieldErrors(prev => ({ ...prev, forkBlockNumber: false }))
+                            }
+                          }}
+                          placeholder="Fork Block (latest)"
+                          className={`${styles.simOptionInputSmall} ${fieldErrors.forkBlockNumber ? styles.inputError : ''}`}
                           disabled={loading}
                         />
                       )}
                       <div className={styles.simOptionFromAddress}>
                         <AddressArgInput
                           value={fromAddress}
-                          onChange={(value) => setFromAddress(value)}
+                          onChange={(value) => {
+                            setFromAddress(value)
+                            if (fieldErrors.fromAddress) {
+                              setFieldErrors(prev => ({ ...prev, fromAddress: false }))
+                            }
+                          }}
                           addressBook={addressBook}
                           disabled={loading}
                           placeholder="From Address"
                           onBookmarkClick={handleOpenBookmarkModal}
+                          error={fieldErrors.fromAddress}
                         />
                       </div>
                       {useLocalSimulation && (
@@ -2069,16 +2240,26 @@ export default function ContractCaller() {
                           <input
                             type="text"
                             value={cheatcodes.deal.address}
-                            onChange={(e) => setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, address: e.target.value } }))}
+                            onChange={(e) => {
+                              setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, address: e.target.value } }))
+                              if (fieldErrors.dealAddress) {
+                                setFieldErrors(prev => ({ ...prev, dealAddress: false }))
+                              }
+                            }}
                             placeholder="Address"
-                            className={styles.simOptionInput}
+                            className={`${styles.simOptionInput} ${fieldErrors.dealAddress ? styles.inputError : ''}`}
                           />
                           <input
                             type="text"
                             value={cheatcodes.deal.amount}
-                            onChange={(e) => setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, amount: e.target.value } }))}
+                            onChange={(e) => {
+                              setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, amount: e.target.value } }))
+                              if (fieldErrors.dealAmount) {
+                                setFieldErrors(prev => ({ ...prev, dealAmount: false }))
+                              }
+                            }}
                             placeholder="ETH Amount"
-                            className={styles.simOptionInputSmall}
+                            className={`${styles.simOptionInputSmall} ${fieldErrors.dealAmount ? styles.inputError : ''}`}
                           />
                         </div>
                       )}
@@ -2088,9 +2269,14 @@ export default function ContractCaller() {
                           <input
                             type="text"
                             value={cheatcodes.prank.address}
-                            onChange={(e) => setCheatcodes(prev => ({ ...prev, prank: { ...prev.prank, address: e.target.value } }))}
+                            onChange={(e) => {
+                              setCheatcodes(prev => ({ ...prev, prank: { ...prev.prank, address: e.target.value } }))
+                              if (fieldErrors.prankAddress) {
+                                setFieldErrors(prev => ({ ...prev, prankAddress: false }))
+                              }
+                            }}
                             placeholder="Impersonate Address"
-                            className={styles.simOptionInput}
+                            className={`${styles.simOptionInput} ${fieldErrors.prankAddress ? styles.inputError : ''}`}
                           />
                         </div>
                       )}
@@ -2100,9 +2286,14 @@ export default function ContractCaller() {
                           <input
                             type="text"
                             value={cheatcodes.warp.timestamp}
-                            onChange={(e) => setCheatcodes(prev => ({ ...prev, warp: { ...prev.warp, timestamp: e.target.value } }))}
+                            onChange={(e) => {
+                              setCheatcodes(prev => ({ ...prev, warp: { ...prev.warp, timestamp: e.target.value } }))
+                              if (fieldErrors.warpTimestamp) {
+                                setFieldErrors(prev => ({ ...prev, warpTimestamp: false }))
+                              }
+                            }}
                             placeholder="Unix Timestamp"
-                            className={styles.simOptionInputSmall}
+                            className={`${styles.simOptionInputSmall} ${fieldErrors.warpTimestamp ? styles.inputError : ''}`}
                           />
                         </div>
                       )}
@@ -2121,9 +2312,14 @@ export default function ContractCaller() {
                     <input
                       type="text"
                       value={ethValue}
-                      onChange={(e) => setEthValue(e.target.value)}
+                      onChange={(e) => {
+                        setEthValue(e.target.value)
+                        if (fieldErrors.ethValue) {
+                          setFieldErrors(prev => ({ ...prev, ethValue: false }))
+                        }
+                      }}
                       placeholder={ethValueUnit === 'ETH' ? '0.0' : '0'}
-                      className={styles.ethValueInput}
+                      className={`${styles.ethValueInput} ${fieldErrors.ethValue ? styles.inputError : ''}`}
                       disabled={loading}
                     />
                     <div className={styles.ethValueUnitToggle}>
@@ -2177,10 +2373,14 @@ export default function ContractCaller() {
                           const newArgs = [...args]
                           newArgs[index] = value
                           setArgs(newArgs)
+                          if (fieldErrors[`arg_${index}`]) {
+                            setFieldErrors(prev => ({ ...prev, [`arg_${index}`]: false }))
+                          }
                         }}
                         addressBook={addressBook}
                         disabled={loading}
                         onBookmarkClick={handleOpenBookmarkModal}
+                        error={fieldErrors[`arg_${index}`]}
                       />
                     </div>
                   ))}

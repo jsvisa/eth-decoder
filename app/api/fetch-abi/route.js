@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createPublicClient, http } from 'viem'
 import { mainnet, arbitrum, base, polygon, bsc } from 'viem/chains'
+import { isValidEthAddress } from '../../utils/validation'
 
 // Etherscan V2 API uses chain IDs
 const CHAIN_IDS = {
@@ -268,7 +269,7 @@ export async function GET(request) {
     }
 
     // Validate address format
-    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    if (!isValidEthAddress(address)) {
       return NextResponse.json(
         { error: 'Invalid address format' },
         { status: 400 }
