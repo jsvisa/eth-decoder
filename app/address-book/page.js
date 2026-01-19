@@ -12,6 +12,7 @@ import {
   importFromCSV,
   mergeAddressBook,
 } from '../utils/addressBook'
+import { isValidEthAddress } from '../utils/validation'
 
 export default function AddressBook() {
   const [addressBook, setAddressBook] = useState([])
@@ -106,7 +107,7 @@ export default function AddressBook() {
       return
     }
 
-    if (!/^0x[a-fA-F0-9]{40}$/.test(newAddress)) {
+    if (!isValidEthAddress(newAddress)) {
       setError('Invalid address format')
       return
     }

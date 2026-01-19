@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createPublicClient, http, decodeFunctionResult, encodeFunctionData } from 'viem'
 import { mainnet, arbitrum, base, polygon, bsc } from 'viem/chains'
+import { isValidEthAddress } from '../../utils/validation'
 
 const CHAINS = {
   ethereum: mainnet,
@@ -31,7 +32,7 @@ export async function POST(request) {
     }
 
     // Validate address format
-    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    if (!isValidEthAddress(address)) {
       return NextResponse.json(
         { error: 'Invalid address format' },
         { status: 400 }
@@ -39,7 +40,7 @@ export async function POST(request) {
     }
 
     // Validate fromAddress if provided
-    if (fromAddress && !/^0x[a-fA-F0-9]{40}$/.test(fromAddress)) {
+    if (fromAddress && !isValidEthAddress(fromAddress)) {
       return NextResponse.json(
         { error: 'Invalid from address format' },
         { status: 400 }

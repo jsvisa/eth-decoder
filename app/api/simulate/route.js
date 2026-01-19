@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { encodeFunctionData } from 'viem'
+import { isValidEthAddress } from '../../utils/validation'
 
 // Tenderly network IDs for simulation API
 const TENDERLY_NETWORK_IDS = {
@@ -23,7 +24,7 @@ export async function POST(request) {
     }
 
     // Validate address format
-    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    if (!isValidEthAddress(address)) {
       return NextResponse.json(
         { error: 'Invalid address format' },
         { status: 400 }

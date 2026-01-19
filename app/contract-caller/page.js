@@ -12,6 +12,7 @@ import {
   getBookmarkedAddress,
 } from '../utils/addressBook'
 import { simulateWithTevm } from '../utils/tevmSimulator'
+import { isValidEthAddress, isValidForkBlock, isValidNumber, isValidPositiveInteger } from '../utils/validation'
 
 const CHAINS = [
   { id: 'ethereum', name: 'Ethereum', icon: 'https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg' },
@@ -36,28 +37,6 @@ const CHAIN_IDS = {
   base: 8453,
   polygon: 137,
   bsc: 56,
-}
-
-// Validation helpers
-const isValidEthAddress = (address) => {
-  if (!address) return false
-  return /^0x[a-fA-F0-9]{40}$/.test(address)
-}
-
-const isValidForkBlock = (value) => {
-  if (!value || value === '') return true // empty is valid (means latest)
-  if (value.toLowerCase() === 'latest') return true
-  return /^\d+$/.test(value) // valid positive integer
-}
-
-const isValidNumber = (value) => {
-  if (!value || value === '') return true // empty is valid
-  return /^-?\d*\.?\d+$/.test(value) && !isNaN(parseFloat(value))
-}
-
-const isValidPositiveInteger = (value) => {
-  if (!value || value === '') return true // empty is valid
-  return /^\d+$/.test(value)
 }
 
 // Recursively validate all addresses in an argument (handles tuples, arrays, nested structures)
@@ -225,7 +204,7 @@ function AddressArgInput({ value, onChange, addressBook, disabled, placeholder, 
   const [showDropdown, setShowDropdown] = useState(false)
   const [filter, setFilter] = useState('')
 
-  const isValidAddress = value && /^0x[a-fA-F0-9]{40}$/.test(value)
+  const isValidAddress = isValidEthAddress(value)
   const isBookmarked = isValidAddress && addressBook.some(item => item.address.toLowerCase() === value.toLowerCase())
 
   const filteredAddresses = addressBook.filter(item => {
@@ -729,7 +708,7 @@ export default function ContractCaller() {
 
   // Auto-load cached ABI when address or chain changes
   useEffect(() => {
-    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    if (!isValidEthAddress(address)) {
       setContractName(null)
       return
     }
@@ -1619,14 +1598,14 @@ export default function ContractCaller() {
 
   // Check if current address is bookmarked
   const isCurrentAddressBookmarked = () => {
-    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) return false
+    if (!isValidEthAddress(address)) return false
     return isAddressBookmarked(address)
   }
 
   // Open bookmark modal (for main contract or any address)
   const handleOpenBookmarkModal = (addr) => {
     const targetAddr = addr || address
-    if (!targetAddr || !/^0x[a-fA-F0-9]{40}$/.test(targetAddr)) return
+    if (!isValidEthAddress(targetAddr)) return
 
     const existing = getBookmarkedAddress(targetAddr)
     if (existing) {
@@ -2003,7 +1982,7 @@ export default function ContractCaller() {
                 <button
                   onClick={() => handleOpenBookmarkModal()}
                   className={`${styles.bookmarkButton} ${isCurrentAddressBookmarked() ? styles.bookmarked : ''}`}
-                  disabled={loading || !address || !/^0x[a-fA-F0-9]{40}$/.test(address)}
+                  disabled={loading || !isValidEthAddress(address)}
                   type="button"
                   title={isCurrentAddressBookmarked() ? 'Edit bookmark' : 'Add to address book'}
                 >

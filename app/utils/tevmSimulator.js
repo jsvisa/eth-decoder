@@ -1,5 +1,6 @@
 import { createMemoryClient, http } from 'tevm'
 import { encodeFunctionData, decodeFunctionResult, parseEther, decodeEventLog } from 'viem'
+import { isValidEthAddress } from './validation'
 
 // Chain configurations for forking
 const CHAIN_CONFIGS = {
@@ -208,7 +209,7 @@ export async function simulateWithTevm({
       throw new Error('Missing required parameters: address, functionName, abi')
     }
 
-    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    if (!isValidEthAddress(address)) {
       throw new Error('Invalid address format')
     }
 
