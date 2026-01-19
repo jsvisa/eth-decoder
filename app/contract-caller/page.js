@@ -1135,10 +1135,12 @@ export default function ContractCaller() {
       const argErrors = []
       selectedFunc.inputs.forEach((input, index) => {
         const argValue = args[index] || ''
-        // Validate address type arguments
-        if (input.type === 'address' && argValue && !isValidEthAddress(argValue)) {
-          errors[`arg_${index}`] = true
-          argErrors.push(`${input.name || `Argument ${index + 1}`} must be a valid Ethereum address`)
+        // Validate address type arguments - must be a valid address (not empty)
+        if (input.type === 'address') {
+          if (!argValue || !isValidEthAddress(argValue)) {
+            errors[`arg_${index}`] = true
+            argErrors.push(`${input.name || `Argument ${index + 1}`} must be a valid Ethereum address`)
+          }
         }
         // Validate address[] type arguments
         if (input.type === 'address[]' && argValue) {
@@ -1146,7 +1148,7 @@ export default function ContractCaller() {
             const addresses = typeof argValue === 'string' ? JSON.parse(argValue) : argValue
             if (Array.isArray(addresses)) {
               addresses.forEach((addr, i) => {
-                if (addr && !isValidEthAddress(addr)) {
+                if (!isValidEthAddress(addr)) {
                   errors[`arg_${index}`] = true
                   argErrors.push(`${input.name || `Argument ${index + 1}`}[${i}] must be a valid Ethereum address`)
                 }
