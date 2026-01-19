@@ -38,6 +38,18 @@ const CHAIN_IDS = {
   bsc: 56,
 }
 
+// Validation helpers
+const isValidEthAddress = (address) => {
+  if (!address) return false
+  return /^0x[a-fA-F0-9]{40}$/.test(address)
+}
+
+const isValidForkBlock = (value) => {
+  if (!value || value === '') return true // empty is valid (means latest)
+  if (value.toLowerCase() === 'latest') return true
+  return /^\d+$/.test(value) // valid positive integer
+}
+
 // Helper functions for ABI cache
 const getAbiCacheKey = (chain, address) => `${ABI_CACHE_PREFIX}${chain}-${address.toLowerCase()}`
 
@@ -1057,6 +1069,18 @@ export default function ContractCaller() {
       return
     }
 
+    // Validate from address for write functions
+    if (isWrite && !isValidEthAddress(fromAddress)) {
+      setError('Please provide a valid From Address (must start with 0x and be 42 characters)')
+      return
+    }
+
+    // Validate fork block number for local simulation
+    if (isWrite && useLocalSimulation && !isValidForkBlock(forkBlockNumber)) {
+      setError('Fork Block must be empty, "latest", or a valid block number')
+      return
+    }
+
     setLoading(true)
     setError(null)
     setResult(null)
@@ -2015,8 +2039,8 @@ export default function ContractCaller() {
                         <input
                           type="text"
                           value={forkBlockNumber}
-                          onChange={(e) => setForkBlockNumber(e.target.value.replace(/[^0-9]/g, ''))}
-                          placeholder="Fork Block"
+                          onChange={(e) => setForkBlockNumber(e.target.value)}
+                          placeholder="Fork Block (latest)"
                           className={styles.simOptionInputSmall}
                           disabled={loading}
                         />
