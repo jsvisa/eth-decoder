@@ -134,7 +134,7 @@ const getCachedAddresses = () => {
 }
 
 // Component for address-type argument input with address book support
-function AddressArgInput({ value, onChange, addressBook, disabled, placeholder, onBookmarkClick }) {
+function AddressArgInput({ value, onChange, addressBook, disabled, placeholder, onBookmarkClick, error }) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [filter, setFilter] = useState('')
 
@@ -177,7 +177,7 @@ function AddressArgInput({ value, onChange, addressBook, disabled, placeholder, 
         onFocus={() => setShowDropdown(true)}
         onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
         placeholder={placeholder}
-        className={styles.input}
+        className={`${styles.input} ${error ? styles.inputError : ''}`}
         disabled={disabled}
       />
       {isValidAddress && onBookmarkClick && (
@@ -457,6 +457,7 @@ export default function ContractCaller() {
   })
   const [abiCollapsed, setAbiCollapsed] = useState(true) // Collapse ABI JSON textarea (default collapsed)
   const [simOptionsExpanded, setSimOptionsExpanded] = useState(false) // Expand simulation options
+  const [fieldErrors, setFieldErrors] = useState({}) // Track validation errors for fields
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null) // { functionName, args, timestamp }
   const bookmarkInputRef = useRef(null)
@@ -1069,18 +1070,25 @@ export default function ContractCaller() {
       return
     }
 
-    // Validate from address for write functions
+    // Validate from address and fork block for write functions
+    const errors = {}
     if (isWrite && !isValidEthAddress(fromAddress)) {
-      setError('Please provide a valid From Address (must start with 0x and be 42 characters)')
-      return
+      errors.fromAddress = true
     }
-
-    // Validate fork block number for local simulation
     if (isWrite && useLocalSimulation && !isValidForkBlock(forkBlockNumber)) {
-      setError('Fork Block must be empty, "latest", or a valid block number')
+      errors.forkBlockNumber = true
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      const errorMessages = []
+      if (errors.fromAddress) errorMessages.push('From Address must be a valid Ethereum address (0x + 40 hex chars)')
+      if (errors.forkBlockNumber) errorMessages.push('Fork Block must be empty, "latest", or a valid block number')
+      setError(errorMessages.join('; '))
       return
     }
 
+    setFieldErrors({})
     setLoading(true)
     setError(null)
     setResult(null)
@@ -2039,20 +2047,31 @@ export default function ContractCaller() {
                         <input
                           type="text"
                           value={forkBlockNumber}
-                          onChange={(e) => setForkBlockNumber(e.target.value)}
+                          onChange={(e) => {
+                            setForkBlockNumber(e.target.value)
+                            if (fieldErrors.forkBlockNumber) {
+                              setFieldErrors(prev => ({ ...prev, forkBlockNumber: false }))
+                            }
+                          }}
                           placeholder="Fork Block (latest)"
-                          className={styles.simOptionInputSmall}
+                          className={`${styles.simOptionInputSmall} ${fieldErrors.forkBlockNumber ? styles.inputError : ''}`}
                           disabled={loading}
                         />
                       )}
                       <div className={styles.simOptionFromAddress}>
                         <AddressArgInput
                           value={fromAddress}
-                          onChange={(value) => setFromAddress(value)}
+                          onChange={(value) => {
+                            setFromAddress(value)
+                            if (fieldErrors.fromAddress) {
+                              setFieldErrors(prev => ({ ...prev, fromAddress: false }))
+                            }
+                          }}
                           addressBook={addressBook}
                           disabled={loading}
                           placeholder="From Address"
                           onBookmarkClick={handleOpenBookmarkModal}
+                          error={fieldErrors.fromAddress}
                         />
                       </div>
                       {useLocalSimulation && (

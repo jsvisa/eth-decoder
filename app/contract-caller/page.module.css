@@ -2629,6 +2629,21 @@
   color: #f472b6;
 }
 
+/* Error state for input fields */
+.inputError {
+  border-color: #ef4444 !important;
+  background-color: rgba(239, 68, 68, 0.05) !important;
+}
+
+.inputError:focus {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+.inputError::placeholder {
+  color: #f87171 !important;
+}
+
 .cheatcodesInline {
   display: flex;
   align-items: center;
