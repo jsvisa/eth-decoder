@@ -228,7 +228,7 @@ function AddressArgInput({ value, onChange, addressBook, disabled, placeholder, 
 }
 
 // Recursive argument input component for complex types
-function ArgInput({ input, value, onChange, addressBook, disabled, onBookmarkClick, depth = 0 }) {
+function ArgInput({ input, value, onChange, addressBook, disabled, onBookmarkClick, depth = 0, error }) {
   const type = input.type
 
   // Handle address type
@@ -241,6 +241,7 @@ function ArgInput({ input, value, onChange, addressBook, disabled, onBookmarkCli
         disabled={disabled}
         placeholder={`Enter ${type}...`}
         onBookmarkClick={onBookmarkClick}
+        error={error}
       />
     )
   }
@@ -256,6 +257,7 @@ function ArgInput({ input, value, onChange, addressBook, disabled, onBookmarkCli
         disabled={disabled}
         onBookmarkClick={onBookmarkClick}
         depth={depth}
+        error={error}
       />
     )
   }
@@ -271,6 +273,7 @@ function ArgInput({ input, value, onChange, addressBook, disabled, onBookmarkCli
         disabled={disabled}
         onBookmarkClick={onBookmarkClick}
         depth={depth}
+        error={error}
       />
     )
   }
@@ -282,7 +285,7 @@ function ArgInput({ input, value, onChange, addressBook, disabled, onBookmarkCli
       value={value || ''}
       onChange={(e) => onChange(e.target.value)}
       placeholder={`Enter ${type}...`}
-      className={styles.input}
+      className={`${styles.input} ${error ? styles.inputError : ''}`}
       disabled={disabled}
     />
   )
@@ -1127,6 +1130,38 @@ export default function ContractCaller() {
       }
     }
 
+    // Validate function arguments (especially address types)
+    if (selectedFunc && selectedFunc.inputs) {
+      const argErrors = []
+      selectedFunc.inputs.forEach((input, index) => {
+        const argValue = args[index] || ''
+        // Validate address type arguments
+        if (input.type === 'address' && argValue && !isValidEthAddress(argValue)) {
+          errors[`arg_${index}`] = true
+          argErrors.push(`${input.name || `Argument ${index + 1}`} must be a valid Ethereum address`)
+        }
+        // Validate address[] type arguments
+        if (input.type === 'address[]' && argValue) {
+          try {
+            const addresses = typeof argValue === 'string' ? JSON.parse(argValue) : argValue
+            if (Array.isArray(addresses)) {
+              addresses.forEach((addr, i) => {
+                if (addr && !isValidEthAddress(addr)) {
+                  errors[`arg_${index}`] = true
+                  argErrors.push(`${input.name || `Argument ${index + 1}`}[${i}] must be a valid Ethereum address`)
+                }
+              })
+            }
+          } catch {
+            // JSON parse error will be caught later
+          }
+        }
+      })
+      if (argErrors.length > 0) {
+        errors.argErrors = argErrors
+      }
+    }
+
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors)
       const errorMessages = []
@@ -1138,6 +1173,7 @@ export default function ContractCaller() {
       if (errors.dealAmount) errorMessages.push('Deal amount must be a valid number')
       if (errors.prankAddress) errorMessages.push('Prank address must be a valid Ethereum address')
       if (errors.warpTimestamp) errorMessages.push('Warp timestamp must be a valid positive integer')
+      if (errors.argErrors) errorMessages.push(...errors.argErrors)
       setError(errorMessages.join('; '))
       return
     }
@@ -2301,10 +2337,14 @@ export default function ContractCaller() {
                           const newArgs = [...args]
                           newArgs[index] = value
                           setArgs(newArgs)
+                          if (fieldErrors[`arg_${index}`]) {
+                            setFieldErrors(prev => ({ ...prev, [`arg_${index}`]: false }))
+                          }
                         }}
                         addressBook={addressBook}
                         disabled={loading}
                         onBookmarkClick={handleOpenBookmarkModal}
+                        error={fieldErrors[`arg_${index}`]}
                       />
                     </div>
                   ))}
