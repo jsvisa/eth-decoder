@@ -10,9 +10,9 @@
   },
   "dependencies": {
     "js-yaml": "^4.1.0",
-    "next": "14.0.4",
-    "react": "^18",
-    "react-dom": "^18",
+    "next": "^15.3.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "tevm": "^1.0.0-next.149",
     "viem": "^2.44.2"
   }
