@@ -19,6 +19,86 @@ const DEFAULT_RPCS = {
   bsc: 'https://bsc-rpc.publicnode.com',
 }
 
+// Helper to parse an argument value based on ABI type
+const parseArgValue = (arg, input) => {
+  if (arg === undefined || arg === null || arg === '') {
+    return arg
+  }
+
+  const type = input.type
+
+  // Handle integer types
+  if (type.startsWith('uint') || type.startsWith('int')) {
+    try {
+      return BigInt(arg)
+    } catch {
+      return arg
+    }
+  }
+
+  // Handle boolean
+  if (type === 'bool') {
+    return arg === 'true' || arg === true
+  }
+
+  // Handle tuple types
+  if (type === 'tuple' || type.startsWith('tuple')) {
+    // If it's already an object/array, recursively parse components
+    let tupleValue = arg
+    if (typeof arg === 'string') {
+      try {
+        // Try to parse as JSON first
+        tupleValue = JSON.parse(arg)
+      } catch {
+        // If not valid JSON, try to parse as comma-separated values
+        // This handles cases like "value1,value2,value3"
+        const parts = arg.split(',').map(s => s.trim())
+        tupleValue = parts
+      }
+    }
+
+    // If it's a tuple array (tuple[])
+    if (type === 'tuple[]') {
+      if (!Array.isArray(tupleValue)) {
+        return arg
+      }
+      return tupleValue.map(item => parseArgValue(item, { ...input, type: 'tuple' }))
+    }
+
+    // For single tuple, parse each component
+    if (input.components && Array.isArray(tupleValue)) {
+      const parsed = tupleValue.map((val, idx) => {
+        const component = input.components[idx]
+        if (!component) return val
+        return parseArgValue(val, component)
+      })
+      return parsed
+    }
+
+    return tupleValue
+  }
+
+  // Handle array types (e.g., address[], uint256[])
+  if (type.endsWith('[]')) {
+    let arrayValue = arg
+    if (typeof arg === 'string') {
+      try {
+        arrayValue = JSON.parse(arg)
+      } catch {
+        return arg
+      }
+    }
+    if (!Array.isArray(arrayValue)) {
+      return arg
+    }
+    // Get the base type (remove [])
+    const baseType = type.slice(0, -2)
+    return arrayValue.map(item => parseArgValue(item, { ...input, type: baseType }))
+  }
+
+  return arg
+}
+
 // Helper to serialize BigInt values for JSON
 const serializeValue = (value) => {
   if (typeof value === 'bigint') return value.toString()
@@ -145,28 +225,7 @@ export async function simulateWithTevm({
     const parsedArgs = (args || []).map((arg, index) => {
       const input = functionAbi.inputs[index]
       if (!input) return arg
-
-      if (input.type.startsWith('uint') || input.type.startsWith('int')) {
-        if (arg === undefined || arg === null || arg === '') {
-          return arg
-        }
-        try {
-          return BigInt(arg)
-        } catch {
-          return arg
-        }
-      }
-      if (input.type === 'bool') {
-        return arg === 'true' || arg === true
-      }
-      if (input.type.endsWith('[]')) {
-        try {
-          return typeof arg === 'string' ? JSON.parse(arg) : arg
-        } catch {
-          return arg
-        }
-      }
-      return arg
+      return parseArgValue(arg, input)
     })
 
     // Create Tevm client with the specified block
