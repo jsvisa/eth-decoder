@@ -758,8 +758,13 @@ export default function ContractCaller() {
       })
 
       setFunctions(allFunctions)
-      setSelectedFunction('')
-      setArgs([])
+      // Don't reset selectedFunction if we have pending history waiting
+      if (pendingHistoryRef.current) {
+        setSelectedFunction(pendingHistoryRef.current.functionName)
+      } else {
+        setSelectedFunction('')
+        setArgs([])
+      }
       setError(null)
     } catch (err) {
       setParsedAbi(null)
