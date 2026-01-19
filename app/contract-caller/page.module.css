@@ -813,6 +813,118 @@
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
 }
 
+/* Tuple input styles */
+.tupleContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+}
+
+.tupleField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tupleLabel {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+.tupleType {
+  margin-left: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+/* Array input styles */
+.arrayContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+}
+
+.arrayItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+}
+
+.arrayItemHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.arrayIndex {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+.arrayItemContent {
+  flex: 1;
+}
+
+.arrayRemoveButton {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--accent-red);
+  background: transparent;
+  border: 1px solid var(--accent-red);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.arrayRemoveButton:hover:not(:disabled) {
+  background-color: var(--accent-red);
+  color: white;
+}
+
+.arrayRemoveButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.arrayAddButton {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  color: var(--accent-blue);
+  background: transparent;
+  border: 1px dashed var(--accent-blue);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.arrayAddButton:hover:not(:disabled) {
+  background-color: var(--accent-blue);
+  color: white;
+  border-style: solid;
+}
+
+.arrayAddButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .button {
   padding: 1rem 2rem;
   font-size: 1.125rem;

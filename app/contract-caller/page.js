@@ -205,6 +205,175 @@ function AddressArgInput({ value, onChange, addressBook, disabled, placeholder, 
   )
 }
 
+// Recursive argument input component for complex types
+function ArgInput({ input, value, onChange, addressBook, disabled, onBookmarkClick, depth = 0 }) {
+  const type = input.type
+
+  // Handle address type
+  if (type === 'address') {
+    return (
+      <AddressArgInput
+        value={value || ''}
+        onChange={onChange}
+        addressBook={addressBook}
+        disabled={disabled}
+        placeholder={`Enter ${type}...`}
+        onBookmarkClick={onBookmarkClick}
+      />
+    )
+  }
+
+  // Handle tuple type
+  if (type === 'tuple' && input.components) {
+    return (
+      <TupleArgInput
+        input={input}
+        value={value}
+        onChange={onChange}
+        addressBook={addressBook}
+        disabled={disabled}
+        onBookmarkClick={onBookmarkClick}
+        depth={depth}
+      />
+    )
+  }
+
+  // Handle array types (including tuple[])
+  if (type.endsWith('[]')) {
+    return (
+      <ArrayArgInput
+        input={input}
+        value={value}
+        onChange={onChange}
+        addressBook={addressBook}
+        disabled={disabled}
+        onBookmarkClick={onBookmarkClick}
+        depth={depth}
+      />
+    )
+  }
+
+  // Handle simple types (uint, int, bool, bytes, string, etc.)
+  return (
+    <input
+      type="text"
+      value={value || ''}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={`Enter ${type}...`}
+      className={styles.input}
+      disabled={disabled}
+    />
+  )
+}
+
+// Tuple input component - renders nested fields for each member
+function TupleArgInput({ input, value, onChange, addressBook, disabled, onBookmarkClick, depth = 0 }) {
+  const components = input.components || []
+
+  // Initialize value as array if not already
+  const tupleValue = Array.isArray(value) ? value : components.map(() => '')
+
+  const handleComponentChange = (index, newValue) => {
+    const newTuple = [...tupleValue]
+    newTuple[index] = newValue
+    onChange(newTuple)
+  }
+
+  return (
+    <div className={styles.tupleContainer} style={{ marginLeft: depth > 0 ? '1rem' : 0 }}>
+      {components.map((component, index) => (
+        <div key={index} className={styles.tupleField}>
+          <label className={styles.tupleLabel}>
+            {component.name || `[${index}]`}
+            <span className={styles.tupleType}>({component.type})</span>
+          </label>
+          <ArgInput
+            input={component}
+            value={tupleValue[index]}
+            onChange={(val) => handleComponentChange(index, val)}
+            addressBook={addressBook}
+            disabled={disabled}
+            onBookmarkClick={onBookmarkClick}
+            depth={depth + 1}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Array input component - allows adding/removing elements
+function ArrayArgInput({ input, value, onChange, addressBook, disabled, onBookmarkClick, depth = 0 }) {
+  const baseType = input.type.slice(0, -2) // Remove '[]' from type
+  const isBaseTuple = baseType === 'tuple'
+
+  // Create a mock input for the base type
+  const baseInput = isBaseTuple
+    ? { type: 'tuple', components: input.components }
+    : { type: baseType }
+
+  // Initialize value as array if not already
+  const arrayValue = Array.isArray(value) ? value : []
+
+  const handleItemChange = (index, newValue) => {
+    const newArray = [...arrayValue]
+    newArray[index] = newValue
+    onChange(newArray)
+  }
+
+  const handleAddItem = () => {
+    const newItem = isBaseTuple && input.components
+      ? input.components.map(() => '')
+      : ''
+    onChange([...arrayValue, newItem])
+  }
+
+  const handleRemoveItem = (index) => {
+    const newArray = arrayValue.filter((_, i) => i !== index)
+    onChange(newArray)
+  }
+
+  return (
+    <div className={styles.arrayContainer} style={{ marginLeft: depth > 0 ? '1rem' : 0 }}>
+      {arrayValue.map((item, index) => (
+        <div key={index} className={styles.arrayItem}>
+          <div className={styles.arrayItemHeader}>
+            <span className={styles.arrayIndex}>[{index}]</span>
+            <button
+              type="button"
+              onClick={() => handleRemoveItem(index)}
+              className={styles.arrayRemoveButton}
+              disabled={disabled}
+              title="Remove item"
+            >
+              ×
+            </button>
+          </div>
+          <div className={styles.arrayItemContent}>
+            <ArgInput
+              input={baseInput}
+              value={item}
+              onChange={(val) => handleItemChange(index, val)}
+              addressBook={addressBook}
+              disabled={disabled}
+              onBookmarkClick={onBookmarkClick}
+              depth={depth + 1}
+            />
+          </div>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={handleAddItem}
+        className={styles.arrayAddButton}
+        disabled={disabled}
+      >
+        + Add {isBaseTuple ? 'tuple' : baseType}
+      </button>
+    </div>
+  )
+}
+
 export default function ContractCaller() {
   const [chain, setChain] = useState('ethereum')
   const [address, setAddress] = useState('')
@@ -307,6 +476,22 @@ export default function ContractCaller() {
   // Helper to check if function is payable
   const isPayable = (func) => {
     return func?.stateMutability === 'payable'
+  }
+
+  // Helper to get default value for an input type
+  const getDefaultValue = (input) => {
+    if (!input) return ''
+    const type = input.type
+    // For tuple types, initialize with array of default values for each component
+    if (type === 'tuple' && input.components) {
+      return input.components.map(comp => getDefaultValue(comp))
+    }
+    // For array types, initialize with empty array
+    if (type.endsWith('[]')) {
+      return []
+    }
+    // For simple types, return empty string
+    return ''
   }
 
   // Get selected function object
@@ -537,7 +722,7 @@ export default function ContractCaller() {
 
     // No pending history - normal function switch, reset args
     if (func && func.inputs) {
-      setArgs(func.inputs.map(() => ''))
+      setArgs(func.inputs.map(input => getDefaultValue(input)))
     } else {
       setArgs([])
     }
@@ -1985,33 +2170,18 @@ export default function ContractCaller() {
                       <label className={styles.argLabel}>
                         {input.name || `arg${index}`} ({input.type})
                       </label>
-                      {input.type === 'address' ? (
-                        <AddressArgInput
-                          value={args[index] || ''}
-                          onChange={(value) => {
-                            const newArgs = [...args]
-                            newArgs[index] = value
-                            setArgs(newArgs)
-                          }}
-                          addressBook={addressBook}
-                          disabled={loading}
-                          placeholder={`Enter ${input.type}...`}
-                          onBookmarkClick={handleOpenBookmarkModal}
-                        />
-                      ) : (
-                        <input
-                          type="text"
-                          value={args[index] || ''}
-                          onChange={(e) => {
-                            const newArgs = [...args]
-                            newArgs[index] = e.target.value
-                            setArgs(newArgs)
-                          }}
-                          placeholder={`Enter ${input.type}...`}
-                          className={styles.input}
-                          disabled={loading}
-                        />
-                      )}
+                      <ArgInput
+                        input={input}
+                        value={args[index]}
+                        onChange={(value) => {
+                          const newArgs = [...args]
+                          newArgs[index] = value
+                          setArgs(newArgs)
+                        }}
+                        addressBook={addressBook}
+                        disabled={loading}
+                        onBookmarkClick={handleOpenBookmarkModal}
+                      />
                     </div>
                   ))}
                 </div>
