@@ -50,6 +50,16 @@ const isValidForkBlock = (value) => {
   return /^\d+$/.test(value) // valid positive integer
 }
 
+const isValidNumber = (value) => {
+  if (!value || value === '') return true // empty is valid
+  return /^-?\d*\.?\d+$/.test(value) && !isNaN(parseFloat(value))
+}
+
+const isValidPositiveInteger = (value) => {
+  if (!value || value === '') return true // empty is valid
+  return /^\d+$/.test(value)
+}
+
 // Helper functions for ABI cache
 const getAbiCacheKey = (chain, address) => `${ABI_CACHE_PREFIX}${chain}-${address.toLowerCase()}`
 
@@ -1055,7 +1065,13 @@ export default function ContractCaller() {
   }
 
   const handleCall = async () => {
+    // Clear previous field errors
+    setFieldErrors({})
+
     if (!address || !selectedFunction || !parsedAbi) {
+      const errors = {}
+      if (!address || !isValidEthAddress(address)) errors.address = true
+      setFieldErrors(errors)
       setError('Please fill in all required fields')
       return
     }
@@ -1070,25 +1086,62 @@ export default function ContractCaller() {
       return
     }
 
-    // Validate from address and fork block for write functions
+    // Validate all input fields
     const errors = {}
+
+    // Contract address validation
+    if (!isValidEthAddress(address)) {
+      errors.address = true
+    }
+
+    // From address validation for write functions
     if (isWrite && !isValidEthAddress(fromAddress)) {
       errors.fromAddress = true
     }
+
+    // Fork block validation for local simulation
     if (isWrite && useLocalSimulation && !isValidForkBlock(forkBlockNumber)) {
       errors.forkBlockNumber = true
+    }
+
+    // ETH value validation for payable functions
+    if (selectedFunc && isPayable(selectedFunc) && ethValue && !isValidNumber(ethValue)) {
+      errors.ethValue = true
+    }
+
+    // Cheatcode validation for local simulation
+    if (isWrite && useLocalSimulation) {
+      if (cheatcodes.deal.enabled) {
+        if (cheatcodes.deal.address && !isValidEthAddress(cheatcodes.deal.address)) {
+          errors.dealAddress = true
+        }
+        if (cheatcodes.deal.amount && !isValidNumber(cheatcodes.deal.amount)) {
+          errors.dealAmount = true
+        }
+      }
+      if (cheatcodes.prank.enabled && cheatcodes.prank.address && !isValidEthAddress(cheatcodes.prank.address)) {
+        errors.prankAddress = true
+      }
+      if (cheatcodes.warp.enabled && cheatcodes.warp.timestamp && !isValidPositiveInteger(cheatcodes.warp.timestamp)) {
+        errors.warpTimestamp = true
+      }
     }
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors)
       const errorMessages = []
-      if (errors.fromAddress) errorMessages.push('From Address must be a valid Ethereum address (0x + 40 hex chars)')
+      if (errors.address) errorMessages.push('Contract Address must be a valid Ethereum address')
+      if (errors.fromAddress) errorMessages.push('From Address must be a valid Ethereum address')
       if (errors.forkBlockNumber) errorMessages.push('Fork Block must be empty, "latest", or a valid block number')
+      if (errors.ethValue) errorMessages.push('ETH Value must be a valid number')
+      if (errors.dealAddress) errorMessages.push('Deal address must be a valid Ethereum address')
+      if (errors.dealAmount) errorMessages.push('Deal amount must be a valid number')
+      if (errors.prankAddress) errorMessages.push('Prank address must be a valid Ethereum address')
+      if (errors.warpTimestamp) errorMessages.push('Warp timestamp must be a valid positive integer')
       setError(errorMessages.join('; '))
       return
     }
 
-    setFieldErrors({})
     setLoading(true)
     setError(null)
     setResult(null)
@@ -1806,11 +1859,14 @@ export default function ContractCaller() {
                       setAddress(e.target.value)
                       setAddressFilter(e.target.value)
                       setShowAddressSuggestions(true)
+                      if (fieldErrors.address) {
+                        setFieldErrors(prev => ({ ...prev, address: false }))
+                      }
                     }}
                     onFocus={() => setShowAddressSuggestions(true)}
                     onBlur={() => setTimeout(() => setShowAddressSuggestions(false), 200)}
                     placeholder="0x..."
-                    className={styles.input}
+                    className={`${styles.input} ${fieldErrors.address ? styles.inputError : ''}`}
                     disabled={loading}
                   />
                   {showAddressSuggestions && getCombinedSuggestions().length > 0 && (
@@ -2112,16 +2168,26 @@ export default function ContractCaller() {
                           <input
                             type="text"
                             value={cheatcodes.deal.address}
-                            onChange={(e) => setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, address: e.target.value } }))}
+                            onChange={(e) => {
+                              setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, address: e.target.value } }))
+                              if (fieldErrors.dealAddress) {
+                                setFieldErrors(prev => ({ ...prev, dealAddress: false }))
+                              }
+                            }}
                             placeholder="Address"
-                            className={styles.simOptionInput}
+                            className={`${styles.simOptionInput} ${fieldErrors.dealAddress ? styles.inputError : ''}`}
                           />
                           <input
                             type="text"
                             value={cheatcodes.deal.amount}
-                            onChange={(e) => setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, amount: e.target.value } }))}
+                            onChange={(e) => {
+                              setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, amount: e.target.value } }))
+                              if (fieldErrors.dealAmount) {
+                                setFieldErrors(prev => ({ ...prev, dealAmount: false }))
+                              }
+                            }}
                             placeholder="ETH Amount"
-                            className={styles.simOptionInputSmall}
+                            className={`${styles.simOptionInputSmall} ${fieldErrors.dealAmount ? styles.inputError : ''}`}
                           />
                         </div>
                       )}
@@ -2131,9 +2197,14 @@ export default function ContractCaller() {
                           <input
                             type="text"
                             value={cheatcodes.prank.address}
-                            onChange={(e) => setCheatcodes(prev => ({ ...prev, prank: { ...prev.prank, address: e.target.value } }))}
+                            onChange={(e) => {
+                              setCheatcodes(prev => ({ ...prev, prank: { ...prev.prank, address: e.target.value } }))
+                              if (fieldErrors.prankAddress) {
+                                setFieldErrors(prev => ({ ...prev, prankAddress: false }))
+                              }
+                            }}
                             placeholder="Impersonate Address"
-                            className={styles.simOptionInput}
+                            className={`${styles.simOptionInput} ${fieldErrors.prankAddress ? styles.inputError : ''}`}
                           />
                         </div>
                       )}
@@ -2143,9 +2214,14 @@ export default function ContractCaller() {
                           <input
                             type="text"
                             value={cheatcodes.warp.timestamp}
-                            onChange={(e) => setCheatcodes(prev => ({ ...prev, warp: { ...prev.warp, timestamp: e.target.value } }))}
+                            onChange={(e) => {
+                              setCheatcodes(prev => ({ ...prev, warp: { ...prev.warp, timestamp: e.target.value } }))
+                              if (fieldErrors.warpTimestamp) {
+                                setFieldErrors(prev => ({ ...prev, warpTimestamp: false }))
+                              }
+                            }}
                             placeholder="Unix Timestamp"
-                            className={styles.simOptionInputSmall}
+                            className={`${styles.simOptionInputSmall} ${fieldErrors.warpTimestamp ? styles.inputError : ''}`}
                           />
                         </div>
                       )}
@@ -2164,9 +2240,14 @@ export default function ContractCaller() {
                     <input
                       type="text"
                       value={ethValue}
-                      onChange={(e) => setEthValue(e.target.value)}
+                      onChange={(e) => {
+                        setEthValue(e.target.value)
+                        if (fieldErrors.ethValue) {
+                          setFieldErrors(prev => ({ ...prev, ethValue: false }))
+                        }
+                      }}
                       placeholder={ethValueUnit === 'ETH' ? '0.0' : '0'}
-                      className={styles.ethValueInput}
+                      className={`${styles.ethValueInput} ${fieldErrors.ethValue ? styles.inputError : ''}`}
                       disabled={loading}
                     />
                     <div className={styles.ethValueUnitToggle}>
