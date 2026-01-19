@@ -13,7 +13,7 @@ const TENDERLY_NETWORK_IDS = {
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { chain, address, functionName, args, abi, fromAddress, tenderlyAccessKey, tenderlyAccount, tenderlyProject, value } = body
+    const { chain, address, functionName, args, abi, fromAddress, tenderlyAccessKey, tenderlyAccount, tenderlyProject, value, valueUnit = 'ETH' } = body
 
     if (!address || !functionName || !abi) {
       return NextResponse.json(
@@ -93,11 +93,23 @@ export async function POST(request) {
     // Default from address if not provided
     const sender = fromAddress || '0x0000000000000000000000000000000000000001'
 
-    // Convert ETH value to wei
+    // Convert value to wei based on unit
     let valueInWei = '0'
-    if (value && parseFloat(value) > 0) {
-      const { parseEther } = await import('viem')
-      valueInWei = parseEther(value).toString()
+    if (value) {
+      try {
+        if (valueUnit === 'Wei') {
+          // Value is already in Wei
+          valueInWei = BigInt(value).toString()
+        } else {
+          // Value is in ETH, convert to Wei
+          if (parseFloat(value) > 0) {
+            const { parseEther } = await import('viem')
+            valueInWei = parseEther(value).toString()
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to parse value:', e.message)
+      }
     }
 
     // Build Tenderly simulation request

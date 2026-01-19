@@ -485,6 +485,66 @@
   margin-left: 0.5rem;
 }
 
+/* ETH Value with unit toggle */
+.ethValueWrapper {
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+}
+
+.ethValueInput {
+  flex: 1;
+  padding: 0.875rem 1rem;
+  font-size: 1rem;
+  border: 2px solid var(--border-primary);
+  border-radius: 6px 0 0 6px;
+  border-right: none;
+  transition: border-color 0.3s;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.ethValueInput:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.ethValueInput:disabled {
+  background-color: var(--bg-hover);
+  cursor: not-allowed;
+}
+
+.ethValueUnitToggle {
+  display: flex;
+  border: 2px solid var(--border-primary);
+  border-radius: 0 6px 6px 0;
+  overflow: hidden;
+}
+
+.ethValueUnitBtn {
+  padding: 0.875rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background-color: var(--bg-hover);
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ethValueUnitBtn:first-child {
+  border-right: 1px solid var(--border-primary);
+}
+
+.ethValueUnitBtn:hover {
+  background-color: var(--bg-secondary);
+}
+
+.ethValueUnitBtn.active {
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  color: white;
+}
+
 /* Function selector badge */
 .funcSelector {
   font-family: 'Menlo', 'Consolas', 'Monaco', 'Courier New', monospace;
@@ -1351,6 +1411,69 @@
   color: #808080;
 }
 
+/* Balance changes section styles */
+.balanceSection {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #333;
+}
+
+.balanceTitle {
+  color: #4ade80;
+  font-size: 1rem;
+  margin: 0 0 1rem 0;
+  font-weight: 600;
+}
+
+.balanceItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background-color: rgba(74, 222, 128, 0.05);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  border: 1px solid rgba(74, 222, 128, 0.2);
+}
+
+.balanceAddress {
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 0.85rem;
+  color: #a78bfa;
+}
+
+.balanceValues {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 0.85rem;
+}
+
+.balanceBefore {
+  color: #9ca3af;
+}
+
+.balanceArrow {
+  color: #6b7280;
+}
+
+.balanceAfter {
+  color: #e5e7eb;
+}
+
+.balanceDiff {
+  font-weight: 600;
+}
+
+.balanceDiffPositive {
+  color: #4ade80;
+}
+
+.balanceDiffNegative {
+  color: #f87171;
+}
+
 /* State changes section styles */
 .stateSection {
   margin-bottom: 1.5rem;
@@ -2058,6 +2181,36 @@
   cursor: not-allowed;
 }
 
+.addressBookToggleButton {
+  padding: 0.5rem 0.6rem;
+  font-size: 1rem;
+  color: #9ca3af;
+  background-color: transparent;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1;
+}
+
+.addressBookToggleButton:hover {
+  color: #f59e0b;
+  border-color: #f59e0b;
+  background-color: #fffbeb;
+}
+
+.addressBookToggleButton.bookmarked {
+  color: #f59e0b;
+  border-color: #fcd34d;
+  background-color: #fffbeb;
+}
+
+.addressBookToggleButton.bookmarked:hover {
+  color: #dc2626;
+  border-color: #dc2626;
+  background-color: #fef2f2;
+}
+
 .addressArgDropdown {
   position: absolute;
   top: 100%;
@@ -2182,6 +2335,337 @@
   cursor: not-allowed;
 }
 
+/* Simulation Mode Tag */
+.simModeTag {
+  display: inline-block;
+  padding: 0.15rem 0.4rem;
+  margin-left: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+/* Cheatcodes Section */
+.cheatcodesSection {
+  margin-bottom: 1rem;
+}
+
+.cheatcodesList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+}
+
+.cheatcodeItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.cheatcodeItem input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+.cheatcodeInputs {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: 1.5rem;
+  margin-top: 0.25rem;
+}
+
+.cheatcodeInputs .input {
+  flex: 1;
+  padding: 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* Checkbox Label for Settings */
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.checkboxLabel input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+/* ABI Collapse Button */
+.abiCollapseBtn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.2rem 0.5rem;
+  margin-left: 0.5rem;
+  border-radius: 4px;
+}
+
+.abiCollapseBtn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Simulation Options Section */
+.simOptionsSection {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(168, 85, 247, 0.08) 50%, rgba(236, 72, 153, 0.08) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.1);
+}
+
+.simOptionsHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.simOptionsLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #8b5cf6;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.simOptionsToggle {
+  background: none;
+  border: none;
+  color: #a855f7;
+  cursor: pointer;
+  padding: 0.2rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+
+.simOptionsToggle:hover {
+  color: #c084fc;
+  transform: scale(1.2);
+}
+
+.simOptionsInline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  flex-wrap: nowrap;
+}
+
+.simOptionInput {
+  flex: 1;
+  min-width: 150px;
+  max-width: 300px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.simOptionInput:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+}
+
+.simOptionInput::placeholder {
+  color: #a78bfa;
+}
+
+.simOptionInputSmall {
+  width: 110px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid rgba(236, 72, 153, 0.3);
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.simOptionInputSmall:focus {
+  outline: none;
+  border-color: #ec4899;
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.15);
+}
+
+.simOptionInputSmall::placeholder {
+  color: #f472b6;
+}
+
+.cheatcodesInline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.cheatcodeInlineItem {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6366f1;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.cheatcodeInlineItem input[type="checkbox"] {
+  width: 0.85rem;
+  height: 0.85rem;
+  cursor: pointer;
+  accent-color: #8b5cf6;
+}
+
+.cheatcodeInlineItem:hover {
+  background: rgba(99, 102, 241, 0.15);
+  color: #4f46e5;
+}
+
+.simOptionsExpanded {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(139, 92, 246, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cheatcodeExpandedRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 6px;
+}
+
+.cheatcodeLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  min-width: 70px;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.cheatcodeLabel:nth-child(1) {
+  color: #059669;
+  background: rgba(5, 150, 105, 0.1);
+}
+
+.cheatcodeExpandedRow:nth-child(1) .cheatcodeLabel {
+  color: #059669;
+  background: rgba(5, 150, 105, 0.1);
+}
+
+.cheatcodeExpandedRow:nth-child(2) .cheatcodeLabel {
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.1);
+}
+
+.cheatcodeExpandedRow:nth-child(3) .cheatcodeLabel {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+/* From Address wrapper in simulation options */
+.simOptionFromAddress {
+  flex: 1;
+  min-width: 200px;
+}
+
+.simOptionFromAddress input {
+  border: 1px solid rgba(139, 92, 246, 0.3) !important;
+  border-radius: 6px !important;
+}
+
+.simOptionFromAddress input:focus {
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15) !important;
+}
+
+.simOptionFromAddress input::placeholder {
+  color: #a78bfa !important;
+}
+
+/* Read Block Number Section */
+.readBlockSection {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.6rem 1rem;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 8px;
+}
+
+.readBlockLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #059669;
+  white-space: nowrap;
+}
+
+.readBlockInput {
+  width: 120px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.readBlockInput:focus {
+  outline: none;
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.readBlockInput::placeholder {
+  color: #6ee7b7;
+}
+
+.readBlockHint {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-style: italic;
+}
+
 @media (max-width: 768px) {
   .row {
     flex-direction: column;
@@ -2207,5 +2691,42 @@
   .buttonGroup .calldataButton,
   .buttonGroup .shareButton {
     width: 100%;
+  }
+
+  .cheatcodeInputs {
+    flex-direction: column;
+  }
+
+  .simOptionsInline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .simOptionInput {
+    max-width: none;
+  }
+
+  .cheatcodesInline {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .cheatcodeExpandedRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .simOptionFromAddress {
+    max-width: none;
+    width: 100%;
+  }
+
+  .readBlockSection {
+    flex-wrap: wrap;
+  }
+
+  .readBlockHint {
+    width: 100%;
+    margin-top: 0.25rem;
   }
 }

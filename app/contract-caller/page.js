@@ -11,6 +11,7 @@ import {
   isAddressBookmarked,
   getBookmarkedAddress,
 } from '../utils/addressBook'
+import { simulateWithTevm } from '../utils/tevmSimulator'
 
 const CHAINS = [
   { id: 'ethereum', name: 'Ethereum', icon: 'https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg' },
@@ -25,6 +26,7 @@ const ABI_CACHE_PREFIX = 'abi-'
 const TENDERLY_SETTINGS_KEY = 'tenderly_settings'
 const API_KEYS_STORAGE_KEY = 'api_keys_settings'
 const RPC_SETTINGS_KEY = 'rpc_settings'
+const SIMULATION_SETTINGS_KEY = 'simulation_settings'
 const MAX_HISTORY_ITEMS = 50
 
 // Expected chain IDs for validation
@@ -119,10 +121,13 @@ const getCachedAddresses = () => {
   return addresses
 }
 
-// Component for address-type argument input with address book picker
-function AddressArgInput({ value, onChange, addressBook, disabled, placeholder }) {
+// Component for address-type argument input with address book support
+function AddressArgInput({ value, onChange, addressBook, disabled, placeholder, onBookmarkClick }) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [filter, setFilter] = useState('')
+
+  const isValidAddress = value && /^0x[a-fA-F0-9]{40}$/.test(value)
+  const isBookmarked = isValidAddress && addressBook.some(item => item.address.toLowerCase() === value.toLowerCase())
 
   const filteredAddresses = addressBook.filter(item => {
     if (!filter.trim()) return true
@@ -134,10 +139,18 @@ function AddressArgInput({ value, onChange, addressBook, disabled, placeholder }
     )
   })
 
-  const handleSelect = (address) => {
-    onChange(address)
+  const handleSelect = (addr) => {
+    onChange(addr)
     setShowDropdown(false)
     setFilter('')
+  }
+
+  const handleStarClick = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!isValidAddress || !onBookmarkClick) return
+    // Always open the modal - for both adding and editing/removing
+    onBookmarkClick(value)
   }
 
   return (
@@ -155,15 +168,16 @@ function AddressArgInput({ value, onChange, addressBook, disabled, placeholder }
         className={styles.input}
         disabled={disabled}
       />
-      <button
-        type="button"
-        className={styles.addressBookPickerButton}
-        onClick={() => setShowDropdown(!showDropdown)}
-        disabled={disabled || addressBook.length === 0}
-        title="Select from address book"
-      >
-        ★
-      </button>
+      {isValidAddress && onBookmarkClick && (
+        <button
+          type="button"
+          className={`${styles.addressBookToggleButton} ${isBookmarked ? styles.bookmarked : ''}`}
+          onClick={handleStarClick}
+          title={isBookmarked ? 'Edit bookmark' : 'Add to address book'}
+        >
+          {isBookmarked ? '★' : '☆'}
+        </button>
+      )}
       {showDropdown && addressBook.length > 0 && (
         <div className={styles.addressArgDropdown}>
           {filteredAddresses.length === 0 ? (
@@ -236,6 +250,7 @@ export default function ContractCaller() {
   const [showFunctionList, setShowFunctionList] = useState(false)
   const [copiedItem, setCopiedItem] = useState(null) // 'selector' | 'signature' | null
   const [ethValue, setEthValue] = useState('') // ETH value for payable functions
+  const [ethValueUnit, setEthValueUnit] = useState('ETH') // 'ETH' or 'Wei'
   const [urlCopied, setUrlCopied] = useState(false) // For share URL feedback
   const [calldataCopied, setCalldataCopied] = useState(false) // For copy calldata feedback
   const [testingEtherscan, setTestingEtherscan] = useState(false)
@@ -246,11 +261,31 @@ export default function ContractCaller() {
   const [rpcTestResult, setRpcTestResult] = useState({}) // { [chain]: 'success' | 'error' | null }
   const [addressBook, setAddressBook] = useState([]) // Address book entries
   const [showBookmarkModal, setShowBookmarkModal] = useState(false) // Show save to address book modal
+  const [bookmarkAddress, setBookmarkAddress] = useState('') // Address being bookmarked (empty = main contract address)
   const [bookmarkLabel, setBookmarkLabel] = useState('') // Label for new bookmark
   const [bookmarkNotes, setBookmarkNotes] = useState('') // Notes for new bookmark
   const [selectedRpcChain, setSelectedRpcChain] = useState('ethereum') // For RPC settings dropdown
+  // Simulation settings
+  const [useLocalSimulation, setUseLocalSimulation] = useState(true) // Use browser-based Tevm simulation (default)
+  const [forkBlockNumber, setForkBlockNumber] = useState('') // Block number to fork from (empty = latest)
+  const [readBlockNumber, setReadBlockNumber] = useState('') // Block number for read-only eth_call (empty = latest)
+  const [cheatcodes, setCheatcodes] = useState({
+    deal: { enabled: false, address: '', amount: '' },
+    prank: { enabled: false, address: '' },
+    warp: { enabled: false, timestamp: '' },
+  })
+  const [abiCollapsed, setAbiCollapsed] = useState(true) // Collapse ABI JSON textarea (default collapsed)
+  const [simOptionsExpanded, setSimOptionsExpanded] = useState(false) // Expand simulation options
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null) // { functionName, args, timestamp }
+  const bookmarkInputRef = useRef(null)
+
+  // Focus bookmark input when modal opens
+  useEffect(() => {
+    if (showBookmarkModal && bookmarkInputRef.current) {
+      bookmarkInputRef.current.focus()
+    }
+  }, [showBookmarkModal])
 
   // Clear stale pending history after 5 seconds
   useEffect(() => {
@@ -327,6 +362,15 @@ export default function ContractCaller() {
       const savedRpcSettings = localStorage.getItem(RPC_SETTINGS_KEY)
       if (savedRpcSettings) {
         setRpcSettings(JSON.parse(savedRpcSettings))
+      }
+
+      // Load simulation settings
+      const savedSimSettings = localStorage.getItem(SIMULATION_SETTINGS_KEY)
+      if (savedSimSettings) {
+        const parsed = JSON.parse(savedSimSettings)
+        if (typeof parsed.useLocalSimulation === 'boolean') {
+          setUseLocalSimulation(parsed.useLocalSimulation)
+        }
       }
 
       // Load address book
@@ -550,6 +594,8 @@ export default function ContractCaller() {
         : data.contractName
       setContractName(nameDisplay)
       setAbiSource(data.isProxy ? `fetched (proxy → ${data.implAddress?.slice(0, 10)}...)` : 'fetched')
+      // Expand ABI when first fetched from remote
+      setAbiCollapsed(false)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -794,6 +840,22 @@ export default function ContractCaller() {
     }
   }
 
+  // Helper to get ETH value with unit info
+  const getEthValueWithUnit = () => {
+    if (!ethValue || ethValue.trim() === '') return { value: undefined, unit: 'ETH' }
+    // Validate the value is a valid number
+    try {
+      if (ethValueUnit === 'Wei') {
+        BigInt(ethValue) // Validate it's a valid integer for Wei
+      } else {
+        parseFloat(ethValue) // Validate it's a valid number for ETH
+      }
+    } catch {
+      return { value: undefined, unit: ethValueUnit }
+    }
+    return { value: ethValue, unit: ethValueUnit }
+  }
+
   const handleCall = async () => {
     if (!address || !selectedFunction || !parsedAbi) {
       setError('Please fill in all required fields')
@@ -803,9 +865,9 @@ export default function ContractCaller() {
     const selectedFunc = getSelectedFunction()
     const isWrite = !isReadOnly(selectedFunc)
 
-    // Check Tenderly configuration for write functions
-    if (isWrite && !isTenderlyConfigured()) {
-      setError('Please configure Tenderly API settings to simulate write functions')
+    // Check simulation configuration for write functions
+    if (isWrite && !useLocalSimulation && !isTenderlyConfigured()) {
+      setError('Please configure Tenderly API settings or enable Local Simulation to simulate write functions')
       setShowSettings(true)
       return
     }
@@ -815,44 +877,90 @@ export default function ContractCaller() {
     setResult(null)
 
     try {
-      // Use different API for read vs write functions
-      const apiEndpoint = isWrite ? '/api/simulate' : '/api/call-contract'
+      let data
 
-      const requestBody = {
-        chain,
-        address,
-        functionName: selectedFunction,
-        args,
-        abi: parsedAbi,
-      }
-
-      // Add custom RPC if configured for this chain
-      if (rpcSettings[chain]) {
-        requestBody.rpcUrl = rpcSettings[chain]
-      }
-
-      // Add Tenderly credentials for write functions
-      if (isWrite) {
-        requestBody.fromAddress = fromAddress || undefined
-        requestBody.tenderlyAccessKey = tenderlySettings.accessKey
-        requestBody.tenderlyAccount = tenderlySettings.account
-        requestBody.tenderlyProject = tenderlySettings.project
-        // Add ETH value for payable functions
-        if (ethValue && parseFloat(ethValue) > 0) {
-          requestBody.value = ethValue
+      // Use local Tevm simulation for write functions if enabled
+      if (isWrite && useLocalSimulation) {
+        // Build cheatcodes object
+        const activeCheatcodes = {}
+        if (cheatcodes.deal.enabled && cheatcodes.deal.address && cheatcodes.deal.amount) {
+          activeCheatcodes.deal = {
+            address: cheatcodes.deal.address,
+            amount: cheatcodes.deal.amount,
+          }
         }
-      }
+        if (cheatcodes.prank.enabled && cheatcodes.prank.address) {
+          activeCheatcodes.prank = {
+            address: cheatcodes.prank.address,
+          }
+        }
+        if (cheatcodes.warp.enabled && cheatcodes.warp.timestamp) {
+          activeCheatcodes.warp = {
+            timestamp: parseInt(cheatcodes.warp.timestamp),
+          }
+        }
 
-      const response = await fetch(apiEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      })
+        const ethValueInfo = getEthValueWithUnit()
+        data = await simulateWithTevm({
+          chain,
+          address,
+          functionName: selectedFunction,
+          args,
+          abi: parsedAbi,
+          fromAddress: fromAddress || undefined,
+          value: ethValueInfo.value,
+          valueUnit: ethValueInfo.unit,
+          rpcUrl: rpcSettings[chain] || undefined,
+          blockNumber: forkBlockNumber || 'latest',
+          cheatcodes: activeCheatcodes,
+        })
+      } else {
+        // Use API for read functions or Tenderly for write functions
+        const apiEndpoint = isWrite ? '/api/simulate' : '/api/call-contract'
 
-      const data = await response.json()
+        const requestBody = {
+          chain,
+          address,
+          functionName: selectedFunction,
+          args,
+          abi: parsedAbi,
+        }
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to call contract')
+        // Add custom RPC if configured for this chain
+        if (rpcSettings[chain]) {
+          requestBody.rpcUrl = rpcSettings[chain]
+        }
+
+        // Add block number for read-only calls
+        if (!isWrite && readBlockNumber) {
+          requestBody.blockNumber = readBlockNumber
+        }
+
+        // Add Tenderly credentials for write functions
+        if (isWrite) {
+          requestBody.fromAddress = fromAddress || undefined
+          requestBody.tenderlyAccessKey = tenderlySettings.accessKey
+          requestBody.tenderlyAccount = tenderlySettings.account
+          requestBody.tenderlyProject = tenderlySettings.project
+          // Add ETH value for payable functions
+          const ethValueInfo = getEthValueWithUnit()
+          if (ethValueInfo.value) {
+            requestBody.value = ethValueInfo.value
+            requestBody.valueUnit = ethValueInfo.unit
+          }
+        }
+
+        const response = await fetch(apiEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        })
+
+        data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to call contract')
+        }
       }
 
       // For simulation, check if it was successful
@@ -1152,44 +1260,54 @@ export default function ContractCaller() {
     return isAddressBookmarked(address)
   }
 
-  // Open bookmark modal
-  const handleOpenBookmarkModal = () => {
-    const existing = getBookmarkedAddress(address)
+  // Open bookmark modal (for main contract or any address)
+  const handleOpenBookmarkModal = (addr) => {
+    const targetAddr = addr || address
+    if (!targetAddr || !/^0x[a-fA-F0-9]{40}$/.test(targetAddr)) return
+
+    const existing = getBookmarkedAddress(targetAddr)
     if (existing) {
       setBookmarkLabel(existing.label || '')
       setBookmarkNotes(existing.notes || '')
     } else {
-      setBookmarkLabel(contractName || '')
+      // Only use contractName for main contract (when addr is not provided)
+      setBookmarkLabel(addr ? '' : (contractName || ''))
       setBookmarkNotes('')
     }
+
+    setBookmarkAddress(addr || '') // Empty string means main contract
     setShowBookmarkModal(true)
   }
 
   // Save bookmark
   const handleSaveBookmark = () => {
-    if (!address) return
+    const addrToSave = bookmarkAddress || address
+    if (!addrToSave) return
 
     const updatedBook = addToAddressBook({
-      address,
+      address: addrToSave,
       label: bookmarkLabel,
-      contractName: contractName || '',
+      contractName: bookmarkAddress ? '' : (contractName || ''), // Only use contractName for main contract
       notes: bookmarkNotes,
     })
 
     setAddressBook(updatedBook)
     setShowBookmarkModal(false)
+    setBookmarkAddress('')
     setBookmarkLabel('')
     setBookmarkNotes('')
   }
 
-  // Remove bookmark
+  // Remove bookmark (for main contract or modal)
   const handleRemoveBookmark = () => {
-    const existing = getBookmarkedAddress(address)
+    const addrToRemove = bookmarkAddress || address
+    const existing = getBookmarkedAddress(addrToRemove)
     if (existing) {
       const updatedBook = removeFromAddressBook(existing.id)
       setAddressBook(updatedBook)
     }
     setShowBookmarkModal(false)
+    setBookmarkAddress('')
   }
 
   // Get combined suggestions (bookmarked addresses + cached addresses)
@@ -1260,6 +1378,31 @@ export default function ContractCaller() {
                 </div>
               </div>
 
+              {/* Simulation Mode */}
+              <div className={styles.settingsGroup}>
+                <h3 className={styles.settingsTitle}>
+                  Simulation Mode
+                  {useLocalSimulation && <span className={styles.settingsCheck}>✓ Local</span>}
+                </h3>
+                <p className={styles.settingsDesc}>
+                  Choose between local browser-based simulation (Tevm) or Tenderly API.
+                </p>
+                <div className={styles.settingsFields}>
+                  <label className={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={useLocalSimulation}
+                      onChange={(e) => {
+                        const useLocal = e.target.checked
+                        setUseLocalSimulation(useLocal)
+                        localStorage.setItem(SIMULATION_SETTINGS_KEY, JSON.stringify({ useLocalSimulation: useLocal }))
+                      }}
+                    />
+                    <span>Use Local Simulation (Tevm - no API keys required)</span>
+                  </label>
+                </div>
+              </div>
+
               {/* Tenderly Settings */}
               <div className={styles.settingsGroup}>
                 <h3 className={styles.settingsTitle}>
@@ -1267,7 +1410,7 @@ export default function ContractCaller() {
                   {isTenderlyConfigured() && <span className={styles.settingsCheck}>✓</span>}
                 </h3>
                 <p className={styles.settingsDesc}>
-                  Required for simulating write functions. Get your credentials from{' '}
+                  {useLocalSimulation ? 'Optional when using Local Simulation.' : 'Required for simulating write functions.'} Get your credentials from{' '}
                   <a href="https://dashboard.tenderly.co/account/authorization" target="_blank" rel="noopener noreferrer">
                     Tenderly Dashboard
                   </a>
@@ -1492,7 +1635,7 @@ export default function ContractCaller() {
                   )}
                 </div>
                 <button
-                  onClick={handleOpenBookmarkModal}
+                  onClick={() => handleOpenBookmarkModal()}
                   className={`${styles.bookmarkButton} ${isCurrentAddressBookmarked() ? styles.bookmarked : ''}`}
                   disabled={loading || !address || !/^0x[a-fA-F0-9]{40}$/.test(address)}
                   type="button"
@@ -1515,6 +1658,13 @@ export default function ContractCaller() {
           <div className={styles.field}>
             <div className={styles.abiLabelRow}>
               <label className={styles.label}>ABI (JSON)</label>
+              <button
+                onClick={() => setAbiCollapsed(!abiCollapsed)}
+                className={styles.abiCollapseBtn}
+                type="button"
+              >
+                {abiCollapsed ? '▶ Expand' : '▼ Collapse'}
+              </button>
               {abiSource && (
                 <span className={styles.abiSource}>
                   {abiSource}
@@ -1529,17 +1679,19 @@ export default function ContractCaller() {
                 </span>
               )}
             </div>
-            <textarea
-              value={abi}
-              onChange={(e) => {
-                setAbi(e.target.value)
-                setAbiSource(null)
-              }}
-              placeholder="Paste contract ABI here or use Fetch ABI button..."
-              className={styles.textarea}
-              disabled={loading}
-              rows={6}
-            />
+            {!abiCollapsed && (
+              <textarea
+                value={abi}
+                onChange={(e) => {
+                  setAbi(e.target.value)
+                  setAbiSource(null)
+                }}
+                placeholder="Paste contract ABI here or use Fetch ABI button..."
+                className={styles.textarea}
+                disabled={loading}
+                rows={6}
+              />
+            )}
           </div>
 
           {functions.length > 0 && (
@@ -1661,20 +1813,116 @@ export default function ContractCaller() {
                 </div>
               </div>
 
-              {/* From Address for write functions (optional) */}
+              {/* Simulation Options - From Address, Fork Block, Cheatcodes in one row */}
               {selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) && (
-                <div className={styles.field}>
-                  <label className={styles.label}>
-                    From Address <span className={styles.optional}>(optional, for simulation)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={fromAddress}
-                    onChange={(e) => setFromAddress(e.target.value)}
-                    placeholder="0x... (sender address for simulation)"
-                    className={styles.input}
-                    disabled={loading}
-                  />
+                <div className={styles.simOptionsSection}>
+                  <div className={styles.simOptionsHeader}>
+                    <span className={styles.simOptionsLabel}>Simulation Options</span>
+                    <button
+                      onClick={() => setSimOptionsExpanded(!simOptionsExpanded)}
+                      className={styles.simOptionsToggle}
+                      type="button"
+                    >
+                      {simOptionsExpanded ? '▼' : '▶'}
+                    </button>
+                    <div className={styles.simOptionsInline}>
+                      {useLocalSimulation && (
+                        <input
+                          type="text"
+                          value={forkBlockNumber}
+                          onChange={(e) => setForkBlockNumber(e.target.value.replace(/[^0-9]/g, ''))}
+                          placeholder="Fork Block"
+                          className={styles.simOptionInputSmall}
+                          disabled={loading}
+                        />
+                      )}
+                      <div className={styles.simOptionFromAddress}>
+                        <AddressArgInput
+                          value={fromAddress}
+                          onChange={(value) => setFromAddress(value)}
+                          addressBook={addressBook}
+                          disabled={loading}
+                          placeholder="From Address"
+                          onBookmarkClick={handleOpenBookmarkModal}
+                        />
+                      </div>
+                      {useLocalSimulation && (
+                        <div className={styles.cheatcodesInline}>
+                          <label className={styles.cheatcodeInlineItem} title="vm.deal - Set ETH balance">
+                            <input
+                              type="checkbox"
+                              checked={cheatcodes.deal.enabled}
+                              onChange={(e) => setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, enabled: e.target.checked } }))}
+                            />
+                            <span>deal</span>
+                          </label>
+                          <label className={styles.cheatcodeInlineItem} title="vm.prank - Impersonate address">
+                            <input
+                              type="checkbox"
+                              checked={cheatcodes.prank.enabled}
+                              onChange={(e) => setCheatcodes(prev => ({ ...prev, prank: { ...prev.prank, enabled: e.target.checked } }))}
+                            />
+                            <span>prank</span>
+                          </label>
+                          <label className={styles.cheatcodeInlineItem} title="vm.warp - Set timestamp">
+                            <input
+                              type="checkbox"
+                              checked={cheatcodes.warp.enabled}
+                              onChange={(e) => setCheatcodes(prev => ({ ...prev, warp: { ...prev.warp, enabled: e.target.checked } }))}
+                            />
+                            <span>warp</span>
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {simOptionsExpanded && (cheatcodes.deal.enabled || cheatcodes.prank.enabled || cheatcodes.warp.enabled) && (
+                    <div className={styles.simOptionsExpanded}>
+                      {cheatcodes.deal.enabled && (
+                        <div className={styles.cheatcodeExpandedRow}>
+                          <span className={styles.cheatcodeLabel}>vm.deal:</span>
+                          <input
+                            type="text"
+                            value={cheatcodes.deal.address}
+                            onChange={(e) => setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, address: e.target.value } }))}
+                            placeholder="Address"
+                            className={styles.simOptionInput}
+                          />
+                          <input
+                            type="text"
+                            value={cheatcodes.deal.amount}
+                            onChange={(e) => setCheatcodes(prev => ({ ...prev, deal: { ...prev.deal, amount: e.target.value } }))}
+                            placeholder="ETH Amount"
+                            className={styles.simOptionInputSmall}
+                          />
+                        </div>
+                      )}
+                      {cheatcodes.prank.enabled && (
+                        <div className={styles.cheatcodeExpandedRow}>
+                          <span className={styles.cheatcodeLabel}>vm.prank:</span>
+                          <input
+                            type="text"
+                            value={cheatcodes.prank.address}
+                            onChange={(e) => setCheatcodes(prev => ({ ...prev, prank: { ...prev.prank, address: e.target.value } }))}
+                            placeholder="Impersonate Address"
+                            className={styles.simOptionInput}
+                          />
+                        </div>
+                      )}
+                      {cheatcodes.warp.enabled && (
+                        <div className={styles.cheatcodeExpandedRow}>
+                          <span className={styles.cheatcodeLabel}>vm.warp:</span>
+                          <input
+                            type="text"
+                            value={cheatcodes.warp.timestamp}
+                            onChange={(e) => setCheatcodes(prev => ({ ...prev, warp: { ...prev.warp, timestamp: e.target.value } }))}
+                            placeholder="Unix Timestamp"
+                            className={styles.simOptionInputSmall}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1684,14 +1932,48 @@ export default function ContractCaller() {
                   <label className={styles.label}>
                     ETH Value <span className={styles.payableBadge}>payable</span>
                   </label>
+                  <div className={styles.ethValueWrapper}>
+                    <input
+                      type="text"
+                      value={ethValue}
+                      onChange={(e) => setEthValue(e.target.value)}
+                      placeholder={ethValueUnit === 'ETH' ? '0.0' : '0'}
+                      className={styles.ethValueInput}
+                      disabled={loading}
+                    />
+                    <div className={styles.ethValueUnitToggle}>
+                      <button
+                        type="button"
+                        className={`${styles.ethValueUnitBtn} ${ethValueUnit === 'Wei' ? styles.active : ''}`}
+                        onClick={() => setEthValueUnit('Wei')}
+                      >
+                        Wei
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.ethValueUnitBtn} ${ethValueUnit === 'ETH' ? styles.active : ''}`}
+                        onClick={() => setEthValueUnit('ETH')}
+                      >
+                        ETH
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Block number for read-only functions */}
+              {selectedFunction && getSelectedFunction() && isReadOnly(getSelectedFunction()) && (
+                <div className={styles.readBlockSection}>
+                  <label className={styles.readBlockLabel}>Block Number</label>
                   <input
                     type="text"
-                    value={ethValue}
-                    onChange={(e) => setEthValue(e.target.value)}
-                    placeholder="0.0 (ETH to send with transaction)"
-                    className={styles.input}
+                    value={readBlockNumber}
+                    onChange={(e) => setReadBlockNumber(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="latest"
+                    className={styles.readBlockInput}
                     disabled={loading}
                   />
+                  <span className={styles.readBlockHint}>Leave empty for latest block</span>
                 </div>
               )}
 
@@ -1714,6 +1996,7 @@ export default function ContractCaller() {
                           addressBook={addressBook}
                           disabled={loading}
                           placeholder={`Enter ${input.type}...`}
+                          onBookmarkClick={handleOpenBookmarkModal}
                         />
                       ) : (
                         <input
@@ -1744,7 +2027,9 @@ export default function ContractCaller() {
             >
               {loading
                 ? (selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? 'Simulating...' : 'Calling...')
-                : (selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? 'Simulate Call' : 'Call Contract')
+                : (selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction())
+                    ? <>Simulate Call <span className={styles.simModeTag}>{useLocalSimulation ? 'L' : 'T'}</span></>
+                    : 'Call Contract')
               }
             </button>
             {address && selectedFunction && (
@@ -1985,15 +2270,44 @@ export default function ContractCaller() {
               </div>
             )}
 
-            {/* State changes (simulation only) */}
+            {/* Balance changes (simulation only) */}
+            {result.simulated && result.balanceChanges && result.balanceChanges.length > 0 && (
+              <div className={styles.balanceSection}>
+                <h3 className={styles.balanceTitle}>Balance Changes ({result.balanceChanges.length})</h3>
+                {result.balanceChanges.map((change, index) => (
+                  <div key={index} className={styles.balanceItem}>
+                    <div className={styles.balanceAddress}>
+                      {change.address?.slice(0, 10)}...{change.address?.slice(-8)}
+                    </div>
+                    <div className={styles.balanceValues}>
+                      <span className={styles.balanceBefore}>
+                        {change.before != null ? (BigInt(change.before) / BigInt(10 ** 18)).toString() : '?'} ETH
+                      </span>
+                      <span className={styles.balanceArrow}>→</span>
+                      <span className={styles.balanceAfter}>
+                        {change.after != null ? (BigInt(change.after) / BigInt(10 ** 18)).toString() : '?'} ETH
+                      </span>
+                      {change.diff != null && (
+                        <span className={`${styles.balanceDiff} ${BigInt(change.diff) >= 0n ? styles.balanceDiffPositive : styles.balanceDiffNegative}`}>
+                          ({BigInt(change.diff) >= 0n ? '+' : ''}{(BigInt(change.diff) / BigInt(10 ** 18)).toString()} ETH)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* State/Storage changes (simulation only) */}
             {result.simulated && result.stateChanges && result.stateChanges.length > 0 && (
               <div className={styles.stateSection}>
-                <h3 className={styles.stateTitle}>State Changes ({result.stateChanges.length})</h3>
+                <h3 className={styles.stateTitle}>Storage Access ({result.stateChanges.length})</h3>
                 {result.stateChanges.map((change, index) => (
                   <div key={index} className={styles.stateItem}>
                     <div className={styles.stateAddress}>
                       {change.address?.slice(0, 10)}...{change.address?.slice(-8)}
                     </div>
+                    {/* Tenderly format: change.changes */}
                     {change.changes && change.changes.length > 0 && (
                       <div className={styles.stateChanges}>
                         {change.changes.map((c, i) => (
@@ -2011,6 +2325,21 @@ export default function ContractCaller() {
                                 <span className={styles.stateLabel}>After:</span> {c.dirty}
                               </div>
                             )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Tevm format: change.storage */}
+                    {change.storage && change.storage.length > 0 && (
+                      <div className={styles.stateChanges}>
+                        {change.storage.map((s, i) => (
+                          <div key={i} className={styles.stateChange}>
+                            <div className={styles.stateSlot}>
+                              <span className={styles.stateSlotLabel}>Slot:</span> {s.slot}
+                            </div>
+                            <div className={styles.stateDirty}>
+                              <span className={styles.stateLabel}>Value:</span> {s.value}
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -2143,25 +2472,30 @@ export default function ContractCaller() {
 
       {/* Bookmark Modal */}
       {showBookmarkModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowBookmarkModal(false)}>
+        <div
+          className={styles.modalOverlay}
+          onClick={() => { setShowBookmarkModal(false); setBookmarkAddress(''); }}
+          onKeyDown={(e) => { if (e.key === 'Escape') { setShowBookmarkModal(false); setBookmarkAddress(''); } }}
+          tabIndex={-1}
+        >
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h3 className={styles.modalTitle}>
-              {isCurrentAddressBookmarked() ? 'Edit Bookmark' : 'Add to Address Book'}
+              {(bookmarkAddress || address) && getBookmarkedAddress(bookmarkAddress || address) ? 'Edit Bookmark' : 'Add to Address Book'}
             </h3>
             <div className={styles.modalBody}>
               <div className={styles.modalField}>
                 <label className={styles.modalLabel}>Address</label>
-                <div className={styles.modalAddress}>{address}</div>
+                <div className={styles.modalAddress}>{bookmarkAddress || address}</div>
               </div>
               <div className={styles.modalField}>
                 <label className={styles.modalLabel}>Label</label>
                 <input
                   type="text"
+                  ref={bookmarkInputRef}
                   value={bookmarkLabel}
                   onChange={(e) => setBookmarkLabel(e.target.value)}
                   placeholder="e.g., USDC Token, Uniswap Router..."
                   className={styles.modalInput}
-                  autoFocus
                 />
               </div>
               <div className={styles.modalField}>
@@ -2176,7 +2510,7 @@ export default function ContractCaller() {
               </div>
             </div>
             <div className={styles.modalActions}>
-              {isCurrentAddressBookmarked() && (
+              {(bookmarkAddress || address) && getBookmarkedAddress(bookmarkAddress || address) && (
                 <button
                   onClick={handleRemoveBookmark}
                   className={styles.modalDeleteButton}
@@ -2186,7 +2520,7 @@ export default function ContractCaller() {
                 </button>
               )}
               <button
-                onClick={() => setShowBookmarkModal(false)}
+                onClick={() => { setShowBookmarkModal(false); setBookmarkAddress(''); }}
                 className={styles.modalCancelButton}
                 type="button"
               >

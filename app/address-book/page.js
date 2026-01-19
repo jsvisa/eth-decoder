@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import styles from './page.module.css'
 import {
   getAddressBook,
@@ -28,11 +28,27 @@ export default function AddressBook() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [importOverwrite, setImportOverwrite] = useState(false)
   const fileInputRef = useRef(null)
+  const editInputRef = useRef(null)
+  const addAddressInputRef = useRef(null)
 
   // Load address book on mount
   useEffect(() => {
     setAddressBook(getAddressBook())
   }, [])
+
+  // Focus edit input when entering edit mode
+  useEffect(() => {
+    if (editingId && editInputRef.current) {
+      editInputRef.current.focus()
+    }
+  }, [editingId])
+
+  // Focus add address input when modal opens
+  useEffect(() => {
+    if (showAddModal && addAddressInputRef.current) {
+      addAddressInputRef.current.focus()
+    }
+  }, [showAddModal])
 
   // Filter addresses
   const filteredAddresses = addressBook.filter(item => {
@@ -251,10 +267,10 @@ export default function AddressBook() {
                       <label className={styles.editLabel}>Label</label>
                       <input
                         type="text"
+                        ref={editInputRef}
                         value={editLabel}
                         onChange={(e) => setEditLabel(e.target.value)}
                         className={styles.editInput}
-                        autoFocus
                       />
                     </div>
                     <div className={styles.editField}>
@@ -346,11 +362,11 @@ export default function AddressBook() {
                 <label className={styles.modalLabel}>Address *</label>
                 <input
                   type="text"
+                  ref={addAddressInputRef}
                   value={newAddress}
                   onChange={(e) => setNewAddress(e.target.value)}
                   placeholder="0x..."
                   className={styles.modalInput}
-                  autoFocus
                 />
               </div>
               <div className={styles.modalField}>
