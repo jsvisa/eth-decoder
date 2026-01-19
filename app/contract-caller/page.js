@@ -278,6 +278,14 @@ export default function ContractCaller() {
   const [simOptionsExpanded, setSimOptionsExpanded] = useState(false) // Expand simulation options
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null) // { functionName, args, timestamp }
+  const bookmarkInputRef = useRef(null)
+
+  // Focus bookmark input when modal opens
+  useEffect(() => {
+    if (showBookmarkModal && bookmarkInputRef.current) {
+      bookmarkInputRef.current.focus()
+    }
+  }, [showBookmarkModal])
 
   // Clear stale pending history after 5 seconds
   useEffect(() => {
@@ -2463,36 +2471,31 @@ export default function ContractCaller() {
       </div>
 
       {/* Bookmark Modal */}
-      {showBookmarkModal && (() => {
-        const modalAddr = bookmarkAddress || address
-        const isBookmarked = modalAddr && getBookmarkedAddress(modalAddr)
-        const closeModal = () => { setShowBookmarkModal(false); setBookmarkAddress(''); }
-        return (
+      {showBookmarkModal && (
         <div
           className={styles.modalOverlay}
-          onClick={closeModal}
-          onKeyDown={(e) => { if (e.key === 'Escape') closeModal(); }}
+          onClick={() => { setShowBookmarkModal(false); setBookmarkAddress(''); }}
+          onKeyDown={(e) => { if (e.key === 'Escape') { setShowBookmarkModal(false); setBookmarkAddress(''); } }}
           tabIndex={-1}
-          ref={(el) => el?.focus()}
         >
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h3 className={styles.modalTitle}>
-              {isBookmarked ? 'Edit Bookmark' : 'Add to Address Book'}
+              {(bookmarkAddress || address) && getBookmarkedAddress(bookmarkAddress || address) ? 'Edit Bookmark' : 'Add to Address Book'}
             </h3>
             <div className={styles.modalBody}>
               <div className={styles.modalField}>
                 <label className={styles.modalLabel}>Address</label>
-                <div className={styles.modalAddress}>{modalAddr}</div>
+                <div className={styles.modalAddress}>{bookmarkAddress || address}</div>
               </div>
               <div className={styles.modalField}>
                 <label className={styles.modalLabel}>Label</label>
                 <input
                   type="text"
+                  ref={bookmarkInputRef}
                   value={bookmarkLabel}
                   onChange={(e) => setBookmarkLabel(e.target.value)}
                   placeholder="e.g., USDC Token, Uniswap Router..."
                   className={styles.modalInput}
-                  autoFocus
                 />
               </div>
               <div className={styles.modalField}>
@@ -2507,7 +2510,7 @@ export default function ContractCaller() {
               </div>
             </div>
             <div className={styles.modalActions}>
-              {isBookmarked && (
+              {(bookmarkAddress || address) && getBookmarkedAddress(bookmarkAddress || address) && (
                 <button
                   onClick={handleRemoveBookmark}
                   className={styles.modalDeleteButton}
@@ -2517,7 +2520,7 @@ export default function ContractCaller() {
                 </button>
               )}
               <button
-                onClick={closeModal}
+                onClick={() => { setShowBookmarkModal(false); setBookmarkAddress(''); }}
                 className={styles.modalCancelButton}
                 type="button"
               >
@@ -2533,8 +2536,7 @@ export default function ContractCaller() {
             </div>
           </div>
         </div>
-        )
-      })()}
+      )}
     </main>
   )
 }
