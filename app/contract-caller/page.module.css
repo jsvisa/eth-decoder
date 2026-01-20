@@ -2755,6 +2755,29 @@
   color: #4f46e5;
 }
 
+.abiClickable {
+  cursor: pointer;
+}
+
+.abiClickable:hover {
+  background: #f3f4f6;
+}
+
+.abiCopied {
+  background: rgba(34, 197, 94, 0.1) !important;
+}
+
+.abiCopiedBadge {
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #16a34a;
+  background: rgba(34, 197, 94, 0.15);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
 /* Simulation Options Section */
 .simOptionsSection {
   margin-bottom: 1rem;
