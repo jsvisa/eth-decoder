@@ -14,7 +14,7 @@ const TENDERLY_NETWORK_IDS = {
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { chain, address, functionName, args, abi, fromAddress, tenderlyAccessKey, tenderlyAccount, tenderlyProject, value, valueUnit = 'ETH', blockNumber } = body
+    const { chain, address, functionName, args, abi, fromAddress, tenderlyAccessKey, tenderlyAccount, tenderlyProject, value, valueUnit = 'ETH', blockNumber, stateOverrides } = body
 
     if (!address || !functionName || !abi) {
       return NextResponse.json(
@@ -130,6 +130,36 @@ export async function POST(request) {
     // Add block number if specified
     if (blockNumber) {
       simulationRequest.block_number = parseInt(blockNumber, 10)
+    }
+
+    // Add state overrides (balance overrides) if specified
+    if (stateOverrides && stateOverrides.balances && stateOverrides.balances.length > 0) {
+      const stateObjects = {}
+      for (const override of stateOverrides.balances) {
+        if (override.address && override.balance) {
+          const addr = override.address.toLowerCase()
+          if (!stateObjects[addr]) {
+            stateObjects[addr] = {}
+          }
+          // Convert balance to hex (Tenderly expects hex string)
+          try {
+            const { parseEther } = await import('viem')
+            const balanceWei = parseEther(override.balance)
+            stateObjects[addr].balance = '0x' + balanceWei.toString(16)
+          } catch (e) {
+            // If parsing fails, try to use it as raw wei value
+            try {
+              const balanceWei = BigInt(override.balance)
+              stateObjects[addr].balance = '0x' + balanceWei.toString(16)
+            } catch {
+              console.warn('Failed to parse balance override:', e.message)
+            }
+          }
+        }
+      }
+      if (Object.keys(stateObjects).length > 0) {
+        simulationRequest.state_objects = stateObjects
+      }
     }
 
     // Call Tenderly Simulation API for decoded outputs, logs, state changes

@@ -524,6 +524,8 @@ export default function ContractCaller() {
     prank: { enabled: false, address: '' },
     warp: { enabled: false, timestamp: '' },
   })
+  // Tenderly-specific state overrides
+  const [balanceOverrides, setBalanceOverrides] = useState([]) // Array of {address, balance}
   const [abiCollapsed, setAbiCollapsed] = useState(true) // Collapse ABI JSON textarea (default collapsed)
   const [simOptionsExpanded, setSimOptionsExpanded] = useState(false) // Expand simulation options
   const [fieldErrors, setFieldErrors] = useState({}) // Track validation errors for fields
@@ -1298,6 +1300,12 @@ export default function ContractCaller() {
           if (ethValueInfo.value) {
             requestBody.value = ethValueInfo.value
             requestBody.valueUnit = ethValueInfo.unit
+          }
+          // Add state overrides for Tenderly simulation
+          if (balanceOverrides.length > 0) {
+            requestBody.stateOverrides = {
+              balances: balanceOverrides.filter(o => o.address && o.balance)
+            }
           }
         }
 
@@ -2237,6 +2245,16 @@ export default function ContractCaller() {
                           </label>
                         </div>
                       )}
+                      {!useLocalSimulation && (
+                        <button
+                          type="button"
+                          className={styles.addOverrideBtn}
+                          onClick={() => setBalanceOverrides(prev => [...prev, { address: '', balance: '' }])}
+                          title="Add balance override"
+                        >
+                          + Balance
+                        </button>
+                      )}
                     </div>
                   </div>
                   {simOptionsExpanded && (cheatcodes.deal.enabled || cheatcodes.prank.enabled || cheatcodes.warp.enabled) && (
@@ -2304,6 +2322,49 @@ export default function ContractCaller() {
                           />
                         </div>
                       )}
+                    </div>
+                  )}
+                  {/* Balance overrides for Tenderly simulation */}
+                  {!useLocalSimulation && balanceOverrides.length > 0 && (
+                    <div className={styles.simOptionsExpanded}>
+                      <div className={styles.overridesLabel}>Balance Overrides:</div>
+                      {balanceOverrides.map((override, index) => (
+                        <div key={index} className={styles.cheatcodeExpandedRow}>
+                          <input
+                            type="text"
+                            value={override.address}
+                            onChange={(e) => {
+                              const newOverrides = [...balanceOverrides]
+                              newOverrides[index].address = e.target.value
+                              setBalanceOverrides(newOverrides)
+                            }}
+                            placeholder="Address (0x...)"
+                            className={styles.simOptionInput}
+                          />
+                          <input
+                            type="text"
+                            value={override.balance}
+                            onChange={(e) => {
+                              const newOverrides = [...balanceOverrides]
+                              newOverrides[index].balance = e.target.value
+                              setBalanceOverrides(newOverrides)
+                            }}
+                            placeholder="ETH Balance"
+                            className={styles.simOptionInputSmall}
+                          />
+                          <button
+                            type="button"
+                            className={styles.removeOverrideBtn}
+                            onClick={() => {
+                              const newOverrides = balanceOverrides.filter((_, i) => i !== index)
+                              setBalanceOverrides(newOverrides)
+                            }}
+                            title="Remove override"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
