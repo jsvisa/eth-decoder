@@ -473,6 +473,7 @@ export default function ContractCaller() {
   const [showHistory, setShowHistory] = useState(true)
   const [abiSource, setAbiSource] = useState(null) // 'cached', 'fetched', or null
   const [contractName, setContractName] = useState(null)
+  const [abiSaved, setAbiSaved] = useState(false) // Feedback for ABI save action
   const [showFullResponse, setShowFullResponse] = useState(false)
   const [cachedAddresses, setCachedAddresses] = useState([])
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false)
@@ -529,6 +530,9 @@ export default function ContractCaller() {
   const [storageOverrides, setStorageOverrides] = useState([]) // Array of {address, slot, value}
   const [timestampOverride, setTimestampOverride] = useState('') // Unix timestamp override
   const [abiCollapsed, setAbiCollapsed] = useState(true) // Collapse ABI JSON textarea (default collapsed)
+  const [abiViewMode, setAbiViewMode] = useState('list') // 'list' or 'raw' view mode
+  const [abiFilter, setAbiFilter] = useState('') // Search filter for ABI entries
+  const [abiCopiedItem, setAbiCopiedItem] = useState(null) // Track which ABI item was just copied
   const [simOptionsExpanded, setSimOptionsExpanded] = useState(false) // Expand simulation options
   const [fieldErrors, setFieldErrors] = useState({}) // Track validation errors for fields
   // Store pending args with context to handle race conditions when switching contracts
@@ -606,6 +610,50 @@ export default function ContractCaller() {
       func.name.toLowerCase().includes(search) ||
       func.inputs?.some(input => input.name?.toLowerCase().includes(search) || input.type?.toLowerCase().includes(search))
     )
+  }
+
+  // Filter and group ABI entries for searchable view
+  const getFilteredAbiEntries = () => {
+    if (!parsedAbi || !Array.isArray(parsedAbi)) return { functions: [], events: [], errors: [], other: [] }
+
+    const search = abiFilter.toLowerCase().trim()
+    const filtered = search
+      ? parsedAbi.filter(item => {
+          const name = item.name?.toLowerCase() || ''
+          const type = item.type?.toLowerCase() || ''
+          const inputs = item.inputs?.map(i => `${i.name} ${i.type}`).join(' ').toLowerCase() || ''
+          const outputs = item.outputs?.map(o => `${o.name} ${o.type}`).join(' ').toLowerCase() || ''
+          return name.includes(search) || type.includes(search) || inputs.includes(search) || outputs.includes(search)
+        })
+      : parsedAbi
+
+    return {
+      functions: filtered.filter(item => item.type === 'function'),
+      events: filtered.filter(item => item.type === 'event'),
+      errors: filtered.filter(item => item.type === 'error'),
+      other: filtered.filter(item => !['function', 'event', 'error'].includes(item.type))
+    }
+  }
+
+  // Format ABI entry signature for display
+  const formatAbiSignature = (item) => {
+    const inputs = item.inputs?.map(i => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ') || ''
+    if (item.type === 'function') {
+      const outputs = item.outputs?.map(o => o.type).join(', ') || ''
+      return `${item.name}(${inputs})${outputs ? ` → ${outputs}` : ''}`
+    }
+    return `${item.name || item.type}(${inputs})`
+  }
+
+  // Copy ABI entry to clipboard and show feedback
+  const copyAbiEntry = async (item, itemKey) => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(item, null, 2))
+      setAbiCopiedItem(itemKey)
+      setTimeout(() => setAbiCopiedItem(null), 1500)
+    } catch (err) {
+      console.error('Failed to copy ABI:', err)
+    }
   }
 
   // Load history, cached addresses, and Tenderly settings on mount
@@ -876,6 +924,37 @@ export default function ContractCaller() {
       setError(err.message)
     } finally {
       setFetchingAbi(false)
+    }
+  }
+
+  // Save current ABI to local cache
+  const saveAbiToCache = () => {
+    if (!address || !abi) return
+
+    try {
+      const parsedAbiToSave = JSON.parse(abi)
+      // Get existing cached data to preserve proxy metadata
+      const existingCache = getCachedAbi(chain, address)
+      setCachedAbi(
+        chain,
+        address,
+        parsedAbiToSave,
+        existingCache?.isProxy || false,
+        existingCache?.implAddress || null,
+        existingCache?.contractName || contractName,
+        existingCache?.implContractName || null
+      )
+      // Update cached addresses list
+      setCachedAddresses(getCachedAddresses())
+      // Show feedback
+      setAbiSaved(true)
+      setTimeout(() => setAbiSaved(false), 2000)
+      // Update source to indicate it's now cached
+      if (!abiSource?.includes('cached')) {
+        setAbiSource('cached (manual)')
+      }
+    } catch (err) {
+      setError('Failed to save ABI: Invalid JSON format')
     }
   }
 
@@ -2039,6 +2118,17 @@ export default function ContractCaller() {
               >
                 {abiCollapsed ? '▶ Expand' : '▼ Collapse'}
               </button>
+              {address && abi && (
+                <button
+                  onClick={saveAbiToCache}
+                  className={`${styles.abiSaveBtn} ${abiSaved ? styles.saved : ''}`}
+                  type="button"
+                  title="Save ABI to local cache"
+                  disabled={loading}
+                >
+                  {abiSaved ? '✓ Saved' : 'Save'}
+                </button>
+              )}
               {abiSource && (
                 <span className={styles.abiSource}>
                   {abiSource}
@@ -2054,17 +2144,168 @@ export default function ContractCaller() {
               )}
             </div>
             {!abiCollapsed && (
-              <textarea
-                value={abi}
-                onChange={(e) => {
-                  setAbi(e.target.value)
-                  setAbiSource(null)
-                }}
-                placeholder="Paste contract ABI here or use Fetch ABI button..."
-                className={styles.textarea}
-                disabled={loading}
-                rows={6}
-              />
+              <div className={styles.abiContent}>
+                {/* View mode toggle and search */}
+                <div className={styles.abiToolbar}>
+                  <div className={styles.abiViewToggle}>
+                    <button
+                      type="button"
+                      className={`${styles.abiViewBtn} ${abiViewMode === 'list' ? styles.active : ''}`}
+                      onClick={() => setAbiViewMode('list')}
+                    >
+                      List
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.abiViewBtn} ${abiViewMode === 'raw' ? styles.active : ''}`}
+                      onClick={() => setAbiViewMode('raw')}
+                    >
+                      Raw
+                    </button>
+                  </div>
+                  {abiViewMode === 'list' && parsedAbi && (
+                    <input
+                      type="text"
+                      value={abiFilter}
+                      onChange={(e) => setAbiFilter(e.target.value)}
+                      placeholder="Search functions, events, types..."
+                      className={styles.abiSearchInput}
+                    />
+                  )}
+                </div>
+
+                {/* List view */}
+                {abiViewMode === 'list' && parsedAbi && (
+                  <div className={styles.abiListView}>
+                    {(() => {
+                      const entries = getFilteredAbiEntries()
+                      const totalCount = entries.functions.length + entries.events.length + entries.errors.length + entries.other.length
+                      if (totalCount === 0) {
+                        return <div className={styles.abiEmptyState}>{abiFilter ? 'No matching entries' : 'No ABI entries'}</div>
+                      }
+                      return (
+                        <>
+                          {entries.functions.length > 0 && (
+                            <div className={styles.abiCategory}>
+                              <div className={styles.abiCategoryHeader}>
+                                <span className={styles.abiCategoryLabel}>Functions</span>
+                                <span className={styles.abiCategoryCount}>{entries.functions.length}</span>
+                              </div>
+                              <div className={styles.abiCategoryItems}>
+                                {entries.functions.map((item, idx) => {
+                                  const itemKey = `func-${item.name}-${idx}`
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className={`${styles.abiItem} ${styles.abiClickable} ${isReadOnly(item) ? styles.abiRead : styles.abiWrite} ${abiCopiedItem === itemKey ? styles.abiCopied : ''}`}
+                                      onClick={() => copyAbiEntry(item, itemKey)}
+                                      title={`Click to copy ${item.name}`}
+                                    >
+                                      <span className={styles.abiItemBadge}>{isReadOnly(item) ? 'R' : 'W'}</span>
+                                      <span className={styles.abiItemSignature}>{formatAbiSignature(item)}</span>
+                                      {abiCopiedItem === itemKey && <span className={styles.abiCopiedBadge}>Copied!</span>}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          {entries.events.length > 0 && (
+                            <div className={styles.abiCategory}>
+                              <div className={styles.abiCategoryHeader}>
+                                <span className={styles.abiCategoryLabel}>Events</span>
+                                <span className={styles.abiCategoryCount}>{entries.events.length}</span>
+                              </div>
+                              <div className={styles.abiCategoryItems}>
+                                {entries.events.map((item, idx) => {
+                                  const itemKey = `event-${item.name}-${idx}`
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className={`${styles.abiItem} ${styles.abiEvent} ${styles.abiClickable} ${abiCopiedItem === itemKey ? styles.abiCopied : ''}`}
+                                      onClick={() => copyAbiEntry(item, itemKey)}
+                                      title={`Click to copy ${item.name}`}
+                                    >
+                                      <span className={styles.abiItemBadge}>E</span>
+                                      <span className={styles.abiItemSignature}>{formatAbiSignature(item)}</span>
+                                      {abiCopiedItem === itemKey && <span className={styles.abiCopiedBadge}>Copied!</span>}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          {entries.errors.length > 0 && (
+                            <div className={styles.abiCategory}>
+                              <div className={styles.abiCategoryHeader}>
+                                <span className={styles.abiCategoryLabel}>Errors</span>
+                                <span className={styles.abiCategoryCount}>{entries.errors.length}</span>
+                              </div>
+                              <div className={styles.abiCategoryItems}>
+                                {entries.errors.map((item, idx) => {
+                                  const itemKey = `error-${item.name}-${idx}`
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className={`${styles.abiItem} ${styles.abiError} ${styles.abiClickable} ${abiCopiedItem === itemKey ? styles.abiCopied : ''}`}
+                                      onClick={() => copyAbiEntry(item, itemKey)}
+                                      title={`Click to copy ${item.name}`}
+                                    >
+                                      <span className={styles.abiItemBadge}>!</span>
+                                      <span className={styles.abiItemSignature}>{formatAbiSignature(item)}</span>
+                                      {abiCopiedItem === itemKey && <span className={styles.abiCopiedBadge}>Copied!</span>}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          {entries.other.length > 0 && (
+                            <div className={styles.abiCategory}>
+                              <div className={styles.abiCategoryHeader}>
+                                <span className={styles.abiCategoryLabel}>Other</span>
+                                <span className={styles.abiCategoryCount}>{entries.other.length}</span>
+                              </div>
+                              <div className={styles.abiCategoryItems}>
+                                {entries.other.map((item, idx) => {
+                                  const itemKey = `other-${item.type}-${idx}`
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className={`${styles.abiItem} ${styles.abiOther} ${styles.abiClickable} ${abiCopiedItem === itemKey ? styles.abiCopied : ''}`}
+                                      onClick={() => copyAbiEntry(item, itemKey)}
+                                      title={`Click to copy ${item.type}`}
+                                    >
+                                      <span className={styles.abiItemBadge}>{item.type?.[0]?.toUpperCase() || '?'}</span>
+                                      <span className={styles.abiItemSignature}>{item.type}{item.name ? `: ${item.name}` : ''}</span>
+                                      {abiCopiedItem === itemKey && <span className={styles.abiCopiedBadge}>Copied!</span>}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </div>
+                )}
+
+                {/* Raw view */}
+                {(abiViewMode === 'raw' || !parsedAbi) && (
+                  <textarea
+                    value={abi}
+                    onChange={(e) => {
+                      setAbi(e.target.value)
+                      setAbiSource(null)
+                    }}
+                    placeholder="Paste contract ABI here or use Fetch ABI button..."
+                    className={styles.textarea}
+                    disabled={loading}
+                    rows={6}
+                  />
+                )}
+              </div>
             )}
           </div>
 
@@ -2104,14 +2345,19 @@ export default function ContractCaller() {
                         className={`${styles.selectedFunctionText} ${copiedItem === 'signature' ? styles.copiedText : ''}`}
                         onClick={async () => {
                           const func = getSelectedFunction()
-                          const sig = `${selectedFunction}(${func.inputs.map(i => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})`
+                          const outputs = func.outputs && func.outputs.length > 0 ? ` → ${func.outputs.map(o => o.type).join(', ')}` : ''
+                          const sig = `${selectedFunction}(${func.inputs.map(i => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})${outputs}`
                           await navigator.clipboard.writeText(sig)
                           setCopiedItem('signature')
                           setTimeout(() => setCopiedItem(null), 1500)
                         }}
                         title="Click to copy function signature"
                       >
-                        {copiedItem === 'signature' ? '✓ Copied!' : `${selectedFunction}(${getSelectedFunction().inputs.map(i => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})`}
+                        {copiedItem === 'signature' ? '✓ Copied!' : (() => {
+                          const func = getSelectedFunction()
+                          const outputs = func.outputs && func.outputs.length > 0 ? ` → ${func.outputs.map(o => o.type).join(', ')}` : ''
+                          return `${selectedFunction}(${func.inputs.map(i => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})${outputs}`
+                        })()}
                       </span>
                       <button
                         className={styles.clearFunctionBtn}
@@ -2177,6 +2423,11 @@ export default function ContractCaller() {
                           <span className={styles.funcParams}>
                             ({func.inputs.map((i) => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})
                           </span>
+                          {func.outputs && func.outputs.length > 0 && (
+                            <span className={styles.funcReturns}>
+                              → {func.outputs.map((o) => o.type).join(', ')}
+                            </span>
+                          )}
                         </div>
                       ))}
                       {getFilteredFunctions().length === 0 && (

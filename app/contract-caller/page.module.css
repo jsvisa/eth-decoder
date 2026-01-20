@@ -731,10 +731,16 @@
   white-space: nowrap;
 }
 
+.funcReturns {
+  color: #666;
+  font-size: 0.85rem;
+  margin-left: 0.25rem;
+  flex-shrink: 0;
+}
+
 .abiLabelRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.5rem;
 }
 
@@ -747,6 +753,7 @@
   background-color: #f0f0f0;
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
+  margin-left: auto;
 }
 
 .refreshButton {
@@ -2533,6 +2540,238 @@
 .abiCollapseBtn:hover {
   background-color: var(--bg-hover);
   color: var(--text-primary);
+}
+
+.abiSaveBtn {
+  background: none;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #22c55e;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.abiSaveBtn:hover:not(:disabled) {
+  background-color: rgba(34, 197, 94, 0.1);
+  border-color: #22c55e;
+}
+
+.abiSaveBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.abiSaveBtn.saved {
+  background-color: rgba(34, 197, 94, 0.15);
+  border-color: #22c55e;
+  color: #16a34a;
+}
+
+/* ABI Content Container */
+.abiContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.abiToolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.abiViewToggle {
+  display: flex;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.abiViewBtn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: #fff;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.15s ease;
+}
+
+.abiViewBtn:first-child {
+  border-right: 1px solid #e5e7eb;
+}
+
+.abiViewBtn:hover {
+  background: #f9fafb;
+}
+
+.abiViewBtn.active {
+  background: #4f46e5;
+  color: #fff;
+}
+
+.abiSearchInput {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.abiSearchInput:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.abiSearchInput::placeholder {
+  color: #9ca3af;
+}
+
+/* ABI List View */
+.abiListView {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.abiEmptyState {
+  padding: 2rem;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+.abiCategory {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.abiCategory:last-child {
+  border-bottom: none;
+}
+
+.abiCategoryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  background: #f3f4f6;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #374151;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.abiCategoryLabel {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.abiCategoryCount {
+  background: #e5e7eb;
+  color: #6b7280;
+  padding: 0.1rem 0.4rem;
+  border-radius: 10px;
+  font-size: 0.7rem;
+}
+
+.abiCategoryItems {
+  display: flex;
+  flex-direction: column;
+}
+
+.abiItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.1s ease;
+}
+
+.abiItem:last-child {
+  border-bottom: none;
+}
+
+
+.abiItemBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.abiRead .abiItemBadge {
+  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+}
+
+.abiWrite .abiItemBadge {
+  background: rgba(249, 115, 22, 0.15);
+  color: #ea580c;
+}
+
+.abiEvent .abiItemBadge {
+  background: rgba(139, 92, 246, 0.15);
+  color: #7c3aed;
+}
+
+.abiError .abiItemBadge {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}
+
+.abiOther .abiItemBadge {
+  background: rgba(107, 114, 128, 0.15);
+  color: #4b5563;
+}
+
+.abiItemSignature {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #374151;
+}
+
+.abiClickable {
+  cursor: pointer;
+}
+
+.abiClickable:hover {
+  background: #f3f4f6;
+}
+
+.abiCopied {
+  background: rgba(34, 197, 94, 0.1) !important;
+}
+
+.abiCopiedBadge {
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #16a34a;
+  background: rgba(34, 197, 94, 0.15);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-family: system-ui, -apple-system, sans-serif;
 }
 
 /* Simulation Options Section */
