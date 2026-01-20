@@ -14,7 +14,7 @@ const TENDERLY_NETWORK_IDS = {
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { chain, address, functionName, args, abi, fromAddress, tenderlyAccessKey, tenderlyAccount, tenderlyProject, value, valueUnit = 'ETH', blockNumber, stateOverrides } = body
+    const { chain, address, functionName, args, abi, fromAddress, tenderlyAccessKey, tenderlyAccount, tenderlyProject, value, valueUnit = 'ETH', blockNumber, stateOverrides, blockHeaderOverrides } = body
 
     if (!address || !functionName || !abi) {
       return NextResponse.json(
@@ -183,6 +183,16 @@ export async function POST(request) {
 
       if (Object.keys(stateObjects).length > 0) {
         simulationRequest.state_objects = stateObjects
+      }
+    }
+
+    // Add block header overrides (timestamp) if specified
+    if (blockHeaderOverrides && blockHeaderOverrides.timestamp) {
+      const timestamp = parseInt(blockHeaderOverrides.timestamp, 10)
+      if (!isNaN(timestamp)) {
+        simulationRequest.block_header = {
+          timestamp: '0x' + timestamp.toString(16)
+        }
       }
     }
 

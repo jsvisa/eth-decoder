@@ -527,6 +527,7 @@ export default function ContractCaller() {
   // Tenderly-specific state overrides
   const [balanceOverrides, setBalanceOverrides] = useState([]) // Array of {address, balance}
   const [storageOverrides, setStorageOverrides] = useState([]) // Array of {address, slot, value}
+  const [timestampOverride, setTimestampOverride] = useState('') // Unix timestamp override
   const [abiCollapsed, setAbiCollapsed] = useState(true) // Collapse ABI JSON textarea (default collapsed)
   const [simOptionsExpanded, setSimOptionsExpanded] = useState(false) // Expand simulation options
   const [fieldErrors, setFieldErrors] = useState({}) // Track validation errors for fields
@@ -1310,6 +1311,12 @@ export default function ContractCaller() {
             }
             if (storageOverrides.length > 0) {
               requestBody.stateOverrides.storage = storageOverrides.filter(o => o.address && o.slot && o.value)
+            }
+          }
+          // Add block header overrides for Tenderly simulation
+          if (timestampOverride) {
+            requestBody.blockHeaderOverrides = {
+              timestamp: timestampOverride
             }
           }
         }
@@ -2268,6 +2275,15 @@ export default function ContractCaller() {
                           >
                             + Storage
                           </button>
+                          <input
+                            type="text"
+                            value={timestampOverride}
+                            onChange={(e) => setTimestampOverride(e.target.value)}
+                            placeholder="Timestamp (unix)"
+                            className={styles.simOptionInputSmall}
+                            disabled={loading}
+                            title="Override block timestamp"
+                          />
                         </>
                       )}
                     </div>
