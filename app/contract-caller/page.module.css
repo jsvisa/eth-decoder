@@ -731,6 +731,13 @@
   white-space: nowrap;
 }
 
+.funcReturns {
+  color: #22c55e;
+  font-size: 0.8rem;
+  margin-left: 0.25rem;
+  flex-shrink: 0;
+}
+
 .abiLabelRow {
   display: flex;
   align-items: center;

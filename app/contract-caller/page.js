@@ -2418,6 +2418,11 @@ export default function ContractCaller() {
                           <span className={styles.funcParams}>
                             ({func.inputs.map((i) => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})
                           </span>
+                          {func.outputs && func.outputs.length > 0 && (
+                            <span className={styles.funcReturns}>
+                              → {func.outputs.map((o) => o.type).join(', ')}
+                            </span>
+                          )}
                         </div>
                       ))}
                       {getFilteredFunctions().length === 0 && (
