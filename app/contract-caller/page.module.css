@@ -2699,13 +2699,6 @@
   border-bottom: none;
 }
 
-.abiFunction {
-  cursor: pointer;
-}
-
-.abiFunction:hover {
-  background: #eef2ff;
-}
 
 .abiItemBadge {
   display: inline-flex;
@@ -2749,10 +2742,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #374151;
-}
-
-.abiFunction:hover .abiItemSignature {
-  color: #4f46e5;
 }
 
 .abiClickable {

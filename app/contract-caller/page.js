@@ -2197,13 +2197,9 @@ export default function ContractCaller() {
                                   return (
                                     <div
                                       key={idx}
-                                      className={`${styles.abiItem} ${styles.abiFunction} ${isReadOnly(item) ? styles.abiRead : styles.abiWrite} ${abiCopiedItem === itemKey ? styles.abiCopied : ''}`}
-                                      onClick={() => {
-                                        copyAbiEntry(item, itemKey)
-                                        setSelectedFunction(item.name)
-                                        setAbiCollapsed(true)
-                                      }}
-                                      title={`Click to select and copy ${item.name}`}
+                                      className={`${styles.abiItem} ${styles.abiClickable} ${isReadOnly(item) ? styles.abiRead : styles.abiWrite} ${abiCopiedItem === itemKey ? styles.abiCopied : ''}`}
+                                      onClick={() => copyAbiEntry(item, itemKey)}
+                                      title={`Click to copy ${item.name}`}
                                     >
                                       <span className={styles.abiItemBadge}>{isReadOnly(item) ? 'R' : 'W'}</span>
                                       <span className={styles.abiItemSignature}>{formatAbiSignature(item)}</span>
