@@ -732,8 +732,8 @@
 }
 
 .funcReturns {
-  color: #22c55e;
-  font-size: 0.8rem;
+  color: #666;
+  font-size: 0.85rem;
   margin-left: 0.25rem;
   flex-shrink: 0;
 }
