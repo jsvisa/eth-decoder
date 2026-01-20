@@ -14,7 +14,7 @@ const TENDERLY_NETWORK_IDS = {
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { chain, address, functionName, args, abi, fromAddress, tenderlyAccessKey, tenderlyAccount, tenderlyProject, value, valueUnit = 'ETH' } = body
+    const { chain, address, functionName, args, abi, fromAddress, tenderlyAccessKey, tenderlyAccount, tenderlyProject, value, valueUnit = 'ETH', blockNumber } = body
 
     if (!address || !functionName || !abi) {
       return NextResponse.json(
@@ -125,6 +125,11 @@ export async function POST(request) {
       save: false,
       save_if_fails: false,
       simulation_type: 'full', // Full mode includes decoded call traces
+    }
+
+    // Add block number if specified
+    if (blockNumber) {
+      simulationRequest.block_number = parseInt(blockNumber, 10)
     }
 
     // Call Tenderly Simulation API for decoded outputs, logs, state changes

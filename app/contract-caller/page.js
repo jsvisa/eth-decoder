@@ -1163,8 +1163,8 @@ export default function ContractCaller() {
       errors.fromAddress = true
     }
 
-    // Fork block validation for local simulation
-    if (isWrite && useLocalSimulation && !isValidForkBlock(forkBlockNumber)) {
+    // Fork block validation for simulation
+    if (isWrite && forkBlockNumber && !isValidForkBlock(forkBlockNumber)) {
       errors.forkBlockNumber = true
     }
 
@@ -1289,6 +1289,10 @@ export default function ContractCaller() {
           requestBody.tenderlyAccessKey = tenderlySettings.accessKey
           requestBody.tenderlyAccount = tenderlySettings.account
           requestBody.tenderlyProject = tenderlySettings.project
+          // Add block number for simulation
+          if (forkBlockNumber) {
+            requestBody.blockNumber = forkBlockNumber
+          }
           // Add ETH value for payable functions
           const ethValueInfo = getEthValueWithUnit()
           if (ethValueInfo.value) {
@@ -2176,21 +2180,19 @@ export default function ContractCaller() {
                       {simOptionsExpanded ? '▼' : '▶'}
                     </button>
                     <div className={styles.simOptionsInline}>
-                      {useLocalSimulation && (
-                        <input
-                          type="text"
-                          value={forkBlockNumber}
-                          onChange={(e) => {
-                            setForkBlockNumber(e.target.value)
-                            if (fieldErrors.forkBlockNumber) {
-                              setFieldErrors(prev => ({ ...prev, forkBlockNumber: false }))
-                            }
-                          }}
-                          placeholder="Fork Block (latest)"
-                          className={`${styles.simOptionInputSmall} ${fieldErrors.forkBlockNumber ? styles.inputError : ''}`}
-                          disabled={loading}
-                        />
-                      )}
+                      <input
+                        type="text"
+                        value={forkBlockNumber}
+                        onChange={(e) => {
+                          setForkBlockNumber(e.target.value)
+                          if (fieldErrors.forkBlockNumber) {
+                            setFieldErrors(prev => ({ ...prev, forkBlockNumber: false }))
+                          }
+                        }}
+                        placeholder="Block # (latest)"
+                        className={`${styles.simOptionInputSmall} ${fieldErrors.forkBlockNumber ? styles.inputError : ''}`}
+                        disabled={loading}
+                      />
                       <div className={styles.simOptionFromAddress}>
                         <AddressArgInput
                           value={fromAddress}
