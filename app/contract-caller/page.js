@@ -473,6 +473,7 @@ export default function ContractCaller() {
   const [showHistory, setShowHistory] = useState(true)
   const [abiSource, setAbiSource] = useState(null) // 'cached', 'fetched', or null
   const [contractName, setContractName] = useState(null)
+  const [abiSaved, setAbiSaved] = useState(false) // Feedback for ABI save action
   const [showFullResponse, setShowFullResponse] = useState(false)
   const [cachedAddresses, setCachedAddresses] = useState([])
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false)
@@ -876,6 +877,37 @@ export default function ContractCaller() {
       setError(err.message)
     } finally {
       setFetchingAbi(false)
+    }
+  }
+
+  // Save current ABI to local cache
+  const saveAbiToCache = () => {
+    if (!address || !abi) return
+
+    try {
+      const parsedAbiToSave = JSON.parse(abi)
+      // Get existing cached data to preserve proxy metadata
+      const existingCache = getCachedAbi(chain, address)
+      setCachedAbi(
+        chain,
+        address,
+        parsedAbiToSave,
+        existingCache?.isProxy || false,
+        existingCache?.implAddress || null,
+        existingCache?.contractName || contractName,
+        existingCache?.implContractName || null
+      )
+      // Update cached addresses list
+      setCachedAddresses(getCachedAddresses())
+      // Show feedback
+      setAbiSaved(true)
+      setTimeout(() => setAbiSaved(false), 2000)
+      // Update source to indicate it's now cached
+      if (!abiSource?.includes('cached')) {
+        setAbiSource('cached (manual)')
+      }
+    } catch (err) {
+      setError('Failed to save ABI: Invalid JSON format')
     }
   }
 
@@ -2039,6 +2071,17 @@ export default function ContractCaller() {
               >
                 {abiCollapsed ? '▶ Expand' : '▼ Collapse'}
               </button>
+              {address && abi && (
+                <button
+                  onClick={saveAbiToCache}
+                  className={`${styles.abiSaveBtn} ${abiSaved ? styles.saved : ''}`}
+                  type="button"
+                  title="Save ABI to local cache"
+                  disabled={loading}
+                >
+                  {abiSaved ? '✓ Saved' : 'Save'}
+                </button>
+              )}
               {abiSource && (
                 <span className={styles.abiSource}>
                   {abiSource}
