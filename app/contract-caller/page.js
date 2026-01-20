@@ -524,6 +524,10 @@ export default function ContractCaller() {
     prank: { enabled: false, address: '' },
     warp: { enabled: false, timestamp: '' },
   })
+  // Tenderly-specific state overrides
+  const [balanceOverrides, setBalanceOverrides] = useState([]) // Array of {address, balance}
+  const [storageOverrides, setStorageOverrides] = useState([]) // Array of {address, slot, value}
+  const [timestampOverride, setTimestampOverride] = useState('') // Unix timestamp override
   const [abiCollapsed, setAbiCollapsed] = useState(true) // Collapse ABI JSON textarea (default collapsed)
   const [simOptionsExpanded, setSimOptionsExpanded] = useState(false) // Expand simulation options
   const [fieldErrors, setFieldErrors] = useState({}) // Track validation errors for fields
@@ -1163,8 +1167,8 @@ export default function ContractCaller() {
       errors.fromAddress = true
     }
 
-    // Fork block validation for local simulation
-    if (isWrite && useLocalSimulation && !isValidForkBlock(forkBlockNumber)) {
+    // Fork block validation for simulation
+    if (isWrite && forkBlockNumber && !isValidForkBlock(forkBlockNumber)) {
       errors.forkBlockNumber = true
     }
 
@@ -1289,11 +1293,31 @@ export default function ContractCaller() {
           requestBody.tenderlyAccessKey = tenderlySettings.accessKey
           requestBody.tenderlyAccount = tenderlySettings.account
           requestBody.tenderlyProject = tenderlySettings.project
+          // Add block number for simulation
+          if (forkBlockNumber) {
+            requestBody.blockNumber = forkBlockNumber
+          }
           // Add ETH value for payable functions
           const ethValueInfo = getEthValueWithUnit()
           if (ethValueInfo.value) {
             requestBody.value = ethValueInfo.value
             requestBody.valueUnit = ethValueInfo.unit
+          }
+          // Add state overrides for Tenderly simulation
+          if (balanceOverrides.length > 0 || storageOverrides.length > 0) {
+            requestBody.stateOverrides = {}
+            if (balanceOverrides.length > 0) {
+              requestBody.stateOverrides.balances = balanceOverrides.filter(o => o.address && o.balance)
+            }
+            if (storageOverrides.length > 0) {
+              requestBody.stateOverrides.storage = storageOverrides.filter(o => o.address && o.slot && o.value)
+            }
+          }
+          // Add block header overrides for Tenderly simulation
+          if (timestampOverride) {
+            requestBody.blockHeaderOverrides = {
+              timestamp: timestampOverride
+            }
           }
         }
 
@@ -2176,22 +2200,20 @@ export default function ContractCaller() {
                       {simOptionsExpanded ? '▼' : '▶'}
                     </button>
                     <div className={styles.simOptionsInline}>
-                      {useLocalSimulation && (
-                        <input
-                          type="text"
-                          value={forkBlockNumber}
-                          onChange={(e) => {
-                            setForkBlockNumber(e.target.value)
-                            if (fieldErrors.forkBlockNumber) {
-                              setFieldErrors(prev => ({ ...prev, forkBlockNumber: false }))
-                            }
-                          }}
-                          placeholder="Fork Block (latest)"
-                          className={`${styles.simOptionInputSmall} ${fieldErrors.forkBlockNumber ? styles.inputError : ''}`}
-                          disabled={loading}
-                        />
-                      )}
-                      <div className={styles.simOptionFromAddress}>
+                      <input
+                        type="text"
+                        value={forkBlockNumber}
+                        onChange={(e) => {
+                          setForkBlockNumber(e.target.value)
+                          if (fieldErrors.forkBlockNumber) {
+                            setFieldErrors(prev => ({ ...prev, forkBlockNumber: false }))
+                          }
+                        }}
+                        placeholder="Block # (latest)"
+                        className={`${styles.simOptionInputSmall} ${fieldErrors.forkBlockNumber ? styles.inputError : ''}`}
+                        disabled={loading}
+                      />
+                      <div className={styles.simOptionFromAddress} title="Sender address to impersonate (prank) - simulates msg.sender">
                         <AddressArgInput
                           value={fromAddress}
                           onChange={(value) => {
@@ -2202,7 +2224,7 @@ export default function ContractCaller() {
                           }}
                           addressBook={addressBook}
                           disabled={loading}
-                          placeholder="From Address"
+                          placeholder="From (prank)"
                           onBookmarkClick={handleOpenBookmarkModal}
                           error={fieldErrors.fromAddress}
                         />
@@ -2234,6 +2256,35 @@ export default function ContractCaller() {
                             <span>warp</span>
                           </label>
                         </div>
+                      )}
+                      {!useLocalSimulation && (
+                        <>
+                          <button
+                            type="button"
+                            className={styles.addOverrideBtn}
+                            onClick={() => setBalanceOverrides(prev => [...prev, { address: '', balance: '' }])}
+                            title="Add balance override"
+                          >
+                            + Balance
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.addOverrideBtn}
+                            onClick={() => setStorageOverrides(prev => [...prev, { address: '', slot: '', value: '' }])}
+                            title="Add storage override"
+                          >
+                            + Storage
+                          </button>
+                          <input
+                            type="text"
+                            value={timestampOverride}
+                            onChange={(e) => setTimestampOverride(e.target.value)}
+                            placeholder="Timestamp (unix)"
+                            className={styles.simOptionInputSmall}
+                            disabled={loading}
+                            title="Override block timestamp"
+                          />
+                        </>
                       )}
                     </div>
                   </div>
@@ -2302,6 +2353,103 @@ export default function ContractCaller() {
                           />
                         </div>
                       )}
+                    </div>
+                  )}
+                  {/* Balance overrides for Tenderly simulation */}
+                  {!useLocalSimulation && balanceOverrides.length > 0 && (
+                    <div className={styles.simOptionsExpanded}>
+                      <div className={styles.overridesLabel}>Balance Overrides:</div>
+                      {balanceOverrides.map((override, index) => (
+                        <div key={index} className={styles.cheatcodeExpandedRow}>
+                          <input
+                            type="text"
+                            value={override.address}
+                            onChange={(e) => {
+                              const newOverrides = [...balanceOverrides]
+                              newOverrides[index].address = e.target.value
+                              setBalanceOverrides(newOverrides)
+                            }}
+                            placeholder="Address (0x...)"
+                            className={styles.simOptionInput}
+                          />
+                          <input
+                            type="text"
+                            value={override.balance}
+                            onChange={(e) => {
+                              const newOverrides = [...balanceOverrides]
+                              newOverrides[index].balance = e.target.value
+                              setBalanceOverrides(newOverrides)
+                            }}
+                            placeholder="ETH Balance"
+                            className={styles.simOptionInputSmall}
+                          />
+                          <button
+                            type="button"
+                            className={styles.removeOverrideBtn}
+                            onClick={() => {
+                              const newOverrides = balanceOverrides.filter((_, i) => i !== index)
+                              setBalanceOverrides(newOverrides)
+                            }}
+                            title="Remove override"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Storage overrides for Tenderly simulation */}
+                  {!useLocalSimulation && storageOverrides.length > 0 && (
+                    <div className={styles.simOptionsExpanded}>
+                      <div className={styles.overridesLabel}>Storage Overrides:</div>
+                      {storageOverrides.map((override, index) => (
+                        <div key={index} className={styles.cheatcodeExpandedRow}>
+                          <input
+                            type="text"
+                            value={override.address}
+                            onChange={(e) => {
+                              const newOverrides = [...storageOverrides]
+                              newOverrides[index].address = e.target.value
+                              setStorageOverrides(newOverrides)
+                            }}
+                            placeholder="Contract (0x...)"
+                            className={styles.simOptionInput}
+                          />
+                          <input
+                            type="text"
+                            value={override.slot}
+                            onChange={(e) => {
+                              const newOverrides = [...storageOverrides]
+                              newOverrides[index].slot = e.target.value
+                              setStorageOverrides(newOverrides)
+                            }}
+                            placeholder="Slot (0x...)"
+                            className={styles.simOptionInputSmall}
+                          />
+                          <input
+                            type="text"
+                            value={override.value}
+                            onChange={(e) => {
+                              const newOverrides = [...storageOverrides]
+                              newOverrides[index].value = e.target.value
+                              setStorageOverrides(newOverrides)
+                            }}
+                            placeholder="Value (0x...)"
+                            className={styles.simOptionInputSmall}
+                          />
+                          <button
+                            type="button"
+                            className={styles.removeOverrideBtn}
+                            onClick={() => {
+                              const newOverrides = storageOverrides.filter((_, i) => i !== index)
+                              setStorageOverrides(newOverrides)
+                            }}
+                            title="Remove override"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>

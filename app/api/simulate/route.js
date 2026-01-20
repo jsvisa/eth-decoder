@@ -14,7 +14,7 @@ const TENDERLY_NETWORK_IDS = {
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { chain, address, functionName, args, abi, fromAddress, tenderlyAccessKey, tenderlyAccount, tenderlyProject, value, valueUnit = 'ETH' } = body
+    const { chain, address, functionName, args, abi, fromAddress, tenderlyAccessKey, tenderlyAccount, tenderlyProject, value, valueUnit = 'ETH', blockNumber, stateOverrides, blockHeaderOverrides } = body
 
     if (!address || !functionName || !abi) {
       return NextResponse.json(
@@ -125,6 +125,75 @@ export async function POST(request) {
       save: false,
       save_if_fails: false,
       simulation_type: 'full', // Full mode includes decoded call traces
+    }
+
+    // Add block number if specified
+    if (blockNumber) {
+      simulationRequest.block_number = parseInt(blockNumber, 10)
+    }
+
+    // Add state overrides (balance and storage overrides) if specified
+    if (stateOverrides) {
+      const stateObjects = {}
+
+      // Process balance overrides
+      if (stateOverrides.balances && stateOverrides.balances.length > 0) {
+        for (const override of stateOverrides.balances) {
+          if (override.address && override.balance) {
+            const addr = override.address.toLowerCase()
+            if (!stateObjects[addr]) {
+              stateObjects[addr] = {}
+            }
+            // Convert balance to hex (Tenderly expects hex string)
+            try {
+              const { parseEther } = await import('viem')
+              const balanceWei = parseEther(override.balance)
+              stateObjects[addr].balance = '0x' + balanceWei.toString(16)
+            } catch (e) {
+              // If parsing fails, try to use it as raw wei value
+              try {
+                const balanceWei = BigInt(override.balance)
+                stateObjects[addr].balance = '0x' + balanceWei.toString(16)
+              } catch {
+                console.warn('Failed to parse balance override:', e.message)
+              }
+            }
+          }
+        }
+      }
+
+      // Process storage overrides
+      if (stateOverrides.storage && stateOverrides.storage.length > 0) {
+        for (const override of stateOverrides.storage) {
+          if (override.address && override.slot && override.value) {
+            const addr = override.address.toLowerCase()
+            if (!stateObjects[addr]) {
+              stateObjects[addr] = {}
+            }
+            if (!stateObjects[addr].storage) {
+              stateObjects[addr].storage = {}
+            }
+            // Ensure slot and value are properly formatted as hex
+            const slot = override.slot.startsWith('0x') ? override.slot : '0x' + override.slot
+            const value = override.value.startsWith('0x') ? override.value : '0x' + override.value
+            stateObjects[addr].storage[slot] = value
+          }
+        }
+      }
+
+      if (Object.keys(stateObjects).length > 0) {
+        simulationRequest.state_objects = stateObjects
+      }
+    }
+
+    // Add block header overrides (timestamp) if specified
+    if (blockHeaderOverrides && blockHeaderOverrides.timestamp) {
+      const timestamp = parseInt(blockHeaderOverrides.timestamp, 10)
+      if (!isNaN(timestamp)) {
+        simulationRequest.block_header = {
+          timestamp: '0x' + timestamp.toString(16)
+        }
+      }
     }
 
     // Call Tenderly Simulation API for decoded outputs, logs, state changes
