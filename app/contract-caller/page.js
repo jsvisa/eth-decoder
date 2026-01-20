@@ -2213,7 +2213,7 @@ export default function ContractCaller() {
                         className={`${styles.simOptionInputSmall} ${fieldErrors.forkBlockNumber ? styles.inputError : ''}`}
                         disabled={loading}
                       />
-                      <div className={styles.simOptionFromAddress}>
+                      <div className={styles.simOptionFromAddress} title="Sender address to impersonate (prank) - simulates msg.sender">
                         <AddressArgInput
                           value={fromAddress}
                           onChange={(value) => {
@@ -2224,7 +2224,7 @@ export default function ContractCaller() {
                           }}
                           addressBook={addressBook}
                           disabled={loading}
-                          placeholder="From Address"
+                          placeholder="From (prank)"
                           onBookmarkClick={handleOpenBookmarkModal}
                           error={fieldErrors.fromAddress}
                         />
