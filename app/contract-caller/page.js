@@ -2345,14 +2345,19 @@ export default function ContractCaller() {
                         className={`${styles.selectedFunctionText} ${copiedItem === 'signature' ? styles.copiedText : ''}`}
                         onClick={async () => {
                           const func = getSelectedFunction()
-                          const sig = `${selectedFunction}(${func.inputs.map(i => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})`
+                          const outputs = func.outputs && func.outputs.length > 0 ? ` → ${func.outputs.map(o => o.type).join(', ')}` : ''
+                          const sig = `${selectedFunction}(${func.inputs.map(i => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})${outputs}`
                           await navigator.clipboard.writeText(sig)
                           setCopiedItem('signature')
                           setTimeout(() => setCopiedItem(null), 1500)
                         }}
                         title="Click to copy function signature"
                       >
-                        {copiedItem === 'signature' ? '✓ Copied!' : `${selectedFunction}(${getSelectedFunction().inputs.map(i => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})`}
+                        {copiedItem === 'signature' ? '✓ Copied!' : (() => {
+                          const func = getSelectedFunction()
+                          const outputs = func.outputs && func.outputs.length > 0 ? ` → ${func.outputs.map(o => o.type).join(', ')}` : ''
+                          return `${selectedFunction}(${func.inputs.map(i => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})${outputs}`
+                        })()}
                       </span>
                       <button
                         className={styles.clearFunctionBtn}
