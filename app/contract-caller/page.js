@@ -2760,25 +2760,25 @@ export default function ContractCaller() {
                 </div>
               )}
 
-              {/* Block number for read-only functions */}
-              {selectedFunction && getSelectedFunction() && isReadOnly(getSelectedFunction()) && (
-                <div className={styles.readBlockSection}>
-                  <label className={styles.readBlockLabel}>Block Number</label>
-                  <input
-                    type="text"
-                    value={readBlockNumber}
-                    onChange={(e) => setReadBlockNumber(e.target.value.replace(/[^0-9]/g, ''))}
-                    placeholder="latest"
-                    className={styles.readBlockInput}
-                    disabled={loading}
-                  />
-                  <span className={styles.readBlockHint}>Leave empty for latest block</span>
-                </div>
-              )}
-
               {selectedFunction && getSelectedFunctionInputs().length > 0 && (
                 <div className={styles.argsSection}>
-                  <label className={styles.label}>Arguments</label>
+                  <div className={styles.argsSectionHeader}>
+                    <label className={styles.label}>Arguments</label>
+                    {/* Block number for read-only functions */}
+                    {isReadOnly(getSelectedFunction()) && (
+                      <div className={styles.readBlockInline}>
+                        <label className={styles.readBlockLabel}>Block</label>
+                        <input
+                          type="text"
+                          value={readBlockNumber}
+                          onChange={(e) => setReadBlockNumber(e.target.value.replace(/[^0-9]/g, ''))}
+                          placeholder="latest"
+                          className={styles.readBlockInput}
+                          disabled={loading}
+                        />
+                      </div>
+                    )}
+                  </div>
                   {getSelectedFunctionInputs().map((input, index) => (
                     <div key={index} className={styles.argField}>
                       <label className={styles.argLabel}>
@@ -2802,6 +2802,21 @@ export default function ContractCaller() {
                       />
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Block number for read-only functions with no arguments */}
+              {selectedFunction && getSelectedFunction() && isReadOnly(getSelectedFunction()) && getSelectedFunctionInputs().length === 0 && (
+                <div className={styles.readBlockStandalone}>
+                  <label className={styles.readBlockLabel}>Block</label>
+                  <input
+                    type="text"
+                    value={readBlockNumber}
+                    onChange={(e) => setReadBlockNumber(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="latest"
+                    className={styles.readBlockInput}
+                    disabled={loading}
+                  />
                 </div>
               )}
             </>
