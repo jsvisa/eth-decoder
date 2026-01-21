@@ -3123,7 +3123,7 @@ export default function ContractCaller() {
               </div>
             )}
 
-            {/* Decoded outputs and Raw data - always show for Call, show on "Show Full" for Simulate */}
+            {/* Decoded outputs - always show for Call, show on "Show Full" for Simulate */}
             {(!result.simulated || showFullResponse) && (
               <>
                 {/* Decoded outputs */}
@@ -3145,7 +3145,12 @@ export default function ContractCaller() {
                     ))}
                   </div>
                 )}
+              </>
+            )}
 
+            {/* Raw data and Full JSON/YAML output - only shown when Show Full is clicked */}
+            {showFullResponse && (
+              <>
                 {/* Raw data */}
                 {result.rawData && (
                   <div className={styles.rawSection}>
