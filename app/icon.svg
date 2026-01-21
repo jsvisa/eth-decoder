@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Background -->
+  <rect width="32" height="32" rx="6" fill="#1a1a2e"/>
+
+  <!-- Ethereum-style diamond -->
+  <path d="M16 4L8 16L16 21L24 16L16 4Z" fill="#627EEA"/>
+  <path d="M16 4L8 16L16 13V4Z" fill="#8C9FEF"/>
+  <path d="M16 21L8 16L16 13V21Z" fill="#454A75"/>
+
+  <!-- Decoder brackets -->
+  <path d="M6 24L9 21L6 18" stroke="#00D4AA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M26 24L23 21L26 18" stroke="#00D4AA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Code line -->
+  <line x1="12" y1="27" x2="20" y2="27" stroke="#00D4AA" stroke-width="2" stroke-linecap="round"/>
+</svg>
