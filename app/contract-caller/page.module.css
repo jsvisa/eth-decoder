@@ -643,6 +643,20 @@
   color: #666;
 }
 
+.changeFunctionBtnLeft {
+  background: none;
+  border: none;
+  font-size: 0.8rem;
+  color: #999;
+  cursor: pointer;
+  padding: 0 5px;
+  flex-shrink: 0;
+}
+
+.changeFunctionBtnLeft:hover {
+  color: #666;
+}
+
 .functionListSearch {
   padding: 0.5rem;
   border-bottom: 1px solid #e0e0e0;

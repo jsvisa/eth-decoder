@@ -2348,6 +2348,13 @@ export default function ContractCaller() {
                 <div className={styles.functionSelectWrapper}>
                   {selectedFunction && getSelectedFunction() ? (
                     <div className={styles.selectedFunctionDisplay}>
+                      <button
+                        className={styles.changeFunctionBtnLeft}
+                        onClick={() => setShowFunctionList(!showFunctionList)}
+                        title="Change function"
+                      >
+                        ▼
+                      </button>
                       <span
                         className={`${styles.selectedFunctionText} ${copiedItem === 'signature' ? styles.copiedText : ''}`}
                         onClick={async () => {
