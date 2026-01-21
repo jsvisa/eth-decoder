@@ -2026,6 +2026,13 @@ export default function ContractCaller() {
             <div className={styles.field} style={{ flex: 2 }}>
               <div className={styles.addressLabelRow}>
                 <label className={styles.label}>Contract Address</label>
+                {(() => {
+                  const bookmark = addressBook.find(item => item.address.toLowerCase() === address.toLowerCase())
+                  if (bookmark?.label) {
+                    return <span className={styles.bookmarkName}>{bookmark.label}</span>
+                  }
+                  return null
+                })()}
                 {contractName && (
                   <span className={styles.contractName}>{contractName}</span>
                 )}

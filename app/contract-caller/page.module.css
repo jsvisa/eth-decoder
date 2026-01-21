@@ -349,6 +349,15 @@
   gap: 0.5rem;
 }
 
+.bookmarkName {
+  font-size: 0.85rem;
+  color: #f59e0b;
+  font-weight: 600;
+  background-color: #fef3c7;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+}
+
 .contractName {
   font-size: 0.85rem;
   color: #0070f3;
