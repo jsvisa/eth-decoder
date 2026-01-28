@@ -2127,11 +2127,13 @@ export default function ContractCaller() {
                         onChange={(e) => setSelectedRpcChain(e.target.value)}
                         className={styles.select}
                       >
-                        {allChains.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name} {rpcSettings[c.id] ? '✓' : ''}
-                          </option>
-                        ))}
+                        {[...allChains]
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name} {rpcSettings[c.id] ? '✓' : ''}
+                            </option>
+                          ))}
                       </select>
                     </div>
                   </div>
@@ -2197,7 +2199,7 @@ export default function ContractCaller() {
 
         <div className={styles.form}>
           <div className={styles.row}>
-            <div className={styles.field}>
+            <div className={styles.field} style={{ minWidth: '200px' }}>
               <label className={styles.label}>Network</label>
               <div className={styles.chainSelectRow}>
                 <div className={styles.chainSelectWithIcon}>
@@ -2215,19 +2217,13 @@ export default function ContractCaller() {
                     className={styles.select}
                     disabled={loading}
                   >
-                    {CHAINS.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                    {customChains.length > 0 && (
-                      <option disabled>──────────</option>
-                    )}
-                    {customChains.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
+                    {[...CHAINS, ...customChains]
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
                   </select>
                 </div>
                 <button
