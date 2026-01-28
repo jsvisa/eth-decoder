@@ -543,6 +543,7 @@ export default function ContractCaller() {
   const [chainlistLoading, setChainlistLoading] = useState(false) // Loading chainlist data
   const [chainlistSearch, setChainlistSearch] = useState('') // Search filter for chainlist
   const [chainlistError, setChainlistError] = useState(null) // Error loading chainlist
+  const [addedChainsCollapsed, setAddedChainsCollapsed] = useState(true) // Collapse added chains by default
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null) // { functionName, args, timestamp }
   const bookmarkInputRef = useRef(null)
@@ -3591,28 +3592,39 @@ export default function ContractCaller() {
                 />
               </div>
 
-              {/* Added chains section */}
+              {/* Added chains section - collapsible */}
               {customChains.length > 0 && (
                 <div className={styles.addedChainsSection}>
-                  <label className={styles.modalLabel}>Added Networks</label>
-                  <div className={styles.addedChainsList}>
-                    {customChains.map((c) => (
-                      <div key={c.id} className={styles.addedChainItem}>
-                        {c.icon && (
-                          <img src={c.icon} alt="" className={styles.chainIconTiny} />
-                        )}
-                        <span className={styles.addedChainName}>{c.name}</span>
-                        <span className={styles.addedChainId}>#{c.chainId}</span>
-                        <button
-                          onClick={() => removeCustomChain(c.id)}
-                          className={styles.removeChainButton}
-                          title="Remove"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                  <button
+                    className={styles.addedChainsHeader}
+                    onClick={() => setAddedChainsCollapsed(!addedChainsCollapsed)}
+                  >
+                    <span className={styles.collapseIcon}>{addedChainsCollapsed ? '▶' : '▼'}</span>
+                    <span className={styles.modalLabel}>Added Networks ({customChains.length})</span>
+                  </button>
+                  {!addedChainsCollapsed && (
+                    <div className={styles.addedChainsList}>
+                      {customChains.map((c) => (
+                        <div key={c.id} className={styles.addedChainItem}>
+                          {c.icon && (
+                            <img src={c.icon} alt="" className={styles.chainIconTiny} />
+                          )}
+                          <span className={styles.addedChainName}>{c.name}</span>
+                          <span className={styles.addedChainId}>#{c.chainId}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              removeCustomChain(c.id)
+                            }}
+                            className={styles.removeChainButton}
+                            title="Remove"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

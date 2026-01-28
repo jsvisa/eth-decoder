@@ -3248,6 +3248,32 @@
   border-bottom: 1px solid var(--border-primary);
 }
 
+.addedChainsHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.addedChainsHeader:hover {
+  opacity: 0.8;
+}
+
+.addedChainsHeader .modalLabel {
+  margin: 0;
+}
+
+.collapseIcon {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  width: 1rem;
+}
+
 .addedChainsList {
   display: flex;
   flex-direction: column;
