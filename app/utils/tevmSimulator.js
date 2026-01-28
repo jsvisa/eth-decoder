@@ -2,8 +2,8 @@ import { createMemoryClient, http } from 'tevm'
 import { encodeFunctionData, decodeFunctionResult, parseEther, decodeEventLog } from 'viem'
 import { isValidEthAddress } from './validation'
 
-// Chain configurations for forking
-const CHAIN_CONFIGS = {
+// Chain configurations for forking (built-in chains)
+const BUILT_IN_CHAIN_CONFIGS = {
   ethereum: { chainId: 1, name: 'Ethereum' },
   arbitrum: { chainId: 42161, name: 'Arbitrum' },
   base: { chainId: 8453, name: 'Base' },
@@ -119,12 +119,20 @@ const serializeValue = (value) => {
  * @param {string} chain - Chain identifier
  * @param {string} rpcUrl - Optional custom RPC URL
  * @param {string|number} blockNumber - Block number or tag ('latest')
+ * @param {number} customChainId - Optional custom chain ID for non-built-in chains
  * @returns {Promise<{client: any, blockNumber: string}>}
  */
-export async function createTevmClient(chain, rpcUrl, blockNumber = 'latest') {
-  const chainConfig = CHAIN_CONFIGS[chain]
+export async function createTevmClient(chain, rpcUrl, blockNumber = 'latest', customChainId = null) {
+  // Get chain config from built-in or use custom chain ID
+  let chainConfig = BUILT_IN_CHAIN_CONFIGS[chain]
+
+  // Handle custom chains
+  if (!chainConfig && customChainId) {
+    chainConfig = { chainId: customChainId, name: chain }
+  }
+
   if (!chainConfig) {
-    throw new Error(`Unsupported chain: ${chain}`)
+    throw new Error(`Unsupported chain: ${chain}. Please provide a custom chain ID.`)
   }
 
   const forkUrl = rpcUrl || DEFAULT_RPCS[chain]
@@ -202,6 +210,7 @@ export async function simulateWithTevm({
   rpcUrl,
   blockNumber = 'latest',
   cheatcodes = {},
+  customChainId = null,
 }) {
   try {
     // Validate inputs
@@ -230,7 +239,7 @@ export async function simulateWithTevm({
     })
 
     // Create Tevm client with the specified block
-    const { client, blockNumber: actualBlock } = await createTevmClient(chain, rpcUrl, blockNumber)
+    const { client, blockNumber: actualBlock } = await createTevmClient(chain, rpcUrl, blockNumber, customChainId)
 
     // Apply cheatcodes
     const { prankAddress } = await applyCheatcodes(client, cheatcodes)
@@ -435,9 +444,9 @@ export async function simulateWithTevm({
 /**
  * Helper to check if Tevm is available and working
  */
-export async function checkTevmAvailability(chain, rpcUrl) {
+export async function checkTevmAvailability(chain, rpcUrl, customChainId = null) {
   try {
-    const { client } = await createTevmClient(chain, rpcUrl, 'latest')
+    const { client } = await createTevmClient(chain, rpcUrl, 'latest', customChainId)
     const blockNumber = await client.getBlockNumber()
     return {
       available: true,
