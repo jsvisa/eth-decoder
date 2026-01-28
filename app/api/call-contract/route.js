@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createPublicClient, http, decodeFunctionResult, encodeFunctionData } from 'viem'
+import { createPublicClient, http, decodeFunctionResult, encodeFunctionData, defineChain } from 'viem'
 import { mainnet, arbitrum, base, polygon, bsc } from 'viem/chains'
 import { isValidEthAddress } from '../../utils/validation'
 
@@ -22,7 +22,7 @@ const RPC_URLS = {
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { chain, address, functionName, args, abi, fromAddress, simulate, rpcUrl: customRpcUrl, blockNumber } = body
+    const { chain, address, functionName, args, abi, fromAddress, simulate, rpcUrl: customRpcUrl, blockNumber, chainId: customChainId } = body
 
     if (!address || !functionName || !abi) {
       return NextResponse.json(
@@ -47,13 +47,27 @@ export async function POST(request) {
       )
     }
 
-    const chainConfig = CHAINS[chain]
-    // Use custom RPC if provided, otherwise use default
-    const rpcUrl = customRpcUrl || RPC_URLS[chain]
+    // Get chain config - either from built-in chains or create a custom one
+    let chainConfig = CHAINS[chain]
+    let rpcUrl = customRpcUrl || RPC_URLS[chain]
+
+    // Handle custom chains (chain IDs starting with "chain-")
+    if (!chainConfig && customChainId && customRpcUrl) {
+      // Create a custom chain config for non-built-in chains
+      chainConfig = defineChain({
+        id: customChainId,
+        name: chain,
+        nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+        rpcUrls: {
+          default: { http: [customRpcUrl] },
+        },
+      })
+      rpcUrl = customRpcUrl
+    }
 
     if (!chainConfig || !rpcUrl) {
       return NextResponse.json(
-        { error: `Unsupported chain: ${chain}` },
+        { error: `Unsupported chain: ${chain}. Please configure an RPC URL for this chain.` },
         { status: 400 }
       )
     }

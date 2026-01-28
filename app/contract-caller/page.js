@@ -28,10 +28,11 @@ const TENDERLY_SETTINGS_KEY = 'tenderly_settings'
 const API_KEYS_STORAGE_KEY = 'api_keys_settings'
 const RPC_SETTINGS_KEY = 'rpc_settings'
 const SIMULATION_SETTINGS_KEY = 'simulation_settings'
+const CUSTOM_CHAINS_KEY = 'custom_chains'
 const MAX_HISTORY_ITEMS = 50
 
-// Expected chain IDs for validation
-const CHAIN_IDS = {
+// Expected chain IDs for validation (built-in chains)
+const BUILT_IN_CHAIN_IDS = {
   ethereum: 1,
   arbitrum: 42161,
   base: 8453,
@@ -535,9 +536,18 @@ export default function ContractCaller() {
   const [abiCopiedItem, setAbiCopiedItem] = useState(null) // Track which ABI item was just copied
   const [simOptionsExpanded, setSimOptionsExpanded] = useState(false) // Expand simulation options
   const [fieldErrors, setFieldErrors] = useState({}) // Track validation errors for fields
+  // Custom chains state
+  const [customChains, setCustomChains] = useState([]) // User-added chains from chainlist.org
+  const [showAddChainModal, setShowAddChainModal] = useState(false) // Modal for adding custom chains
+  const [chainlistData, setChainlistData] = useState([]) // Data from chainlist.org
+  const [chainlistLoading, setChainlistLoading] = useState(false) // Loading chainlist data
+  const [chainlistSearch, setChainlistSearch] = useState('') // Search filter for chainlist
+  const [chainlistError, setChainlistError] = useState(null) // Error loading chainlist
+  const [addedChainsCollapsed, setAddedChainsCollapsed] = useState(true) // Collapse added chains by default
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null) // { functionName, args, timestamp }
   const bookmarkInputRef = useRef(null)
+  const chainSearchRef = useRef(null)
 
   // Focus bookmark input when modal opens
   useEffect(() => {
@@ -545,6 +555,30 @@ export default function ContractCaller() {
       bookmarkInputRef.current.focus()
     }
   }, [showBookmarkModal])
+
+  // Focus chain search input when add chain modal opens
+  useEffect(() => {
+    if (showAddChainModal && chainSearchRef.current) {
+      chainSearchRef.current.focus()
+    }
+  }, [showAddChainModal])
+
+  // Compute merged chains list (built-in + custom)
+  const allChains = [...CHAINS, ...customChains]
+
+  // Compute chain IDs map (built-in + custom)
+  const getChainId = (chainId) => {
+    if (BUILT_IN_CHAIN_IDS[chainId]) {
+      return BUILT_IN_CHAIN_IDS[chainId]
+    }
+    const customChain = customChains.find(c => c.id === chainId)
+    return customChain?.chainId || null
+  }
+
+  // Get chain info by ID
+  const getChainInfo = (chainId) => {
+    return allChains.find(c => c.id === chainId) || null
+  }
 
   // Clear stale pending history after 5 seconds
   useEffect(() => {
@@ -694,6 +728,12 @@ export default function ContractCaller() {
 
       // Load address book
       setAddressBook(getAddressBook())
+
+      // Load custom chains
+      const savedCustomChains = localStorage.getItem(CUSTOM_CHAINS_KEY)
+      if (savedCustomChains) {
+        setCustomChains(JSON.parse(savedCustomChains))
+      }
     } catch (err) {
       console.error('Failed to load history:', err)
     }
@@ -710,9 +750,20 @@ export default function ContractCaller() {
     const urlValue = params.get('value')
 
     if (urlAddress) {
-      // Set chain first if provided
-      if (urlChain && CHAINS.some(c => c.id === urlChain)) {
-        setChain(urlChain)
+      // Set chain first if provided - check both built-in and custom chains
+      if (urlChain) {
+        const isBuiltIn = CHAINS.some(c => c.id === urlChain)
+        let isCustom = false
+        try {
+          const savedCustomChains = localStorage.getItem(CUSTOM_CHAINS_KEY)
+          if (savedCustomChains) {
+            const parsed = JSON.parse(savedCustomChains)
+            isCustom = parsed.some(c => c.id === urlChain)
+          }
+        } catch (e) {}
+        if (isBuiltIn || isCustom) {
+          setChain(urlChain)
+        }
       }
 
       setAddress(urlAddress)
@@ -898,6 +949,11 @@ export default function ContractCaller() {
       // Pass custom RPC if configured for this chain
       if (rpcSettings[chain]) {
         params.set('rpcUrl', rpcSettings[chain])
+      }
+      // Pass chain ID for custom chains
+      const chainIdForApi = getChainId(chain)
+      if (chainIdForApi) {
+        params.set('chainId', chainIdForApi.toString())
       }
       const response = await fetch(`/api/fetch-abi?${params}`)
       const data = await response.json()
@@ -1179,7 +1235,7 @@ export default function ContractCaller() {
 
       // Validate chain ID matches expected
       const returnedChainId = parseInt(data.result, 16)
-      const expectedChainId = CHAIN_IDS[chainId]
+      const expectedChainId = getChainId(chainId)
 
       if (returnedChainId === expectedChainId) {
         setRpcTestResult(prev => ({ ...prev, [chainId]: 'success' }))
@@ -1193,6 +1249,137 @@ export default function ContractCaller() {
       // Clear result after 3 seconds
       setTimeout(() => setRpcTestResult(prev => ({ ...prev, [chainId]: null })), 3000)
     }
+  }
+
+  // Fetch chainlist data from chainlist.org
+  const fetchChainlistData = async () => {
+    if (chainlistData.length > 0) return // Already loaded
+
+    setChainlistLoading(true)
+    setChainlistError(null)
+
+    try {
+      const response = await fetch('https://chainlist.org/rpcs.json')
+      if (!response.ok) {
+        throw new Error('Failed to fetch chainlist data')
+      }
+      const data = await response.json()
+      // Filter out testnets and sort by TVL (higher first)
+      const mainnets = data
+        .filter(chain => !chain.isTestnet && chain.chainId)
+        .sort((a, b) => (b.tvl || 0) - (a.tvl || 0))
+      setChainlistData(mainnets)
+    } catch (err) {
+      console.error('Failed to fetch chainlist:', err)
+      setChainlistError('Failed to load chain data. Please try again.')
+    } finally {
+      setChainlistLoading(false)
+    }
+  }
+
+  // Get the best RPC URL from a chain's RPC list
+  const getBestRpcUrl = (rpcs) => {
+    if (!rpcs || rpcs.length === 0) return null
+    // Prefer RPCs with no tracking or limited tracking
+    const sortedRpcs = [...rpcs].sort((a, b) => {
+      const trackingOrder = { none: 0, limited: 1, yes: 2, undefined: 3 }
+      const aTracking = typeof a === 'string' ? 'undefined' : (a.tracking || 'undefined')
+      const bTracking = typeof b === 'string' ? 'undefined' : (b.tracking || 'undefined')
+      return (trackingOrder[aTracking] || 3) - (trackingOrder[bTracking] || 3)
+    })
+    // Get the URL from the first valid RPC
+    for (const rpc of sortedRpcs) {
+      const url = typeof rpc === 'string' ? rpc : rpc.url
+      // Skip RPCs that require API keys (contain ${...})
+      if (url && !url.includes('${') && url.startsWith('http')) {
+        return url
+      }
+    }
+    return null
+  }
+
+  // Add a custom chain
+  const addCustomChain = (chainData) => {
+    const chainId = `chain-${chainData.chainId}`
+
+    // Check if already added
+    if (customChains.some(c => c.id === chainId)) {
+      return false
+    }
+
+    // Check if it's a built-in chain
+    if (CHAINS.some(c => c.id === chainId || BUILT_IN_CHAIN_IDS[c.id] === chainData.chainId)) {
+      return false
+    }
+
+    const bestRpc = getBestRpcUrl(chainData.rpc)
+
+    const newChain = {
+      id: chainId,
+      name: chainData.name,
+      chainId: chainData.chainId,
+      icon: chainData.icon
+        ? `https://icons.llamao.fi/icons/chains/rsz_${chainData.icon}.jpg`
+        : null,
+      nativeCurrency: chainData.nativeCurrency,
+      rpcUrl: bestRpc,
+      explorers: chainData.explorers || [],
+    }
+
+    const updatedChains = [...customChains, newChain]
+    setCustomChains(updatedChains)
+    localStorage.setItem(CUSTOM_CHAINS_KEY, JSON.stringify(updatedChains))
+
+    // Also save the RPC URL to rpcSettings
+    if (bestRpc) {
+      const newRpcSettings = { ...rpcSettings, [chainId]: bestRpc }
+      setRpcSettings(newRpcSettings)
+      localStorage.setItem(RPC_SETTINGS_KEY, JSON.stringify(newRpcSettings))
+    }
+
+    return true
+  }
+
+  // Remove a custom chain
+  const removeCustomChain = (chainId) => {
+    const updatedChains = customChains.filter(c => c.id !== chainId)
+    setCustomChains(updatedChains)
+    localStorage.setItem(CUSTOM_CHAINS_KEY, JSON.stringify(updatedChains))
+
+    // Also remove RPC setting if exists
+    if (rpcSettings[chainId]) {
+      const newRpcSettings = { ...rpcSettings }
+      delete newRpcSettings[chainId]
+      setRpcSettings(newRpcSettings)
+      localStorage.setItem(RPC_SETTINGS_KEY, JSON.stringify(newRpcSettings))
+    }
+
+    // If current chain is removed, switch to ethereum
+    if (chain === chainId) {
+      setChain('ethereum')
+    }
+  }
+
+  // Filter chainlist data based on search
+  const getFilteredChainlist = () => {
+    if (!chainlistSearch.trim()) {
+      return chainlistData.slice(0, 50) // Show top 50 by TVL
+    }
+    const search = chainlistSearch.toLowerCase()
+    return chainlistData
+      .filter(chain =>
+        chain.name?.toLowerCase().includes(search) ||
+        chain.chain?.toLowerCase().includes(search) ||
+        String(chain.chainId).includes(search)
+      )
+      .slice(0, 50)
+  }
+
+  // Check if a chainlist chain is already added
+  const isChainAdded = (chainData) => {
+    const chainId = `chain-${chainData.chainId}`
+    return customChains.some(c => c.id === chainId) ||
+           Object.values(BUILT_IN_CHAIN_IDS).includes(chainData.chainId)
   }
 
   // Helper to get ETH value with unit info
@@ -1331,6 +1518,7 @@ export default function ContractCaller() {
         }
 
         const ethValueInfo = getEthValueWithUnit()
+        const chainIdForSimulation = getChainId(chain)
         data = await simulateWithTevm({
           chain,
           address,
@@ -1343,6 +1531,7 @@ export default function ContractCaller() {
           rpcUrl: rpcSettings[chain] || undefined,
           blockNumber: forkBlockNumber || 'latest',
           cheatcodes: activeCheatcodes,
+          customChainId: chainIdForSimulation,
         })
       } else {
         // Use API for read functions or Tenderly for write functions
@@ -1354,6 +1543,12 @@ export default function ContractCaller() {
           functionName: selectedFunction,
           args,
           abi: parsedAbi,
+        }
+
+        // Add chain ID for custom chains
+        const chainIdForApi = getChainId(chain)
+        if (chainIdForApi) {
+          requestBody.chainId = chainIdForApi
         }
 
         // Add custom RPC if configured for this chain
@@ -1920,21 +2115,29 @@ export default function ContractCaller() {
                   <div className={styles.settingsField}>
                     <label className={styles.settingsLabel}>Chain</label>
                     <div className={styles.chainSelectWithIcon}>
-                      <img
-                        src={CHAINS.find(c => c.id === selectedRpcChain)?.icon}
-                        alt=""
-                        className={styles.chainIconSmall}
-                      />
+                      {allChains.find(c => c.id === selectedRpcChain)?.icon && (
+                        <img
+                          src={allChains.find(c => c.id === selectedRpcChain)?.icon}
+                          alt=""
+                          className={styles.chainIconSmall}
+                          onError={(e) => { e.target.style.display = 'none' }}
+                        />
+                      )}
                       <select
                         value={selectedRpcChain}
                         onChange={(e) => setSelectedRpcChain(e.target.value)}
                         className={styles.select}
                       >
-                        {CHAINS.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name} {rpcSettings[c.id] ? '✓' : ''}
-                          </option>
-                        ))}
+                        {[...allChains]
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .map((c) => {
+                            const chainIdNum = c.chainId || BUILT_IN_CHAIN_IDS[c.id]
+                            return (
+                              <option key={c.id} value={c.id}>
+                                {c.name} ({chainIdNum}) {rpcSettings[c.id] ? '✓' : ''}
+                              </option>
+                            )
+                          })}
                       </select>
                     </div>
                   </div>
@@ -1945,7 +2148,7 @@ export default function ContractCaller() {
                         type="text"
                         value={rpcSettings[selectedRpcChain] || ''}
                         onChange={(e) => saveRpcSettings({ ...rpcSettings, [selectedRpcChain]: e.target.value })}
-                        placeholder={`Custom RPC URL for ${CHAINS.find(c => c.id === selectedRpcChain)?.name}...`}
+                        placeholder={`Custom RPC URL for ${allChains.find(c => c.id === selectedRpcChain)?.name}...`}
                         className={styles.settingsInput}
                       />
                       <button
@@ -1965,7 +2168,7 @@ export default function ContractCaller() {
                     {Object.entries(rpcSettings)
                       .filter(([_, url]) => url)
                       .map(([chainId, url]) => {
-                        const chainInfo = CHAINS.find(c => c.id === chainId)
+                        const chainInfo = allChains.find(c => c.id === chainId)
                         return (
                           <div key={chainId} className={styles.configuredRpcItem}>
                             {chainInfo?.icon && (
@@ -2000,26 +2203,47 @@ export default function ContractCaller() {
 
         <div className={styles.form}>
           <div className={styles.row}>
-            <div className={styles.field}>
+            <div className={styles.field} style={{ minWidth: '200px' }}>
               <label className={styles.label}>Network</label>
-              <div className={styles.chainSelectWithIcon}>
-                <img
-                  src={CHAINS.find(c => c.id === chain)?.icon}
-                  alt=""
-                  className={styles.chainIconSmall}
-                />
-                <select
-                  value={chain}
-                  onChange={(e) => setChain(e.target.value)}
-                  className={styles.select}
+              <div className={styles.chainSelectRow}>
+                <div className={styles.chainSelectWithIcon}>
+                  {allChains.find(c => c.id === chain)?.icon && (
+                    <img
+                      src={allChains.find(c => c.id === chain)?.icon}
+                      alt=""
+                      className={styles.chainIconSmall}
+                      onError={(e) => { e.target.style.display = 'none' }}
+                    />
+                  )}
+                  <select
+                    value={chain}
+                    onChange={(e) => setChain(e.target.value)}
+                    className={styles.select}
+                    disabled={loading}
+                  >
+                    {[...CHAINS, ...customChains]
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((c) => {
+                        const chainIdNum = c.chainId || BUILT_IN_CHAIN_IDS[c.id]
+                        return (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({chainIdNum})
+                          </option>
+                        )
+                      })}
+                  </select>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowAddChainModal(true)
+                    fetchChainlistData()
+                  }}
+                  className={styles.addChainButton}
+                  title="Add more networks"
                   disabled={loading}
                 >
-                  {CHAINS.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                  +
+                </button>
               </div>
             </div>
 
@@ -3340,6 +3564,132 @@ export default function ContractCaller() {
                 type="button"
               >
                 Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Chain Modal */}
+      {showAddChainModal && (
+        <div
+          className={styles.modalOverlay}
+          onClick={() => { setShowAddChainModal(false); setChainlistSearch(''); }}
+          onKeyDown={(e) => { if (e.key === 'Escape') { setShowAddChainModal(false); setChainlistSearch(''); } }}
+          tabIndex={-1}
+        >
+          <div className={styles.chainModal} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.modalTitle}>Add Network</h3>
+            <div className={styles.modalBody}>
+              <div className={styles.modalField}>
+                <input
+                  type="text"
+                  ref={chainSearchRef}
+                  value={chainlistSearch}
+                  onChange={(e) => setChainlistSearch(e.target.value)}
+                  placeholder="Search networks by name or chain ID..."
+                  className={styles.modalInput}
+                />
+              </div>
+
+              {/* Added chains section - collapsible */}
+              {customChains.length > 0 && (
+                <div className={styles.addedChainsSection}>
+                  <button
+                    className={styles.addedChainsHeader}
+                    onClick={() => setAddedChainsCollapsed(!addedChainsCollapsed)}
+                  >
+                    <span className={styles.collapseIcon}>{addedChainsCollapsed ? '▶' : '▼'}</span>
+                    <span className={styles.modalLabel}>Added Networks ({customChains.length})</span>
+                  </button>
+                  {!addedChainsCollapsed && (
+                    <div className={styles.addedChainsList}>
+                      {customChains.map((c) => (
+                        <div key={c.id} className={styles.addedChainItem}>
+                          {c.icon && (
+                            <img src={c.icon} alt="" className={styles.chainIconTiny} />
+                          )}
+                          <span className={styles.addedChainName}>{c.name}</span>
+                          <span className={styles.addedChainId}>#{c.chainId}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              removeCustomChain(c.id)
+                            }}
+                            className={styles.removeChainButton}
+                            title="Remove"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Chainlist results */}
+              <div className={styles.chainlistSection}>
+                <label className={styles.modalLabel}>
+                  Available Networks
+                  {chainlistLoading && <span className={styles.loadingText}> (Loading...)</span>}
+                </label>
+                {chainlistError && (
+                  <div className={styles.chainlistError}>{chainlistError}</div>
+                )}
+                {!chainlistLoading && !chainlistError && (
+                  <div className={styles.chainlistResults}>
+                    {getFilteredChainlist().map((chainData) => {
+                      const added = isChainAdded(chainData)
+                      return (
+                        <div
+                          key={chainData.chainId}
+                          className={`${styles.chainlistItem} ${added ? styles.chainlistItemAdded : ''}`}
+                          onClick={() => {
+                            if (!added) {
+                              addCustomChain(chainData)
+                            }
+                          }}
+                        >
+                          {chainData.icon && (
+                            <img
+                              src={`https://icons.llamao.fi/icons/chains/rsz_${chainData.icon}.jpg`}
+                              alt=""
+                              className={styles.chainIconSmall}
+                              onError={(e) => { e.target.style.display = 'none' }}
+                            />
+                          )}
+                          <div className={styles.chainlistItemInfo}>
+                            <span className={styles.chainlistItemName}>{chainData.name}</span>
+                            <span className={styles.chainlistItemMeta}>
+                              Chain ID: {chainData.chainId}
+                              {chainData.nativeCurrency && ` • ${chainData.nativeCurrency.symbol}`}
+                            </span>
+                          </div>
+                          {added ? (
+                            <span className={styles.chainlistItemAdded}>Added</span>
+                          ) : (
+                            <button className={styles.addChainItemButton}>+ Add</button>
+                          )}
+                        </div>
+                      )
+                    })}
+                    {getFilteredChainlist().length === 0 && !chainlistLoading && (
+                      <div className={styles.chainlistEmpty}>
+                        {chainlistSearch ? 'No networks found matching your search.' : 'No networks available.'}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className={styles.modalActions}>
+              <button
+                onClick={() => { setShowAddChainModal(false); setChainlistSearch(''); }}
+                className={styles.modalCancelButton}
+                type="button"
+              >
+                Close
               </button>
             </div>
           </div>

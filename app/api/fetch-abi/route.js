@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { createPublicClient, http } from 'viem'
+import { createPublicClient, http, defineChain } from 'viem'
 import { mainnet, arbitrum, base, polygon, bsc } from 'viem/chains'
 import { isValidEthAddress } from '../../utils/validation'
 
-// Etherscan V2 API uses chain IDs
-const CHAIN_IDS = {
+// Etherscan V2 API uses chain IDs (built-in chains)
+const BUILT_IN_CHAIN_IDS = {
   ethereum: 1,
   arbitrum: 42161,
   base: 8453,
@@ -276,15 +276,34 @@ export async function GET(request) {
       )
     }
 
-    const chainId = CHAIN_IDS[chain]
-    const chainConfig = CHAINS[chain]
     // Use custom RPC if provided, otherwise use default
     const customRpcUrl = searchParams.get('rpcUrl')
-    const rpcUrl = customRpcUrl || RPC_URLS[chain]
+    // Get custom chain ID from query params (for non-built-in chains)
+    const customChainIdParam = searchParams.get('chainId')
 
-    if (!chainId || !chainConfig) {
+    // Determine chain ID and config
+    let chainId = BUILT_IN_CHAIN_IDS[chain]
+    let chainConfig = CHAINS[chain]
+    let rpcUrl = customRpcUrl || RPC_URLS[chain]
+
+    // Handle custom chains (chain IDs starting with "chain-")
+    if (!chainId && customChainIdParam && customRpcUrl) {
+      chainId = parseInt(customChainIdParam, 10)
+      // Create a custom chain config for non-built-in chains
+      chainConfig = defineChain({
+        id: chainId,
+        name: chain,
+        nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+        rpcUrls: {
+          default: { http: [customRpcUrl] },
+        },
+      })
+      rpcUrl = customRpcUrl
+    }
+
+    if (!chainId || !chainConfig || !rpcUrl) {
       return NextResponse.json(
-        { error: `Unsupported chain: ${chain}` },
+        { error: `Unsupported chain: ${chain}. Please configure an RPC URL for this chain.` },
         { status: 400 }
       )
     }
