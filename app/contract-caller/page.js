@@ -2129,11 +2129,14 @@ export default function ContractCaller() {
                       >
                         {[...allChains]
                           .sort((a, b) => a.name.localeCompare(b.name))
-                          .map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name} {rpcSettings[c.id] ? '✓' : ''}
-                            </option>
-                          ))}
+                          .map((c) => {
+                            const chainIdNum = c.chainId || BUILT_IN_CHAIN_IDS[c.id]
+                            return (
+                              <option key={c.id} value={c.id}>
+                                {c.name} ({chainIdNum}) {rpcSettings[c.id] ? '✓' : ''}
+                              </option>
+                            )
+                          })}
                       </select>
                     </div>
                   </div>
@@ -2219,11 +2222,14 @@ export default function ContractCaller() {
                   >
                     {[...CHAINS, ...customChains]
                       .sort((a, b) => a.name.localeCompare(b.name))
-                      .map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
+                      .map((c) => {
+                        const chainIdNum = c.chainId || BUILT_IN_CHAIN_IDS[c.id]
+                        return (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({chainIdNum})
+                          </option>
+                        )
+                      })}
                   </select>
                 </div>
                 <button
