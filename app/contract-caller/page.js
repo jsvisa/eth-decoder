@@ -3612,7 +3612,6 @@ export default function ContractCaller() {
                           onChange={(e) => setLogsFilter(e.target.value)}
                           placeholder="event = Transfer and args.to = 0x..."
                           className={styles.logsFilterInput}
-                          title="Filter syntax: field op value [and|or ...]. Fields: event, args.*, topic0-3, data, block, tx. Ops: =, !=, >, <, contains"
                         />
                         <button
                           onClick={downloadLogsAsCsv}
@@ -3622,6 +3621,12 @@ export default function ContractCaller() {
                           Download CSV
                         </button>
                       </div>
+                    </div>
+                    <div className={styles.filterSyntaxHelp}>
+                      <span className={styles.filterSyntaxLabel}>Filter:</span>
+                      <code>event</code> <code>args.*</code> <code>topic0-3</code> <code>data</code> <code>block</code> <code>tx</code>
+                      <span className={styles.filterSyntaxOps}>=  !=  &gt;  &lt;  contains</span>
+                      <span className={styles.filterSyntaxBool}>and  or</span>
                     </div>
                     <div className={styles.logsTableContainer}>
                       <table className={styles.logsTable}>
