@@ -3669,6 +3669,31 @@
   color: var(--text-primary);
 }
 
+.logsHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.logsFilterInput {
+  width: 220px;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.logsFilterInput:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.logsFilterInput::placeholder {
+  color: var(--text-muted);
+}
+
 .downloadCsvButton {
   padding: 0.375rem 0.75rem;
   font-size: 0.8rem;

@@ -553,6 +553,7 @@ export default function ContractCaller() {
   const [logsError, setLogsError] = useState(null) // Error state for logs
   const [logsPage, setLogsPage] = useState(1) // Pagination page
   const [logsOffset, setLogsOffset] = useState(1000) // Records per page
+  const [logsFilter, setLogsFilter] = useState('') // Filter for topics/data after fetch
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null) // { functionName, args, timestamp }
   const bookmarkInputRef = useRef(null)
@@ -867,6 +868,30 @@ export default function ContractCaller() {
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
+  }
+
+  // Filter fetched logs by topic/data content
+  const getFilteredLogs = () => {
+    if (!logsFilter.trim()) return eventLogs
+    const search = logsFilter.toLowerCase()
+    return eventLogs.filter(log => {
+      // Search in topics
+      if (log.topics?.some(t => t.toLowerCase().includes(search))) return true
+      // Search in data
+      if (log.data?.toLowerCase().includes(search)) return true
+      // Search in decoded args (stringified)
+      if (log.decodedArgs) {
+        const argsStr = JSON.stringify(log.decodedArgs, (key, value) =>
+          typeof value === 'bigint' ? value.toString() : value
+        ).toLowerCase()
+        if (argsStr.includes(search)) return true
+      }
+      // Search in event name
+      if (log.decodedName?.toLowerCase().includes(search)) return true
+      // Search in tx hash
+      if (log.transactionHash?.toLowerCase().includes(search)) return true
+      return false
+    })
   }
 
   // Load history, cached addresses, and Tenderly settings on mount
@@ -3334,14 +3359,28 @@ export default function ContractCaller() {
                 {eventLogs.length > 0 && (
                   <div className={styles.logsResults}>
                     <div className={styles.logsResultsHeader}>
-                      <span>Found {eventLogs.length} logs</span>
-                      <button
-                        onClick={downloadLogsAsCsv}
-                        className={styles.downloadCsvButton}
-                        type="button"
-                      >
-                        Download CSV
-                      </button>
+                      <span>
+                        {logsFilter.trim()
+                          ? `Showing ${getFilteredLogs().length} of ${eventLogs.length} logs`
+                          : `Found ${eventLogs.length} logs`
+                        }
+                      </span>
+                      <div className={styles.logsHeaderActions}>
+                        <input
+                          type="text"
+                          value={logsFilter}
+                          onChange={(e) => setLogsFilter(e.target.value)}
+                          placeholder="Filter by topic, data, address..."
+                          className={styles.logsFilterInput}
+                        />
+                        <button
+                          onClick={downloadLogsAsCsv}
+                          className={styles.downloadCsvButton}
+                          type="button"
+                        >
+                          Download CSV
+                        </button>
+                      </div>
                     </div>
                     <div className={styles.logsTableContainer}>
                       <table className={styles.logsTable}>
@@ -3354,7 +3393,7 @@ export default function ContractCaller() {
                           </tr>
                         </thead>
                         <tbody>
-                          {eventLogs.map((log, idx) => (
+                          {getFilteredLogs().map((log, idx) => (
                             <tr key={idx} className={styles.logRow}>
                               <td className={styles.logBlockCell}>
                                 <div className={styles.logBlockNumber}>{parseInt(log.blockNumber, 16)}</div>
