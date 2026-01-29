@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { toFunctionSelector, encodeFunctionData } from 'viem'
+import { toFunctionSelector, encodeFunctionData, toEventSelector, decodeEventLog } from 'viem'
 import yaml from 'js-yaml'
 import styles from './page.module.css'
 import {
@@ -544,6 +544,15 @@ export default function ContractCaller() {
   const [chainlistSearch, setChainlistSearch] = useState('') // Search filter for chainlist
   const [chainlistError, setChainlistError] = useState(null) // Error loading chainlist
   const [addedChainsCollapsed, setAddedChainsCollapsed] = useState(true) // Collapse added chains by default
+  // Events tab state
+  const [activeTab, setActiveTab] = useState('functions') // 'functions' | 'events'
+  const [selectedEvents, setSelectedEvents] = useState([]) // Array of selected event names
+  const [eventFilter, setEventFilter] = useState('') // Search filter for events
+  const [eventLogs, setEventLogs] = useState([]) // Fetched logs from API
+  const [fetchingLogs, setFetchingLogs] = useState(false) // Loading state for logs
+  const [logsError, setLogsError] = useState(null) // Error state for logs
+  const [logsPage, setLogsPage] = useState(1) // Pagination page
+  const [logsOffset, setLogsOffset] = useState(1000) // Records per page
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null) // { functionName, args, timestamp }
   const bookmarkInputRef = useRef(null)
@@ -687,6 +696,138 @@ export default function ContractCaller() {
       setTimeout(() => setAbiCopiedItem(null), 1500)
     } catch (err) {
       console.error('Failed to copy ABI:', err)
+    }
+  }
+
+  // Get events from parsed ABI
+  const getEvents = () => {
+    if (!parsedAbi || !Array.isArray(parsedAbi)) return []
+    return parsedAbi.filter(item => item.type === 'event')
+  }
+
+  // Filter events by search term
+  const getFilteredEvents = () => {
+    const events = getEvents()
+    if (!eventFilter.trim()) return events
+    const search = eventFilter.toLowerCase()
+    return events.filter(event =>
+      event.name.toLowerCase().includes(search) ||
+      event.inputs?.some(input => input.name?.toLowerCase().includes(search) || input.type?.toLowerCase().includes(search))
+    )
+  }
+
+  // Toggle event selection
+  const toggleEventSelection = (eventName) => {
+    setSelectedEvents(prev =>
+      prev.includes(eventName)
+        ? prev.filter(e => e !== eventName)
+        : [...prev, eventName]
+    )
+  }
+
+  // Select all visible events
+  const selectAllEvents = () => {
+    const filtered = getFilteredEvents()
+    setSelectedEvents(filtered.map(e => e.name))
+  }
+
+  // Clear all event selections
+  const clearEventSelection = () => {
+    setSelectedEvents([])
+  }
+
+  // Decode a single log entry
+  const decodeLog = (log) => {
+    if (!parsedAbi) return { ...log, decodedName: null, decodedArgs: null }
+
+    try {
+      const decoded = decodeEventLog({
+        abi: parsedAbi,
+        data: log.data,
+        topics: log.topics,
+      })
+      return {
+        ...log,
+        decodedName: decoded.eventName,
+        decodedArgs: decoded.args,
+      }
+    } catch {
+      return { ...log, decodedName: null, decodedArgs: null }
+    }
+  }
+
+  // Fetch logs for selected events
+  const fetchLogs = async () => {
+    if (selectedEvents.length === 0) {
+      setLogsError('Please select at least one event')
+      return
+    }
+
+    if (!address || !isValidEthAddress(address)) {
+      setLogsError('Please enter a valid contract address')
+      return
+    }
+
+    if (!apiKeys.etherscan) {
+      setLogsError('Please configure your Etherscan API key in Settings')
+      setShowSettings(true)
+      return
+    }
+
+    setFetchingLogs(true)
+    setLogsError(null)
+    setEventLogs([])
+
+    try {
+      const allLogs = []
+
+      for (const eventName of selectedEvents) {
+        const event = parsedAbi.find(e => e.type === 'event' && e.name === eventName)
+        if (!event) continue
+
+        const topic0 = toEventSelector(event)
+
+        const params = new URLSearchParams({
+          address,
+          chain,
+          topic0,
+          fromBlock: '0',
+          toBlock: 'latest',
+          page: logsPage.toString(),
+          offset: logsOffset.toString(),
+        })
+
+        if (apiKeys.etherscan) {
+          params.set('apiKey', apiKeys.etherscan)
+        }
+
+        const chainIdForApi = getChainId(chain)
+        if (chainIdForApi) {
+          params.set('chainId', chainIdForApi.toString())
+        }
+
+        const response = await fetch(`/api/get-logs?${params}`)
+        const data = await response.json()
+
+        if (data.error) {
+          throw new Error(data.error)
+        }
+
+        if (data.result && Array.isArray(data.result)) {
+          allLogs.push(...data.result)
+        }
+      }
+
+      // Sort by block number descending (most recent first)
+      allLogs.sort((a, b) => parseInt(b.blockNumber, 16) - parseInt(a.blockNumber, 16))
+
+      // Decode all logs
+      const decodedLogs = allLogs.map(log => decodeLog(log))
+      setEventLogs(decodedLogs)
+    } catch (err) {
+      setLogsError(err.message || 'Failed to fetch logs')
+    } finally {
+      setFetchingLogs(false)
     }
   }
 
@@ -2540,8 +2681,27 @@ export default function ContractCaller() {
             )}
           </div>
 
-          {functions.length > 0 && (
+          {(functions.length > 0 || getEvents().length > 0) && (
             <>
+              {/* Tab Switcher */}
+              <div className={styles.tabContainer}>
+                <button
+                  className={`${styles.tab} ${activeTab === 'functions' ? styles.tabActive : ''}`}
+                  onClick={() => setActiveTab('functions')}
+                >
+                  Functions ({functions.length})
+                </button>
+                <button
+                  className={`${styles.tab} ${activeTab === 'events' ? styles.tabActive : ''}`}
+                  onClick={() => setActiveTab('events')}
+                >
+                  Events ({getEvents().length})
+                </button>
+              </div>
+
+              {/* Functions Tab */}
+              {activeTab === 'functions' && functions.length > 0 && (
+              <>
               <div className={styles.field}>
                 <div className={styles.functionLabelRow}>
                   <label className={styles.label}>Function</label>
@@ -3042,6 +3202,145 @@ export default function ContractCaller() {
                     disabled={loading}
                   />
                 </div>
+              )}
+              </>
+              )}
+
+              {/* Events Tab */}
+              {activeTab === 'events' && getEvents().length > 0 && (
+              <div className={styles.eventsSection}>
+                <div className={styles.eventListHeader}>
+                  <input
+                    type="text"
+                    value={eventFilter}
+                    onChange={(e) => setEventFilter(e.target.value)}
+                    placeholder="Search events..."
+                    className={styles.eventSearchInput}
+                  />
+                  <button
+                    onClick={selectAllEvents}
+                    className={styles.eventSelectBtn}
+                    type="button"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    onClick={clearEventSelection}
+                    className={styles.eventSelectBtn}
+                    type="button"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <div className={styles.eventList}>
+                  {getFilteredEvents().map((event) => (
+                    <label key={event.name} className={styles.eventItem}>
+                      <input
+                        type="checkbox"
+                        checked={selectedEvents.includes(event.name)}
+                        onChange={() => toggleEventSelection(event.name)}
+                      />
+                      <span className={styles.eventTag}>E</span>
+                      <span className={styles.eventName}>{event.name}</span>
+                      <span className={styles.eventParams}>
+                        ({event.inputs?.map(i => `${i.indexed ? 'indexed ' : ''}${i.type}`).join(', ')})
+                      </span>
+                    </label>
+                  ))}
+                  {getFilteredEvents().length === 0 && (
+                    <div className={styles.eventItemEmpty}>No matching events</div>
+                  )}
+                </div>
+
+                <div className={styles.logsControls}>
+                  <div className={styles.paginationControls}>
+                    <label>
+                      Page:
+                      <input
+                        type="number"
+                        value={logsPage}
+                        onChange={(e) => setLogsPage(Math.max(1, parseInt(e.target.value) || 1))}
+                        min="1"
+                        className={styles.paginationInput}
+                      />
+                    </label>
+                    <label>
+                      Per page:
+                      <select
+                        value={logsOffset}
+                        onChange={(e) => setLogsOffset(parseInt(e.target.value))}
+                        className={styles.paginationSelect}
+                      >
+                        <option value="100">100</option>
+                        <option value="500">500</option>
+                        <option value="1000">1000</option>
+                      </select>
+                    </label>
+                  </div>
+                  <button
+                    onClick={fetchLogs}
+                    className={styles.fetchLogsButton}
+                    disabled={fetchingLogs || selectedEvents.length === 0}
+                    type="button"
+                  >
+                    {fetchingLogs ? 'Fetching...' : `Fetch Logs (${selectedEvents.length} selected)`}
+                  </button>
+                </div>
+
+                {logsError && (
+                  <div className={styles.logsErrorBox}>
+                    <strong>Error:</strong> {logsError}
+                  </div>
+                )}
+
+                {eventLogs.length > 0 && (
+                  <div className={styles.logsResults}>
+                    <div className={styles.logsResultsHeader}>
+                      Found {eventLogs.length} logs
+                    </div>
+                    <div className={styles.logsTableContainer}>
+                      <table className={styles.logsTable}>
+                        <thead>
+                          <tr>
+                            <th>Block</th>
+                            <th>Tx Hash</th>
+                            <th>Event</th>
+                            <th>Data</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {eventLogs.map((log, idx) => (
+                            <tr key={idx} className={styles.logRow}>
+                              <td>{parseInt(log.blockNumber, 16)}</td>
+                              <td className={styles.logTxHash}>
+                                <a
+                                  href={`https://etherscan.io/tx/${log.transactionHash}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {log.transactionHash.slice(0, 10)}...
+                                </a>
+                              </td>
+                              <td className={styles.logEventName}>{log.decodedName || 'Unknown'}</td>
+                              <td className={styles.logDataCell}>
+                                {log.decodedArgs ? (
+                                  <pre className={styles.logDecodedArgs}>
+                                    {JSON.stringify(log.decodedArgs, (key, value) =>
+                                      typeof value === 'bigint' ? value.toString() : value
+                                    , 2)}
+                                  </pre>
+                                ) : (
+                                  <span className={styles.logRawData}>{log.data?.slice(0, 20)}...</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
               )}
             </>
           )}
