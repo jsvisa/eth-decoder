@@ -3464,65 +3464,6 @@ export default function ContractCaller() {
               {/* Events Tab */}
               {activeTab === 'events' && getEvents().length > 0 && (
               <div className={styles.eventsSection}>
-                {/* Fetch Controls - Always visible at top */}
-                <div className={styles.logsControls}>
-                  <div className={styles.blockRangeControls}>
-                    <label>
-                      From:
-                      <input
-                        type="text"
-                        value={logsFromBlock}
-                        onChange={(e) => setLogsFromBlock(e.target.value.replace(/[^0-9]/g, ''))}
-                        placeholder={latestBlockCache ? `${Math.max(0, latestBlockCache - 10000)}` : 'latest-10k'}
-                        className={styles.blockRangeInput}
-                        title="Leave empty to auto-fetch last 10,000 blocks"
-                      />
-                    </label>
-                    <label>
-                      To:
-                      <input
-                        type="text"
-                        value={logsToBlock}
-                        onChange={(e) => setLogsToBlock(e.target.value)}
-                        placeholder="latest"
-                        className={styles.blockRangeInput}
-                      />
-                    </label>
-                  </div>
-                  <div className={styles.paginationControls}>
-                    <label>
-                      Page:
-                      <input
-                        type="number"
-                        value={logsPage}
-                        onChange={(e) => setLogsPage(Math.max(1, parseInt(e.target.value) || 1))}
-                        min="1"
-                        className={styles.paginationInput}
-                      />
-                    </label>
-                    <label>
-                      Per page:
-                      <select
-                        value={logsOffset}
-                        onChange={(e) => setLogsOffset(parseInt(e.target.value))}
-                        className={styles.paginationSelect}
-                      >
-                        <option value="100">100</option>
-                        <option value="500">500</option>
-                        <option value="1000">1000</option>
-                      </select>
-                    </label>
-                  </div>
-                  <button
-                    onClick={fetchLogs}
-                    className={styles.fetchLogsButton}
-                    disabled={fetchingLogs || selectedEvents.length === 0}
-                    type="button"
-                  >
-                    {fetchingLogs ? 'Fetching...' : `Fetch Logs (${selectedEvents.length} selected)`}
-                  </button>
-                </div>
-
                 {/* Collapsible Event Selection */}
                 <div className={styles.eventSelectionSection}>
                   <div
@@ -3582,6 +3523,65 @@ export default function ContractCaller() {
                       </div>
                     </>
                   )}
+                </div>
+
+                {/* Fetch Controls */}
+                <div className={styles.logsControls}>
+                  <div className={styles.blockRangeControls}>
+                    <label>
+                      From:
+                      <input
+                        type="text"
+                        value={logsFromBlock}
+                        onChange={(e) => setLogsFromBlock(e.target.value.replace(/[^0-9]/g, ''))}
+                        placeholder={latestBlockCache ? `${Math.max(0, latestBlockCache - 10000)}` : 'latest-10k'}
+                        className={styles.blockRangeInput}
+                        title="Leave empty to auto-fetch last 10,000 blocks"
+                      />
+                    </label>
+                    <label>
+                      To:
+                      <input
+                        type="text"
+                        value={logsToBlock}
+                        onChange={(e) => setLogsToBlock(e.target.value)}
+                        placeholder="latest"
+                        className={styles.blockRangeInput}
+                      />
+                    </label>
+                  </div>
+                  <div className={styles.paginationControls}>
+                    <label>
+                      Page:
+                      <input
+                        type="number"
+                        value={logsPage}
+                        onChange={(e) => setLogsPage(Math.max(1, parseInt(e.target.value) || 1))}
+                        min="1"
+                        className={styles.paginationInput}
+                      />
+                    </label>
+                    <label>
+                      Per page:
+                      <select
+                        value={logsOffset}
+                        onChange={(e) => setLogsOffset(parseInt(e.target.value))}
+                        className={styles.paginationSelect}
+                      >
+                        <option value="100">100</option>
+                        <option value="500">500</option>
+                        <option value="1000">1000</option>
+                      </select>
+                    </label>
+                  </div>
+                  <button
+                    onClick={fetchLogs}
+                    className={styles.fetchLogsButton}
+                    disabled={fetchingLogs || selectedEvents.length === 0}
+                    type="button"
+                  >
+                    {fetchingLogs ? 'Fetching...' : `Fetch Logs (${selectedEvents.length} selected)`}
+                  </button>
                 </div>
 
                 {logsError && (
