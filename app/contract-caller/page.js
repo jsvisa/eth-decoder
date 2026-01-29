@@ -3656,40 +3656,42 @@ export default function ContractCaller() {
             </>
           )}
 
-          <div className={styles.buttonGroup}>
-            <button
-              onClick={handleCall}
-              className={`${styles.button} ${selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? styles.simulateButton : ''}`}
-              disabled={loading || !selectedFunction}
-            >
-              {loading
-                ? (selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? 'Simulating...' : 'Calling...')
-                : (selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction())
-                    ? <>Simulate Call <span className={styles.simModeTag}>{useLocalSimulation ? 'L' : 'T'}</span></>
-                    : 'Call Contract')
-              }
-            </button>
-            {address && selectedFunction && (
-              <>
-                <button
-                  onClick={handleCopyCalldata}
-                  className={styles.calldataButton}
-                  disabled={loading}
-                  type="button"
-                >
-                  {calldataCopied ? 'Copied!' : 'Copy Calldata'}
-                </button>
-                <button
-                  onClick={handleShareUrl}
-                  className={styles.shareButton}
-                  disabled={loading}
-                  type="button"
-                >
-                  {urlCopied ? 'Copied!' : 'Share URL'}
-                </button>
-              </>
-            )}
-          </div>
+          {activeTab === 'functions' && (
+            <div className={styles.buttonGroup}>
+              <button
+                onClick={handleCall}
+                className={`${styles.button} ${selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? styles.simulateButton : ''}`}
+                disabled={loading || !selectedFunction}
+              >
+                {loading
+                  ? (selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? 'Simulating...' : 'Calling...')
+                  : (selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction())
+                      ? <>Simulate Call <span className={styles.simModeTag}>{useLocalSimulation ? 'L' : 'T'}</span></>
+                      : 'Call Contract')
+                }
+              </button>
+              {address && selectedFunction && (
+                <>
+                  <button
+                    onClick={handleCopyCalldata}
+                    className={styles.calldataButton}
+                    disabled={loading}
+                    type="button"
+                  >
+                    {calldataCopied ? 'Copied!' : 'Copy Calldata'}
+                  </button>
+                  <button
+                    onClick={handleShareUrl}
+                    className={styles.shareButton}
+                    disabled={loading}
+                    type="button"
+                  >
+                    {urlCopied ? 'Copied!' : 'Share URL'}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {error && (
