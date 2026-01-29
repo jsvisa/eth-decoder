@@ -831,6 +831,41 @@ export default function ContractCaller() {
     }
   }
 
+  // Download event logs as CSV
+  const downloadLogsAsCsv = () => {
+    if (eventLogs.length === 0) return
+
+    const headers = ['Block', 'Tx Hash', 'Event', 'Topics', 'Data', 'Decoded Args']
+    const rows = eventLogs.map(log => {
+      const block = parseInt(log.blockNumber, 16)
+      const txHash = log.transactionHash
+      const eventName = log.decodedName || 'Unknown'
+      const topics = log.topics?.join('; ') || ''
+      const data = log.data || ''
+      const decodedArgs = log.decodedArgs
+        ? JSON.stringify(log.decodedArgs, (key, value) =>
+            typeof value === 'bigint' ? value.toString() : value
+          )
+        : ''
+      return [block, txHash, eventName, topics, data, decodedArgs]
+    })
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `event_logs_${address.slice(0, 10)}_${Date.now()}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
   // Load history, cached addresses, and Tenderly settings on mount
   useEffect(() => {
     try {
@@ -3296,7 +3331,14 @@ export default function ContractCaller() {
                 {eventLogs.length > 0 && (
                   <div className={styles.logsResults}>
                     <div className={styles.logsResultsHeader}>
-                      Found {eventLogs.length} logs
+                      <span>Found {eventLogs.length} logs</span>
+                      <button
+                        onClick={downloadLogsAsCsv}
+                        className={styles.downloadCsvButton}
+                        type="button"
+                      >
+                        Download CSV
+                      </button>
                     </div>
                     <div className={styles.logsTableContainer}>
                       <table className={styles.logsTable}>
