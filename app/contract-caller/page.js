@@ -3606,13 +3606,36 @@ export default function ContractCaller() {
                         }
                       </span>
                       <div className={styles.logsHeaderActions}>
-                        <input
-                          type="text"
-                          value={logsFilter}
-                          onChange={(e) => setLogsFilter(e.target.value)}
-                          placeholder="event = Transfer and args.to = 0x..."
-                          className={styles.logsFilterInput}
-                        />
+                        <div className={styles.filterInputWrapper}>
+                          <input
+                            type="text"
+                            value={logsFilter}
+                            onChange={(e) => setLogsFilter(e.target.value)}
+                            placeholder="event = Transfer and args.to = 0x..."
+                            className={styles.logsFilterInput}
+                          />
+                          <span className={styles.filterHelpIcon}>
+                            ?
+                            <div className={styles.filterHelpPopup}>
+                              <div className={styles.filterHelpTitle}>Filter Syntax</div>
+                              <div className={styles.filterHelpRow}>
+                                <span className={styles.filterHelpLabel}>Fields:</span>
+                                <code>event</code> <code>args.*</code> <code>topic0-3</code> <code>data</code> <code>block</code> <code>tx</code>
+                              </div>
+                              <div className={styles.filterHelpRow}>
+                                <span className={styles.filterHelpLabel}>Operators:</span>
+                                <code>=</code> <code>!=</code> <code>&gt;</code> <code>&lt;</code> <code>contains</code>
+                              </div>
+                              <div className={styles.filterHelpRow}>
+                                <span className={styles.filterHelpLabel}>Boolean:</span>
+                                <code>and</code> <code>or</code>
+                              </div>
+                              <div className={styles.filterHelpExample}>
+                                Example: event = Transfer and args.value &gt; 1000
+                              </div>
+                            </div>
+                          </span>
+                        </div>
                         <button
                           onClick={downloadLogsAsCsv}
                           className={styles.downloadCsvButton}
@@ -3621,12 +3644,6 @@ export default function ContractCaller() {
                           Download CSV
                         </button>
                       </div>
-                    </div>
-                    <div className={styles.filterSyntaxHelp}>
-                      <span className={styles.filterSyntaxLabel}>Filter:</span>
-                      <code>event</code> <code>args.*</code> <code>topic0-3</code> <code>data</code> <code>block</code> <code>tx</code>
-                      <span className={styles.filterSyntaxOps}>=  !=  &gt;  &lt;  contains</span>
-                      <span className={styles.filterSyntaxBool}>and  or</span>
                     </div>
                     <div className={styles.logsTableContainer}>
                       <table className={styles.logsTable}>

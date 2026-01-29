@@ -3775,45 +3775,102 @@
   color: var(--text-muted);
 }
 
-/* Filter Syntax Help */
-.filterSyntaxHelp {
+/* Filter Input with Help Popup */
+.filterInputWrapper {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 1rem;
+  flex: 1;
+  min-width: 150px;
+}
+
+.filterInputWrapper .logsFilterInput {
+  flex: 1;
+  padding-right: 2rem;
+}
+
+.filterHelpIcon {
+  position: absolute;
+  right: 0.5rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
   background-color: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-secondary);
-  font-size: 0.95rem;
+  border: 1px solid var(--border-primary);
+  border-radius: 50%;
+  cursor: help;
+  transition: all 0.2s;
+}
+
+.filterHelpIcon:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-blue);
+  background-color: var(--bg-hover);
+}
+
+.filterHelpPopup {
+  display: none;
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  min-width: 320px;
+  padding: 1rem;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+}
+
+.filterHelpIcon:hover .filterHelpPopup {
+  display: block;
+}
+
+.filterHelpTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.filterHelpRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
   flex-wrap: wrap;
 }
 
-.filterSyntaxHelp code {
+.filterHelpLabel {
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 70px;
+}
+
+.filterHelpPopup code {
   background-color: var(--bg-code);
-  padding: 0.2rem 0.5rem;
+  padding: 0.15rem 0.4rem;
   border-radius: 4px;
   font-family: 'Monaco', 'Menlo', monospace;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: #9333ea;
   font-weight: 600;
 }
 
-.filterSyntaxLabel {
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.filterSyntaxOps {
+.filterHelpExample {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-primary);
+  font-size: 0.85rem;
+  color: var(--text-muted);
   font-family: 'Monaco', 'Menlo', monospace;
-  color: var(--accent-blue);
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.filterSyntaxBool {
-  font-family: 'Monaco', 'Menlo', monospace;
-  color: #059669;
-  font-weight: 600;
-  font-size: 0.9rem;
 }
 
 .downloadCsvButton {
