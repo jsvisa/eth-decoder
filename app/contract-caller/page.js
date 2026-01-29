@@ -835,9 +835,12 @@ export default function ContractCaller() {
   const downloadLogsAsCsv = () => {
     if (eventLogs.length === 0) return
 
-    const headers = ['Block', 'Tx Hash', 'Event', 'Topics', 'Data', 'Decoded Args']
+    const headers = ['Block', 'Timestamp', 'Tx Hash', 'Event', 'Topics', 'Data', 'Decoded Args']
     const rows = eventLogs.map(log => {
       const block = parseInt(log.blockNumber, 16)
+      const timestamp = log.timeStamp
+        ? new Date(parseInt(log.timeStamp, 16) * 1000).toISOString()
+        : ''
       const txHash = log.transactionHash
       const eventName = log.decodedName || 'Unknown'
       const topics = log.topics?.join('; ') || ''
@@ -847,7 +850,7 @@ export default function ContractCaller() {
             typeof value === 'bigint' ? value.toString() : value
           )
         : ''
-      return [block, txHash, eventName, topics, data, decodedArgs]
+      return [block, timestamp, txHash, eventName, topics, data, decodedArgs]
     })
 
     const csvContent = [
@@ -3353,7 +3356,14 @@ export default function ContractCaller() {
                         <tbody>
                           {eventLogs.map((log, idx) => (
                             <tr key={idx} className={styles.logRow}>
-                              <td>{parseInt(log.blockNumber, 16)}</td>
+                              <td className={styles.logBlockCell}>
+                                <div className={styles.logBlockNumber}>{parseInt(log.blockNumber, 16)}</div>
+                                {log.timeStamp && (
+                                  <div className={styles.logTimestamp}>
+                                    {new Date(parseInt(log.timeStamp, 16) * 1000).toLocaleString()}
+                                  </div>
+                                )}
+                              </td>
                               <td className={styles.logTxHash}>
                                 <a
                                   href={`https://etherscan.io/tx/${log.transactionHash}`}

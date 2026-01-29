@@ -3717,6 +3717,21 @@
   background-color: var(--bg-hover);
 }
 
+.logBlockCell {
+  white-space: nowrap;
+}
+
+.logBlockNumber {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.logTimestamp {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
 .logTxHash a {
   color: var(--accent-blue);
   text-decoration: none;
