@@ -554,6 +554,9 @@ export default function ContractCaller() {
   const [logsPage, setLogsPage] = useState(1) // Pagination page
   const [logsOffset, setLogsOffset] = useState(1000) // Records per page
   const [logsFilter, setLogsFilter] = useState('') // Filter for topics/data after fetch
+  const [logsFromBlock, setLogsFromBlock] = useState('') // From block (empty = auto latest-10000)
+  const [logsToBlock, setLogsToBlock] = useState('latest') // To block
+  const [latestBlockCache, setLatestBlockCache] = useState(null) // Cached latest block number
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null) // { functionName, args, timestamp }
   const bookmarkInputRef = useRef(null)
@@ -757,6 +760,31 @@ export default function ContractCaller() {
     }
   }
 
+  // Fetch latest block number from Etherscan
+  const fetchLatestBlock = async () => {
+    const chainIdForApi = getChainId(chain)
+    if (!chainIdForApi || !apiKeys.etherscan) return null
+
+    try {
+      const params = new URLSearchParams({
+        chainid: chainIdForApi.toString(),
+        module: 'proxy',
+        action: 'eth_blockNumber',
+        apikey: apiKeys.etherscan,
+      })
+      const response = await fetch(`https://api.etherscan.io/v2/api?${params}`)
+      const data = await response.json()
+      if (data.result) {
+        const blockNum = parseInt(data.result, 16)
+        setLatestBlockCache(blockNum)
+        return blockNum
+      }
+    } catch (err) {
+      console.error('Failed to fetch latest block:', err)
+    }
+    return null
+  }
+
   // Fetch logs for selected events
   const fetchLogs = async () => {
     if (selectedEvents.length === 0) {
@@ -780,6 +808,20 @@ export default function ContractCaller() {
     setEventLogs([])
 
     try {
+      // Determine block range
+      let fromBlock = logsFromBlock.trim()
+      let toBlock = logsToBlock.trim() || 'latest'
+
+      // If fromBlock is empty, default to latest - 10000
+      if (!fromBlock) {
+        const latestBlock = latestBlockCache || await fetchLatestBlock()
+        if (latestBlock) {
+          fromBlock = Math.max(0, latestBlock - 10000).toString()
+        } else {
+          fromBlock = '0' // Fallback if can't get latest
+        }
+      }
+
       const allLogs = []
 
       for (const eventName of selectedEvents) {
@@ -792,8 +834,8 @@ export default function ContractCaller() {
           address,
           chain,
           topic0,
-          fromBlock: '0',
-          toBlock: 'latest',
+          fromBlock,
+          toBlock,
           page: logsPage.toString(),
           offset: logsOffset.toString(),
         })
@@ -3462,6 +3504,29 @@ export default function ContractCaller() {
                 </div>
 
                 <div className={styles.logsControls}>
+                  <div className={styles.blockRangeControls}>
+                    <label>
+                      From:
+                      <input
+                        type="text"
+                        value={logsFromBlock}
+                        onChange={(e) => setLogsFromBlock(e.target.value.replace(/[^0-9]/g, ''))}
+                        placeholder={latestBlockCache ? `${Math.max(0, latestBlockCache - 10000)}` : 'latest-10k'}
+                        className={styles.blockRangeInput}
+                        title="Leave empty to auto-fetch last 10,000 blocks"
+                      />
+                    </label>
+                    <label>
+                      To:
+                      <input
+                        type="text"
+                        value={logsToBlock}
+                        onChange={(e) => setLogsToBlock(e.target.value)}
+                        placeholder="latest"
+                        className={styles.blockRangeInput}
+                      />
+                    </label>
+                  </div>
                   <div className={styles.paginationControls}>
                     <label>
                       Page:
