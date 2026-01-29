@@ -2937,7 +2937,7 @@ export default function ContractCaller() {
           </div>
 
           {(functions.length > 0 || getEvents().length > 0) && (
-            <>
+            <div className={styles.tabSection}>
               {/* Tab Switcher */}
               <div className={styles.tabContainer}>
                 <button
@@ -3696,7 +3696,7 @@ export default function ContractCaller() {
                 )}
               </div>
               )}
-            </>
+            </div>
           )}
 
           {activeTab === 'functions' && (

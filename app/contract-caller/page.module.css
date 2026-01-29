@@ -3419,11 +3419,17 @@
   color: var(--text-muted);
 }
 
+/* Tab Section - wraps tabs and content together */
+.tabSection {
+  display: flex;
+  flex-direction: column;
+}
+
 /* Tab Container Styles */
 .tabContainer {
   display: flex;
   gap: 0;
-  margin-bottom: 0;
+  margin-bottom: 0.5rem;
   border-bottom: 2px solid var(--border-primary);
 }
 
@@ -3456,7 +3462,6 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  margin-top: 0.5rem;
 }
 
 .eventListHeader {
