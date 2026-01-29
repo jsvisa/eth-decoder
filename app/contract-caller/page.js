@@ -558,6 +558,7 @@ export default function ContractCaller() {
   const [logsToBlock, setLogsToBlock] = useState('latest') // To block
   const [latestBlockCache, setLatestBlockCache] = useState(null) // Cached latest block number
   const [logsFetched, setLogsFetched] = useState(false) // Track if fetch was attempted
+  const [eventListCollapsed, setEventListCollapsed] = useState(false) // Collapse event selection list
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null) // { functionName, args, timestamp }
   const bookmarkInputRef = useRef(null)
@@ -3463,49 +3464,7 @@ export default function ContractCaller() {
               {/* Events Tab */}
               {activeTab === 'events' && getEvents().length > 0 && (
               <div className={styles.eventsSection}>
-                <div className={styles.eventListHeader}>
-                  <input
-                    type="text"
-                    value={eventFilter}
-                    onChange={(e) => setEventFilter(e.target.value)}
-                    placeholder="Search events..."
-                    className={styles.eventSearchInput}
-                  />
-                  <button
-                    onClick={selectAllEvents}
-                    className={styles.eventSelectBtn}
-                    type="button"
-                  >
-                    Select All
-                  </button>
-                  <button
-                    onClick={clearEventSelection}
-                    className={styles.eventSelectBtn}
-                    type="button"
-                  >
-                    Clear
-                  </button>
-                </div>
-                <div className={styles.eventList}>
-                  {getFilteredEvents().map((event) => (
-                    <label key={event.name} className={styles.eventItem}>
-                      <input
-                        type="checkbox"
-                        checked={selectedEvents.includes(event.name)}
-                        onChange={() => toggleEventSelection(event.name)}
-                      />
-                      <span className={styles.eventTag}>E</span>
-                      <span className={styles.eventName}>{event.name}</span>
-                      <span className={styles.eventParams}>
-                        ({event.inputs?.map(i => `${i.indexed ? 'indexed ' : ''}${i.type}`).join(', ')})
-                      </span>
-                    </label>
-                  ))}
-                  {getFilteredEvents().length === 0 && (
-                    <div className={styles.eventItemEmpty}>No matching events</div>
-                  )}
-                </div>
-
+                {/* Fetch Controls - Always visible at top */}
                 <div className={styles.logsControls}>
                   <div className={styles.blockRangeControls}>
                     <label>
@@ -3562,6 +3521,67 @@ export default function ContractCaller() {
                   >
                     {fetchingLogs ? 'Fetching...' : `Fetch Logs (${selectedEvents.length} selected)`}
                   </button>
+                </div>
+
+                {/* Collapsible Event Selection */}
+                <div className={styles.eventSelectionSection}>
+                  <div
+                    className={styles.eventSelectionHeader}
+                    onClick={() => setEventListCollapsed(!eventListCollapsed)}
+                  >
+                    <span className={styles.eventSelectionToggle}>
+                      {eventListCollapsed ? '▶' : '▼'}
+                    </span>
+                    <span className={styles.eventSelectionTitle}>
+                      Select Events ({selectedEvents.length} of {getEvents().length} selected)
+                    </span>
+                  </div>
+                  {!eventListCollapsed && (
+                    <>
+                      <div className={styles.eventListHeader}>
+                        <input
+                          type="text"
+                          value={eventFilter}
+                          onChange={(e) => setEventFilter(e.target.value)}
+                          placeholder="Search events..."
+                          className={styles.eventSearchInput}
+                        />
+                        <button
+                          onClick={selectAllEvents}
+                          className={styles.eventSelectBtn}
+                          type="button"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          onClick={clearEventSelection}
+                          className={styles.eventSelectBtn}
+                          type="button"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className={styles.eventList}>
+                        {getFilteredEvents().map((event) => (
+                          <label key={event.name} className={styles.eventItem}>
+                            <input
+                              type="checkbox"
+                              checked={selectedEvents.includes(event.name)}
+                              onChange={() => toggleEventSelection(event.name)}
+                            />
+                            <span className={styles.eventTag}>E</span>
+                            <span className={styles.eventName}>{event.name}</span>
+                            <span className={styles.eventParams}>
+                              ({event.inputs?.map(i => `${i.indexed ? 'indexed ' : ''}${i.type}`).join(', ')})
+                            </span>
+                          </label>
+                        ))}
+                        {getFilteredEvents().length === 0 && (
+                          <div className={styles.eventItemEmpty}>No matching events</div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {logsError && (
