@@ -557,6 +557,7 @@ export default function ContractCaller() {
   const [logsFromBlock, setLogsFromBlock] = useState('') // From block (empty = auto latest-10000)
   const [logsToBlock, setLogsToBlock] = useState('latest') // To block
   const [latestBlockCache, setLatestBlockCache] = useState(null) // Cached latest block number
+  const [logsFetched, setLogsFetched] = useState(false) // Track if fetch was attempted
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null) // { functionName, args, timestamp }
   const bookmarkInputRef = useRef(null)
@@ -867,6 +868,7 @@ export default function ContractCaller() {
       // Decode all logs
       const decodedLogs = allLogs.map(log => decodeLog(log))
       setEventLogs(decodedLogs)
+      setLogsFetched(true)
     } catch (err) {
       setLogsError(err.message || 'Failed to fetch logs')
     } finally {
@@ -3564,6 +3566,12 @@ export default function ContractCaller() {
                 {logsError && (
                   <div className={styles.logsErrorBox}>
                     <strong>Error:</strong> {logsError}
+                  </div>
+                )}
+
+                {logsFetched && eventLogs.length === 0 && !logsError && (
+                  <div className={styles.logsEmptyBox}>
+                    No logs found in the specified block range.
                   </div>
                 )}
 

@@ -3686,6 +3686,17 @@
   font-size: 0.9rem;
 }
 
+/* Logs Empty Box */
+.logsEmptyBox {
+  padding: 1.5rem;
+  background-color: var(--bg-code);
+  border: 1px solid var(--border-secondary);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
 /* Logs Results */
 .logsResults {
   background-color: var(--bg-code);
