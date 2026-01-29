@@ -876,12 +876,13 @@ export default function ContractCaller() {
     }
   }
 
-  // Download event logs as CSV
+  // Download event logs as CSV (respects current filter)
   const downloadLogsAsCsv = () => {
-    if (eventLogs.length === 0) return
+    const logsToExport = getFilteredLogs()
+    if (logsToExport.length === 0) return
 
     const headers = ['Block', 'Timestamp', 'Tx Hash', 'Event', 'Topics', 'Data', 'Decoded Args']
-    const rows = eventLogs.map(log => {
+    const rows = logsToExport.map(log => {
       const block = parseInt(log.blockNumber, 16)
       const timestamp = log.timeStamp
         ? new Date(parseInt(log.timeStamp, 16) * 1000).toISOString()
