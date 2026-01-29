@@ -870,28 +870,174 @@ export default function ContractCaller() {
     URL.revokeObjectURL(url)
   }
 
-  // Filter fetched logs by topic/data content
+  // Parse and evaluate boolean filter expression for logs
+  // Syntax: field op value [and|or field op value ...]
+  // Fields: event, args.*, topic0-3, data, block, tx
+  // Operators: =, !=, >, <, >=, <=, contains
+  const parseFilterExpression = (expr) => {
+    if (!expr.trim()) return () => true
+
+    // Tokenize: split by and/or while preserving them, handle quoted strings
+    const tokenize = (str) => {
+      const tokens = []
+      let current = ''
+      let inQuote = false
+      let quoteChar = ''
+
+      for (let i = 0; i < str.length; i++) {
+        const char = str[i]
+
+        if ((char === '"' || char === "'") && !inQuote) {
+          inQuote = true
+          quoteChar = char
+          current += char
+        } else if (char === quoteChar && inQuote) {
+          inQuote = false
+          current += char
+          quoteChar = ''
+        } else if (!inQuote && (char === ' ' || char === '\t')) {
+          if (current.trim()) {
+            tokens.push(current.trim())
+            current = ''
+          }
+        } else {
+          current += char
+        }
+      }
+      if (current.trim()) tokens.push(current.trim())
+      return tokens
+    }
+
+    // Parse a single condition: field op value
+    const parseCondition = (tokens, startIdx) => {
+      if (startIdx >= tokens.length) return { condition: null, nextIdx: startIdx }
+
+      const field = tokens[startIdx]
+      if (!field || field.toLowerCase() === 'and' || field.toLowerCase() === 'or') {
+        return { condition: null, nextIdx: startIdx }
+      }
+
+      const op = tokens[startIdx + 1]
+      let value = tokens[startIdx + 2]
+
+      if (!op || !value) return { condition: null, nextIdx: startIdx + 1 }
+
+      // Remove quotes from value
+      if ((value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1)
+      }
+
+      return {
+        condition: { field: field.toLowerCase(), op: op.toLowerCase(), value },
+        nextIdx: startIdx + 3
+      }
+    }
+
+    // Evaluate a condition against a log
+    const evalCondition = (cond, log) => {
+      if (!cond) return true
+
+      const { field, op, value } = cond
+      let logValue = null
+
+      // Get field value from log
+      if (field === 'event') {
+        logValue = log.decodedName || ''
+      } else if (field.startsWith('args.')) {
+        const argName = field.slice(5)
+        if (log.decodedArgs) {
+          logValue = log.decodedArgs[argName]
+          if (typeof logValue === 'bigint') logValue = logValue.toString()
+          else if (logValue !== undefined) logValue = String(logValue)
+        }
+      } else if (field.startsWith('topic')) {
+        const idx = parseInt(field.slice(5)) || 0
+        logValue = log.topics?.[idx] || ''
+      } else if (field === 'data') {
+        logValue = log.data || ''
+      } else if (field === 'block') {
+        logValue = parseInt(log.blockNumber, 16)
+      } else if (field === 'tx') {
+        logValue = log.transactionHash || ''
+      } else {
+        return true // Unknown field, pass through
+      }
+
+      if (logValue === null || logValue === undefined) logValue = ''
+
+      // Compare based on operator
+      const strValue = String(logValue).toLowerCase()
+      const compareValue = String(value).toLowerCase()
+
+      switch (op) {
+        case '=':
+        case '==':
+          return strValue === compareValue
+        case '!=':
+        case '<>':
+          return strValue !== compareValue
+        case 'contains':
+          return strValue.includes(compareValue)
+        case '>':
+          return Number(logValue) > Number(value)
+        case '<':
+          return Number(logValue) < Number(value)
+        case '>=':
+          return Number(logValue) >= Number(value)
+        case '<=':
+          return Number(logValue) <= Number(value)
+        default:
+          return strValue.includes(compareValue) // Default to contains
+      }
+    }
+
+    // Parse the full expression
+    const tokens = tokenize(expr)
+    const conditions = []
+    const operators = []
+    let idx = 0
+
+    while (idx < tokens.length) {
+      const token = tokens[idx].toLowerCase()
+      if (token === 'and' || token === 'or') {
+        operators.push(token)
+        idx++
+      } else {
+        const { condition, nextIdx } = parseCondition(tokens, idx)
+        if (condition) {
+          conditions.push(condition)
+        }
+        idx = nextIdx
+      }
+    }
+
+    // Return evaluator function
+    return (log) => {
+      if (conditions.length === 0) return true
+
+      let result = evalCondition(conditions[0], log)
+      for (let i = 0; i < operators.length && i + 1 < conditions.length; i++) {
+        const nextResult = evalCondition(conditions[i + 1], log)
+        if (operators[i] === 'and') {
+          result = result && nextResult
+        } else {
+          result = result || nextResult
+        }
+      }
+      return result
+    }
+  }
+
+  // Filter fetched logs using boolean expression
   const getFilteredLogs = () => {
     if (!logsFilter.trim()) return eventLogs
-    const search = logsFilter.toLowerCase()
-    return eventLogs.filter(log => {
-      // Search in topics
-      if (log.topics?.some(t => t.toLowerCase().includes(search))) return true
-      // Search in data
-      if (log.data?.toLowerCase().includes(search)) return true
-      // Search in decoded args (stringified)
-      if (log.decodedArgs) {
-        const argsStr = JSON.stringify(log.decodedArgs, (key, value) =>
-          typeof value === 'bigint' ? value.toString() : value
-        ).toLowerCase()
-        if (argsStr.includes(search)) return true
-      }
-      // Search in event name
-      if (log.decodedName?.toLowerCase().includes(search)) return true
-      // Search in tx hash
-      if (log.transactionHash?.toLowerCase().includes(search)) return true
-      return false
-    })
+    try {
+      const evaluator = parseFilterExpression(logsFilter)
+      return eventLogs.filter(evaluator)
+    } catch {
+      return eventLogs // On parse error, return all
+    }
   }
 
   // Load history, cached addresses, and Tenderly settings on mount
@@ -3370,8 +3516,9 @@ export default function ContractCaller() {
                           type="text"
                           value={logsFilter}
                           onChange={(e) => setLogsFilter(e.target.value)}
-                          placeholder="Filter by topic, data, address..."
+                          placeholder="event = Transfer and args.to = 0x..."
                           className={styles.logsFilterInput}
+                          title="Filter syntax: field op value [and|or ...]. Fields: event, args.*, topic0-3, data, block, tx. Ops: =, !=, >, <, contains"
                         />
                         <button
                           onClick={downloadLogsAsCsv}

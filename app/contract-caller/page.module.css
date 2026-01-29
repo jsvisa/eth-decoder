@@ -3676,9 +3676,10 @@
 }
 
 .logsFilterInput {
-  width: 220px;
+  width: 320px;
   padding: 0.375rem 0.75rem;
   font-size: 0.8rem;
+  font-family: 'Monaco', 'Menlo', monospace;
   border: 1px solid var(--border-primary);
   border-radius: 4px;
   background-color: var(--bg-input);
