@@ -218,8 +218,25 @@ const getCachedAddresses = () => {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
       if (key && key.startsWith(ABI_CACHE_PREFIX)) {
-        const [, chainAndAddress] = key.split(ABI_CACHE_PREFIX)
-        const [chain, address] = chainAndAddress.split('-')
+        const withoutPrefix = key.substring(ABI_CACHE_PREFIX.length)
+
+        // Parse chain and address from key
+        // Format: {chain}-{address} where chain could be "ethereum" or "chain-1"
+        let chain, address
+        if (withoutPrefix.startsWith('chain-')) {
+          // Custom chain format: chain-{chainId}-{address}
+          const addressIndex = withoutPrefix.indexOf('-0x')
+          if (addressIndex === -1) continue
+          chain = withoutPrefix.substring(0, addressIndex)
+          address = withoutPrefix.substring(addressIndex + 1)
+        } else {
+          // Built-in chain format: {chainName}-{address}
+          const firstDash = withoutPrefix.indexOf('-')
+          if (firstDash === -1) continue
+          chain = withoutPrefix.substring(0, firstDash)
+          address = withoutPrefix.substring(firstDash + 1)
+        }
+
         const cached = JSON.parse(localStorage.getItem(key))
         addresses.push({
           chain,
@@ -2837,7 +2854,8 @@ export default function ContractCaller() {
                           const textMatch = addressFilter === '' ||
                             item.address.toLowerCase().includes(addressFilter.toLowerCase()) ||
                             (item.label && item.label.toLowerCase().includes(addressFilter.toLowerCase())) ||
-                            (item.contractName && item.contractName.toLowerCase().includes(addressFilter.toLowerCase()))
+                            (item.contractName && item.contractName.toLowerCase().includes(addressFilter.toLowerCase())) ||
+                            (item.implContractName && item.implContractName.toLowerCase().includes(addressFilter.toLowerCase()))
                           return chainMatch && textMatch
                         })
                         .slice(0, 10)
