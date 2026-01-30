@@ -176,6 +176,15 @@ const formatAbiCompact = (abi) => {
   }).join(',\n') + '\n]'
 }
 
+// Get contract name from cache for a given address
+const getContractNameFromCache = (chain, address) => {
+  if (!address) return null
+  const cached = getCachedAbi(chain, address)
+  if (!cached) return null
+  // Return implementation name for proxies, otherwise contract name
+  return cached.implContractName || cached.contractName || null
+}
+
 // Get all cached contract addresses
 const getCachedAddresses = () => {
   const addresses = []
@@ -3903,11 +3912,16 @@ export default function ContractCaller() {
             {result.simulated && result.logs && result.logs.length > 0 && (
               <div className={styles.logsSection}>
                 <h3 className={styles.logsTitle}>Event Logs ({result.logs.length})</h3>
-                {result.logs.map((log, index) => (
+                {result.logs.map((log, index) => {
+                  const contractName = getContractNameFromCache(chain, log.address)
+                  return (
                   <div key={index} className={styles.logItem}>
                     <div className={styles.logHeader}>
                       <span className={styles.logName}>{log.name || 'Unknown Event'}</span>
-                      <span className={styles.logAddress}>{log.address}</span>
+                      <span className={styles.logAddress}>
+                        {contractName && <span className={styles.logContractName}>{contractName}</span>}
+                        {log.address}
+                      </span>
                     </div>
                     {log.inputs && log.inputs.length > 0 && (
                       <div className={styles.logInputs}>
@@ -3941,7 +3955,7 @@ export default function ContractCaller() {
                       </div>
                     )}
                   </div>
-                ))}
+                )})}
               </div>
             )}
 
