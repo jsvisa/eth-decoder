@@ -367,13 +367,6 @@ export default function AddressBook() {
                         </td>
                         <td className={styles.tdDate}>{formatDate(item.createdAt)}</td>
                         <td className={styles.tdActions}>
-                          <a
-                            href={`/contract-caller?address=${item.address}`}
-                            className={styles.openButton}
-                            title="Use in Contract Caller"
-                          >
-                            Open
-                          </a>
                           <button
                             onClick={() => handleEdit(item)}
                             className={styles.editButton}
