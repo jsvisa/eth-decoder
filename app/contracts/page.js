@@ -246,10 +246,17 @@ export default function Contracts() {
           </div>
         </div>
 
-        {success && (
+        {success && !success.includes('copied') && (
           <div className={styles.success}>
             {success}
             <button onClick={() => setSuccess(null)} className={styles.dismissButton}>x</button>
+          </div>
+        )}
+
+        {/* Toast notification for copy feedback */}
+        {success && success.includes('copied') && (
+          <div className={styles.toast}>
+            {success}
           </div>
         )}
 
