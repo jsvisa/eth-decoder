@@ -34,47 +34,33 @@
   flex-wrap: wrap;
 }
 
-.addButton {
-  padding: 0.625rem 1.25rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: white;
-  background-color: var(--accent-blue);
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.addButton:hover {
-  background-color: var(--accent-blue-hover);
-}
-
-.importButton,
-.exportButton {
+.deleteAllButton {
   padding: 0.625rem 1.25rem;
   font-size: 0.9rem;
   font-weight: 500;
-  color: var(--text-secondary);
-  background-color: var(--bg-hover);
-  border: 1px solid var(--border-primary);
+  color: #dc2626;
+  background-color: white;
+  border: 1px solid #fecaca;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
-.importButton:hover,
-.exportButton:hover {
-  background-color: #e8e8e8;
-  border-color: #ccc;
+.deleteAllButton:hover {
+  background-color: #fee2e2;
+  border-color: #dc2626;
 }
 
-.exportButton:disabled {
+.deleteAllButton:disabled {
   color: #999;
+  border-color: #ddd;
   cursor: not-allowed;
 }
 
-.error,
+.deleteAllButton:disabled:hover {
+  background-color: white;
+}
+
 .success {
   padding: 1rem 1.25rem;
   border-radius: 6px;
@@ -82,15 +68,6 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.error {
-  background-color: #fee2e2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
-}
-
-.success {
   background-color: #d1fae5;
   border: 1px solid #a7f3d0;
   color: #059669;
@@ -162,6 +139,22 @@
   border-color: var(--border-focus);
 }
 
+.chainSelect {
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border: 2px solid var(--border-primary);
+  border-radius: 6px;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  cursor: pointer;
+  min-width: 180px;
+}
+
+.chainSelect:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
 .count {
   color: var(--text-secondary);
   font-size: 0.875rem;
@@ -176,7 +169,6 @@
 
 .emptyIcon {
   font-size: 3rem;
-  color: #f59e0b;
   margin-bottom: 1rem;
 }
 
@@ -186,7 +178,23 @@
 }
 
 .emptyState p {
-  margin: 0;
+  margin: 0 0 1.5rem 0;
+}
+
+.goToCallerButton {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  background-color: var(--accent-blue);
+  border-radius: 6px;
+  text-decoration: none;
+  transition: background-color 0.2s;
+}
+
+.goToCallerButton:hover {
+  background-color: var(--accent-blue-hover);
 }
 
 /* Table styles */
@@ -223,16 +231,21 @@
   background-color: var(--bg-hover);
 }
 
-.thLabel {
-  min-width: 180px;
+.thChain {
+  width: 160px;
 }
 
 .thAddress {
   width: 180px;
 }
 
-.thNotes {
-  min-width: 150px;
+.thName {
+  min-width: 200px;
+}
+
+.thStats {
+  width: 80px;
+  text-align: center !important;
 }
 
 .thDate {
@@ -243,32 +256,44 @@
   width: 140px;
 }
 
+.tdStats {
+  text-align: center;
+  color: var(--text-secondary);
+}
+
 .tdDate {
   color: var(--text-secondary);
   font-size: 0.85rem;
 }
 
-/* Label cell */
-.labelCell {
+/* Chain cell */
+.chainCell {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  flex-wrap: wrap;
 }
 
-.star {
-  color: #f59e0b;
-  font-size: 1rem;
+.chainIcon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
-.labelText {
+.chainInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.chainName {
   font-weight: 500;
   color: var(--text-primary);
 }
 
-.contractName {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
+.chainId {
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 /* Address */
@@ -287,30 +312,27 @@
   filter: brightness(0.95);
 }
 
-/* Notes */
-.notesText {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+/* Name cell */
+.nameCell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
-/* Inline edit input */
-.inlineInput {
-  width: 100%;
-  padding: 0.375rem 0.5rem;
-  font-size: 0.9rem;
-  border: 1px solid var(--border-focus);
-  border-radius: 4px;
-  background-color: var(--bg-input);
+.contractName {
   color: var(--text-primary);
+  font-weight: 500;
 }
 
-.inlineInput:focus {
-  outline: none;
-  border-color: var(--accent-blue);
+.proxyBadge {
+  padding: 0.125rem 0.375rem;
+  background-color: #fef3c7;
+  color: #92400e;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 /* Actions */
@@ -336,24 +358,6 @@
   background-color: var(--accent-blue-light);
 }
 
-.editButton {
-  padding: 0.375rem 0.75rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: #666;
-  background-color: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-  margin-right: 0.5rem;
-}
-
-.editButton:hover {
-  background-color: #f5f5f5;
-  border-color: #ccc;
-}
-
 .deleteButton {
   padding: 0.375rem 0.75rem;
   font-size: 0.8rem;
@@ -371,192 +375,6 @@
   border-color: #dc2626;
 }
 
-.saveButton {
-  padding: 0.375rem 0.75rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: white;
-  background-color: var(--accent-blue);
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  margin-right: 0.5rem;
-}
-
-.saveButton:hover {
-  background-color: var(--accent-blue-hover);
-}
-
-.cancelButton {
-  padding: 0.375rem 0.75rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: #666;
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.cancelButton:hover {
-  background-color: #e8e8e8;
-}
-
-/* Modal styles */
-.modalOverlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal {
-  background: white;
-  border-radius: 12px;
-  padding: 1.5rem;
-  width: 90%;
-  max-width: 500px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-}
-
-.modalTitle {
-  margin: 0 0 1.5rem 0;
-  font-size: 1.25rem;
-  color: #333;
-}
-
-.modalBody {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.modalField {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-}
-
-.modalLabel {
-  font-weight: 500;
-  color: #555;
-  font-size: 0.875rem;
-}
-
-.modalInput {
-  padding: 0.75rem 1rem;
-  font-size: 1rem;
-  border: 2px solid #ddd;
-  border-radius: 6px;
-  transition: border-color 0.2s;
-}
-
-.modalInput:focus {
-  outline: none;
-  border-color: #0070f3;
-}
-
-.modalTextarea {
-  padding: 0.75rem 1rem;
-  font-size: 0.9rem;
-  border: 2px solid #ddd;
-  border-radius: 6px;
-  resize: vertical;
-  min-height: 60px;
-  transition: border-color 0.2s;
-}
-
-.modalTextarea:focus {
-  outline: none;
-  border-color: #0070f3;
-}
-
-.modalActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  margin-top: 1.5rem;
-}
-
-.modalCancelButton {
-  padding: 0.75rem 1.25rem;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: #666;
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.modalCancelButton:hover {
-  background-color: #e8e8e8;
-}
-
-.modalSaveButton {
-  padding: 0.75rem 1.25rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: white;
-  background-color: #0070f3;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.modalSaveButton:hover {
-  background-color: #0051cc;
-}
-
-/* Import modal specific styles */
-.importInfo {
-  margin: 0;
-  color: #666;
-  font-size: 0.9rem;
-}
-
-.csvFormat {
-  display: block;
-  padding: 0.75rem 1rem;
-  background-color: #f5f5f5;
-  border-radius: 4px;
-  font-size: 0.85rem;
-  color: #333;
-}
-
-.importNote {
-  margin: 0;
-  color: #666;
-  font-size: 0.85rem;
-}
-
-.checkboxLabel {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  color: #555;
-  cursor: pointer;
-}
-
-.checkboxLabel input {
-  width: 1rem;
-  height: 1rem;
-  cursor: pointer;
-}
-
-.fileInput {
-  display: none;
-}
-
 @media (max-width: 900px) {
   .container {
     padding: 1rem;
@@ -567,22 +385,16 @@
     align-items: flex-start;
   }
 
-  .headerActions {
-    width: 100%;
-  }
-
-  .addButton,
-  .importButton,
-  .exportButton {
-    flex: 1;
-  }
-
   .filterRow {
     flex-direction: column;
     align-items: stretch;
   }
 
   .searchInput {
+    width: 100%;
+  }
+
+  .chainSelect {
     width: 100%;
   }
 
@@ -595,8 +407,8 @@
     padding: 0.5rem;
   }
 
-  .thNotes,
-  .tdNotes {
+  .thStats,
+  .tdStats {
     display: none;
   }
 
@@ -606,10 +418,7 @@
   }
 
   .openButton,
-  .editButton,
-  .deleteButton,
-  .saveButton,
-  .cancelButton {
+  .deleteButton {
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
   }

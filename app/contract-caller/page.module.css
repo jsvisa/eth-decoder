@@ -1506,10 +1506,22 @@
   font-size: 0.95rem;
 }
 
+.logTokenSymbol {
+  color: #ce9178;
+  font-weight: 500;
+  margin-left: 0.5rem;
+}
+
 .logAddress {
   color: #808080;
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 0.8rem;
+}
+
+.logContractName {
+  color: #dcdcaa;
+  font-weight: 500;
+  margin-right: 0.5rem;
 }
 
 .logInputs {

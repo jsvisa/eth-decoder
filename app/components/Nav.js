@@ -31,6 +31,12 @@ export default function Nav() {
           >
             Address Book
           </Link>
+          <Link
+            href="/contracts"
+            className={`${styles.link} ${pathname === '/contracts' ? styles.active : ''}`}
+          >
+            Contracts
+          </Link>
         </div>
         <button
           onClick={toggleTheme}

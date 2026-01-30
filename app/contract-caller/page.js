@@ -11,7 +11,8 @@ import {
   isAddressBookmarked,
   getBookmarkedAddress,
 } from '../utils/addressBook'
-import { simulateWithTevm } from '../utils/tevmSimulator'
+import { simulateWithTevm, redecodeLogs } from '../utils/tevmSimulator'
+import { buildAbiCacheFromStorage, fetchAbisForAddresses } from '../utils/abiCache'
 import { isValidEthAddress, isValidForkBlock, isValidNumber, isValidPositiveInteger } from '../utils/validation'
 
 const CHAINS = [
@@ -24,6 +25,7 @@ const CHAINS = [
 
 const STORAGE_KEY = 'contract_caller_history'
 const ABI_CACHE_PREFIX = 'abi-'
+const TOKEN_SYMBOL_CACHE_PREFIX = 'token-symbol-'
 const TENDERLY_SETTINGS_KEY = 'tenderly_settings'
 const API_KEYS_STORAGE_KEY = 'api_keys_settings'
 const RPC_SETTINGS_KEY = 'rpc_settings'
@@ -175,6 +177,40 @@ const formatAbiCompact = (abi) => {
   }).join(',\n') + '\n]'
 }
 
+// Get contract name from cache for a given address
+const getContractNameFromCache = (chain, address) => {
+  if (!address) return null
+  const cached = getCachedAbi(chain, address)
+  if (!cached) return null
+  // Return implementation name for proxies, otherwise contract name
+  return cached.implContractName || cached.contractName || null
+}
+
+// Token symbol cache functions
+const getTokenSymbolCacheKey = (chain, address) => `${TOKEN_SYMBOL_CACHE_PREFIX}${chain}-${address.toLowerCase()}`
+
+const getCachedTokenSymbol = (chain, address) => {
+  if (!address) return null
+  try {
+    const key = getTokenSymbolCacheKey(chain, address)
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+const setCachedTokenSymbol = (chain, address, symbol) => {
+  try {
+    const key = getTokenSymbolCacheKey(chain, address)
+    localStorage.setItem(key, symbol)
+  } catch {
+    // Ignore cache errors
+  }
+}
+
+// ERC20 symbol() ABI for fetching token symbols
+const ERC20_SYMBOL_ABI = [{ type: 'function', name: 'symbol', inputs: [], outputs: [{ type: 'string' }], stateMutability: 'view' }]
+
 // Get all cached contract addresses
 const getCachedAddresses = () => {
   const addresses = []
@@ -182,8 +218,25 @@ const getCachedAddresses = () => {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
       if (key && key.startsWith(ABI_CACHE_PREFIX)) {
-        const [, chainAndAddress] = key.split(ABI_CACHE_PREFIX)
-        const [chain, address] = chainAndAddress.split('-')
+        const withoutPrefix = key.substring(ABI_CACHE_PREFIX.length)
+
+        // Parse chain and address from key
+        // Format: {chain}-{address} where chain could be "ethereum" or "chain-1"
+        let chain, address
+        if (withoutPrefix.startsWith('chain-')) {
+          // Custom chain format: chain-{chainId}-{address}
+          const addressIndex = withoutPrefix.indexOf('-0x')
+          if (addressIndex === -1) continue
+          chain = withoutPrefix.substring(0, addressIndex)
+          address = withoutPrefix.substring(addressIndex + 1)
+        } else {
+          // Built-in chain format: {chainName}-{address}
+          const firstDash = withoutPrefix.indexOf('-')
+          if (firstDash === -1) continue
+          chain = withoutPrefix.substring(0, firstDash)
+          address = withoutPrefix.substring(firstDash + 1)
+        }
+
         const cached = JSON.parse(localStorage.getItem(key))
         addresses.push({
           chain,
@@ -477,6 +530,7 @@ export default function ContractCaller() {
   const [abiSaved, setAbiSaved] = useState(false) // Feedback for ABI save action
   const [showFullResponse, setShowFullResponse] = useState(false)
   const [cachedAddresses, setCachedAddresses] = useState([])
+  const [tokenSymbols, setTokenSymbols] = useState({}) // Map of address -> symbol for Transfer events
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false)
   const [addressFilter, setAddressFilter] = useState('')
   const [fromAddress, setFromAddress] = useState('')
@@ -1095,6 +1149,21 @@ export default function ContractCaller() {
       }
       setCachedAddresses(getCachedAddresses())
 
+      // Load cached token symbols
+      const symbols = {}
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key && key.startsWith(TOKEN_SYMBOL_CACHE_PREFIX)) {
+          const [, chainAndAddress] = key.split(TOKEN_SYMBOL_CACHE_PREFIX)
+          const dashIndex = chainAndAddress.indexOf('-')
+          if (dashIndex !== -1) {
+            const addr = chainAndAddress.substring(dashIndex + 1)
+            symbols[addr] = localStorage.getItem(key)
+          }
+        }
+      }
+      setTokenSymbols(symbols)
+
       // Load Tenderly settings
       const savedTenderly = localStorage.getItem(TENDERLY_SETTINGS_KEY)
       if (savedTenderly) {
@@ -1313,6 +1382,56 @@ export default function ContractCaller() {
       setArgs([])
     }
   }, [selectedFunction, parsedAbi, address])
+
+  // Fetch token symbols for Transfer events
+  const fetchTokenSymbolsForLogs = async (logs, chainId) => {
+    if (!logs || logs.length === 0) return
+
+    // Find unique addresses that emitted Transfer events
+    const transferAddresses = new Set()
+    for (const log of logs) {
+      if (log.name === 'Transfer' && log.address) {
+        const addr = log.address.toLowerCase()
+        // Only fetch if not already cached
+        if (!getCachedTokenSymbol(chain, addr) && !tokenSymbols[addr]) {
+          transferAddresses.add(addr)
+        }
+      }
+    }
+
+    if (transferAddresses.size === 0) return
+
+    // Fetch symbols in parallel
+    const newSymbols = { ...tokenSymbols }
+    const fetchPromises = Array.from(transferAddresses).map(async (addr) => {
+      try {
+        const response = await fetch('/api/call-contract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chain,
+            address: addr,
+            functionName: 'symbol',
+            args: [],
+            abi: ERC20_SYMBOL_ABI,
+            rpcUrl: rpcSettings[chain] || undefined,
+            chainId: chainId,
+          }),
+        })
+        const data = await response.json()
+        if (response.ok && data.decoded && data.decoded.length > 0) {
+          const symbol = data.decoded[0].value
+          newSymbols[addr] = symbol
+          setCachedTokenSymbol(chain, addr, symbol)
+        }
+      } catch {
+        // Ignore errors for individual symbol fetches
+      }
+    })
+
+    await Promise.all(fetchPromises)
+    setTokenSymbols(newSymbols)
+  }
 
   const fetchAbi = async (forceRefresh = false) => {
     if (!address.trim()) {
@@ -1915,6 +2034,12 @@ export default function ContractCaller() {
 
         const ethValueInfo = getEthValueWithUnit()
         const chainIdForSimulation = getChainId(chain)
+
+        // Build initial ABI cache from localStorage
+        const initialAbiCache = buildAbiCacheFromStorage(chain)
+        // Also add the current contract's ABI to the cache
+        initialAbiCache.set(address.toLowerCase(), parsedAbi)
+
         data = await simulateWithTevm({
           chain,
           address,
@@ -1928,7 +2053,44 @@ export default function ContractCaller() {
           blockNumber: forkBlockNumber || 'latest',
           cheatcodes: activeCheatcodes,
           customChainId: chainIdForSimulation,
+          abiCache: initialAbiCache,
         })
+
+        // If there are undecoded addresses, fetch their ABIs and re-decode
+        if (data.undecodedAddresses && data.undecodedAddresses.length > 0) {
+          // Filter out addresses we already have in cache
+          const addressesToFetch = data.undecodedAddresses.filter(
+            addr => !initialAbiCache.has(addr.toLowerCase())
+          )
+
+          if (addressesToFetch.length > 0) {
+            // Fetch ABIs for undecoded addresses
+            const newAbis = await fetchAbisForAddresses(
+              chain,
+              addressesToFetch,
+              apiKeys.etherscan,
+              rpcSettings[chain],
+              chainIdForSimulation
+            )
+
+            // Merge new ABIs into cache
+            for (const [addr, abi] of newAbis) {
+              initialAbiCache.set(addr, abi)
+            }
+
+            // Re-decode logs with the updated cache
+            if (newAbis.size > 0) {
+              data.logs = redecodeLogs(data.logs, initialAbiCache)
+              // Also re-decode logs in call trace if present
+              if (data.callTrace && data.callTrace.logs) {
+                data.callTrace.logs = redecodeLogs(data.callTrace.logs, initialAbiCache)
+              }
+            }
+          }
+        }
+
+        // Update the cached addresses list in state
+        setCachedAddresses(getCachedAddresses())
       } else {
         // Use API for read functions or Tenderly for write functions
         const apiEndpoint = isWrite ? '/api/simulate' : '/api/call-contract'
@@ -2010,6 +2172,12 @@ export default function ContractCaller() {
         setResult(data) // Still show result for debugging
       } else {
         setResult(data)
+      }
+
+      // Fetch token symbols for Transfer events (async, non-blocking)
+      if (data.logs && data.logs.length > 0) {
+        const chainIdForSymbols = getChainId(chain)
+        fetchTokenSymbolsForLogs(data.logs, chainIdForSymbols)
       }
 
       saveToHistory({ chain, address, selectedFunction, args }, data, isWrite)
@@ -2686,7 +2854,8 @@ export default function ContractCaller() {
                           const textMatch = addressFilter === '' ||
                             item.address.toLowerCase().includes(addressFilter.toLowerCase()) ||
                             (item.label && item.label.toLowerCase().includes(addressFilter.toLowerCase())) ||
-                            (item.contractName && item.contractName.toLowerCase().includes(addressFilter.toLowerCase()))
+                            (item.contractName && item.contractName.toLowerCase().includes(addressFilter.toLowerCase())) ||
+                            (item.implContractName && item.implContractName.toLowerCase().includes(addressFilter.toLowerCase()))
                           return chainMatch && textMatch
                         })
                         .slice(0, 10)
@@ -3859,12 +4028,20 @@ export default function ContractCaller() {
             {result.simulated && result.logs && result.logs.length > 0 && (
               <div className={styles.logsSection}>
                 <h3 className={styles.logsTitle}>Event Logs ({result.logs.length})</h3>
-                {result.logs.map((log, index) => (
+                {result.logs.map((log, index) => {
+                  const contractName = getContractNameFromCache(chain, log.address)
+                  const logAddress = log.address?.toLowerCase()
+                  const symbol = log.name === 'Transfer' ? (tokenSymbols[logAddress] || getCachedTokenSymbol(chain, logAddress)) : null
+                  return (
                   <div key={index} className={styles.logItem}>
                     <div className={styles.logHeader}>
-                      <span className={styles.logName}>{log.name || 'Unknown Event'}</span>
+                      <span className={styles.logName}>
+                        {log.name || 'Unknown Event'}
+                        {symbol && <span className={styles.logTokenSymbol}>[{symbol}]</span>}
+                      </span>
                       <span className={styles.logAddress}>
-                        {log.address?.slice(0, 10)}...{log.address?.slice(-8)}
+                        {contractName && <span className={styles.logContractName}>{contractName}</span>}
+                        {log.address}
                       </span>
                     </div>
                     {log.inputs && log.inputs.length > 0 && (
@@ -3899,7 +4076,7 @@ export default function ContractCaller() {
                       </div>
                     )}
                   </div>
-                ))}
+                )})}
               </div>
             )}
 

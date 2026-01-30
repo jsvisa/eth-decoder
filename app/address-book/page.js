@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import styles from './page.module.css'
 import {
   getAddressBook,
@@ -80,6 +80,8 @@ export default function AddressBook() {
     setEditingId(null)
     setEditLabel('')
     setEditNotes('')
+    setSuccess('Address updated successfully')
+    setTimeout(() => setSuccess(null), 3000)
   }
 
   // Cancel edit
@@ -90,12 +92,15 @@ export default function AddressBook() {
   }
 
   // Delete entry
-  const handleDelete = (id) => {
-    if (!window.confirm('Are you sure you want to remove this address from your address book?')) {
+  const handleDelete = (item) => {
+    const name = item.label || item.contractName || item.address.slice(0, 10) + '...'
+    if (!window.confirm(`Are you sure you want to remove "${name}" from your address book?`)) {
       return
     }
-    const updated = removeFromAddressBook(id)
+    const updated = removeFromAddressBook(item.id)
     setAddressBook(updated)
+    setSuccess('Address removed successfully')
+    setTimeout(() => setSuccess(null), 3000)
   }
 
   // Add new address
@@ -182,7 +187,8 @@ export default function AddressBook() {
   }
 
   // Copy address to clipboard
-  const handleCopyAddress = async (address) => {
+  const handleCopyAddress = async (address, e) => {
+    e?.stopPropagation()
     try {
       await navigator.clipboard.writeText(address)
       setSuccess('Address copied to clipboard')
@@ -191,6 +197,19 @@ export default function AddressBook() {
       console.error('Failed to copy:', err)
     }
   }
+
+  // Format date
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '-'
+    return new Date(dateStr).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    })
+  }
+
+  // Check if success message is a toast (copy feedback)
+  const isToast = success && success.includes('copied')
 
   return (
     <main className={styles.main}>
@@ -223,18 +242,25 @@ export default function AddressBook() {
         {error && (
           <div className={styles.error}>
             {error}
-            <button onClick={() => setError(null)} className={styles.dismissButton}>×</button>
+            <button onClick={() => setError(null)} className={styles.dismissButton}>x</button>
           </div>
         )}
 
-        {success && (
+        {success && !isToast && (
           <div className={styles.success}>
             {success}
-            <button onClick={() => setSuccess(null)} className={styles.dismissButton}>×</button>
+            <button onClick={() => setSuccess(null)} className={styles.dismissButton}>x</button>
           </div>
         )}
 
-        <div className={styles.searchRow}>
+        {/* Toast notification for copy feedback */}
+        {isToast && (
+          <div className={styles.toast}>
+            {success}
+          </div>
+        )}
+
+        <div className={styles.filterRow}>
           <input
             type="text"
             value={searchFilter}
@@ -249,7 +275,7 @@ export default function AddressBook() {
 
         {addressBook.length === 0 ? (
           <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>★</div>
+            <div className={styles.emptyIcon}>&#9733;</div>
             <h2>No Saved Addresses</h2>
             <p>Add addresses from the Contract Caller or click "Add Address" to get started.</p>
           </div>
@@ -258,97 +284,108 @@ export default function AddressBook() {
             <p>No addresses match your search.</p>
           </div>
         ) : (
-          <div className={styles.addressList}>
-            {filteredAddresses.map((item) => (
-              <div key={item.id} className={styles.addressItem}>
-                {editingId === item.id ? (
-                  // Edit mode
-                  <div className={styles.editForm}>
-                    <div className={styles.editField}>
-                      <label className={styles.editLabel}>Label</label>
-                      <input
-                        type="text"
-                        ref={editInputRef}
-                        value={editLabel}
-                        onChange={(e) => setEditLabel(e.target.value)}
-                        className={styles.editInput}
-                      />
-                    </div>
-                    <div className={styles.editField}>
-                      <label className={styles.editLabel}>Notes</label>
-                      <textarea
-                        value={editNotes}
-                        onChange={(e) => setEditNotes(e.target.value)}
-                        className={styles.editTextarea}
-                        rows={2}
-                      />
-                    </div>
-                    <div className={styles.editActions}>
-                      <button
-                        onClick={handleCancelEdit}
-                        className={styles.cancelButton}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => handleSaveEdit(item.id)}
-                        className={styles.saveButton}
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  // View mode
-                  <>
-                    <div className={styles.addressHeader}>
-                      <span className={styles.star}>★</span>
-                      <span className={styles.label}>
-                        {item.label || item.contractName || 'Unnamed'}
-                      </span>
-                      {item.contractName && item.label && item.label !== item.contractName && (
-                        <span className={styles.contractName}>({item.contractName})</span>
-                      )}
-                    </div>
-                    <div
-                      className={styles.address}
-                      onClick={() => handleCopyAddress(item.address)}
-                      title="Click to copy"
-                    >
-                      {item.address}
-                    </div>
-                    {item.notes && (
-                      <div className={styles.notes}>{item.notes}</div>
+          <div className={styles.tableWrapper}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th className={styles.thLabel}>Label</th>
+                  <th className={styles.thAddress}>Address</th>
+                  <th className={styles.thNotes}>Notes</th>
+                  <th className={styles.thDate}>Added</th>
+                  <th className={styles.thActions}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredAddresses.map((item) => (
+                  <tr key={item.id} className={styles.row}>
+                    {editingId === item.id ? (
+                      // Edit mode - full row edit
+                      <>
+                        <td className={styles.tdLabel}>
+                          <input
+                            type="text"
+                            ref={editInputRef}
+                            value={editLabel}
+                            onChange={(e) => setEditLabel(e.target.value)}
+                            className={styles.inlineInput}
+                            placeholder="Label"
+                          />
+                        </td>
+                        <td className={styles.tdAddress}>
+                          <span className={styles.address}>{item.address.slice(0, 10)}...{item.address.slice(-8)}</span>
+                        </td>
+                        <td className={styles.tdNotes}>
+                          <input
+                            type="text"
+                            value={editNotes}
+                            onChange={(e) => setEditNotes(e.target.value)}
+                            className={styles.inlineInput}
+                            placeholder="Notes"
+                          />
+                        </td>
+                        <td className={styles.tdDate}>{formatDate(item.createdAt)}</td>
+                        <td className={styles.tdActions}>
+                          <button
+                            onClick={() => handleSaveEdit(item.id)}
+                            className={styles.saveButton}
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            className={styles.cancelButton}
+                          >
+                            Cancel
+                          </button>
+                        </td>
+                      </>
+                    ) : (
+                      // View mode
+                      <>
+                        <td className={styles.tdLabel}>
+                          <div className={styles.labelCell}>
+                            <span className={styles.star}>&#9733;</span>
+                            <span className={styles.labelText}>
+                              {item.label || item.contractName || 'Unnamed'}
+                            </span>
+                            {item.contractName && item.label && item.label !== item.contractName && (
+                              <span className={styles.contractName}>({item.contractName})</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className={styles.tdAddress}>
+                          <span
+                            className={styles.address}
+                            onClick={(e) => handleCopyAddress(item.address, e)}
+                            title="Click to copy"
+                          >
+                            {item.address.slice(0, 10)}...{item.address.slice(-8)}
+                          </span>
+                        </td>
+                        <td className={styles.tdNotes}>
+                          <span className={styles.notesText}>{item.notes || '-'}</span>
+                        </td>
+                        <td className={styles.tdDate}>{formatDate(item.createdAt)}</td>
+                        <td className={styles.tdActions}>
+                          <button
+                            onClick={() => handleEdit(item)}
+                            className={styles.editButton}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(item)}
+                            className={styles.deleteButton}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </>
                     )}
-                    <div className={styles.meta}>
-                      <span className={styles.date}>
-                        Added {new Date(item.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className={styles.actions}>
-                      <a
-                        href={`/contract-caller?address=${item.address}`}
-                        className={styles.useButton}
-                      >
-                        Use in Contract Caller
-                      </a>
-                      <button
-                        onClick={() => handleEdit(item)}
-                        className={styles.editButton}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className={styles.deleteButton}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
