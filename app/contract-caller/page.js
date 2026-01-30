@@ -25,6 +25,7 @@ const CHAINS = [
 
 const STORAGE_KEY = 'contract_caller_history'
 const ABI_CACHE_PREFIX = 'abi-'
+const TOKEN_SYMBOL_CACHE_PREFIX = 'token-symbol-'
 const TENDERLY_SETTINGS_KEY = 'tenderly_settings'
 const API_KEYS_STORAGE_KEY = 'api_keys_settings'
 const RPC_SETTINGS_KEY = 'rpc_settings'
@@ -184,6 +185,31 @@ const getContractNameFromCache = (chain, address) => {
   // Return implementation name for proxies, otherwise contract name
   return cached.implContractName || cached.contractName || null
 }
+
+// Token symbol cache functions
+const getTokenSymbolCacheKey = (chain, address) => `${TOKEN_SYMBOL_CACHE_PREFIX}${chain}-${address.toLowerCase()}`
+
+const getCachedTokenSymbol = (chain, address) => {
+  if (!address) return null
+  try {
+    const key = getTokenSymbolCacheKey(chain, address)
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+const setCachedTokenSymbol = (chain, address, symbol) => {
+  try {
+    const key = getTokenSymbolCacheKey(chain, address)
+    localStorage.setItem(key, symbol)
+  } catch {
+    // Ignore cache errors
+  }
+}
+
+// ERC20 symbol() ABI for fetching token symbols
+const ERC20_SYMBOL_ABI = [{ type: 'function', name: 'symbol', inputs: [], outputs: [{ type: 'string' }], stateMutability: 'view' }]
 
 // Get all cached contract addresses
 const getCachedAddresses = () => {
@@ -487,6 +513,7 @@ export default function ContractCaller() {
   const [abiSaved, setAbiSaved] = useState(false) // Feedback for ABI save action
   const [showFullResponse, setShowFullResponse] = useState(false)
   const [cachedAddresses, setCachedAddresses] = useState([])
+  const [tokenSymbols, setTokenSymbols] = useState({}) // Map of address -> symbol for Transfer events
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false)
   const [addressFilter, setAddressFilter] = useState('')
   const [fromAddress, setFromAddress] = useState('')
@@ -1105,6 +1132,21 @@ export default function ContractCaller() {
       }
       setCachedAddresses(getCachedAddresses())
 
+      // Load cached token symbols
+      const symbols = {}
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key && key.startsWith(TOKEN_SYMBOL_CACHE_PREFIX)) {
+          const [, chainAndAddress] = key.split(TOKEN_SYMBOL_CACHE_PREFIX)
+          const dashIndex = chainAndAddress.indexOf('-')
+          if (dashIndex !== -1) {
+            const addr = chainAndAddress.substring(dashIndex + 1)
+            symbols[addr] = localStorage.getItem(key)
+          }
+        }
+      }
+      setTokenSymbols(symbols)
+
       // Load Tenderly settings
       const savedTenderly = localStorage.getItem(TENDERLY_SETTINGS_KEY)
       if (savedTenderly) {
@@ -1323,6 +1365,56 @@ export default function ContractCaller() {
       setArgs([])
     }
   }, [selectedFunction, parsedAbi, address])
+
+  // Fetch token symbols for Transfer events
+  const fetchTokenSymbolsForLogs = async (logs, chainId) => {
+    if (!logs || logs.length === 0) return
+
+    // Find unique addresses that emitted Transfer events
+    const transferAddresses = new Set()
+    for (const log of logs) {
+      if (log.name === 'Transfer' && log.address) {
+        const addr = log.address.toLowerCase()
+        // Only fetch if not already cached
+        if (!getCachedTokenSymbol(chain, addr) && !tokenSymbols[addr]) {
+          transferAddresses.add(addr)
+        }
+      }
+    }
+
+    if (transferAddresses.size === 0) return
+
+    // Fetch symbols in parallel
+    const newSymbols = { ...tokenSymbols }
+    const fetchPromises = Array.from(transferAddresses).map(async (addr) => {
+      try {
+        const response = await fetch('/api/call-contract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chain,
+            address: addr,
+            functionName: 'symbol',
+            args: [],
+            abi: ERC20_SYMBOL_ABI,
+            rpcUrl: rpcSettings[chain] || undefined,
+            chainId: chainId,
+          }),
+        })
+        const data = await response.json()
+        if (response.ok && data.decoded && data.decoded.length > 0) {
+          const symbol = data.decoded[0].value
+          newSymbols[addr] = symbol
+          setCachedTokenSymbol(chain, addr, symbol)
+        }
+      } catch {
+        // Ignore errors for individual symbol fetches
+      }
+    })
+
+    await Promise.all(fetchPromises)
+    setTokenSymbols(newSymbols)
+  }
 
   const fetchAbi = async (forceRefresh = false) => {
     if (!address.trim()) {
@@ -2063,6 +2155,12 @@ export default function ContractCaller() {
         setResult(data) // Still show result for debugging
       } else {
         setResult(data)
+      }
+
+      // Fetch token symbols for Transfer events (async, non-blocking)
+      if (data.logs && data.logs.length > 0) {
+        const chainIdForSymbols = getChainId(chain)
+        fetchTokenSymbolsForLogs(data.logs, chainIdForSymbols)
       }
 
       saveToHistory({ chain, address, selectedFunction, args }, data, isWrite)
@@ -3914,10 +4012,15 @@ export default function ContractCaller() {
                 <h3 className={styles.logsTitle}>Event Logs ({result.logs.length})</h3>
                 {result.logs.map((log, index) => {
                   const contractName = getContractNameFromCache(chain, log.address)
+                  const logAddress = log.address?.toLowerCase()
+                  const symbol = log.name === 'Transfer' ? (tokenSymbols[logAddress] || getCachedTokenSymbol(chain, logAddress)) : null
                   return (
                   <div key={index} className={styles.logItem}>
                     <div className={styles.logHeader}>
-                      <span className={styles.logName}>{log.name || 'Unknown Event'}</span>
+                      <span className={styles.logName}>
+                        {log.name || 'Unknown Event'}
+                        {symbol && <span className={styles.logTokenSymbol}>[{symbol}]</span>}
+                      </span>
                       <span className={styles.logAddress}>
                         {contractName && <span className={styles.logContractName}>{contractName}</span>}
                         {log.address}
