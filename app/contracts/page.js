@@ -4,34 +4,99 @@ import { useState, useEffect } from 'react'
 import styles from './page.module.css'
 
 const ABI_CACHE_PREFIX = 'abi-'
+const CUSTOM_CHAINS_KEY = 'custom_chains'
 
 // Built-in chains for display
-const CHAIN_INFO = {
-  ethereum: { name: 'Ethereum', icon: 'https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg' },
-  arbitrum: { name: 'Arbitrum', icon: 'https://icons.llamao.fi/icons/chains/rsz_arbitrum.jpg' },
-  base: { name: 'Base', icon: 'https://icons.llamao.fi/icons/chains/rsz_base.jpg' },
-  polygon: { name: 'Polygon', icon: 'https://icons.llamao.fi/icons/chains/rsz_polygon.jpg' },
-  bsc: { name: 'BSC', icon: 'https://icons.llamao.fi/icons/chains/rsz_binance.jpg' },
+const BUILT_IN_CHAINS = {
+  ethereum: { name: 'Ethereum', chainId: 1, icon: 'https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg' },
+  arbitrum: { name: 'Arbitrum', chainId: 42161, icon: 'https://icons.llamao.fi/icons/chains/rsz_arbitrum.jpg' },
+  base: { name: 'Base', chainId: 8453, icon: 'https://icons.llamao.fi/icons/chains/rsz_base.jpg' },
+  polygon: { name: 'Polygon', chainId: 137, icon: 'https://icons.llamao.fi/icons/chains/rsz_polygon.jpg' },
+  bsc: { name: 'BSC', chainId: 56, icon: 'https://icons.llamao.fi/icons/chains/rsz_binance.jpg' },
+}
+
+// Load custom chains from localStorage
+const loadCustomChains = () => {
+  try {
+    const stored = localStorage.getItem(CUSTOM_CHAINS_KEY)
+    if (stored) {
+      return JSON.parse(stored)
+    }
+  } catch (err) {
+    console.error('Failed to load custom chains:', err)
+  }
+  return []
+}
+
+// Parse the ABI cache key to extract chain and address
+// Key format: abi-{chain}-{address} where chain could be "ethereum" or "chain-1"
+const parseAbiCacheKey = (key) => {
+  if (!key.startsWith(ABI_CACHE_PREFIX)) return null
+
+  const withoutPrefix = key.substring(ABI_CACHE_PREFIX.length)
+
+  // Check if it's a custom chain (starts with "chain-")
+  if (withoutPrefix.startsWith('chain-')) {
+    // Format: chain-{chainId}-{address}
+    // Find the address part (starts with 0x)
+    const addressIndex = withoutPrefix.indexOf('-0x')
+    if (addressIndex === -1) return null
+
+    const chain = withoutPrefix.substring(0, addressIndex)
+    const address = withoutPrefix.substring(addressIndex + 1)
+    return { chain, address }
+  } else {
+    // Format: {chainName}-{address}
+    // Built-in chain names don't contain hyphens
+    const firstDash = withoutPrefix.indexOf('-')
+    if (firstDash === -1) return null
+
+    const chain = withoutPrefix.substring(0, firstDash)
+    const address = withoutPrefix.substring(firstDash + 1)
+    return { chain, address }
+  }
 }
 
 // Get all cached contracts from localStorage
-const getCachedContracts = () => {
+const getCachedContracts = (customChains) => {
   const contracts = []
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
       if (key && key.startsWith(ABI_CACHE_PREFIX)) {
-        const [, chainAndAddress] = key.split(ABI_CACHE_PREFIX)
-        const dashIndex = chainAndAddress.indexOf('-')
-        if (dashIndex === -1) continue
+        const parsed = parseAbiCacheKey(key)
+        if (!parsed) continue
 
-        const chain = chainAndAddress.substring(0, dashIndex)
-        const address = chainAndAddress.substring(dashIndex + 1)
+        const { chain, address } = parsed
         const cached = JSON.parse(localStorage.getItem(key))
+
+        // Get chain info
+        let chainInfo = BUILT_IN_CHAINS[chain]
+        if (!chainInfo && chain.startsWith('chain-')) {
+          // Look up custom chain
+          const customChain = customChains.find(c => c.id === chain)
+          if (customChain) {
+            chainInfo = {
+              name: customChain.name,
+              chainId: customChain.chainId,
+              icon: customChain.icon,
+            }
+          } else {
+            // Extract chain ID from the chain key
+            const chainIdMatch = chain.match(/^chain-(\d+)$/)
+            const chainId = chainIdMatch ? parseInt(chainIdMatch[1], 10) : null
+            chainInfo = {
+              name: chain,
+              chainId: chainId,
+              icon: null,
+            }
+          }
+        }
 
         contracts.push({
           key,
           chain,
+          chainInfo,
           address,
           contractName: cached.contractName,
           implContractName: cached.implContractName,
@@ -63,17 +128,29 @@ const deleteCachedContract = (key) => {
 
 export default function Contracts() {
   const [contracts, setContracts] = useState([])
+  const [customChains, setCustomChains] = useState([])
   const [searchFilter, setSearchFilter] = useState('')
   const [chainFilter, setChainFilter] = useState('')
   const [success, setSuccess] = useState(null)
 
-  // Load contracts on mount
+  // Load contracts and custom chains on mount
   useEffect(() => {
-    setContracts(getCachedContracts())
+    const chains = loadCustomChains()
+    setCustomChains(chains)
+    setContracts(getCachedContracts(chains))
   }, [])
 
-  // Get unique chains from contracts
+  // Get unique chains from contracts for filter dropdown
   const uniqueChains = [...new Set(contracts.map(c => c.chain))]
+    .map(chain => {
+      const contract = contracts.find(c => c.chain === chain)
+      return {
+        id: chain,
+        name: contract?.chainInfo?.name || chain,
+        chainId: contract?.chainInfo?.chainId,
+      }
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
 
   // Filter contracts
   const filteredContracts = contracts.filter(contract => {
@@ -103,7 +180,7 @@ export default function Contracts() {
     }
 
     if (deleteCachedContract(contract.key)) {
-      setContracts(getCachedContracts())
+      setContracts(getCachedContracts(customChains))
       setSuccess('Contract ABI deleted successfully')
       setTimeout(() => setSuccess(null), 3000)
     }
@@ -124,7 +201,8 @@ export default function Contracts() {
   }
 
   // Copy address to clipboard
-  const handleCopyAddress = async (address) => {
+  const handleCopyAddress = async (address, e) => {
+    e.stopPropagation()
     try {
       await navigator.clipboard.writeText(address)
       setSuccess('Address copied to clipboard')
@@ -134,26 +212,22 @@ export default function Contracts() {
     }
   }
 
-  // Get chain display info
-  const getChainDisplay = (chainId) => {
-    const info = CHAIN_INFO[chainId]
-    if (info) {
-      return { name: info.name, icon: info.icon }
-    }
-    // Custom chain
-    return { name: chainId, icon: null }
-  }
-
   // Format timestamp
   const formatDate = (timestamp) => {
-    if (!timestamp) return 'Unknown'
+    if (!timestamp) return '-'
     return new Date(timestamp).toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
     })
+  }
+
+  // Get display name for contract
+  const getContractDisplayName = (contract) => {
+    if (contract.isProxy && contract.implContractName) {
+      return `${contract.contractName || 'Proxy'} → ${contract.implContractName}`
+    }
+    return contract.contractName || '-'
   }
 
   return (
@@ -194,8 +268,8 @@ export default function Contracts() {
           >
             <option value="">All Chains</option>
             {uniqueChains.map(chain => (
-              <option key={chain} value={chain}>
-                {getChainDisplay(chain).name}
+              <option key={chain.id} value={chain.id}>
+                {chain.name}{chain.chainId ? ` (${chain.chainId})` : ''}
               </option>
             ))}
           </select>
@@ -218,89 +292,77 @@ export default function Contracts() {
             <p>No contracts match your search.</p>
           </div>
         ) : (
-          <div className={styles.contractList}>
-            {filteredContracts.map((contract) => {
-              const chainDisplay = getChainDisplay(contract.chain)
-              return (
-                <div key={contract.key} className={styles.contractItem}>
-                  <div className={styles.contractHeader}>
-                    <div className={styles.chainBadge}>
-                      {chainDisplay.icon && (
-                        <img
-                          src={chainDisplay.icon}
-                          alt={chainDisplay.name}
-                          className={styles.chainIcon}
-                        />
-                      )}
-                      <span className={styles.chainName}>{chainDisplay.name}</span>
-                    </div>
-                    {contract.isProxy && (
-                      <span className={styles.proxyBadge}>Proxy</span>
-                    )}
-                  </div>
-
-                  <div className={styles.contractName}>
-                    {contract.isProxy && contract.implContractName ? (
-                      <>
-                        <span className={styles.proxyName}>{contract.contractName}</span>
-                        <span className={styles.arrow}> → </span>
-                        <span className={styles.implName}>{contract.implContractName}</span>
-                      </>
-                    ) : (
-                      contract.contractName || 'Unknown Contract'
-                    )}
-                  </div>
-
-                  <div
-                    className={styles.address}
-                    onClick={() => handleCopyAddress(contract.address)}
-                    title="Click to copy"
-                  >
-                    {contract.address}
-                  </div>
-
-                  {contract.isProxy && contract.implAddress && (
-                    <div className={styles.implAddressRow}>
-                      <span className={styles.implLabel}>Implementation:</span>
+          <div className={styles.tableWrapper}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th className={styles.thChain}>Chain</th>
+                  <th className={styles.thAddress}>Address</th>
+                  <th className={styles.thName}>Name</th>
+                  <th className={styles.thStats}>Functions</th>
+                  <th className={styles.thStats}>Events</th>
+                  <th className={styles.thDate}>Cached</th>
+                  <th className={styles.thActions}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredContracts.map((contract) => (
+                  <tr key={contract.key} className={styles.row}>
+                    <td className={styles.tdChain}>
+                      <div className={styles.chainCell}>
+                        {contract.chainInfo?.icon && (
+                          <img
+                            src={contract.chainInfo.icon}
+                            alt={contract.chainInfo.name}
+                            className={styles.chainIcon}
+                          />
+                        )}
+                        <div className={styles.chainInfo}>
+                          <span className={styles.chainName}>{contract.chainInfo?.name || contract.chain}</span>
+                          {contract.chainInfo?.chainId && (
+                            <span className={styles.chainId}>ID: {contract.chainInfo.chainId}</span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className={styles.tdAddress}>
                       <span
-                        className={styles.implAddress}
-                        onClick={() => handleCopyAddress(contract.implAddress)}
+                        className={styles.address}
+                        onClick={(e) => handleCopyAddress(contract.address, e)}
                         title="Click to copy"
                       >
-                        {contract.implAddress}
+                        {contract.address.slice(0, 10)}...{contract.address.slice(-8)}
                       </span>
-                    </div>
-                  )}
-
-                  <div className={styles.stats}>
-                    <span className={styles.stat}>
-                      <span className={styles.statValue}>{contract.functionCount}</span> functions
-                    </span>
-                    <span className={styles.stat}>
-                      <span className={styles.statValue}>{contract.eventCount}</span> events
-                    </span>
-                    <span className={styles.stat}>
-                      Cached: {formatDate(contract.timestamp)}
-                    </span>
-                  </div>
-
-                  <div className={styles.actions}>
-                    <a
-                      href={`/contract-caller?chain=${contract.chain}&address=${contract.address}`}
-                      className={styles.useButton}
-                    >
-                      Open in Contract Caller
-                    </a>
-                    <button
-                      onClick={() => handleDelete(contract)}
-                      className={styles.deleteButton}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
+                    </td>
+                    <td className={styles.tdName}>
+                      <div className={styles.nameCell}>
+                        <span className={styles.contractName}>{getContractDisplayName(contract)}</span>
+                        {contract.isProxy && <span className={styles.proxyBadge}>Proxy</span>}
+                      </div>
+                    </td>
+                    <td className={styles.tdStats}>{contract.functionCount}</td>
+                    <td className={styles.tdStats}>{contract.eventCount}</td>
+                    <td className={styles.tdDate}>{formatDate(contract.timestamp)}</td>
+                    <td className={styles.tdActions}>
+                      <a
+                        href={`/contract-caller?chain=${contract.chain}&address=${contract.address}`}
+                        className={styles.openButton}
+                        title="Open in Contract Caller"
+                      >
+                        Open
+                      </a>
+                      <button
+                        onClick={() => handleDelete(contract)}
+                        className={styles.deleteButton}
+                        title="Delete cached ABI"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
