@@ -3907,9 +3907,7 @@ export default function ContractCaller() {
                   <div key={index} className={styles.logItem}>
                     <div className={styles.logHeader}>
                       <span className={styles.logName}>{log.name || 'Unknown Event'}</span>
-                      <span className={styles.logAddress}>
-                        {log.address?.slice(0, 10)}...{log.address?.slice(-8)}
-                      </span>
+                      <span className={styles.logAddress}>{log.address}</span>
                     </div>
                     {log.inputs && log.inputs.length > 0 && (
                       <div className={styles.logInputs}>
