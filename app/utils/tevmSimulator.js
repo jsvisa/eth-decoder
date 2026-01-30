@@ -197,6 +197,9 @@ export async function applyCheatcodes(client, cheatcodes = {}) {
 
 /**
  * Simulate a contract call using Tevm
+ * @param {Object} params - Simulation parameters
+ * @param {Map<string, Array>} params.abiCache - Optional map of lowercase address -> ABI array for decoding logs from multiple contracts
+ * @returns {Object} Simulation result including `undecodedAddresses` - addresses that emitted logs but couldn't be decoded
  */
 export async function simulateWithTevm({
   chain,
@@ -211,6 +214,7 @@ export async function simulateWithTevm({
   blockNumber = 'latest',
   cheatcodes = {},
   customChainId = null,
+  abiCache = new Map(),
 }) {
   try {
     // Validate inputs
@@ -325,14 +329,36 @@ export async function simulateWithTevm({
       }
     }
 
-    // Parse logs from execution and try to decode using ABI events
-    const eventAbis = abi.filter(item => item.type === 'event')
+    // Build a combined map of address -> event ABIs for decoding
+    // Include the main contract's ABI and any cached ABIs
+    const eventAbisByAddress = new Map()
+
+    // Add main contract's event ABIs
+    const mainContractEventAbis = abi.filter(item => item.type === 'event')
+    eventAbisByAddress.set(address.toLowerCase(), mainContractEventAbis)
+
+    // Add cached ABIs
+    for (const [cachedAddress, cachedAbi] of abiCache) {
+      const eventAbis = cachedAbi.filter(item => item.type === 'event')
+      if (eventAbis.length > 0) {
+        eventAbisByAddress.set(cachedAddress.toLowerCase(), eventAbis)
+      }
+    }
+
+    // Track addresses that couldn't decode their events
+    const undecodedAddresses = new Set()
+
+    // Parse logs from execution and try to decode using appropriate ABIs
     const parsedLogs = (Array.isArray(callResult.logs) ? callResult.logs : []).map(log => {
       const topics = log.topics || []
       const data = log.data || '0x'
+      const logAddress = log.address?.toLowerCase()
 
-      // Try to decode the log using ABI events
-      for (const eventAbi of eventAbis) {
+      // Get event ABIs for this log's address, or try all known ABIs
+      const addressEventAbis = eventAbisByAddress.get(logAddress) || []
+
+      // First try ABIs specific to this address
+      for (const eventAbi of addressEventAbis) {
         try {
           const decoded = decodeEventLog({
             abi: [eventAbi],
@@ -361,7 +387,45 @@ export async function simulateWithTevm({
         }
       }
 
-      // Could not decode - return raw log
+      // If address-specific ABIs didn't work, try all known ABIs
+      // This helps with common events like ERC20 Transfer
+      for (const [, eventAbis] of eventAbisByAddress) {
+        for (const eventAbi of eventAbis) {
+          try {
+            const decoded = decodeEventLog({
+              abi: [eventAbi],
+              data,
+              topics,
+            })
+
+            // Successfully decoded
+            const inputs = eventAbi.inputs.map((input, index) => ({
+              name: input.name || `arg${index}`,
+              type: input.type,
+              value: serializeValue(decoded.args[input.name] ?? decoded.args[index]),
+              indexed: input.indexed || false,
+            }))
+
+            return {
+              address: log.address,
+              topics,
+              data,
+              name: decoded.eventName,
+              decoded: true,
+              inputs,
+            }
+          } catch {
+            // This event ABI doesn't match, try next
+          }
+        }
+      }
+
+      // Could not decode - track this address for potential ABI fetch
+      if (logAddress) {
+        undecodedAddresses.add(logAddress)
+      }
+
+      // Return raw log
       return {
         address: log.address,
         topics,
@@ -420,6 +484,7 @@ export async function simulateWithTevm({
         storageKeys: item.storageKeys || [],
       })),
       error: success ? null : (callResult.errors?.[0]?.message || 'Transaction reverted'),
+      undecodedAddresses: Array.from(undecodedAddresses),
     }
   } catch (error) {
     console.error('Tevm simulation error:', error)
@@ -437,8 +502,97 @@ export async function simulateWithTevm({
       callTrace: null,
       stateChanges: [],
       error: error.message || 'Failed to simulate transaction',
+      undecodedAddresses: [],
     }
   }
+}
+
+/**
+ * Re-decode logs using an updated ABI cache
+ * @param {Array} logs - Array of log objects (some may be undecoded)
+ * @param {Map<string, Array>} abiCache - Map of lowercase address -> ABI array
+ * @returns {Array} Logs with updated decoding
+ */
+export function redecodeLogs(logs, abiCache) {
+  if (!logs || !Array.isArray(logs)) return logs
+
+  // Build event ABI map from cache
+  const eventAbisByAddress = new Map()
+  for (const [address, abi] of abiCache) {
+    const eventAbis = abi.filter(item => item.type === 'event')
+    if (eventAbis.length > 0) {
+      eventAbisByAddress.set(address.toLowerCase(), eventAbis)
+    }
+  }
+
+  return logs.map(log => {
+    // If already decoded, skip
+    if (log.decoded) return log
+
+    const topics = log.topics || []
+    const data = log.data || '0x'
+    const logAddress = log.address?.toLowerCase()
+
+    // Try ABIs specific to this address first
+    const addressEventAbis = eventAbisByAddress.get(logAddress) || []
+    for (const eventAbi of addressEventAbis) {
+      try {
+        const decoded = decodeEventLog({
+          abi: [eventAbi],
+          data,
+          topics,
+        })
+
+        const inputs = eventAbi.inputs.map((input, index) => ({
+          name: input.name || `arg${index}`,
+          type: input.type,
+          value: serializeValue(decoded.args[input.name] ?? decoded.args[index]),
+          indexed: input.indexed || false,
+        }))
+
+        return {
+          ...log,
+          name: decoded.eventName,
+          decoded: true,
+          inputs,
+        }
+      } catch {
+        // Try next
+      }
+    }
+
+    // Try all known ABIs (for common events like ERC20 Transfer)
+    for (const [, eventAbis] of eventAbisByAddress) {
+      for (const eventAbi of eventAbis) {
+        try {
+          const decoded = decodeEventLog({
+            abi: [eventAbi],
+            data,
+            topics,
+          })
+
+          const inputs = eventAbi.inputs.map((input, index) => ({
+            name: input.name || `arg${index}`,
+            type: input.type,
+            value: serializeValue(decoded.args[input.name] ?? decoded.args[index]),
+            indexed: input.indexed || false,
+          }))
+
+          return {
+            ...log,
+            name: decoded.eventName,
+            decoded: true,
+            inputs,
+          }
+        } catch {
+          // Try next
+        }
+      }
+    }
+
+    // Still couldn't decode
+    return log
+  })
 }
 
 /**

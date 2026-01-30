@@ -11,7 +11,8 @@ import {
   isAddressBookmarked,
   getBookmarkedAddress,
 } from '../utils/addressBook'
-import { simulateWithTevm } from '../utils/tevmSimulator'
+import { simulateWithTevm, redecodeLogs } from '../utils/tevmSimulator'
+import { buildAbiCacheFromStorage, fetchAbisForAddresses } from '../utils/abiCache'
 import { isValidEthAddress, isValidForkBlock, isValidNumber, isValidPositiveInteger } from '../utils/validation'
 
 const CHAINS = [
@@ -1915,6 +1916,12 @@ export default function ContractCaller() {
 
         const ethValueInfo = getEthValueWithUnit()
         const chainIdForSimulation = getChainId(chain)
+
+        // Build initial ABI cache from localStorage
+        const initialAbiCache = buildAbiCacheFromStorage(chain)
+        // Also add the current contract's ABI to the cache
+        initialAbiCache.set(address.toLowerCase(), parsedAbi)
+
         data = await simulateWithTevm({
           chain,
           address,
@@ -1928,7 +1935,44 @@ export default function ContractCaller() {
           blockNumber: forkBlockNumber || 'latest',
           cheatcodes: activeCheatcodes,
           customChainId: chainIdForSimulation,
+          abiCache: initialAbiCache,
         })
+
+        // If there are undecoded addresses, fetch their ABIs and re-decode
+        if (data.undecodedAddresses && data.undecodedAddresses.length > 0) {
+          // Filter out addresses we already have in cache
+          const addressesToFetch = data.undecodedAddresses.filter(
+            addr => !initialAbiCache.has(addr.toLowerCase())
+          )
+
+          if (addressesToFetch.length > 0) {
+            // Fetch ABIs for undecoded addresses
+            const newAbis = await fetchAbisForAddresses(
+              chain,
+              addressesToFetch,
+              apiKeys.etherscan,
+              rpcSettings[chain],
+              chainIdForSimulation
+            )
+
+            // Merge new ABIs into cache
+            for (const [addr, abi] of newAbis) {
+              initialAbiCache.set(addr, abi)
+            }
+
+            // Re-decode logs with the updated cache
+            if (newAbis.size > 0) {
+              data.logs = redecodeLogs(data.logs, initialAbiCache)
+              // Also re-decode logs in call trace if present
+              if (data.callTrace && data.callTrace.logs) {
+                data.callTrace.logs = redecodeLogs(data.callTrace.logs, initialAbiCache)
+              }
+            }
+          }
+        }
+
+        // Update the cached addresses list in state
+        setCachedAddresses(getCachedAddresses())
       } else {
         // Use API for read functions or Tenderly for write functions
         const apiEndpoint = isWrite ? '/api/simulate' : '/api/call-contract'
