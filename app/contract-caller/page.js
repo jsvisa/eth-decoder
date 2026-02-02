@@ -2848,15 +2848,13 @@ export default function ContractCaller() {
                     <div className={styles.addressSuggestions}>
                       {getCombinedSuggestions()
                         .filter(item => {
-                          // For bookmarked items, show across all chains
-                          // For cached items, filter by current chain
-                          const chainMatch = item.isBookmarked || item.chain === chain
+                          // Only show fetched contracts from the selected chain
+                          if (item.isBookmarked || item.chain !== chain) return false
                           const textMatch = addressFilter === '' ||
                             item.address.toLowerCase().includes(addressFilter.toLowerCase()) ||
-                            (item.label && item.label.toLowerCase().includes(addressFilter.toLowerCase())) ||
                             (item.contractName && item.contractName.toLowerCase().includes(addressFilter.toLowerCase())) ||
                             (item.implContractName && item.implContractName.toLowerCase().includes(addressFilter.toLowerCase()))
-                          return chainMatch && textMatch
+                          return textMatch
                         })
                         .slice(0, 10)
                         .map((item, idx) => (
@@ -4260,10 +4258,10 @@ export default function ContractCaller() {
           </div>
         )}
 
-        {history.length > 0 && (
+        {history.filter(item => item.chain === chain).length > 0 && (
           <div className={styles.historySection}>
             <div className={styles.historyHeader}>
-              <h3>Recent Calls ({history.length})</h3>
+              <h3>Recent Calls ({history.filter(item => item.chain === chain).length})</h3>
               <div className={styles.historyActions}>
                 <button
                   onClick={() => setShowHistory(!showHistory)}
@@ -4284,14 +4282,14 @@ export default function ContractCaller() {
 
             {showHistory && (
               <div className={styles.historyList}>
-                {history.map((item) => (
+                {history.filter(item => item.chain === chain).map((item) => (
                   <div
                     key={item.id}
                     className={styles.historyItem}
                     onClick={() => loadFromHistory(item)}
                   >
                     <div className={styles.historyTop}>
-                      <div className={styles.historyChain}>{item.chain}</div>
+                      <div className={styles.historyChain}>{getChainInfo(item.chain)?.name || item.chain}</div>
                       <span className={item.isWrite ? styles.historyWriteBadge : styles.historyReadBadge}>
                         {item.isWrite ? 'W' : 'R'}
                       </span>
