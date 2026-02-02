@@ -4258,10 +4258,10 @@ export default function ContractCaller() {
           </div>
         )}
 
-        {history.length > 0 && (
+        {history.filter(item => item.chain === chain).length > 0 && (
           <div className={styles.historySection}>
             <div className={styles.historyHeader}>
-              <h3>Recent Calls ({history.length})</h3>
+              <h3>Recent Calls ({history.filter(item => item.chain === chain).length})</h3>
               <div className={styles.historyActions}>
                 <button
                   onClick={() => setShowHistory(!showHistory)}
@@ -4282,14 +4282,14 @@ export default function ContractCaller() {
 
             {showHistory && (
               <div className={styles.historyList}>
-                {history.map((item) => (
+                {history.filter(item => item.chain === chain).map((item) => (
                   <div
                     key={item.id}
                     className={styles.historyItem}
                     onClick={() => loadFromHistory(item)}
                   >
                     <div className={styles.historyTop}>
-                      <div className={styles.historyChain}>{item.chain}</div>
+                      <div className={styles.historyChain}>{getChainInfo(item.chain)?.name || item.chain}</div>
                       <span className={item.isWrite ? styles.historyWriteBadge : styles.historyReadBadge}>
                         {item.isWrite ? 'W' : 'R'}
                       </span>
