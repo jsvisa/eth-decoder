@@ -8,7 +8,7 @@
   max-width: 1200px;
   margin: 0 auto;
   background: var(--bg-card);
-  padding: 3rem;
+  padding: 2rem;
   border-radius: 12px;
   box-shadow: var(--shadow);
 }
@@ -22,7 +22,7 @@
 
 .title {
   color: var(--text-primary);
-  font-size: 2.5rem;
+  font-size: 2rem;
   margin: 0;
 }
 
