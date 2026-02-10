@@ -2848,15 +2848,15 @@ export default function ContractCaller() {
                     <div className={styles.addressSuggestions}>
                       {getCombinedSuggestions()
                         .filter(item => {
-                          // Only show fetched contracts from the selected chain
-                          if (item.isBookmarked || item.chain !== chain) return false
+                          // Show cached contracts from the selected chain + bookmarked addresses
+                          if (!item.isBookmarked && item.chain !== chain) return false
                           const textMatch = addressFilter === '' ||
                             item.address.toLowerCase().includes(addressFilter.toLowerCase()) ||
                             (item.contractName && item.contractName.toLowerCase().includes(addressFilter.toLowerCase())) ||
-                            (item.implContractName && item.implContractName.toLowerCase().includes(addressFilter.toLowerCase()))
+                            (item.implContractName && item.implContractName.toLowerCase().includes(addressFilter.toLowerCase())) ||
+                            (item.label && item.label.toLowerCase().includes(addressFilter.toLowerCase()))
                           return textMatch
                         })
-                        .slice(0, 10)
                         .map((item, idx) => (
                           <div
                             key={idx}
