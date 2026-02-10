@@ -67,6 +67,8 @@ async function fetchContractInfoFromEtherscan(address, chainId, apiKey) {
   return {
     abi,
     contractName: result.ContractName || null,
+    isProxy: result.Proxy === '1',
+    implementation: result.Implementation || null,
     source: 'etherscan',
   }
 }
@@ -349,14 +351,18 @@ export async function GET(request) {
       )
     }
 
-    // Create RPC client to check for proxy
-    const client = createPublicClient({
-      chain: chainConfig,
-      transport: http(rpcUrl),
-    })
+    // Determine implementation address: prefer Etherscan's proxy info, fall back to on-chain detection
+    let implAddress = null
 
-    // Check if this is a proxy contract
-    const implAddress = await getImplementationAddress(client, address)
+    if (proxyInfo.isProxy && proxyInfo.implementation) {
+      implAddress = proxyInfo.implementation
+    } else {
+      const client = createPublicClient({
+        chain: chainConfig,
+        transport: http(rpcUrl),
+      })
+      implAddress = await getImplementationAddress(client, address)
+    }
 
     if (implAddress) {
       // It's a proxy! Fetch implementation ABI and merge
