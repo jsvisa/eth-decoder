@@ -426,6 +426,16 @@
   color: #666;
 }
 
+.detectProxyLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: #666;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .fetchButton {
   padding: 0.875rem 1.5rem;
   font-size: 1rem;

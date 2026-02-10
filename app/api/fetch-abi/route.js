@@ -67,6 +67,8 @@ async function fetchContractInfoFromEtherscan(address, chainId, apiKey) {
   return {
     abi,
     contractName: result.ContractName || null,
+    isProxy: result.Proxy === '1',
+    implementation: result.Implementation || null,
     source: 'etherscan',
   }
 }
@@ -217,6 +219,48 @@ async function getImplementationAddress(client, proxyAddress) {
     // Ignore
   }
 
+  // Try Gnosis Safe proxy pattern (singleton/masterCopy stored at slot 0)
+  try {
+    const slot0Data = await client.getStorageAt({
+      address: proxyAddress,
+      slot: '0x0000000000000000000000000000000000000000000000000000000000000000',
+    })
+
+    if (slot0Data && slot0Data !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
+      const candidateAddress = '0x' + slot0Data.slice(-40)
+      if (candidateAddress !== '0x0000000000000000000000000000000000000000') {
+        // Verify it's actually a contract to avoid false positives
+        const code = await client.getCode({ address: candidateAddress })
+        if (code && code !== '0x') {
+          return candidateAddress
+        }
+      }
+    }
+  } catch (e) {
+    // Ignore
+  }
+
+  // Try EIP-1167 Minimal Proxy (Clone) - implementation address embedded in bytecode
+  // Runtime bytecode pattern: 363d3d373d3d3d363d73<20-byte address>5af43d82803e903d91602b57fd5bf3
+  try {
+    const code = await client.getCode({ address: proxyAddress })
+    if (code && code.length > 2) {
+      const bytecode = code.toLowerCase()
+      const prefix = '363d3d373d3d3d363d73'
+      const suffix = '5af43d82803e903d91602b57fd5bf3'
+      const prefixIndex = bytecode.indexOf(prefix)
+      if (prefixIndex !== -1) {
+        const addrStart = prefixIndex + prefix.length
+        const addrEnd = addrStart + 40
+        if (bytecode.substring(addrEnd, addrEnd + suffix.length) === suffix) {
+          return '0x' + bytecode.substring(addrStart, addrEnd)
+        }
+      }
+    }
+  } catch (e) {
+    // Ignore
+  }
+
   return null
 }
 
@@ -328,14 +372,20 @@ export async function GET(request) {
       )
     }
 
-    // Create RPC client to check for proxy
-    const client = createPublicClient({
-      chain: chainConfig,
-      transport: http(rpcUrl),
-    })
+    // Determine implementation address: prefer Etherscan's proxy info,
+    // only fall back to on-chain detection when explicitly requested
+    const detectProxy = searchParams.get('detectProxy') === 'true'
+    let implAddress = null
 
-    // Check if this is a proxy contract
-    const implAddress = await getImplementationAddress(client, address)
+    if (proxyInfo.isProxy && proxyInfo.implementation) {
+      implAddress = proxyInfo.implementation
+    } else if (detectProxy) {
+      const client = createPublicClient({
+        chain: chainConfig,
+        transport: http(rpcUrl),
+      })
+      implAddress = await getImplementationAddress(client, address)
+    }
 
     if (implAddress) {
       // It's a proxy! Fetch implementation ABI and merge
