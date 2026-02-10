@@ -217,6 +217,27 @@ async function getImplementationAddress(client, proxyAddress) {
     // Ignore
   }
 
+  // Try Gnosis Safe proxy pattern (singleton/masterCopy stored at slot 0)
+  try {
+    const slot0Data = await client.getStorageAt({
+      address: proxyAddress,
+      slot: '0x0000000000000000000000000000000000000000000000000000000000000000',
+    })
+
+    if (slot0Data && slot0Data !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
+      const candidateAddress = '0x' + slot0Data.slice(-40)
+      if (candidateAddress !== '0x0000000000000000000000000000000000000000') {
+        // Verify it's actually a contract to avoid false positives
+        const code = await client.getCode({ address: candidateAddress })
+        if (code && code !== '0x') {
+          return candidateAddress
+        }
+      }
+    }
+  } catch (e) {
+    // Ignore
+  }
+
   return null
 }
 
