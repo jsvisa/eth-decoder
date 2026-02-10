@@ -2521,19 +2521,17 @@ export default function ContractCaller() {
 
   // Get combined suggestions (bookmarked addresses + cached addresses)
   const getCombinedSuggestions = () => {
-    const bookmarked = addressBook.map(item => ({
-      ...item,
-      isBookmarked: true,
-    }))
-
-    const cached = cachedAddresses
-      .filter(item => !addressBook.some(b => b.address.toLowerCase() === item.address.toLowerCase()))
-      .map(item => ({
+    // Cached addresses, with bookmark info merged if also bookmarked
+    const cached = cachedAddresses.map(item => {
+      const bookmark = addressBook.find(b => b.address.toLowerCase() === item.address.toLowerCase())
+      return {
         ...item,
-        isBookmarked: false,
-      }))
+        isBookmarked: !!bookmark,
+        label: bookmark?.label || null,
+      }
+    })
 
-    return [...bookmarked, ...cached]
+    return cached
   }
 
   return (
