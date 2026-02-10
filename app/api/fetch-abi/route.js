@@ -240,6 +240,27 @@ async function getImplementationAddress(client, proxyAddress) {
     // Ignore
   }
 
+  // Try EIP-1167 Minimal Proxy (Clone) - implementation address embedded in bytecode
+  // Runtime bytecode pattern: 363d3d373d3d3d363d73<20-byte address>5af43d82803e903d91602b57fd5bf3
+  try {
+    const code = await client.getCode({ address: proxyAddress })
+    if (code && code.length > 2) {
+      const bytecode = code.toLowerCase()
+      const prefix = '363d3d373d3d3d363d73'
+      const suffix = '5af43d82803e903d91602b57fd5bf3'
+      const prefixIndex = bytecode.indexOf(prefix)
+      if (prefixIndex !== -1) {
+        const addrStart = prefixIndex + prefix.length
+        const addrEnd = addrStart + 40
+        if (bytecode.substring(addrEnd, addrEnd + suffix.length) === suffix) {
+          return '0x' + bytecode.substring(addrStart, addrEnd)
+        }
+      }
+    }
+  } catch (e) {
+    // Ignore
+  }
+
   return null
 }
 
