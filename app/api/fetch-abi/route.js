@@ -372,12 +372,14 @@ export async function GET(request) {
       )
     }
 
-    // Determine implementation address: prefer Etherscan's proxy info, fall back to on-chain detection
+    // Determine implementation address: prefer Etherscan's proxy info,
+    // only fall back to on-chain detection when explicitly requested
+    const detectProxy = searchParams.get('detectProxy') === 'true'
     let implAddress = null
 
     if (proxyInfo.isProxy && proxyInfo.implementation) {
       implAddress = proxyInfo.implementation
-    } else {
+    } else if (detectProxy) {
       const client = createPublicClient({
         chain: chainConfig,
         transport: http(rpcUrl),

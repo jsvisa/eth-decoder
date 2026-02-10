@@ -112,7 +112,7 @@ export const buildAbiCacheFromStorage = (chain) => {
  * @param {number|string} chainId - Optional chain ID for custom chains
  * @returns {Promise<Array|null>} The ABI array or null if fetch failed
  */
-export const fetchAndCacheAbi = async (chain, address, apiKey, rpcUrl, chainId) => {
+export const fetchAndCacheAbi = async (chain, address, apiKey, rpcUrl, chainId, { detectProxy = false } = {}) => {
   try {
     // Check cache first
     const cached = getCachedAbi(chain, address)
@@ -130,6 +130,9 @@ export const fetchAndCacheAbi = async (chain, address, apiKey, rpcUrl, chainId) 
     }
     if (chainId) {
       params.set('chainId', chainId.toString())
+    }
+    if (detectProxy) {
+      params.set('detectProxy', 'true')
     }
 
     const response = await fetch(`/api/fetch-abi?${params}`)

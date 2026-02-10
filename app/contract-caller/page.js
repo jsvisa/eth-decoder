@@ -520,6 +520,7 @@ export default function ContractCaller() {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [fetchingAbi, setFetchingAbi] = useState(false)
+  const [detectProxy, setDetectProxy] = useState(false)
   const [error, setError] = useState(null)
   const [isYaml, setIsYaml] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -1469,6 +1470,9 @@ export default function ContractCaller() {
       const chainIdForApi = getChainId(chain)
       if (chainIdForApi) {
         params.set('chainId', chainIdForApi.toString())
+      }
+      if (detectProxy) {
+        params.set('detectProxy', 'true')
       }
       const response = await fetch(`/api/fetch-abi?${params}`)
       const data = await response.json()
@@ -2888,6 +2892,14 @@ export default function ContractCaller() {
                 >
                   {isCurrentAddressBookmarked() ? '★' : '☆'}
                 </button>
+                <label className={styles.detectProxyLabel} title="Use on-chain detection for proxy contracts not recognized by Etherscan (e.g. Safe, EIP-1167 clones)">
+                  <input
+                    type="checkbox"
+                    checked={detectProxy}
+                    onChange={(e) => setDetectProxy(e.target.checked)}
+                  />
+                  Detect proxy
+                </label>
                 <button
                   onClick={() => fetchAbi(false)}
                   className={styles.fetchButton}
