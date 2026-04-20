@@ -1,5 +1,5 @@
 import { createMemoryClient, http } from 'tevm'
-import { encodeFunctionData, decodeFunctionResult, parseEther, decodeEventLog, keccak256 } from 'viem'
+import { encodeFunctionData, decodeFunctionResult, parseEther, decodeEventLog, keccak256, bytesToHex } from 'viem'
 import { isValidEthAddress } from './validation'
 
 // Wraps an HTTP transport to avoid eth_getProof, which is unsupported by many
