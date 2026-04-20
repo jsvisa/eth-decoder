@@ -1,8 +1,7 @@
-name: chola
 services:
   abi:
     image: abi-server:latest
-    container_name: chola-abi-server
+    container_name: abi-server
     build:
       context: .
       dockerfile: Dockerfile
