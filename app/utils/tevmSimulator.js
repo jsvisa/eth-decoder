@@ -275,8 +275,6 @@ function decodeSubCallNodes(node, selectorMap) {
 
 function _decodeCallNode(node, selectorMap) {
   if (!node) return
-  // STATICCALLs are read-only view calls — skip decoding them and their subtree
-  if (node.type === 'STATICCALL') return
   const input = node.input
   if (input && input.length >= 10) {
     const selector = input.slice(0, 10).toLowerCase()
