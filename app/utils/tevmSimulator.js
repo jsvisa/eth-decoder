@@ -1,5 +1,5 @@
 import { createMemoryClient, http } from 'tevm'
-import { encodeFunctionData, decodeFunctionResult, parseEther, decodeEventLog, keccak256, bytesToHex } from 'viem'
+import { encodeFunctionData, decodeFunctionData, decodeFunctionResult, parseEther, decodeEventLog, keccak256, bytesToHex, toFunctionSelector } from 'viem'
 import { isValidEthAddress } from './validation'
 
 // Wraps an HTTP transport to avoid eth_getProof, which is unsupported by many
@@ -243,6 +243,71 @@ function pruneDecodedAddresses(node, undecodedSet) {
 function flattenLogsFromTree(node) {
   if (!node) return []
   return [...(node.logs || []), ...(node.calls || []).flatMap(flattenLogsFromTree)]
+}
+
+// Build a map of 4-byte selector (e.g. "0xabcd1234") → functionAbi
+// from the main ABI and all cached ABIs, so sub-calls can be decoded.
+function buildSelectorMap(abi, abiCache) {
+  const map = new Map()
+  const add = (abiFrag) => {
+    if (!abiFrag || abiFrag.type !== 'function') return
+    try {
+      const selector = toFunctionSelector(abiFrag)
+      if (!map.has(selector)) map.set(selector, abiFrag)
+    } catch { /* skip malformed entries */ }
+  }
+  ;(abi || []).forEach(add)
+  for (const [, cachedAbi] of (abiCache || new Map())) {
+    ;(cachedAbi || []).forEach(add)
+  }
+  return map
+}
+
+// Recursively decode function name + inputs/outputs for every sub-call node
+// whose input starts with a known 4-byte selector.
+function decodeSubCallNodes(node, selectorMap) {
+  if (!node) return
+  // Skip the root — it's already annotated with the known functionAbi
+  for (const child of (node.calls || [])) {
+    _decodeCallNode(child, selectorMap)
+  }
+}
+
+function _decodeCallNode(node, selectorMap) {
+  if (!node) return
+  const input = node.input
+  if (input && input.length >= 10) {
+    const selector = input.slice(0, 10).toLowerCase()
+    const funcAbi = selectorMap.get(selector)
+    if (funcAbi) {
+      try {
+        const { functionName, args } = decodeFunctionData({ abi: [funcAbi], data: input })
+        node.functionName = functionName
+        node.decodedInputs = funcAbi.inputs.map((inp, i) => ({
+          name: inp.name || `input${i}`,
+          type: inp.type,
+          value: serializeValue(Array.isArray(args) ? args[i] : args),
+        }))
+      } catch { /* leave undecoded */ }
+
+      // Decode output if the call succeeded and we know the return types
+      if (node.output && node.output !== '0x' && !node.error && funcAbi.outputs?.length > 0) {
+        try {
+          const decoded = decodeFunctionResult({ abi: [funcAbi], functionName: funcAbi.name, data: node.output })
+          node.decodedOutputs = funcAbi.outputs.length === 1
+            ? [{ name: funcAbi.outputs[0].name || 'result', type: funcAbi.outputs[0].type, value: serializeValue(decoded) }]
+            : funcAbi.outputs.map((out, i) => ({
+                name: out.name || `output${i}`,
+                type: out.type,
+                value: serializeValue(Array.isArray(decoded) ? decoded[i] : decoded[out.name]),
+              }))
+        } catch { /* leave undecoded */ }
+      }
+    }
+  }
+  for (const child of (node.calls || [])) {
+    _decodeCallNode(child, selectorMap)
+  }
 }
 
 /**
@@ -589,6 +654,10 @@ export async function simulateWithTevm({
         callTraceRoot.error = callResult.errors?.[0]?.message || 'Transaction reverted'
       }
     }
+
+    // Decode function names + args for sub-calls using the selector map
+    const selectorMap = buildSelectorMap(abi, abiCache)
+    decodeSubCallNodes(callTraceRoot, selectorMap)
 
     const callTraceTree = callTraceRoot
 
