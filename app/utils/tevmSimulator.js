@@ -239,6 +239,13 @@ function pruneDecodedAddresses(node, undecodedSet) {
   for (const child of (node.calls || [])) pruneDecodedAddresses(child, undecodedSet)
 }
 
+// Recursively remove STATICCALL nodes from the call tree
+function pruneStaticCalls(node) {
+  if (!node) return
+  node.calls = (node.calls || []).filter(c => c.type !== 'STATICCALL')
+  node.calls.forEach(pruneStaticCalls)
+}
+
 // Flatten all logs from the entire call trace tree into a single array (for the Logs tab)
 function flattenLogsFromTree(node) {
   if (!node) return []
@@ -659,6 +666,9 @@ export async function simulateWithTevm({
         callTraceRoot.error = callResult.errors?.[0]?.message || 'Transaction reverted'
       }
     }
+
+    // Strip STATICCALL nodes from the tree (defence-in-depth: also handled at render time)
+    pruneStaticCalls(callTraceRoot)
 
     // Decode function names + args for sub-calls using the selector map
     const selectorMap = buildSelectorMap(abi, abiCache)

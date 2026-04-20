@@ -2264,6 +2264,7 @@ export default function ContractCaller() {
   // Render call trace node recursively as a tree
   const renderCallTraceNode = (trace, depth) => {
     if (!trace) return null
+    if (trace.type === 'STATICCALL') return null
 
     // Build function signature: ContractName.functionName(param1=value1, param2=value2)
     const contractName = trace.toName || trace.to?.slice(0, 10) + '...'
