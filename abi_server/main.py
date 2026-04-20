@@ -172,18 +172,39 @@ def decode_with_data(data, count=1, with_abi=False, with_sign=False) -> List[Dic
     return errors
 
 
-def get_event_abi_by_topic(topic0: str, count: int = 1):
+def get_event_abi_by_topic(topic0: str, count: int = 1, num_indexed: int | None = None):
     """Look up event ABI by topic0 hash. Events share the evm.func_signs table,
-    distinguished by their 32-byte byte_sign (vs 4-byte for functions)."""
+    distinguished by their 32-byte byte_sign (vs 4-byte for functions).
+
+    When num_indexed is provided, only rows whose ABI has exactly that many
+    indexed inputs are returned — this ensures the ABI matches the actual log
+    (topics count - 1 == number of indexed fields).
+    """
     if count > 10:
         count = 10
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute(
-        "SELECT text_sign, abi FROM evm.func_signs "
-        "WHERE byte_sign = %s ORDER BY score DESC LIMIT %s",
-        (topic0.lower(), count),
-    )
+    if num_indexed is not None:
+        # Filter by indexed field count using a JSONB aggregate subquery
+        cur.execute(
+            """
+            SELECT text_sign, abi FROM evm.func_signs
+            WHERE byte_sign = %s
+              AND (
+                SELECT COUNT(*)
+                FROM jsonb_array_elements(abi->'inputs') AS inp
+                WHERE (inp->>'indexed')::boolean = true
+              ) = %s
+            ORDER BY score DESC LIMIT %s
+            """,
+            (topic0.lower(), num_indexed, count),
+        )
+    else:
+        cur.execute(
+            "SELECT text_sign, abi FROM evm.func_signs "
+            "WHERE byte_sign = %s ORDER BY score DESC LIMIT %s",
+            (topic0.lower(), count),
+        )
     rows = cur.fetchall()
     cur.close()
     conn.close()
@@ -276,7 +297,10 @@ async def decode_event(
     if not topic_list[0].startswith("0x"):
         topic_list[0] = "0x" + topic_list[0]
 
-    rows = get_event_abi_by_topic(sign, count)
+    # topics[0] is the event sig hash; remaining topics are indexed params.
+    # Only fetch ABIs whose indexed field count matches exactly.
+    num_indexed = len(topic_list) - 1
+    rows = get_event_abi_by_topic(sign, count, num_indexed=num_indexed)
     if not rows:
         return {"msg": "not found", "data": None}
 
