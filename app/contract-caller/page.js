@@ -2632,35 +2632,35 @@ export default function ContractCaller() {
                   Choose between local browser-based simulation (Tevm) or Tenderly API.
                 </p>
                 <div className={styles.settingsFields}>
-                  <label className={styles.checkboxLabel}>
-                    <input
-                      type="checkbox"
-                      checked={useLocalSimulation}
-                      onChange={(e) => {
-                        const useLocal = e.target.checked
-                        setUseLocalSimulation(useLocal)
-                        localStorage.setItem(SIMULATION_SETTINGS_KEY, JSON.stringify({ useLocalSimulation: useLocal, rpcBatchSize }))
-                      }}
-                    />
-                    <span>Use Local Simulation (Tevm - no API keys required)</span>
-                  </label>
                   <div className={styles.settingRow}>
-                    <label className={styles.settingLabel}>
-                      RPC Batch Size
-                      <span className={styles.settingHint}> — requests per HTTP call during prefetch (1 = no batching)</span>
+                    <label className={styles.checkboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={useLocalSimulation}
+                        onChange={(e) => {
+                          const useLocal = e.target.checked
+                          setUseLocalSimulation(useLocal)
+                          localStorage.setItem(SIMULATION_SETTINGS_KEY, JSON.stringify({ useLocalSimulation: useLocal, rpcBatchSize }))
+                        }}
+                      />
+                      <span>Use Local Simulation (Tevm - no API keys required)</span>
                     </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="500"
-                      value={rpcBatchSize}
-                      className={styles.settingInput}
-                      onChange={(e) => {
-                        const v = Math.max(1, parseInt(e.target.value) || 1)
-                        setRpcBatchSize(v)
-                        localStorage.setItem(SIMULATION_SETTINGS_KEY, JSON.stringify({ useLocalSimulation, rpcBatchSize: v }))
-                      }}
-                    />
+                    <label className={styles.settingLabel}>
+                      Batch Size
+                      <span className={styles.settingHint}> (1 = no batching)</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="500"
+                        value={rpcBatchSize}
+                        className={styles.settingInput}
+                        onChange={(e) => {
+                          const v = Math.max(1, parseInt(e.target.value) || 1)
+                          setRpcBatchSize(v)
+                          localStorage.setItem(SIMULATION_SETTINGS_KEY, JSON.stringify({ useLocalSimulation, rpcBatchSize: v }))
+                        }}
+                      />
+                    </label>
                   </div>
                 </div>
               </div>

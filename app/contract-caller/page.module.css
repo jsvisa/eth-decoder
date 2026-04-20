@@ -2672,13 +2672,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  margin-top: 0.75rem;
+  gap: 1.5rem;
 }
 
 .settingLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   font-size: 0.85rem;
   color: var(--text-primary);
+  white-space: nowrap;
 }
 
 .settingHint {
