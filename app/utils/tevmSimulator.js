@@ -619,7 +619,7 @@ export async function simulateWithTevm({
     // the EVM starts. Accounts already in tevm's cache are never fetched again.
     await prefetchAccountsFromAccessList({
       client,
-      forkRpcUrl,
+      forkRpcUrl: rpcUrl || DEFAULT_RPCS[chain] || '',
       callParams: { to: address, from: sender, data: callData, value: valueInWei },
       blockTag,
     })
