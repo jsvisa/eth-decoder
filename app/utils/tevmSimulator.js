@@ -246,6 +246,21 @@ function pruneStaticCalls(node) {
   node.calls.forEach(pruneStaticCalls)
 }
 
+// Collect addresses of sub-call nodes that couldn't be decoded (no functionName
+// despite having calldata). These are fed into the ABI-fetch pipeline so a
+// second pass can decode them.
+function collectUndecodedCallAddresses(node, result = new Set()) {
+  if (!node) return result
+  // Skip root (depth 0) — it's decoded via the known ABI, not the selector map
+  for (const child of (node.calls || [])) {
+    if (child.functionName === null && child.input && child.input.length >= 10 && child.to) {
+      result.add(child.to.toLowerCase())
+    }
+    collectUndecodedCallAddresses(child, result)
+  }
+  return result
+}
+
 // Flatten all logs from the entire call trace tree into a single array (for the Logs tab)
 function flattenLogsFromTree(node) {
   if (!node) return []
@@ -674,6 +689,12 @@ export async function simulateWithTevm({
     const selectorMap = buildSelectorMap(abi, abiCache)
     decodeSubCallNodes(callTraceRoot, selectorMap)
 
+    // Also track sub-call addresses that couldn't be decoded — their ABIs will
+    // be fetched and a second decode pass run by the caller (page.js).
+    for (const addr of collectUndecodedCallAddresses(callTraceRoot)) {
+      undecodedAddresses.add(addr)
+    }
+
     const callTraceTree = callTraceRoot
 
     // Get gas used
@@ -743,7 +764,12 @@ export function redecodeLogs(logs, abiCache) {
 export function redecodeCallTrace(callTrace, abiCache) {
   if (!callTrace) return callTrace
   const eventAbisByAddress = buildEventAbiMap(abiCache)
-  return redecodeTreeNode(callTrace, eventAbisByAddress)
+  const selectorMap = buildSelectorMap([], abiCache)
+  const tree = redecodeTreeNode(callTrace, eventAbisByAddress)
+  // Re-run sub-call decoding with the updated selector map so newly fetched
+  // ABIs can decode function names/inputs that were null on the first pass.
+  decodeSubCallNodes(tree, selectorMap)
+  return tree
 }
 
 function buildEventAbiMap(abiCache) {
