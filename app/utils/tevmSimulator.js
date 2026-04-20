@@ -467,17 +467,36 @@ export async function applyCheatcodes(client, cheatcodes = {}) {
 }
 
 /**
- * Prefetch all accounts a transaction will touch using eth_createAccessList,
- * then batch-load their bytecode + balance into tevm's state cache in parallel.
- * This eliminates the sequential per-account RPC stalls during EVM execution.
- * Silently skips on any error (falls back to lazy loading).
+ * Prefetch accounts into tevm's state cache before simulation runs.
+ *
+ * Two-tier strategy:
+ *   1. Always prefetch the target contract (universally supported, zero extra
+ *      round trips since we'd need it anyway).
+ *   2. Try eth_createAccessList to discover the full address set and prefetch
+ *      everything in parallel. If the RPC doesn't support it (or it fails for
+ *      any reason), this tier is silently skipped — lazy loading covers the rest.
+ *
+ * Both tiers use only eth_getCode + eth_getBalance, which every RPC supports.
  */
 async function prefetchAccountsFromAccessList({ client, forkRpcUrl, callParams, blockTag }) {
-  try {
-    const transport = http(forkRpcUrl)({})
-    const tag = blockTag === 'latest' ? 'latest' : `0x${BigInt(blockTag).toString(16)}`
+  const transport = http(forkRpcUrl)({})
+  const tag = blockTag === 'latest' ? 'latest' : `0x${BigInt(blockTag).toString(16)}`
 
-    // One round trip to discover all accounts the tx will touch
+  const prefetchAddr = async (addr) => {
+    try {
+      const [code, balance] = await Promise.all([
+        transport.request({ method: 'eth_getCode', params: [addr, tag] }),
+        transport.request({ method: 'eth_getBalance', params: [addr, tag] }),
+      ])
+      await client.tevmSetAccount({ address: addr, balance: BigInt(balance), deployedBytecode: code })
+    } catch { /* will lazy-load during execution */ }
+  }
+
+  // Tier 1: always prefetch the target contract (no extra RPC method needed)
+  await prefetchAddr(callParams.to)
+
+  // Tier 2: use eth_createAccessList to discover and prefetch remaining accounts
+  try {
     const alResult = await transport.request({
       method: 'eth_createAccessList',
       params: [
@@ -490,28 +509,12 @@ async function prefetchAccountsFromAccessList({ client, forkRpcUrl, callParams, 
         tag,
       ],
     })
+    const extra = (alResult?.accessList ?? [])
+      .map(item => item.address?.toLowerCase())
+      .filter(addr => addr && addr !== callParams.to.toLowerCase())
 
-    // Collect unique addresses: target contract + all addresses in access list
-    const addresses = new Set([callParams.to.toLowerCase()])
-    for (const item of alResult?.accessList ?? []) {
-      if (item.address) addresses.add(item.address.toLowerCase())
-    }
-
-    // Fetch bytecode + balance for all addresses in parallel
-    await Promise.all([...addresses].map(async (addr) => {
-      try {
-        const [code, balance] = await Promise.all([
-          transport.request({ method: 'eth_getCode', params: [addr, tag] }),
-          transport.request({ method: 'eth_getBalance', params: [addr, tag] }),
-        ])
-        await client.tevmSetAccount({
-          address: addr,
-          balance: BigInt(balance),
-          deployedBytecode: code,
-        })
-      } catch { /* skip — this account will lazy-load during execution */ }
-    }))
-  } catch { /* eth_createAccessList not supported or failed — proceed with lazy loading */ }
+    if (extra.length > 0) await Promise.all(extra.map(prefetchAddr))
+  } catch { /* eth_createAccessList unsupported — tier 1 prefetch is still active */ }
 }
 
 /**
