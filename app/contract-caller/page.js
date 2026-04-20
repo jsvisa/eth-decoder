@@ -519,6 +519,8 @@ export default function ContractCaller() {
   const [args, setArgs] = useState([])
   const [result, setResult] = useState(null)
   const [simLogsExpanded, setSimLogsExpanded] = useState(true)
+  const [simProgress, setSimProgress] = useState(null) // null = not simulating, 0-100 = in progress
+  const simAbortRef = useRef(null)
   const [loading, setLoading] = useState(false)
   const [fetchingAbi, setFetchingAbi] = useState(false)
   const [detectProxy, setDetectProxy] = useState(false)
@@ -575,6 +577,7 @@ export default function ContractCaller() {
   const [selectedRpcChain, setSelectedRpcChain] = useState('ethereum') // For RPC settings dropdown
   // Simulation settings
   const [useLocalSimulation, setUseLocalSimulation] = useState(true) // Use browser-based Tevm simulation (default)
+  const [rpcBatchSize, setRpcBatchSize] = useState(1) // JSON-RPC batch size for simulation prefetch
   const [forkBlockNumber, setForkBlockNumber] = useState('') // Block number to fork from (empty = latest)
   const [readBlockNumber, setReadBlockNumber] = useState('') // Block number for read-only eth_call (empty = latest)
   const [cheatcodes, setCheatcodes] = useState({
@@ -1190,6 +1193,9 @@ export default function ContractCaller() {
         const parsed = JSON.parse(savedSimSettings)
         if (typeof parsed.useLocalSimulation === 'boolean') {
           setUseLocalSimulation(parsed.useLocalSimulation)
+        }
+        if (typeof parsed.rpcBatchSize === 'number' && parsed.rpcBatchSize >= 1) {
+          setRpcBatchSize(parsed.rpcBatchSize)
         }
       }
 
@@ -2045,6 +2051,10 @@ export default function ContractCaller() {
         // Also add the current contract's ABI to the cache
         initialAbiCache.set(address.toLowerCase(), parsedAbi)
 
+        const abortController = new AbortController()
+        simAbortRef.current = abortController
+        setSimProgress(0)
+
         data = await simulateWithTevm({
           chain,
           address,
@@ -2059,7 +2069,11 @@ export default function ContractCaller() {
           cheatcodes: activeCheatcodes,
           customChainId: chainIdForSimulation,
           abiCache: initialAbiCache,
+          onProgress: (pct) => setSimProgress(pct),
+          abortSignal: abortController.signal,
+          rpcBatchSize,
         })
+        setSimProgress(100)
 
         // If there are undecoded addresses, fetch their ABIs and re-decode
         if (data.undecodedAddresses && data.undecodedAddresses.length > 0) {
@@ -2198,9 +2212,15 @@ export default function ContractCaller() {
 
       saveToHistory({ chain, address, selectedFunction, args }, data, isWrite)
     } catch (err) {
-      setError(err.message)
+      if (err.message === 'Simulation cancelled') {
+        setError(null)
+      } else {
+        setError(err.message)
+      }
     } finally {
       setLoading(false)
+      setSimProgress(null)
+      simAbortRef.current = null
     }
   }
 
@@ -2612,18 +2632,36 @@ export default function ContractCaller() {
                   Choose between local browser-based simulation (Tevm) or Tenderly API.
                 </p>
                 <div className={styles.settingsFields}>
-                  <label className={styles.checkboxLabel}>
-                    <input
-                      type="checkbox"
-                      checked={useLocalSimulation}
-                      onChange={(e) => {
-                        const useLocal = e.target.checked
-                        setUseLocalSimulation(useLocal)
-                        localStorage.setItem(SIMULATION_SETTINGS_KEY, JSON.stringify({ useLocalSimulation: useLocal }))
-                      }}
-                    />
-                    <span>Use Local Simulation (Tevm - no API keys required)</span>
-                  </label>
+                  <div className={styles.settingRow}>
+                    <label className={styles.checkboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={useLocalSimulation}
+                        onChange={(e) => {
+                          const useLocal = e.target.checked
+                          setUseLocalSimulation(useLocal)
+                          localStorage.setItem(SIMULATION_SETTINGS_KEY, JSON.stringify({ useLocalSimulation: useLocal, rpcBatchSize }))
+                        }}
+                      />
+                      <span>Use Local Simulation (Tevm - no API keys required)</span>
+                    </label>
+                    <label className={styles.settingLabel}>
+                      Batch Size
+                      <span className={styles.settingHint}> (1 = no batching)</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="500"
+                        value={rpcBatchSize}
+                        className={styles.settingInput}
+                        onChange={(e) => {
+                          const v = Math.max(1, parseInt(e.target.value) || 1)
+                          setRpcBatchSize(v)
+                          localStorage.setItem(SIMULATION_SETTINGS_KEY, JSON.stringify({ useLocalSimulation, rpcBatchSize: v }))
+                        }}
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -3903,6 +3941,15 @@ export default function ContractCaller() {
                       : 'Call Contract')
                 }
               </button>
+              {simProgress !== null && (
+                <button
+                  type="button"
+                  className={styles.cancelSimBtn}
+                  onClick={() => simAbortRef.current?.abort()}
+                >
+                  Cancel
+                </button>
+              )}
               {address && selectedFunction && (
                 <>
                   <button
@@ -3926,6 +3973,20 @@ export default function ContractCaller() {
             </div>
           )}
         </div>
+
+        {simProgress !== null && (
+          <div className={styles.simProgressWrapper}>
+            <div className={styles.simProgressBar}>
+              <div
+                className={styles.simProgressFill}
+                style={{ width: `${simProgress}%` }}
+              />
+            </div>
+            <span className={styles.simProgressLabel}>
+              {simProgress < 100 ? `Simulating… ${simProgress}%` : 'Finalizing…'}
+            </span>
+          </div>
+        )}
 
         {error && (
           <div className={styles.error}>

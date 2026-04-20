@@ -2,12 +2,24 @@ import { createMemoryClient, http } from 'tevm'
 import { encodeFunctionData, decodeFunctionData, decodeFunctionResult, parseEther, decodeEventLog, keccak256, bytesToHex, toFunctionSelector } from 'viem'
 import { isValidEthAddress } from './validation'
 
+// Create an http transport with or without JSON-RPC batching.
+// batchSize=1 → http(url) with NO batch option — guarantees single {…} request
+//               format, compatible with all RPCs including those that reject arrays.
+// batchSize>1 → http(url, { batch: {…} }) — packs up to batchSize requests into
+//               one HTTP call as [{…}, {…}, …].
+function makeHttp(url, batchSize = 1) {
+  return batchSize > 1
+    ? http(url, { batch: { batchSize, wait: 0 } })
+    : http(url)
+}
+
 // Wraps an HTTP transport to avoid eth_getProof, which is unsupported by many
-// public RPCs. Intercepts eth_getProof and emulates it using eth_getBalance,
-// eth_getTransactionCount, and eth_getCode — all universally supported.
-// Storage slots are unaffected since tevm already uses eth_getStorageAt for them.
-function createProofFreeTransport(rpcUrl) {
-  const baseHttp = http(rpcUrl)
+// public RPCs. Intercepts eth_getProof and emulates it with eth_getBalance +
+// eth_getCode only — nonce is omitted because it is irrelevant for CALL
+// simulation (only matters for CREATE address derivation, which is rare).
+// Storage slots are unaffected since tevm already uses eth_getStorageAt.
+function createProofFreeTransport(rpcUrl, batchSize = 1) {
+  const baseHttp = makeHttp(rpcUrl, batchSize)
   return (config) => {
     const base = baseHttp(config)
     return {
@@ -16,18 +28,16 @@ function createProofFreeTransport(rpcUrl) {
         if (method === 'eth_getProof') {
           const [address, , blockTag] = params ?? []
           const tag = blockTag ?? 'latest'
-          const [balance, nonce, code] = await Promise.all([
+          const [balance, code] = await Promise.all([
             base.request({ method: 'eth_getBalance', params: [address, tag] }),
-            base.request({ method: 'eth_getTransactionCount', params: [address, tag] }),
             base.request({ method: 'eth_getCode', params: [address, tag] }),
           ])
           return {
             address,
             accountProof: [],
             balance,
-            nonce,
+            nonce: '0x0', // nonce unused in CALL simulation
             codeHash: keccak256(code),
-            // Return empty storage trie root; individual slots are fetched lazily via eth_getStorageAt
             storageHash: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
             storageProof: [],
           }
@@ -394,7 +404,7 @@ function _decodeCallNode(node, selectorMap) {
  * @param {number} customChainId - Optional custom chain ID for non-built-in chains
  * @returns {Promise<{client: any, blockNumber: string}>}
  */
-export async function createTevmClient(chain, rpcUrl, blockNumber = 'latest', customChainId = null) {
+export async function createTevmClient(chain, rpcUrl, blockNumber = 'latest', customChainId = null, batchSize = 1) {
   // Get chain config from built-in or use custom chain ID
   let chainConfig = BUILT_IN_CHAIN_CONFIGS[chain]
 
@@ -424,7 +434,7 @@ export async function createTevmClient(chain, rpcUrl, blockNumber = 'latest', cu
   // Create fork client with the specified block tag
   const client = createMemoryClient({
     fork: {
-      transport: createProofFreeTransport(forkUrl),
+      transport: createProofFreeTransport(forkUrl, batchSize),
       blockTag,
     },
   })
@@ -468,6 +478,83 @@ export async function applyCheatcodes(client, cheatcodes = {}) {
 }
 
 /**
+ * Prefetch accounts + storage slots into tevm's state cache before simulation.
+ *
+ * Two-tier strategy:
+ *   Tier 1 — always runs, needs only eth_getCode + eth_getBalance (universal):
+ *     Prefetches the target contract so the first and most predictable account
+ *     load never stalls execution.
+ *
+ *   Tier 2 — best-effort, requires eth_createAccessList:
+ *     Discovers the full set of addresses AND storage slots the tx will touch,
+ *     then fetches everything in one parallel batch. With batchSize > 1 all
+ *     requests go out in a single HTTP call (JSON-RPC batch array), reducing
+ *     N sequential round trips to ceil(N / batchSize) round trips.
+ *     Silently skipped if the RPC doesn't support eth_createAccessList.
+ */
+async function prefetchAccountsFromAccessList({ client, forkRpcUrl, callParams, blockTag, batchSize = 1 }) {
+  const transport = makeHttp(forkRpcUrl, batchSize)({})
+  const tag = blockTag === 'latest' ? 'latest' : `0x${BigInt(blockTag).toString(16)}`
+
+  // Tier 1: always prefetch the target contract
+  try {
+    const [code, balance] = await Promise.all([
+      transport.request({ method: 'eth_getCode', params: [callParams.to, tag] }),
+      transport.request({ method: 'eth_getBalance', params: [callParams.to, tag] }),
+    ])
+    await client.tevmSetAccount({ address: callParams.to, balance: BigInt(balance), deployedBytecode: code })
+  } catch { /* will lazy-load */ }
+
+  // Tier 2: eth_createAccessList → batch-fetch all accounts + storage slots
+  try {
+    const alResult = await transport.request({
+      method: 'eth_createAccessList',
+      params: [
+        {
+          to: callParams.to,
+          from: callParams.from,
+          data: callParams.data,
+          ...(callParams.value > 0n ? { value: `0x${callParams.value.toString(16)}` } : {}),
+        },
+        tag,
+      ],
+    })
+
+    // Build address → storageKeys map from access list
+    const addrMap = new Map() // addr (lowercase) → string[]
+    for (const item of alResult?.accessList ?? []) {
+      const addr = item.address?.toLowerCase()
+      if (!addr) continue
+      if (!addrMap.has(addr)) addrMap.set(addr, [])
+      for (const slot of item.storageKeys ?? []) addrMap.get(addr).push(slot)
+    }
+
+    // One Promise.all over all addresses — with batch transport all requests
+    // for all addresses (code, balance, and every storage slot) are packed into
+    // ceil(totalRequests / batchSize) HTTP calls instead of N individual ones.
+    await Promise.all([...addrMap.entries()].map(async ([addr, slots]) => {
+      try {
+        const [code, balance, ...storageValues] = await Promise.all([
+          transport.request({ method: 'eth_getCode', params: [addr, tag] }),
+          transport.request({ method: 'eth_getBalance', params: [addr, tag] }),
+          ...slots.map(slot => transport.request({ method: 'eth_getStorageAt', params: [addr, slot, tag] })),
+        ])
+
+        const state = {}
+        slots.forEach((slot, i) => { state[slot] = storageValues[i] })
+
+        await client.tevmSetAccount({
+          address: addr,
+          balance: BigInt(balance),
+          deployedBytecode: code,
+          ...(slots.length > 0 ? { state } : {}),
+        })
+      } catch { /* skip this address, lazy-load during execution */ }
+    }))
+  } catch { /* eth_createAccessList unsupported — tier 1 prefetch is still active */ }
+}
+
+/**
  * Simulate a contract call using Tevm
  * @param {Object} params - Simulation parameters
  * @param {Map<string, Array>} params.abiCache - Optional map of lowercase address -> ABI array for decoding logs from multiple contracts
@@ -487,6 +574,9 @@ export async function simulateWithTevm({
   cheatcodes = {},
   customChainId = null,
   abiCache = new Map(),
+  onProgress = null,    // (percent: 0-100) => void
+  abortSignal = null,   // AbortSignal
+  rpcBatchSize = 1,     // JSON-RPC batch size; 1 = no batching, N>1 = batch array
 }) {
   try {
     // Validate inputs
@@ -515,7 +605,7 @@ export async function simulateWithTevm({
     })
 
     // Create Tevm client with the specified block
-    const { client, blockNumber: actualBlock } = await createTevmClient(chain, rpcUrl, blockNumber, customChainId)
+    const { client, blockNumber: actualBlock } = await createTevmClient(chain, rpcUrl, blockNumber, customChainId, rpcBatchSize)
 
     // Apply cheatcodes
     const { prankAddress } = await applyCheatcodes(client, cheatcodes)
@@ -559,6 +649,24 @@ export async function simulateWithTevm({
       }
     }
 
+    // ── Account prefetch ────────────────────────────────────────────────────
+    // The main latency source is sequential per-account state fetches during
+    // execution: the EVM blocks on each new address it encounters. We front-load
+    // this by calling eth_createAccessList first (one round trip) to learn which
+    // accounts the tx will touch, then fetching all of them in parallel before
+    // the EVM starts. Accounts already in tevm's cache are never fetched again.
+    const resolvedBlockTag = (!blockNumber || blockNumber === 'latest')
+      ? 'latest'
+      : String(blockNumber).trim()
+
+    await prefetchAccountsFromAccessList({
+      client,
+      forkRpcUrl: rpcUrl || DEFAULT_RPCS[chain] || '',
+      callParams: { to: address, from: sender, data: callData, value: valueInWei },
+      blockTag: resolvedBlockTag,
+      batchSize: rpcBatchSize,
+    })
+
     // ── callTracer implementation (forge/anvil/geth style) ──────────────────
     // Uses three hooks mirroring go-ethereum's callTracer / revm's Inspector:
     //   onBeforeMessage  → push a new call frame onto the stack
@@ -568,6 +676,11 @@ export async function simulateWithTevm({
     const callStack = []
     let callTraceRoot = null
     const LOG_OPCODES = new Set(['LOG0', 'LOG1', 'LOG2', 'LOG3', 'LOG4'])
+
+    // Progress tracking: estimate via gas consumed at root depth.
+    // rootGasLimit captured on the first beforeMessage; stepCount throttles updates.
+    let rootGasLimit = 0n
+    let stepCount = 0
 
     const onBeforeMessage = (message, next) => {
       let type = 'CALL'
@@ -598,6 +711,7 @@ export async function simulateWithTevm({
       }
       if (message.depth === 0) {
         callTraceRoot = node
+        rootGasLimit = message.gasLimit ?? 0n
       } else if (type !== 'STATICCALL') {
         // Attach to parent — STATICCALLs are excluded from the visible tree to
         // keep the trace readable, but are still pushed on the stack below so
@@ -632,7 +746,40 @@ export async function simulateWithTevm({
     // Intercept LOG opcodes to associate each log with its emitting frame.
     // At the moment onStep fires the opcode hasn't executed yet, so all
     // arguments are still on the stack — same window that geth's OnLog uses.
-    const onStep = (step, next) => {
+    // Also handles abort signal and progress reporting.
+    //
+    // WHY async + setTimeout yield:
+    // tevm's EVM runs as a microtask chain. The Cancel button click is a
+    // macrotask and cannot interrupt microtasks — so abortSignal.aborted would
+    // never be seen mid-simulation without a periodic yield. Every ~50ms we
+    // schedule a real macrotask break (setTimeout 0) which lets the browser
+    // process the click event and set aborted = true before we resume.
+    let lastYieldAt = Date.now()
+
+    const onStep = async (step, next) => {
+      // Periodically yield to the macrotask queue so the Cancel button click
+      // (a macrotask) can run and set abortSignal.aborted = true.
+      const now = Date.now()
+      if (now - lastYieldAt >= 50) {
+        lastYieldAt = now
+        await new Promise(resolve => setTimeout(resolve, 0))
+      }
+
+      // Check abort after the potential yield
+      if (abortSignal?.aborted) {
+        throw new Error('Simulation cancelled')
+      }
+
+      // Progress: use gasLeft at root depth as proxy for work done.
+      if (onProgress && rootGasLimit > 0n && step.depth === 0) {
+        stepCount++
+        if (stepCount % 100 === 0) {
+          const gasConsumed = rootGasLimit - (step.gasLeft ?? 0n)
+          const pct = Number((gasConsumed * 95n) / rootGasLimit)
+          onProgress(Math.max(1, Math.min(95, pct)))
+        }
+      }
+
       const opName = step.opcode?.name
       if (opName && LOG_OPCODES.has(opName)) {
         const numTopics = parseInt(opName[3]) // 0..4
