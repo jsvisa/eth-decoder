@@ -169,15 +169,26 @@ export async function decodeLogsViaServer(logs) {
       if (!res.ok) return
       const json = await res.json()
       if (json.msg !== 'ok' || !json.data) return
-      const { event, args } = json.data
+      const { event, args, inputs: abiInputs } = json.data
       log.name = event
       log.decoded = true
-      log.inputs = Object.entries(args || {}).map(([name, value]) => ({
-        name,
-        type: 'unknown',
-        value: String(value),
-        indexed: false,
-      }))
+      // Use ABI inputs for proper type and indexed flags when available,
+      // falling back to plain name/value pairs if not.
+      if (abiInputs?.length > 0) {
+        log.inputs = abiInputs.map(inp => ({
+          name: inp.name || '',
+          type: inp.type || 'unknown',
+          value: String(args?.[inp.name] ?? ''),
+          indexed: inp.indexed || false,
+        }))
+      } else {
+        log.inputs = Object.entries(args || {}).map(([name, value]) => ({
+          name,
+          type: 'unknown',
+          value: String(value),
+          indexed: false,
+        }))
+      }
     } catch { /* leave undecoded */ }
   }))
 

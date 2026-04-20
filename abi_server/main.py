@@ -278,6 +278,7 @@ async def decode_event(
             continue
         try:
             result = decode_event_log(abi, topic_list, data or "0x")
+            result["inputs"] = abi.get("inputs", [])  # include full ABI inputs for type/indexed info
             return {"msg": "ok", "data": result}
         except Exception as err:
             logging.error("Error decoding event sign=%s err=%s", sign, err)
