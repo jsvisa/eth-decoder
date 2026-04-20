@@ -747,19 +747,35 @@ export async function simulateWithTevm({
     // At the moment onStep fires the opcode hasn't executed yet, so all
     // arguments are still on the stack — same window that geth's OnLog uses.
     // Also handles abort signal and progress reporting.
-    const onStep = (step, next) => {
-      // Abort: throw to interrupt EVM execution immediately
+    //
+    // WHY async + setTimeout yield:
+    // tevm's EVM runs as a microtask chain. The Cancel button click is a
+    // macrotask and cannot interrupt microtasks — so abortSignal.aborted would
+    // never be seen mid-simulation without a periodic yield. Every ~50ms we
+    // schedule a real macrotask break (setTimeout 0) which lets the browser
+    // process the click event and set aborted = true before we resume.
+    let lastYieldAt = Date.now()
+
+    const onStep = async (step, next) => {
+      // Periodically yield to the macrotask queue so the Cancel button click
+      // (a macrotask) can run and set abortSignal.aborted = true.
+      const now = Date.now()
+      if (now - lastYieldAt >= 50) {
+        lastYieldAt = now
+        await new Promise(resolve => setTimeout(resolve, 0))
+      }
+
+      // Check abort after the potential yield
       if (abortSignal?.aborted) {
         throw new Error('Simulation cancelled')
       }
 
       // Progress: use gasLeft at root depth as proxy for work done.
-      // Update every 100 steps to avoid excessive React re-renders.
       if (onProgress && rootGasLimit > 0n && step.depth === 0) {
         stepCount++
         if (stepCount % 100 === 0) {
           const gasConsumed = rootGasLimit - (step.gasLeft ?? 0n)
-          const pct = Number((gasConsumed * 95n) / rootGasLimit) // cap at 95% until done
+          const pct = Number((gasConsumed * 95n) / rootGasLimit)
           onProgress(Math.max(1, Math.min(95, pct)))
         }
       }
