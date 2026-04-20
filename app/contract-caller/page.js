@@ -518,6 +518,7 @@ export default function ContractCaller() {
   const [selectedFunction, setSelectedFunction] = useState('')
   const [args, setArgs] = useState([])
   const [result, setResult] = useState(null)
+  const [simLogsExpanded, setSimLogsExpanded] = useState(true)
   const [loading, setLoading] = useState(false)
   const [fetchingAbi, setFetchingAbi] = useState(false)
   const [detectProxy, setDetectProxy] = useState(false)
@@ -2179,6 +2180,8 @@ export default function ContractCaller() {
       } else {
         setResult(data)
       }
+      // Auto-collapse event logs when there are many of them
+      setSimLogsExpanded(!data.logs || data.logs.length <= 10)
 
       // Fetch token symbols for Transfer events (async, non-blocking)
       if (data.logs && data.logs.length > 0) {
@@ -4037,8 +4040,16 @@ export default function ContractCaller() {
             {/* Event logs (simulation only) */}
             {result.simulated && result.logs && result.logs.length > 0 && (
               <div className={styles.logsSection}>
-                <h3 className={styles.logsTitle}>Event Logs ({result.logs.length})</h3>
-                {result.logs.map((log, index) => {
+                <h3 className={styles.logsTitle}>
+                  Event Logs ({result.logs.length})
+                  <button
+                    className={styles.logsToggleBtn}
+                    onClick={() => setSimLogsExpanded(v => !v)}
+                  >
+                    {simLogsExpanded ? 'Collapse' : 'Expand'}
+                  </button>
+                </h3>
+                {(simLogsExpanded ? result.logs : result.logs.slice(0, 5)).map((log, index) => {
                   const contractName = getContractNameFromCache(chain, log.address)
                   const logAddress = log.address?.toLowerCase()
                   const symbol = log.name === 'Transfer' ? (tokenSymbols[logAddress] || getCachedTokenSymbol(chain, logAddress)) : null
@@ -4087,6 +4098,14 @@ export default function ContractCaller() {
                     )}
                   </div>
                 )})}
+                {!simLogsExpanded && result.logs.length > 5 && (
+                  <div className={styles.logsMoreIndicator}>
+                    … {result.logs.length - 5} more —{' '}
+                    <button className={styles.logsToggleBtn} onClick={() => setSimLogsExpanded(true)}>
+                      show all
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
