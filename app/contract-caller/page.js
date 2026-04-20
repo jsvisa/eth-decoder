@@ -11,7 +11,7 @@ import {
   isAddressBookmarked,
   getBookmarkedAddress,
 } from '../utils/addressBook'
-import { simulateWithTevm, redecodeLogs } from '../utils/tevmSimulator'
+import { simulateWithTevm, redecodeLogs, redecodeCallTrace } from '../utils/tevmSimulator'
 import { buildAbiCacheFromStorage, fetchAbisForAddresses } from '../utils/abiCache'
 import { isValidEthAddress, isValidForkBlock, isValidNumber, isValidPositiveInteger } from '../utils/validation'
 
@@ -2085,9 +2085,11 @@ export default function ContractCaller() {
             // Re-decode logs with the updated cache
             if (newAbis.size > 0) {
               data.logs = redecodeLogs(data.logs, initialAbiCache)
-              // Also re-decode logs in call trace if present
-              if (data.callTrace && data.callTrace.logs) {
-                data.callTrace.logs = redecodeLogs(data.callTrace.logs, initialAbiCache)
+              // Recursively re-decode logs in every frame of the call trace tree
+              if (data.callTrace) {
+                data.callTrace = redecodeCallTrace(data.callTrace, initialAbiCache)
+                // Keep flat logs in sync with the re-decoded tree
+                data.logs = redecodeLogs(data.logs, initialAbiCache)
               }
             }
           }
