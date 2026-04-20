@@ -20,6 +20,12 @@ export default function Nav() {
             Tx Decoder
           </Link>
           <Link
+            href="/event-decoder"
+            className={`${styles.link} ${pathname === '/event-decoder' ? styles.active : ''}`}
+          >
+            Event Decoder
+          </Link>
+          <Link
             href="/contract-caller"
             className={`${styles.link} ${pathname === '/contract-caller' ? styles.active : ''}`}
           >

@@ -1,0 +1,344 @@
+.main {
+  min-height: 100vh;
+  padding: 2rem;
+  background: linear-gradient(to bottom, var(--bg-primary), var(--bg-secondary));
+}
+
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  background: var(--bg-card);
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.title {
+  text-align: center;
+  color: var(--text-primary);
+  margin-bottom: 1.5rem;
+  font-size: 2rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+/* Topics */
+.topicsSection, .dataSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sectionLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.optional {
+  font-weight: 400;
+  text-transform: none;
+  color: var(--text-muted, #666);
+}
+
+.topicRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.topicIndex {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  min-width: 2rem;
+  text-align: right;
+  font-family: monospace;
+}
+
+.input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  font-family: monospace;
+  border: 2px solid var(--border-primary);
+  border-radius: 6px;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  transition: border-color 0.2s;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.input:disabled {
+  background-color: var(--bg-hover);
+  cursor: not-allowed;
+}
+
+.inputError {
+  border-color: #f44336;
+}
+
+.removeBtn {
+  padding: 0.4rem 0.6rem;
+  background: none;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.removeBtn:hover { border-color: #f44336; color: #f44336; }
+
+.addTopicBtn {
+  align-self: flex-start;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  background: none;
+  border: 1px dashed var(--border-primary);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  margin-left: 2.5rem;
+}
+
+.addTopicBtn:hover { border-color: var(--border-focus); color: var(--text-primary); }
+
+/* Buttons */
+.buttonGroup {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.button {
+  padding: 0.75rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  background-color: var(--accent-primary, #4f9cf9);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.button:hover:not(:disabled) { background-color: var(--accent-hover, #3d8de8); }
+.button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.clearBtn {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  background: none;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.clearBtn:hover:not(:disabled) { border-color: var(--border-focus); color: var(--text-primary); }
+
+/* Error */
+.error {
+  padding: 0.875rem 1rem;
+  background-color: rgba(244, 67, 54, 0.1);
+  border: 1px solid rgba(244, 67, 54, 0.4);
+  border-radius: 6px;
+  color: #f44336;
+  margin-bottom: 1rem;
+}
+
+/* Result */
+.result {
+  margin-top: 1rem;
+}
+
+.resultHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.eventName {
+  font-size: 1.25rem;
+  color: var(--accent-primary, #4f9cf9);
+  margin: 0;
+  font-family: monospace;
+}
+
+.resultActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.actionButton {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  background: none;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.actionButton:hover { border-color: var(--border-focus); color: var(--text-primary); }
+
+/* Args table */
+.argsTable {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  background: var(--bg-input);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
+
+.argRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+}
+
+.argName {
+  font-family: monospace;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 120px;
+}
+
+.argType {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: #9cdcfe;
+  min-width: 80px;
+}
+
+.argIndexed {
+  font-size: 0.7rem;
+  background: rgba(79, 156, 249, 0.15);
+  color: var(--accent-primary, #4f9cf9);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.argValue {
+  font-family: monospace;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+/* JSON output */
+.json {
+  background: var(--bg-input);
+  padding: 1rem;
+  border-radius: 8px;
+  overflow: auto;
+  font-size: 0.85rem;
+  font-family: monospace;
+  line-height: 1.6;
+  color: var(--text-primary);
+  max-height: 500px;
+}
+
+.jsonKey    { color: #9cdcfe; }
+.jsonString { color: #ce9178; }
+.jsonNumber { color: #b5cea8; }
+.jsonBoolean{ color: #569cd6; }
+.jsonNull   { color: #808080; }
+
+/* History */
+.historySection {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-primary);
+}
+
+.historyHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.historyHeader h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.historyActions { display: flex; gap: 0.5rem; }
+
+.historyToggle, .historyClear {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  background: none;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.historyToggle:hover { border-color: var(--border-focus); }
+.historyClear:hover  { border-color: #f44336; color: #f44336; }
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.historyItem {
+  padding: 0.6rem 0.75rem;
+  background: var(--bg-input);
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.historyItem:hover { border-color: var(--border-focus); }
+
+.historyTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.historyInput {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.historyTopicCount {
+  color: var(--accent-primary, #4f9cf9);
+}
+
+.historyFunc {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent-primary, #4f9cf9);
+  font-family: monospace;
+}
+
+.historyMeta {
+  margin-top: 0.2rem;
+}
+
+.historyTime {
+  font-size: 0.72rem;
+  color: var(--text-muted, #666);
+}
