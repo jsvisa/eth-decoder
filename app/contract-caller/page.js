@@ -519,6 +519,8 @@ export default function ContractCaller() {
   const [args, setArgs] = useState([])
   const [result, setResult] = useState(null)
   const [simLogsExpanded, setSimLogsExpanded] = useState(true)
+  const [simProgress, setSimProgress] = useState(null) // null = not simulating, 0-100 = in progress
+  const simAbortRef = useRef(null)
   const [loading, setLoading] = useState(false)
   const [fetchingAbi, setFetchingAbi] = useState(false)
   const [detectProxy, setDetectProxy] = useState(false)
@@ -2045,6 +2047,10 @@ export default function ContractCaller() {
         // Also add the current contract's ABI to the cache
         initialAbiCache.set(address.toLowerCase(), parsedAbi)
 
+        const abortController = new AbortController()
+        simAbortRef.current = abortController
+        setSimProgress(0)
+
         data = await simulateWithTevm({
           chain,
           address,
@@ -2059,7 +2065,10 @@ export default function ContractCaller() {
           cheatcodes: activeCheatcodes,
           customChainId: chainIdForSimulation,
           abiCache: initialAbiCache,
+          onProgress: (pct) => setSimProgress(pct),
+          abortSignal: abortController.signal,
         })
+        setSimProgress(100)
 
         // If there are undecoded addresses, fetch their ABIs and re-decode
         if (data.undecodedAddresses && data.undecodedAddresses.length > 0) {
@@ -2198,9 +2207,15 @@ export default function ContractCaller() {
 
       saveToHistory({ chain, address, selectedFunction, args }, data, isWrite)
     } catch (err) {
-      setError(err.message)
+      if (err.message === 'Simulation cancelled') {
+        setError(null)
+      } else {
+        setError(err.message)
+      }
     } finally {
       setLoading(false)
+      setSimProgress(null)
+      simAbortRef.current = null
     }
   }
 
@@ -3903,6 +3918,15 @@ export default function ContractCaller() {
                       : 'Call Contract')
                 }
               </button>
+              {simProgress !== null && (
+                <button
+                  type="button"
+                  className={styles.cancelSimBtn}
+                  onClick={() => simAbortRef.current?.abort()}
+                >
+                  Cancel
+                </button>
+              )}
               {address && selectedFunction && (
                 <>
                   <button
@@ -3926,6 +3950,20 @@ export default function ContractCaller() {
             </div>
           )}
         </div>
+
+        {simProgress !== null && (
+          <div className={styles.simProgressWrapper}>
+            <div className={styles.simProgressBar}>
+              <div
+                className={styles.simProgressFill}
+                style={{ width: `${simProgress}%` }}
+              />
+            </div>
+            <span className={styles.simProgressLabel}>
+              {simProgress < 100 ? `Simulating… ${simProgress}%` : 'Finalizing…'}
+            </span>
+          </div>
+        )}
 
         {error && (
           <div className={styles.error}>

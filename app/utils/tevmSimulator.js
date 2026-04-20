@@ -487,6 +487,8 @@ export async function simulateWithTevm({
   cheatcodes = {},
   customChainId = null,
   abiCache = new Map(),
+  onProgress = null,  // (percent: 0-100) => void
+  abortSignal = null, // AbortSignal
 }) {
   try {
     // Validate inputs
@@ -569,6 +571,11 @@ export async function simulateWithTevm({
     let callTraceRoot = null
     const LOG_OPCODES = new Set(['LOG0', 'LOG1', 'LOG2', 'LOG3', 'LOG4'])
 
+    // Progress tracking: estimate via gas consumed at root depth.
+    // rootGasLimit captured on the first beforeMessage; stepCount throttles updates.
+    let rootGasLimit = 0n
+    let stepCount = 0
+
     const onBeforeMessage = (message, next) => {
       let type = 'CALL'
       if (message.to === undefined) {
@@ -598,6 +605,7 @@ export async function simulateWithTevm({
       }
       if (message.depth === 0) {
         callTraceRoot = node
+        rootGasLimit = message.gasLimit ?? 0n
       } else if (type !== 'STATICCALL') {
         // Attach to parent — STATICCALLs are excluded from the visible tree to
         // keep the trace readable, but are still pushed on the stack below so
@@ -632,7 +640,24 @@ export async function simulateWithTevm({
     // Intercept LOG opcodes to associate each log with its emitting frame.
     // At the moment onStep fires the opcode hasn't executed yet, so all
     // arguments are still on the stack — same window that geth's OnLog uses.
+    // Also handles abort signal and progress reporting.
     const onStep = (step, next) => {
+      // Abort: throw to interrupt EVM execution immediately
+      if (abortSignal?.aborted) {
+        throw new Error('Simulation cancelled')
+      }
+
+      // Progress: use gasLeft at root depth as proxy for work done.
+      // Update every 100 steps to avoid excessive React re-renders.
+      if (onProgress && rootGasLimit > 0n && step.depth === 0) {
+        stepCount++
+        if (stepCount % 100 === 0) {
+          const gasConsumed = rootGasLimit - (step.gasLeft ?? 0n)
+          const pct = Number((gasConsumed * 95n) / rootGasLimit) // cap at 95% until done
+          onProgress(Math.max(1, Math.min(95, pct)))
+        }
+      }
+
       const opName = step.opcode?.name
       if (opName && LOG_OPCODES.has(opName)) {
         const numTopics = parseInt(opName[3]) // 0..4

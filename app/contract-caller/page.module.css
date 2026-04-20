@@ -2564,6 +2564,51 @@
   vertical-align: middle;
 }
 
+.cancelSimBtn {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: none;
+  color: #f44336;
+  border: 1px solid #f44336;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.cancelSimBtn:hover {
+  background-color: rgba(244, 67, 54, 0.08);
+}
+
+.simProgressWrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+
+.simProgressBar {
+  flex: 1;
+  height: 6px;
+  background-color: #333;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.simProgressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #4f9cf9, #9cdcfe);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.simProgressLabel {
+  font-size: 0.78rem;
+  color: #888;
+  white-space: nowrap;
+  min-width: 110px;
+}
+
 /* Cheatcodes Section */
 .cheatcodesSection {
   margin-bottom: 1rem;
