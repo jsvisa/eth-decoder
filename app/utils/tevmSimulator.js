@@ -3,9 +3,10 @@ import { encodeFunctionData, decodeFunctionData, decodeFunctionResult, parseEthe
 import { isValidEthAddress } from './validation'
 
 // Wraps an HTTP transport to avoid eth_getProof, which is unsupported by many
-// public RPCs. Intercepts eth_getProof and emulates it using eth_getBalance,
-// eth_getTransactionCount, and eth_getCode — all universally supported.
-// Storage slots are unaffected since tevm already uses eth_getStorageAt for them.
+// public RPCs. Intercepts eth_getProof and emulates it with eth_getBalance +
+// eth_getCode only — nonce is omitted because it is irrelevant for CALL
+// simulation (only matters for CREATE address derivation, which is rare).
+// Storage slots are unaffected since tevm already uses eth_getStorageAt.
 function createProofFreeTransport(rpcUrl) {
   const baseHttp = http(rpcUrl)
   return (config) => {
@@ -16,18 +17,16 @@ function createProofFreeTransport(rpcUrl) {
         if (method === 'eth_getProof') {
           const [address, , blockTag] = params ?? []
           const tag = blockTag ?? 'latest'
-          const [balance, nonce, code] = await Promise.all([
+          const [balance, code] = await Promise.all([
             base.request({ method: 'eth_getBalance', params: [address, tag] }),
-            base.request({ method: 'eth_getTransactionCount', params: [address, tag] }),
             base.request({ method: 'eth_getCode', params: [address, tag] }),
           ])
           return {
             address,
             accountProof: [],
             balance,
-            nonce,
+            nonce: '0x0', // nonce unused in CALL simulation
             codeHash: keccak256(code),
-            // Return empty storage trie root; individual slots are fetched lazily via eth_getStorageAt
             storageHash: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
             storageProof: [],
           }
@@ -468,6 +467,54 @@ export async function applyCheatcodes(client, cheatcodes = {}) {
 }
 
 /**
+ * Prefetch all accounts a transaction will touch using eth_createAccessList,
+ * then batch-load their bytecode + balance into tevm's state cache in parallel.
+ * This eliminates the sequential per-account RPC stalls during EVM execution.
+ * Silently skips on any error (falls back to lazy loading).
+ */
+async function prefetchAccountsFromAccessList({ client, forkRpcUrl, callParams, blockTag }) {
+  try {
+    const transport = http(forkRpcUrl)({})
+    const tag = blockTag === 'latest' ? 'latest' : `0x${BigInt(blockTag).toString(16)}`
+
+    // One round trip to discover all accounts the tx will touch
+    const alResult = await transport.request({
+      method: 'eth_createAccessList',
+      params: [
+        {
+          to: callParams.to,
+          from: callParams.from,
+          data: callParams.data,
+          ...(callParams.value > 0n ? { value: `0x${callParams.value.toString(16)}` } : {}),
+        },
+        tag,
+      ],
+    })
+
+    // Collect unique addresses: target contract + all addresses in access list
+    const addresses = new Set([callParams.to.toLowerCase()])
+    for (const item of alResult?.accessList ?? []) {
+      if (item.address) addresses.add(item.address.toLowerCase())
+    }
+
+    // Fetch bytecode + balance for all addresses in parallel
+    await Promise.all([...addresses].map(async (addr) => {
+      try {
+        const [code, balance] = await Promise.all([
+          transport.request({ method: 'eth_getCode', params: [addr, tag] }),
+          transport.request({ method: 'eth_getBalance', params: [addr, tag] }),
+        ])
+        await client.tevmSetAccount({
+          address: addr,
+          balance: BigInt(balance),
+          deployedBytecode: code,
+        })
+      } catch { /* skip — this account will lazy-load during execution */ }
+    }))
+  } catch { /* eth_createAccessList not supported or failed — proceed with lazy loading */ }
+}
+
+/**
  * Simulate a contract call using Tevm
  * @param {Object} params - Simulation parameters
  * @param {Map<string, Array>} params.abiCache - Optional map of lowercase address -> ABI array for decoding logs from multiple contracts
@@ -560,6 +607,19 @@ export async function simulateWithTevm({
         console.warn('Failed to parse value:', e.message)
       }
     }
+
+    // ── Account prefetch ────────────────────────────────────────────────────
+    // The main latency source is sequential per-account state fetches during
+    // execution: the EVM blocks on each new address it encounters. We front-load
+    // this by calling eth_createAccessList first (one round trip) to learn which
+    // accounts the tx will touch, then fetching all of them in parallel before
+    // the EVM starts. Accounts already in tevm's cache are never fetched again.
+    await prefetchAccountsFromAccessList({
+      client,
+      forkRpcUrl,
+      callParams: { to: address, from: sender, data: callData, value: valueInWei },
+      blockTag,
+    })
 
     // ── callTracer implementation (forge/anvil/geth style) ──────────────────
     // Uses three hooks mirroring go-ethereum's callTracer / revm's Inspector:
