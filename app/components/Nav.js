@@ -37,6 +37,12 @@ export default function Nav() {
           >
             Contracts
           </Link>
+          <Link
+            href="/event-decoder"
+            className={`${styles.link} ${pathname === '/event-decoder' ? styles.active : ''}`}
+          >
+            Event Decoder
+          </Link>
         </div>
         <button
           onClick={toggleTheme}
