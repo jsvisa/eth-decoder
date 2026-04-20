@@ -2,11 +2,15 @@ import { createMemoryClient, http } from 'tevm'
 import { encodeFunctionData, decodeFunctionData, decodeFunctionResult, parseEther, decodeEventLog, keccak256, bytesToHex, toFunctionSelector } from 'viem'
 import { isValidEthAddress } from './validation'
 
-// Build viem batch config from a batchSize number.
-// batchSize=1 → no batching (single JSON object per request)
-// batchSize>1 → JSON-RPC batch array, up to batchSize requests per HTTP call
-function batchConfig(batchSize) {
-  return batchSize > 1 ? { batchSize, wait: 0 } : false
+// Create an http transport with or without JSON-RPC batching.
+// batchSize=1 → http(url) with NO batch option — guarantees single {…} request
+//               format, compatible with all RPCs including those that reject arrays.
+// batchSize>1 → http(url, { batch: {…} }) — packs up to batchSize requests into
+//               one HTTP call as [{…}, {…}, …].
+function makeHttp(url, batchSize = 1) {
+  return batchSize > 1
+    ? http(url, { batch: { batchSize, wait: 0 } })
+    : http(url)
 }
 
 // Wraps an HTTP transport to avoid eth_getProof, which is unsupported by many
@@ -15,7 +19,7 @@ function batchConfig(batchSize) {
 // simulation (only matters for CREATE address derivation, which is rare).
 // Storage slots are unaffected since tevm already uses eth_getStorageAt.
 function createProofFreeTransport(rpcUrl, batchSize = 1) {
-  const baseHttp = http(rpcUrl, { batch: batchConfig(batchSize) })
+  const baseHttp = makeHttp(rpcUrl, batchSize)
   return (config) => {
     const base = baseHttp(config)
     return {
@@ -489,7 +493,7 @@ export async function applyCheatcodes(client, cheatcodes = {}) {
  *     Silently skipped if the RPC doesn't support eth_createAccessList.
  */
 async function prefetchAccountsFromAccessList({ client, forkRpcUrl, callParams, blockTag, batchSize = 1 }) {
-  const transport = http(forkRpcUrl, { batch: batchConfig(batchSize) })({})
+  const transport = makeHttp(forkRpcUrl, batchSize)({})
   const tag = blockTag === 'latest' ? 'latest' : `0x${BigInt(blockTag).toString(16)}`
 
   // Tier 1: always prefetch the target contract
