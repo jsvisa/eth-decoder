@@ -617,11 +617,15 @@ export async function simulateWithTevm({
     // this by calling eth_createAccessList first (one round trip) to learn which
     // accounts the tx will touch, then fetching all of them in parallel before
     // the EVM starts. Accounts already in tevm's cache are never fetched again.
+    const resolvedBlockTag = (!blockNumber || blockNumber === 'latest')
+      ? 'latest'
+      : String(blockNumber).trim()
+
     await prefetchAccountsFromAccessList({
       client,
       forkRpcUrl: rpcUrl || DEFAULT_RPCS[chain] || '',
       callParams: { to: address, from: sender, data: callData, value: valueInWei },
-      blockTag,
+      blockTag: resolvedBlockTag,
     })
 
     // ── callTracer implementation (forge/anvil/geth style) ──────────────────
