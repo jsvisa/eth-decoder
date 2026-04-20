@@ -6,6 +6,7 @@ import uvicorn
 import psycopg2
 from typing import List, Dict
 from eth_utils.abi import collapse_if_tuple
+from eth_abi.abi import decode as eth_abi_decode
 from multicall.eth_decode import eth_decode_input
 from fastapi import FastAPI, HTTPException, Query
 
@@ -37,6 +38,20 @@ CREATE TABLE IF NOT EXISTS evm.func_signs (
 
 CREATE INDEX IF NOT EXISTS evm_func_signs_b_idx ON evm.func_signs (byte_sign);
 CREATE INDEX IF NOT EXISTS evm_func_signs_t_idx ON evm.func_signs (split_part(text_sign, '(', 1));
+
+-- Event signatures keyed by topic0 (32-byte keccak256 of the event signature)
+CREATE TABLE IF NOT EXISTS evm.event_signs (
+    pkey                TEXT PRIMARY KEY,      -- md5(byte_sign || text_sign || abi::text)
+    byte_sign           TEXT NOT NULL,         -- topic0: keccak256(event signature), hex with 0x prefix
+    text_sign           TEXT NOT NULL,         -- e.g. "Transfer(address,address,uint256)"
+    abi                 JSONB,                 -- full event ABI including indexed flags
+    score               INTEGER DEFAULT 0,
+    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS evm_event_signs_b_idx ON evm.event_signs (byte_sign);
+CREATE INDEX IF NOT EXISTS evm_event_signs_t_idx ON evm.event_signs (split_part(text_sign, '(', 1));
 """
 
 
@@ -166,6 +181,125 @@ def decode_with_data(data, count=1, with_abi=False, with_sign=False) -> List[Dic
     if len(decoded) > 0:
         return decoded
     return errors
+
+
+def get_event_abi_by_topic(topic0: str, count: int = 1):
+    if count > 10:
+        count = 10
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT text_sign, abi FROM evm.event_signs "
+        "WHERE byte_sign = %s ORDER BY score DESC LIMIT %s",
+        (topic0.lower(), count),
+    )
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return rows
+
+
+def serialize_event_value(value):
+    """Convert Python decoded values to JSON-serialisable types."""
+    if isinstance(value, bytes):
+        return "0x" + value.hex()
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, (list, tuple)):
+        return [serialize_event_value(v) for v in value]
+    return value
+
+
+def decode_event_log(abi: Dict, topics: List[str], data: str) -> Dict:
+    """Decode an event log using its ABI, topics, and data."""
+    inputs = abi.get("inputs", [])
+    indexed = [inp for inp in inputs if inp.get("indexed")]
+    non_indexed = [inp for inp in inputs if not inp.get("indexed")]
+
+    # Decode indexed params — each occupies one 32-byte topic slot
+    indexed_values = []
+    for inp, topic in zip(indexed, topics[1:]):
+        typ = collapse_if_tuple(inp)
+        raw = bytes.fromhex(topic[2:] if topic.startswith("0x") else topic)
+        # Pad/unpad: eth_abi expects exactly 32 bytes for static types
+        val = eth_abi_decode([typ], raw)[0]
+        indexed_values.append(serialize_event_value(val))
+
+    # Decode non-indexed params from data
+    non_indexed_values = []
+    if non_indexed:
+        types = [collapse_if_tuple(inp) for inp in non_indexed]
+        raw_data = bytes.fromhex(data[2:] if data.startswith("0x") else data) if data and data != "0x" else b""
+        if raw_data:
+            decoded = eth_abi_decode(types, raw_data)
+            non_indexed_values = [serialize_event_value(v) for v in decoded]
+
+    # Reconstruct ordered args dict
+    args = {}
+    idx_i, nidx_i = 0, 0
+    for inp in inputs:
+        name = inp.get("name") or f"arg{idx_i + nidx_i}"
+        if inp.get("indexed"):
+            args[name] = indexed_values[idx_i] if idx_i < len(indexed_values) else None
+            idx_i += 1
+        else:
+            args[name] = non_indexed_values[nidx_i] if nidx_i < len(non_indexed_values) else None
+            nidx_i += 1
+
+    return {"event": abi.get("name"), "args": args}
+
+
+@app.get("/api/v1/query-event")
+async def query_event(
+    apikey: str = Query(None, description="API Key"),
+    sign: str = Query(None, description="topic0 hex (32-byte keccak256 of event signature)"),
+    count: int = Query(1, description="Number of results to return"),
+):
+    if apikey != APIKEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if not sign:
+        raise HTTPException(status_code=400, detail="sign is required")
+    rows = get_event_abi_by_topic(sign, count)
+    if not rows:
+        return {"msg": "not found", "data": None}
+    if count == 1:
+        row = rows[0]
+        return {"msg": "ok", "data": {"text_sign": row[0], "abi": row[1]}}
+    return {
+        "msg": "ok",
+        "data": [{"text_sign": row[0], "abi": row[1]} for row in rows],
+    }
+
+
+@app.get("/api/v1/decode-event")
+async def decode_event(
+    sign: str = Query(None, description="topic0 hex"),
+    topics: str = Query(None, description="Comma-separated list of topic hashes"),
+    data: str = Query("0x", description="Log data hex"),
+    count: int = Query(1, description="Number of ABIs to try"),
+):
+    if not sign:
+        raise HTTPException(status_code=400, detail="sign (topic0) is required")
+
+    topic_list = [t.strip() for t in topics.split(",")] if topics else [sign]
+    if not topic_list[0].startswith("0x"):
+        topic_list[0] = "0x" + topic_list[0]
+
+    rows = get_event_abi_by_topic(sign, count)
+    if not rows:
+        return {"msg": "not found", "data": None}
+
+    for row in rows:
+        abi = row[1]
+        if abi is None:
+            continue
+        try:
+            result = decode_event_log(abi, topic_list, data or "0x")
+            return {"msg": "ok", "data": result}
+        except Exception as err:
+            logging.error("Error decoding event sign=%s err=%s", sign, err)
+
+    return {"msg": "error", "data": None}
 
 
 def main():
