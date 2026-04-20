@@ -39,19 +39,8 @@ CREATE TABLE IF NOT EXISTS evm.func_signs (
 CREATE INDEX IF NOT EXISTS evm_func_signs_b_idx ON evm.func_signs (byte_sign);
 CREATE INDEX IF NOT EXISTS evm_func_signs_t_idx ON evm.func_signs (split_part(text_sign, '(', 1));
 
--- Event signatures keyed by topic0 (32-byte keccak256 of the event signature)
-CREATE TABLE IF NOT EXISTS evm.event_signs (
-    pkey                TEXT PRIMARY KEY,      -- md5(byte_sign || text_sign || abi::text)
-    byte_sign           TEXT NOT NULL,         -- topic0: keccak256(event signature), hex with 0x prefix
-    text_sign           TEXT NOT NULL,         -- e.g. "Transfer(address,address,uint256)"
-    abi                 JSONB,                 -- full event ABI including indexed flags
-    score               INTEGER DEFAULT 0,
-    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS evm_event_signs_b_idx ON evm.event_signs (byte_sign);
-CREATE INDEX IF NOT EXISTS evm_event_signs_t_idx ON evm.event_signs (split_part(text_sign, '(', 1));
+-- Note: evm.func_signs stores both function signatures (4-byte byte_sign)
+-- and event signatures (32-byte byte_sign / topic0). No separate table needed.
 """
 
 
@@ -184,12 +173,14 @@ def decode_with_data(data, count=1, with_abi=False, with_sign=False) -> List[Dic
 
 
 def get_event_abi_by_topic(topic0: str, count: int = 1):
+    """Look up event ABI by topic0 hash. Events share the evm.func_signs table,
+    distinguished by their 32-byte byte_sign (vs 4-byte for functions)."""
     if count > 10:
         count = 10
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
-        "SELECT text_sign, abi FROM evm.event_signs "
+        "SELECT text_sign, abi FROM evm.func_signs "
         "WHERE byte_sign = %s ORDER BY score DESC LIMIT %s",
         (topic0.lower(), count),
     )
