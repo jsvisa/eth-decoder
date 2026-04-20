@@ -1,0 +1,14 @@
+name: chola
+services:
+  abi:
+    image: abi-server:latest
+    container_name: chola-abi-server
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: abi-server
+    env_file:
+      - .env
+    ports:
+      - 8010:8000
+    restart: unless-stopped
