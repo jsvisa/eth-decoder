@@ -524,7 +524,10 @@ export async function simulateWithTevm({
       }
       if (message.depth === 0) {
         callTraceRoot = node
-      } else {
+      } else if (type !== 'STATICCALL') {
+        // Attach to parent — STATICCALLs are excluded from the visible tree to
+        // keep the trace readable, but are still pushed on the stack below so
+        // that depth tracking remains correct for any calls nested inside them.
         const parent = callStack[callStack.length - 1]
         if (parent) parent.calls.push(node)
       }
