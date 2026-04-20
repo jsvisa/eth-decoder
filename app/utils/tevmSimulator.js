@@ -150,6 +150,58 @@ const serializeValue = (value) => {
   return value
 }
 
+// Batch-decode undecoded logs using the /api/decode-event server endpoint.
+// Mutates log objects in-place and returns the updated array.
+export async function decodeLogsViaServer(logs) {
+  if (!logs || logs.length === 0) return logs
+  const undecoded = logs.filter(log => !log.decoded && log.topics?.length > 0)
+  if (undecoded.length === 0) return logs
+
+  await Promise.all(undecoded.map(async (log) => {
+    try {
+      const topic0 = log.topics[0]
+      const params = new URLSearchParams({
+        sign: topic0,
+        topics: log.topics.join(','),
+        data: log.data || '0x',
+      })
+      const res = await fetch(`/api/decode-event?${params}`)
+      if (!res.ok) return
+      const json = await res.json()
+      if (json.msg !== 'ok' || !json.data) return
+      const { event, args, inputs: abiInputs } = json.data
+      log.name = event
+      log.decoded = true
+      // Use ABI inputs for proper type and indexed flags when available,
+      // falling back to plain name/value pairs if not.
+      if (abiInputs?.length > 0) {
+        log.inputs = abiInputs.map(inp => ({
+          name: inp.name || '',
+          type: inp.type || 'unknown',
+          value: String(args?.[inp.name] ?? ''),
+          indexed: inp.indexed || false,
+        }))
+      } else {
+        log.inputs = Object.entries(args || {}).map(([name, value]) => ({
+          name,
+          type: 'unknown',
+          value: String(value),
+          indexed: false,
+        }))
+      }
+    } catch { /* leave undecoded */ }
+  }))
+
+  return logs
+}
+
+// Recursively call decodeLogsViaServer for every frame in the call trace tree
+export async function decodeCallTraceLogsViaServer(node) {
+  if (!node) return
+  await decodeLogsViaServer(node.logs || [])
+  await Promise.all((node.calls || []).map(child => decodeCallTraceLogsViaServer(child)))
+}
+
 // Decode Solidity revert reason from return data bytes (hex string)
 // Handles Error(string) and Panic(uint256) encodings, matching the forge/geth approach.
 function decodeRevertReason(hexData) {

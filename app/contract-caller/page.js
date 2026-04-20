@@ -11,7 +11,7 @@ import {
   isAddressBookmarked,
   getBookmarkedAddress,
 } from '../utils/addressBook'
-import { simulateWithTevm, redecodeLogs, redecodeCallTrace } from '../utils/tevmSimulator'
+import { simulateWithTevm, redecodeLogs, redecodeCallTrace, decodeLogsViaServer, decodeCallTraceLogsViaServer } from '../utils/tevmSimulator'
 import { buildAbiCacheFromStorage, fetchAbisForAddresses } from '../utils/abiCache'
 import { isValidEthAddress, isValidForkBlock, isValidNumber, isValidPositiveInteger } from '../utils/validation'
 
@@ -2094,6 +2094,13 @@ export default function ContractCaller() {
               }
             }
           }
+        }
+
+        // Fall back to abi_server for any logs still undecoded after the ABI-fetch pass
+        // (covers unverified contracts whose ABIs aren't on Etherscan)
+        await decodeLogsViaServer(data.logs)
+        if (data.callTrace) {
+          await decodeCallTraceLogsViaServer(data.callTrace)
         }
 
         // Update the cached addresses list in state
