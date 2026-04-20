@@ -2,13 +2,20 @@ import { createMemoryClient, http } from 'tevm'
 import { encodeFunctionData, decodeFunctionData, decodeFunctionResult, parseEther, decodeEventLog, keccak256, bytesToHex, toFunctionSelector } from 'viem'
 import { isValidEthAddress } from './validation'
 
+// Build viem batch config from a batchSize number.
+// batchSize=1 → no batching (single JSON object per request)
+// batchSize>1 → JSON-RPC batch array, up to batchSize requests per HTTP call
+function batchConfig(batchSize) {
+  return batchSize > 1 ? { batchSize, wait: 0 } : false
+}
+
 // Wraps an HTTP transport to avoid eth_getProof, which is unsupported by many
 // public RPCs. Intercepts eth_getProof and emulates it with eth_getBalance +
 // eth_getCode only — nonce is omitted because it is irrelevant for CALL
 // simulation (only matters for CREATE address derivation, which is rare).
 // Storage slots are unaffected since tevm already uses eth_getStorageAt.
-function createProofFreeTransport(rpcUrl) {
-  const baseHttp = http(rpcUrl)
+function createProofFreeTransport(rpcUrl, batchSize = 1) {
+  const baseHttp = http(rpcUrl, { batch: batchConfig(batchSize) })
   return (config) => {
     const base = baseHttp(config)
     return {
@@ -393,7 +400,7 @@ function _decodeCallNode(node, selectorMap) {
  * @param {number} customChainId - Optional custom chain ID for non-built-in chains
  * @returns {Promise<{client: any, blockNumber: string}>}
  */
-export async function createTevmClient(chain, rpcUrl, blockNumber = 'latest', customChainId = null) {
+export async function createTevmClient(chain, rpcUrl, blockNumber = 'latest', customChainId = null, batchSize = 1) {
   // Get chain config from built-in or use custom chain ID
   let chainConfig = BUILT_IN_CHAIN_CONFIGS[chain]
 
@@ -423,7 +430,7 @@ export async function createTevmClient(chain, rpcUrl, blockNumber = 'latest', cu
   // Create fork client with the specified block tag
   const client = createMemoryClient({
     fork: {
-      transport: createProofFreeTransport(forkUrl),
+      transport: createProofFreeTransport(forkUrl, batchSize),
       blockTag,
     },
   })
@@ -467,35 +474,34 @@ export async function applyCheatcodes(client, cheatcodes = {}) {
 }
 
 /**
- * Prefetch accounts into tevm's state cache before simulation runs.
+ * Prefetch accounts + storage slots into tevm's state cache before simulation.
  *
  * Two-tier strategy:
- *   1. Always prefetch the target contract (universally supported, zero extra
- *      round trips since we'd need it anyway).
- *   2. Try eth_createAccessList to discover the full address set and prefetch
- *      everything in parallel. If the RPC doesn't support it (or it fails for
- *      any reason), this tier is silently skipped — lazy loading covers the rest.
+ *   Tier 1 — always runs, needs only eth_getCode + eth_getBalance (universal):
+ *     Prefetches the target contract so the first and most predictable account
+ *     load never stalls execution.
  *
- * Both tiers use only eth_getCode + eth_getBalance, which every RPC supports.
+ *   Tier 2 — best-effort, requires eth_createAccessList:
+ *     Discovers the full set of addresses AND storage slots the tx will touch,
+ *     then fetches everything in one parallel batch. With batchSize > 1 all
+ *     requests go out in a single HTTP call (JSON-RPC batch array), reducing
+ *     N sequential round trips to ceil(N / batchSize) round trips.
+ *     Silently skipped if the RPC doesn't support eth_createAccessList.
  */
-async function prefetchAccountsFromAccessList({ client, forkRpcUrl, callParams, blockTag }) {
-  const transport = http(forkRpcUrl)({})
+async function prefetchAccountsFromAccessList({ client, forkRpcUrl, callParams, blockTag, batchSize = 1 }) {
+  const transport = http(forkRpcUrl, { batch: batchConfig(batchSize) })({})
   const tag = blockTag === 'latest' ? 'latest' : `0x${BigInt(blockTag).toString(16)}`
 
-  const prefetchAddr = async (addr) => {
-    try {
-      const [code, balance] = await Promise.all([
-        transport.request({ method: 'eth_getCode', params: [addr, tag] }),
-        transport.request({ method: 'eth_getBalance', params: [addr, tag] }),
-      ])
-      await client.tevmSetAccount({ address: addr, balance: BigInt(balance), deployedBytecode: code })
-    } catch { /* will lazy-load during execution */ }
-  }
+  // Tier 1: always prefetch the target contract
+  try {
+    const [code, balance] = await Promise.all([
+      transport.request({ method: 'eth_getCode', params: [callParams.to, tag] }),
+      transport.request({ method: 'eth_getBalance', params: [callParams.to, tag] }),
+    ])
+    await client.tevmSetAccount({ address: callParams.to, balance: BigInt(balance), deployedBytecode: code })
+  } catch { /* will lazy-load */ }
 
-  // Tier 1: always prefetch the target contract (no extra RPC method needed)
-  await prefetchAddr(callParams.to)
-
-  // Tier 2: use eth_createAccessList to discover and prefetch remaining accounts
+  // Tier 2: eth_createAccessList → batch-fetch all accounts + storage slots
   try {
     const alResult = await transport.request({
       method: 'eth_createAccessList',
@@ -509,11 +515,38 @@ async function prefetchAccountsFromAccessList({ client, forkRpcUrl, callParams, 
         tag,
       ],
     })
-    const extra = (alResult?.accessList ?? [])
-      .map(item => item.address?.toLowerCase())
-      .filter(addr => addr && addr !== callParams.to.toLowerCase())
 
-    if (extra.length > 0) await Promise.all(extra.map(prefetchAddr))
+    // Build address → storageKeys map from access list
+    const addrMap = new Map() // addr (lowercase) → string[]
+    for (const item of alResult?.accessList ?? []) {
+      const addr = item.address?.toLowerCase()
+      if (!addr) continue
+      if (!addrMap.has(addr)) addrMap.set(addr, [])
+      for (const slot of item.storageKeys ?? []) addrMap.get(addr).push(slot)
+    }
+
+    // One Promise.all over all addresses — with batch transport all requests
+    // for all addresses (code, balance, and every storage slot) are packed into
+    // ceil(totalRequests / batchSize) HTTP calls instead of N individual ones.
+    await Promise.all([...addrMap.entries()].map(async ([addr, slots]) => {
+      try {
+        const [code, balance, ...storageValues] = await Promise.all([
+          transport.request({ method: 'eth_getCode', params: [addr, tag] }),
+          transport.request({ method: 'eth_getBalance', params: [addr, tag] }),
+          ...slots.map(slot => transport.request({ method: 'eth_getStorageAt', params: [addr, slot, tag] })),
+        ])
+
+        const state = {}
+        slots.forEach((slot, i) => { state[slot] = storageValues[i] })
+
+        await client.tevmSetAccount({
+          address: addr,
+          balance: BigInt(balance),
+          deployedBytecode: code,
+          ...(slots.length > 0 ? { state } : {}),
+        })
+      } catch { /* skip this address, lazy-load during execution */ }
+    }))
   } catch { /* eth_createAccessList unsupported — tier 1 prefetch is still active */ }
 }
 
@@ -537,8 +570,9 @@ export async function simulateWithTevm({
   cheatcodes = {},
   customChainId = null,
   abiCache = new Map(),
-  onProgress = null,  // (percent: 0-100) => void
-  abortSignal = null, // AbortSignal
+  onProgress = null,    // (percent: 0-100) => void
+  abortSignal = null,   // AbortSignal
+  rpcBatchSize = 1,     // JSON-RPC batch size; 1 = no batching, N>1 = batch array
 }) {
   try {
     // Validate inputs
@@ -567,7 +601,7 @@ export async function simulateWithTevm({
     })
 
     // Create Tevm client with the specified block
-    const { client, blockNumber: actualBlock } = await createTevmClient(chain, rpcUrl, blockNumber, customChainId)
+    const { client, blockNumber: actualBlock } = await createTevmClient(chain, rpcUrl, blockNumber, customChainId, rpcBatchSize)
 
     // Apply cheatcodes
     const { prankAddress } = await applyCheatcodes(client, cheatcodes)
@@ -626,6 +660,7 @@ export async function simulateWithTevm({
       forkRpcUrl: rpcUrl || DEFAULT_RPCS[chain] || '',
       callParams: { to: address, from: sender, data: callData, value: valueInWei },
       blockTag: resolvedBlockTag,
+      batchSize: rpcBatchSize,
     })
 
     // ── callTracer implementation (forge/anvil/geth style) ──────────────────

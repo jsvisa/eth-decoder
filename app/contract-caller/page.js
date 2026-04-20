@@ -577,6 +577,7 @@ export default function ContractCaller() {
   const [selectedRpcChain, setSelectedRpcChain] = useState('ethereum') // For RPC settings dropdown
   // Simulation settings
   const [useLocalSimulation, setUseLocalSimulation] = useState(true) // Use browser-based Tevm simulation (default)
+  const [rpcBatchSize, setRpcBatchSize] = useState(1) // JSON-RPC batch size for simulation prefetch
   const [forkBlockNumber, setForkBlockNumber] = useState('') // Block number to fork from (empty = latest)
   const [readBlockNumber, setReadBlockNumber] = useState('') // Block number for read-only eth_call (empty = latest)
   const [cheatcodes, setCheatcodes] = useState({
@@ -1192,6 +1193,9 @@ export default function ContractCaller() {
         const parsed = JSON.parse(savedSimSettings)
         if (typeof parsed.useLocalSimulation === 'boolean') {
           setUseLocalSimulation(parsed.useLocalSimulation)
+        }
+        if (typeof parsed.rpcBatchSize === 'number' && parsed.rpcBatchSize >= 1) {
+          setRpcBatchSize(parsed.rpcBatchSize)
         }
       }
 
@@ -2067,6 +2071,7 @@ export default function ContractCaller() {
           abiCache: initialAbiCache,
           onProgress: (pct) => setSimProgress(pct),
           abortSignal: abortController.signal,
+          rpcBatchSize,
         })
         setSimProgress(100)
 
@@ -2634,11 +2639,29 @@ export default function ContractCaller() {
                       onChange={(e) => {
                         const useLocal = e.target.checked
                         setUseLocalSimulation(useLocal)
-                        localStorage.setItem(SIMULATION_SETTINGS_KEY, JSON.stringify({ useLocalSimulation: useLocal }))
+                        localStorage.setItem(SIMULATION_SETTINGS_KEY, JSON.stringify({ useLocalSimulation: useLocal, rpcBatchSize }))
                       }}
                     />
                     <span>Use Local Simulation (Tevm - no API keys required)</span>
                   </label>
+                  <div className={styles.settingRow}>
+                    <label className={styles.settingLabel}>
+                      RPC Batch Size
+                      <span className={styles.settingHint}> — requests per HTTP call during prefetch (1 = no batching)</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="500"
+                      value={rpcBatchSize}
+                      className={styles.settingInput}
+                      onChange={(e) => {
+                        const v = Math.max(1, parseInt(e.target.value) || 1)
+                        setRpcBatchSize(v)
+                        localStorage.setItem(SIMULATION_SETTINGS_KEY, JSON.stringify({ useLocalSimulation, rpcBatchSize: v }))
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
 
