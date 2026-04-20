@@ -11,7 +11,7 @@ import {
   isAddressBookmarked,
   getBookmarkedAddress,
 } from '../utils/addressBook'
-import { simulateWithTevm, redecodeLogs } from '../utils/tevmSimulator'
+import { simulateWithTevm, redecodeLogs, redecodeCallTrace } from '../utils/tevmSimulator'
 import { buildAbiCacheFromStorage, fetchAbisForAddresses } from '../utils/abiCache'
 import { isValidEthAddress, isValidForkBlock, isValidNumber, isValidPositiveInteger } from '../utils/validation'
 
@@ -518,6 +518,7 @@ export default function ContractCaller() {
   const [selectedFunction, setSelectedFunction] = useState('')
   const [args, setArgs] = useState([])
   const [result, setResult] = useState(null)
+  const [simLogsExpanded, setSimLogsExpanded] = useState(true)
   const [loading, setLoading] = useState(false)
   const [fetchingAbi, setFetchingAbi] = useState(false)
   const [detectProxy, setDetectProxy] = useState(false)
@@ -2085,9 +2086,11 @@ export default function ContractCaller() {
             // Re-decode logs with the updated cache
             if (newAbis.size > 0) {
               data.logs = redecodeLogs(data.logs, initialAbiCache)
-              // Also re-decode logs in call trace if present
-              if (data.callTrace && data.callTrace.logs) {
-                data.callTrace.logs = redecodeLogs(data.callTrace.logs, initialAbiCache)
+              // Recursively re-decode logs in every frame of the call trace tree
+              if (data.callTrace) {
+                data.callTrace = redecodeCallTrace(data.callTrace, initialAbiCache)
+                // Keep flat logs in sync with the re-decoded tree
+                data.logs = redecodeLogs(data.logs, initialAbiCache)
               }
             }
           }
@@ -2177,6 +2180,8 @@ export default function ContractCaller() {
       } else {
         setResult(data)
       }
+      // Auto-collapse event logs when there are many of them
+      setSimLogsExpanded(!data.logs || data.logs.length <= 10)
 
       // Fetch token symbols for Transfer events (async, non-blocking)
       if (data.logs && data.logs.length > 0) {
@@ -2259,6 +2264,7 @@ export default function ContractCaller() {
   // Render call trace node recursively as a tree
   const renderCallTraceNode = (trace, depth) => {
     if (!trace) return null
+    if (trace.type === 'STATICCALL') return null
 
     // Build function signature: ContractName.functionName(param1=value1, param2=value2)
     const contractName = trace.toName || trace.to?.slice(0, 10) + '...'
@@ -4035,8 +4041,16 @@ export default function ContractCaller() {
             {/* Event logs (simulation only) */}
             {result.simulated && result.logs && result.logs.length > 0 && (
               <div className={styles.logsSection}>
-                <h3 className={styles.logsTitle}>Event Logs ({result.logs.length})</h3>
-                {result.logs.map((log, index) => {
+                <h3 className={styles.logsTitle}>
+                  Event Logs ({result.logs.length})
+                  <button
+                    className={styles.logsToggleBtn}
+                    onClick={() => setSimLogsExpanded(v => !v)}
+                  >
+                    {simLogsExpanded ? 'Collapse' : 'Expand'}
+                  </button>
+                </h3>
+                {(simLogsExpanded ? result.logs : result.logs.slice(0, 5)).map((log, index) => {
                   const contractName = getContractNameFromCache(chain, log.address)
                   const logAddress = log.address?.toLowerCase()
                   const symbol = log.name === 'Transfer' ? (tokenSymbols[logAddress] || getCachedTokenSymbol(chain, logAddress)) : null
@@ -4085,6 +4099,14 @@ export default function ContractCaller() {
                     )}
                   </div>
                 )})}
+                {!simLogsExpanded && result.logs.length > 5 && (
+                  <div className={styles.logsMoreIndicator}>
+                    … {result.logs.length - 5} more —{' '}
+                    <button className={styles.logsToggleBtn} onClick={() => setSimLogsExpanded(true)}>
+                      show all
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

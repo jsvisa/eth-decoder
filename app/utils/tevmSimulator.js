@@ -1,5 +1,5 @@
 import { createMemoryClient, http } from 'tevm'
-import { encodeFunctionData, decodeFunctionResult, parseEther, decodeEventLog, keccak256 } from 'viem'
+import { encodeFunctionData, decodeFunctionData, decodeFunctionResult, parseEther, decodeEventLog, keccak256, bytesToHex, toFunctionSelector } from 'viem'
 import { isValidEthAddress } from './validation'
 
 // Wraps an HTTP transport to avoid eth_getProof, which is unsupported by many
@@ -148,6 +148,190 @@ const serializeValue = (value) => {
     return serialized
   }
   return value
+}
+
+// Decode Solidity revert reason from return data bytes (hex string)
+// Handles Error(string) and Panic(uint256) encodings, matching the forge/geth approach.
+function decodeRevertReason(hexData) {
+  if (!hexData || hexData.length < 10) return null
+  const selector = hexData.slice(0, 10).toLowerCase()
+  // Error(string) → 0x08c379a0
+  if (selector === '0x08c379a0') {
+    try {
+      const body = hexData.slice(10) // strip selector
+      // ABI layout: offset (32 bytes) | length (32 bytes) | utf8 data
+      const dataStart = parseInt(body.slice(0, 64), 16) * 2
+      const length = parseInt(body.slice(dataStart, dataStart + 64), 16)
+      const strHex = body.slice(dataStart + 64, dataStart + 64 + length * 2)
+      return Buffer.from(strHex, 'hex').toString('utf8')
+    } catch { return null }
+  }
+  // Panic(uint256) → 0x4e487b71
+  if (selector === '0x4e487b71') {
+    try {
+      const code = parseInt(hexData.slice(10, 74), 16)
+      const reasons = {
+        0x00: 'generic panic', 0x01: 'assert failed',
+        0x11: 'arithmetic overflow/underflow', 0x12: 'division by zero',
+        0x21: 'invalid enum value', 0x22: 'corrupted storage array',
+        0x31: 'pop on empty array', 0x32: 'array index out of bounds',
+        0x41: 'out of memory', 0x51: 'zero function pointer',
+      }
+      return `Panic: ${reasons[code] ?? `code 0x${code.toString(16)}`}`
+    } catch { return null }
+  }
+  return null
+}
+
+// Try to decode a single raw log object ({ address, topics, data }) using the event ABI map.
+// Returns the enriched log with { name, decoded, inputs } fields.
+function tryDecodeLog(log, eventAbisByAddress) {
+  const topics = log.topics || []
+  const data = log.data || '0x'
+  const logAddress = log.address?.toLowerCase()
+  const addressAbis = eventAbisByAddress.get(logAddress) || []
+
+  // Try address-specific ABIs first, then all known ABIs (fallback for common events)
+  const candidates = [...addressAbis, ...[...eventAbisByAddress.values()].flat()]
+  for (const eventAbi of candidates) {
+    try {
+      const decoded = decodeEventLog({ abi: [eventAbi], data, topics })
+      return {
+        address: log.address,
+        topics,
+        data,
+        name: decoded.eventName,
+        decoded: true,
+        inputs: eventAbi.inputs.map((inp, i) => ({
+          name: inp.name || `arg${i}`,
+          type: inp.type,
+          value: serializeValue(decoded.args[inp.name] ?? decoded.args[i]),
+          indexed: inp.indexed || false,
+        })),
+      }
+    } catch { /* try next */ }
+  }
+  return { address: log.address, topics, data, name: null, decoded: false, inputs: [] }
+}
+
+// Recursively decode all logs in a call trace tree in-place.
+// Returns Set of lowercase addresses whose logs could not be decoded.
+function decodeLogsInTree(node, eventAbisByAddress) {
+  if (!node) return new Set()
+  const undecoded = new Set()
+  node.logs = node.logs.map(log => {
+    const result = tryDecodeLog(log, eventAbisByAddress)
+    if (!result.decoded && log.address) undecoded.add(log.address.toLowerCase())
+    return result
+  })
+  for (const child of (node.calls || [])) {
+    for (const addr of decodeLogsInTree(child, eventAbisByAddress)) undecoded.add(addr)
+  }
+  return undecoded
+}
+
+// Remove from undecodedSet any address that was successfully decoded somewhere in the tree
+function pruneDecodedAddresses(node, undecodedSet) {
+  if (!node) return
+  for (const log of (node.logs || [])) {
+    if (log.decoded && log.address) undecodedSet.delete(log.address.toLowerCase())
+  }
+  for (const child of (node.calls || [])) pruneDecodedAddresses(child, undecodedSet)
+}
+
+// Recursively remove STATICCALL nodes from the call tree
+function pruneStaticCalls(node) {
+  if (!node) return
+  node.calls = (node.calls || []).filter(c => c.type !== 'STATICCALL')
+  node.calls.forEach(pruneStaticCalls)
+}
+
+// Collect addresses of sub-call nodes that couldn't be decoded (no functionName
+// despite having calldata). These are fed into the ABI-fetch pipeline so a
+// second pass can decode them.
+function collectUndecodedCallAddresses(node, result = new Set()) {
+  if (!node) return result
+  // Skip root (depth 0) — it's decoded via the known ABI, not the selector map
+  for (const child of (node.calls || [])) {
+    if (child.functionName === null && child.input && child.input.length >= 10 && child.to) {
+      result.add(child.to.toLowerCase())
+    }
+    collectUndecodedCallAddresses(child, result)
+  }
+  return result
+}
+
+// Flatten all logs from the entire call trace tree into a single array (for the Logs tab)
+function flattenLogsFromTree(node) {
+  if (!node) return []
+  return [...(node.logs || []), ...(node.calls || []).flatMap(flattenLogsFromTree)]
+}
+
+// Build a map of 4-byte selector (e.g. "0xabcd1234") → functionAbi
+// from the main ABI and all cached ABIs, so sub-calls can be decoded.
+function buildSelectorMap(abi, abiCache) {
+  const map = new Map()
+  const add = (abiFrag) => {
+    if (!abiFrag || abiFrag.type !== 'function') return
+    try {
+      const selector = toFunctionSelector(abiFrag)
+      if (!map.has(selector)) map.set(selector, abiFrag)
+    } catch { /* skip malformed entries */ }
+  }
+  ;(abi || []).forEach(add)
+  for (const [, cachedAbi] of (abiCache || new Map())) {
+    ;(cachedAbi || []).forEach(add)
+  }
+  return map
+}
+
+// Recursively decode function name + inputs/outputs for every sub-call node
+// whose input starts with a known 4-byte selector.
+function decodeSubCallNodes(node, selectorMap) {
+  if (!node) return
+  // Skip the root — it's already annotated with the known functionAbi
+  for (const child of (node.calls || [])) {
+    _decodeCallNode(child, selectorMap)
+  }
+}
+
+function _decodeCallNode(node, selectorMap) {
+  if (!node) return
+  // STATICCALLs are read-only view calls — skip decoding them and their subtree
+  if (node.type === 'STATICCALL') return
+  const input = node.input
+  if (input && input.length >= 10) {
+    const selector = input.slice(0, 10).toLowerCase()
+    const funcAbi = selectorMap.get(selector)
+    if (funcAbi) {
+      try {
+        const { functionName, args } = decodeFunctionData({ abi: [funcAbi], data: input })
+        node.functionName = functionName
+        node.decodedInputs = funcAbi.inputs.map((inp, i) => ({
+          name: inp.name || `input${i}`,
+          type: inp.type,
+          value: serializeValue(Array.isArray(args) ? args[i] : args),
+        }))
+      } catch { /* leave undecoded */ }
+
+      // Decode output if the call succeeded and we know the return types
+      if (node.output && node.output !== '0x' && !node.error && funcAbi.outputs?.length > 0) {
+        try {
+          const decoded = decodeFunctionResult({ abi: [funcAbi], functionName: funcAbi.name, data: node.output })
+          node.decodedOutputs = funcAbi.outputs.length === 1
+            ? [{ name: funcAbi.outputs[0].name || 'result', type: funcAbi.outputs[0].type, value: serializeValue(decoded) }]
+            : funcAbi.outputs.map((out, i) => ({
+                name: out.name || `output${i}`,
+                type: out.type,
+                value: serializeValue(Array.isArray(decoded) ? decoded[i] : decoded[out.name]),
+              }))
+        } catch { /* leave undecoded */ }
+      }
+    }
+  }
+  for (const child of (node.calls || [])) {
+    _decodeCallNode(child, selectorMap)
+  }
 }
 
 /**
@@ -323,14 +507,115 @@ export async function simulateWithTevm({
       }
     }
 
-    // Execute the call using tevmCall for full trace
+    // ── callTracer implementation (forge/anvil/geth style) ──────────────────
+    // Uses three hooks mirroring go-ethereum's callTracer / revm's Inspector:
+    //   onBeforeMessage  → push a new call frame onto the stack
+    //   onAfterMessage   → pop the frame, fill gasUsed/output/error, nest into parent
+    //   onStep           → intercept LOG0-LOG4 opcodes to attach logs to their
+    //                      emitting frame (not the root), exactly as geth's OnLog does
+    const callStack = []
+    let callTraceRoot = null
+    const LOG_OPCODES = new Set(['LOG0', 'LOG1', 'LOG2', 'LOG3', 'LOG4'])
+
+    const onBeforeMessage = (message, next) => {
+      let type = 'CALL'
+      if (message.to === undefined) {
+        type = message.salt !== undefined ? 'CREATE2' : 'CREATE'
+      } else if (message.delegatecall) {
+        type = 'DELEGATECALL'
+      } else if (message.isStatic) {
+        type = 'STATICCALL'
+      }
+      const node = {
+        type,
+        from: message.caller?.toString() || '',
+        to: message.to ? message.to.toString() : null,
+        toName: null,
+        functionName: null,
+        value: (message.value ?? 0n).toString(),
+        gas: (message.gasLimit ?? 0n).toString(),
+        gasUsed: '0',
+        input: bytesToHex(message.data ?? new Uint8Array()),
+        output: '0x',
+        decodedInputs: null,
+        decodedOutputs: null,
+        error: null,
+        errorReason: null,
+        logs: [],
+        calls: [],
+      }
+      if (message.depth === 0) {
+        callTraceRoot = node
+      } else if (type !== 'STATICCALL') {
+        // Attach to parent — STATICCALLs are excluded from the visible tree to
+        // keep the trace readable, but are still pushed on the stack below so
+        // that depth tracking remains correct for any calls nested inside them.
+        const parent = callStack[callStack.length - 1]
+        if (parent) parent.calls.push(node)
+      }
+      callStack.push(node)
+      next?.()
+    }
+
+    const onAfterMessage = (result, next) => {
+      const node = callStack.pop()
+      if (!node) { next?.(); return }
+      node.gasUsed = (result.execResult?.executionGasUsed ?? 0n).toString()
+      if (result.execResult?.returnValue?.length) {
+        node.output = bytesToHex(result.execResult.returnValue)
+      }
+      if (result.createdAddress) {
+        node.to = result.createdAddress.toString()
+      }
+      if (result.execResult?.exceptionError) {
+        node.error = result.execResult.exceptionError.error
+          || String(result.execResult.exceptionError)
+        if (result.execResult.returnValue?.length >= 4) {
+          node.errorReason = decodeRevertReason(bytesToHex(result.execResult.returnValue))
+        }
+      }
+      next?.()
+    }
+
+    // Intercept LOG opcodes to associate each log with its emitting frame.
+    // At the moment onStep fires the opcode hasn't executed yet, so all
+    // arguments are still on the stack — same window that geth's OnLog uses.
+    const onStep = (step, next) => {
+      const opName = step.opcode?.name
+      if (opName && LOG_OPCODES.has(opName)) {
+        const numTopics = parseInt(opName[3]) // 0..4
+        const stack = step.stack             // BigInt[], last = top of stack
+        const len = stack.length
+        if (len >= 2 + numTopics) {
+          const offset = Number(stack[len - 1])
+          const size   = Number(stack[len - 2])
+          const topics = []
+          for (let i = 0; i < numTopics; i++) {
+            topics.push('0x' + stack[len - 3 - i].toString(16).padStart(64, '0'))
+          }
+          const mem  = step.memory
+          const data = (size > 0 && mem) ? bytesToHex(mem.slice(offset, offset + size)) : '0x'
+          const addr = step.address?.toString()
+            || callStack[callStack.length - 1]?.to
+            || ''
+          const currentFrame = callStack[callStack.length - 1]
+          if (currentFrame) {
+            currentFrame.logs.push({ address: addr, topics, data, name: null, decoded: false, inputs: [] })
+          }
+        }
+      }
+      next?.()
+    }
+
     const callResult = await client.tevmCall({
       to: address,
       from: sender,
       data: callData,
       value: valueInWei,
-      createTrace: true,
       createAccessList: true,
+      onBeforeMessage,
+      onAfterMessage,
+      onStep,
     })
 
     // Check for errors
@@ -365,136 +650,52 @@ export async function simulateWithTevm({
       }
     }
 
-    // Build a combined map of address -> event ABIs for decoding
-    // Include the main contract's ABI and any cached ABIs
+    // Build event ABI map for log decoding
     const eventAbisByAddress = new Map()
-
-    // Add main contract's event ABIs
     const mainContractEventAbis = abi.filter(item => item.type === 'event')
     eventAbisByAddress.set(address.toLowerCase(), mainContractEventAbis)
-
-    // Add cached ABIs
     for (const [cachedAddress, cachedAbi] of abiCache) {
       const eventAbis = cachedAbi.filter(item => item.type === 'event')
-      if (eventAbis.length > 0) {
-        eventAbisByAddress.set(cachedAddress.toLowerCase(), eventAbis)
-      }
+      if (eventAbis.length > 0) eventAbisByAddress.set(cachedAddress.toLowerCase(), eventAbis)
     }
 
-    // Track addresses that couldn't decode their events
-    const undecodedAddresses = new Set()
+    // Decode logs across the entire call tree in-place.
+    // Logs are already attached to their emitting frames via onStep.
+    const undecodedAddressesSet = decodeLogsInTree(callTraceRoot, eventAbisByAddress)
+    pruneDecodedAddresses(callTraceRoot, undecodedAddressesSet)
+    const undecodedAddresses = undecodedAddressesSet
 
-    // Parse logs from execution and try to decode using appropriate ABIs
-    const parsedLogs = (Array.isArray(callResult.logs) ? callResult.logs : []).map(log => {
-      const topics = log.topics || []
-      const data = log.data || '0x'
-      const logAddress = log.address?.toLowerCase()
+    // Flat log list for the Logs tab (same set, just flattened)
+    const parsedLogs = flattenLogsFromTree(callTraceRoot)
 
-      // Get event ABIs for this log's address, or try all known ABIs
-      const addressEventAbis = eventAbisByAddress.get(logAddress) || []
-
-      // First try ABIs specific to this address
-      for (const eventAbi of addressEventAbis) {
-        try {
-          const decoded = decodeEventLog({
-            abi: [eventAbi],
-            data,
-            topics,
-          })
-
-          // Successfully decoded
-          const inputs = eventAbi.inputs.map((input, index) => ({
-            name: input.name || `arg${index}`,
-            type: input.type,
-            value: serializeValue(decoded.args[input.name] ?? decoded.args[index]),
-            indexed: input.indexed || false,
-          }))
-
-          return {
-            address: log.address,
-            topics,
-            data,
-            name: decoded.eventName,
-            decoded: true,
-            inputs,
-          }
-        } catch {
-          // This event ABI doesn't match, try next
-        }
-      }
-
-      // If address-specific ABIs didn't work, try all known ABIs
-      // This helps with common events like ERC20 Transfer
-      for (const [, eventAbis] of eventAbisByAddress) {
-        for (const eventAbi of eventAbis) {
-          try {
-            const decoded = decodeEventLog({
-              abi: [eventAbi],
-              data,
-              topics,
-            })
-
-            // Successfully decoded
-            const inputs = eventAbi.inputs.map((input, index) => ({
-              name: input.name || `arg${index}`,
-              type: input.type,
-              value: serializeValue(decoded.args[input.name] ?? decoded.args[index]),
-              indexed: input.indexed || false,
-            }))
-
-            return {
-              address: log.address,
-              topics,
-              data,
-              name: decoded.eventName,
-              decoded: true,
-              inputs,
-            }
-          } catch {
-            // This event ABI doesn't match, try next
-          }
-        }
-      }
-
-      // Could not decode - track this address for potential ABI fetch
-      if (logAddress) {
-        undecodedAddresses.add(logAddress)
-      }
-
-      // Return raw log
-      return {
-        address: log.address,
-        topics,
-        data,
-        name: null,
-        decoded: false,
-        inputs: [],
-      }
-    })
-
-    // Build a simple call trace
-    const callTraceTree = {
-      type: 'CALL',
-      from: sender,
-      to: address,
-      toName: null,
-      functionName: functionName,
-      value: valueInWei.toString(),
-      gas: callResult.executionGasUsed?.toString() || '0',
-      gasUsed: callResult.executionGasUsed?.toString() || '0',
-      input: callData,
-      output: rawOutput,
-      decodedInputs: functionAbi.inputs.map((input, index) => ({
+    // Annotate root frame with decoded function info
+    if (callTraceRoot) {
+      callTraceRoot.functionName = functionName
+      callTraceRoot.decodedInputs = functionAbi.inputs.map((input, index) => ({
         name: input.name || `input${index}`,
         type: input.type,
         value: serializeValue(parsedArgs[index]),
-      })),
-      decodedOutputs,
-      error: success ? null : (callResult.errors?.[0]?.message || 'Transaction reverted'),
-      errorReason: null,
-      logs: parsedLogs,
-      calls: [],
+      }))
+      callTraceRoot.decodedOutputs = decodedOutputs
+      if (!success && !callTraceRoot.error) {
+        callTraceRoot.error = callResult.errors?.[0]?.message || 'Transaction reverted'
+      }
     }
+
+    // Strip STATICCALL nodes from the tree (defence-in-depth: also handled at render time)
+    pruneStaticCalls(callTraceRoot)
+
+    // Decode function names + args for sub-calls using the selector map
+    const selectorMap = buildSelectorMap(abi, abiCache)
+    decodeSubCallNodes(callTraceRoot, selectorMap)
+
+    // Also track sub-call addresses that couldn't be decoded — their ABIs will
+    // be fetched and a second decode pass run by the caller (page.js).
+    for (const addr of collectUndecodedCallAddresses(callTraceRoot)) {
+      undecodedAddresses.add(addr)
+    }
+
+    const callTraceTree = callTraceRoot
 
     // Get gas used
     const gasUsed = callResult.executionGasUsed ? Number(callResult.executionGasUsed) : 0
@@ -551,84 +752,41 @@ export async function simulateWithTevm({
  */
 export function redecodeLogs(logs, abiCache) {
   if (!logs || !Array.isArray(logs)) return logs
+  const eventAbisByAddress = buildEventAbiMap(abiCache)
+  return logs.map(log => log.decoded ? log : tryDecodeLog(log, eventAbisByAddress))
+}
 
-  // Build event ABI map from cache
-  const eventAbisByAddress = new Map()
-  for (const [address, abi] of abiCache) {
-    const eventAbis = abi.filter(item => item.type === 'event')
-    if (eventAbis.length > 0) {
-      eventAbisByAddress.set(address.toLowerCase(), eventAbis)
-    }
+/**
+ * Re-decode all logs in a call trace tree using a new ABI cache.
+ * Call this after fetching ABIs for previously undecoded addresses.
+ * Returns a new tree (shallow clone of nodes, logs replaced).
+ */
+export function redecodeCallTrace(callTrace, abiCache) {
+  if (!callTrace) return callTrace
+  const eventAbisByAddress = buildEventAbiMap(abiCache)
+  const selectorMap = buildSelectorMap([], abiCache)
+  const tree = redecodeTreeNode(callTrace, eventAbisByAddress)
+  // Re-run sub-call decoding with the updated selector map so newly fetched
+  // ABIs can decode function names/inputs that were null on the first pass.
+  decodeSubCallNodes(tree, selectorMap)
+  return tree
+}
+
+function buildEventAbiMap(abiCache) {
+  const map = new Map()
+  for (const [address, abi] of (abiCache || new Map())) {
+    const eventAbis = (abi || []).filter(item => item.type === 'event')
+    if (eventAbis.length > 0) map.set(address.toLowerCase(), eventAbis)
   }
+  return map
+}
 
-  return logs.map(log => {
-    // If already decoded, skip
-    if (log.decoded) return log
-
-    const topics = log.topics || []
-    const data = log.data || '0x'
-    const logAddress = log.address?.toLowerCase()
-
-    // Try ABIs specific to this address first
-    const addressEventAbis = eventAbisByAddress.get(logAddress) || []
-    for (const eventAbi of addressEventAbis) {
-      try {
-        const decoded = decodeEventLog({
-          abi: [eventAbi],
-          data,
-          topics,
-        })
-
-        const inputs = eventAbi.inputs.map((input, index) => ({
-          name: input.name || `arg${index}`,
-          type: input.type,
-          value: serializeValue(decoded.args[input.name] ?? decoded.args[index]),
-          indexed: input.indexed || false,
-        }))
-
-        return {
-          ...log,
-          name: decoded.eventName,
-          decoded: true,
-          inputs,
-        }
-      } catch {
-        // Try next
-      }
-    }
-
-    // Try all known ABIs (for common events like ERC20 Transfer)
-    for (const [, eventAbis] of eventAbisByAddress) {
-      for (const eventAbi of eventAbis) {
-        try {
-          const decoded = decodeEventLog({
-            abi: [eventAbi],
-            data,
-            topics,
-          })
-
-          const inputs = eventAbi.inputs.map((input, index) => ({
-            name: input.name || `arg${index}`,
-            type: input.type,
-            value: serializeValue(decoded.args[input.name] ?? decoded.args[index]),
-            indexed: input.indexed || false,
-          }))
-
-          return {
-            ...log,
-            name: decoded.eventName,
-            decoded: true,
-            inputs,
-          }
-        } catch {
-          // Try next
-        }
-      }
-    }
-
-    // Still couldn't decode
-    return log
-  })
+function redecodeTreeNode(node, eventAbisByAddress) {
+  return {
+    ...node,
+    logs: (node.logs || []).map(log => log.decoded ? log : tryDecodeLog(log, eventAbisByAddress)),
+    calls: (node.calls || []).map(child => redecodeTreeNode(child, eventAbisByAddress)),
+  }
 }
 
 /**
