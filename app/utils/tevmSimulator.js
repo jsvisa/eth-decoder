@@ -1,6 +1,42 @@
 import { createMemoryClient, http } from 'tevm'
-import { encodeFunctionData, decodeFunctionResult, parseEther, decodeEventLog } from 'viem'
+import { encodeFunctionData, decodeFunctionResult, parseEther, decodeEventLog, keccak256 } from 'viem'
 import { isValidEthAddress } from './validation'
+
+// Wraps an HTTP transport to avoid eth_getProof, which is unsupported by many
+// public RPCs. Intercepts eth_getProof and emulates it using eth_getBalance,
+// eth_getTransactionCount, and eth_getCode — all universally supported.
+// Storage slots are unaffected since tevm already uses eth_getStorageAt for them.
+function createProofFreeTransport(rpcUrl) {
+  const baseHttp = http(rpcUrl)
+  return (config) => {
+    const base = baseHttp(config)
+    return {
+      ...base,
+      request: async ({ method, params }) => {
+        if (method === 'eth_getProof') {
+          const [address, , blockTag] = params ?? []
+          const tag = blockTag ?? 'latest'
+          const [balance, nonce, code] = await Promise.all([
+            base.request({ method: 'eth_getBalance', params: [address, tag] }),
+            base.request({ method: 'eth_getTransactionCount', params: [address, tag] }),
+            base.request({ method: 'eth_getCode', params: [address, tag] }),
+          ])
+          return {
+            address,
+            accountProof: [],
+            balance,
+            nonce,
+            codeHash: keccak256(code),
+            // Return empty storage trie root; individual slots are fetched lazily via eth_getStorageAt
+            storageHash: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
+            storageProof: [],
+          }
+        }
+        return base.request({ method, params })
+      },
+    }
+  }
+}
 
 // Chain configurations for forking (built-in chains)
 const BUILT_IN_CHAIN_CONFIGS = {
@@ -152,7 +188,7 @@ export async function createTevmClient(chain, rpcUrl, blockNumber = 'latest', cu
   // Create fork client with the specified block tag
   const client = createMemoryClient({
     fork: {
-      transport: http(forkUrl),
+      transport: createProofFreeTransport(forkUrl),
       blockTag,
     },
   })
