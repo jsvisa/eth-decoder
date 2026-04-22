@@ -54,7 +54,7 @@ jobs:
         run: npm run build
 
       - name: Start production server
-        run: npm run start &
+        run: nohup npm run start > /tmp/nextjs.log 2>&1 &
 
       - name: Wait for server to be ready
         run: npx wait-on http://localhost:3000 --timeout 30000

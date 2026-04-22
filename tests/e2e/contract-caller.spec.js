@@ -16,8 +16,8 @@ test.describe('Contract Caller page', () => {
 
   test('shows an address input field', async ({ page }) => {
     await page.goto('/contract-caller')
-    // Contract address input — look for a text input that accepts 0x addresses
-    const addressInput = page.getByRole('textbox').first()
+    // Contract address input uses placeholder="0x..."
+    const addressInput = page.getByPlaceholder('0x...')
     await expect(addressInput).toBeVisible()
     await addressInput.fill('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
     await expect(addressInput).toHaveValue('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')

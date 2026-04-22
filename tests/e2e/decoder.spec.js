@@ -23,8 +23,7 @@ test.describe('Decoder page', () => {
     const input = page.getByPlaceholder('Enter hex data to decode (e.g., 0x1234abcd...)')
     await input.fill('   ')
     await page.getByRole('button', { name: 'Decode' }).click()
-    // The page should catch empty input before hitting the API
-    await expect(page.locator('text=/enter/i, text=/valid/i, text=/required/i').first())
-      .toBeVisible({ timeout: 5000 })
+    // The page shows "Please enter some data" for whitespace-only input
+    await expect(page.getByText('Please enter some data')).toBeVisible({ timeout: 5000 })
   })
 })
