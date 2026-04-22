@@ -4,6 +4,7 @@ import json
 import os
 import logging
 import uvicorn
+import sqlite3
 import psycopg2
 from typing import List, Dict
 from eth_utils.abi import collapse_if_tuple
@@ -28,7 +29,11 @@ def _param():
 
 def _table():
     """Table name without schema prefix for SQLite."""
-    return "func_signs" if (DB_URL and DB_URL.startswith("sqlite:///")) else "evm.func_signs"
+    return (
+        "func_signs"
+        if (DB_URL and DB_URL.startswith("sqlite:///"))
+        else "evm.func_signs"
+    )
 
 
 def _parse_abi(val):
@@ -67,8 +72,7 @@ CREATE INDEX IF NOT EXISTS evm_func_signs_t_idx ON evm.func_signs (split_part(te
 
 def get_db_connection():
     if DB_URL and DB_URL.startswith("sqlite:///"):
-        import sqlite3
-        return sqlite3.connect(DB_URL[len("sqlite:///"):])
+        return sqlite3.connect(DB_URL[len("sqlite:///") :])
     return psycopg2.connect(DB_URL)
 
 
@@ -222,10 +226,11 @@ def get_event_abi_by_topic(topic0: str, count: int = 1, num_indexed: int | None 
 
     if num_indexed is not None:
         rows = [
-            row for row in rows
-            if row[1] and sum(
-                1 for inp in row[1].get("inputs", []) if inp.get("indexed")
-            ) == num_indexed
+            row
+            for row in rows
+            if row[1]
+            and sum(1 for inp in row[1].get("inputs", []) if inp.get("indexed"))
+            == num_indexed
         ]
 
     return rows[:count]
@@ -253,7 +258,9 @@ def decode_event_log(abi: Dict, topics: List[str], data: str) -> Dict:
 @app.get("/api/v1/query-event")
 async def query_event(
     apikey: str = Query(None, description="API Key"),
-    sign: str = Query(None, description="topic0 hex (32-byte keccak256 of event signature)"),
+    sign: str = Query(
+        None, description="topic0 hex (32-byte keccak256 of event signature)"
+    ),
     count: int = Query(1, description="Number of results to return"),
 ):
     if apikey != APIKEY:
@@ -299,7 +306,9 @@ async def decode_event(
             continue
         try:
             result = decode_event_log(abi, topic_list, data or "0x")
-            result["inputs"] = abi.get("inputs", [])  # include full ABI inputs for type/indexed info
+            result["inputs"] = abi.get(
+                "inputs", []
+            )  # include full ABI inputs for type/indexed info
             return {"msg": "ok", "data": result}
         except Exception as err:
             logging.error("Error decoding event sign=%s err=%s", sign, err)

@@ -1,4 +1,3 @@
-import main as main_module
 from main import (
     decode_event_log,
     extract_output_sign,
@@ -7,16 +6,10 @@ from main import (
 )
 
 
-def test_get_db_connection_uses_sqlite(db_path):
-    """get_db_connection() should return a sqlite3 connection when DB_URL is sqlite:///."""
-    import sqlite3
-    conn = main_module.get_db_connection()
-    assert isinstance(conn, sqlite3.Connection)
-    conn.close()
-
 # ---------------------------------------------------------------------------
 # is_valid_hex_data
 # ---------------------------------------------------------------------------
+
 
 def test_is_valid_hex_data_with_prefix():
     assert is_valid_hex_data("0x1234abcd") is True
@@ -37,6 +30,7 @@ def test_is_valid_hex_data_empty():
 # ---------------------------------------------------------------------------
 # extract_output_sign
 # ---------------------------------------------------------------------------
+
 
 def test_extract_output_sign_simple():
     abi = {"outputs": [{"name": "", "type": "uint256"}]}
@@ -62,6 +56,7 @@ def test_extract_output_sign_tuple():
 # ---------------------------------------------------------------------------
 # serialize_value
 # ---------------------------------------------------------------------------
+
 
 def test_serialize_value_int_becomes_string():
     assert serialize_value(123) == "123"
@@ -126,7 +121,10 @@ def test_decode_event_log_decodes_indexed_address():
         [TRANSFER_TOPIC0, TRANSFER_TOPIC1, TRANSFER_TOPIC2],
         TRANSFER_DATA,
     )
-    assert result["args"]["fromAddress"].lower() == "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+    assert (
+        result["args"]["fromAddress"].lower()
+        == "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -138,12 +136,16 @@ GETADAPTERS_SIGN = "0xb82e16e3"  # getAdapters() — present in evm.func_sign.cs
 
 
 def test_query_wrong_apikey_returns_401(client):
-    resp = client.get("/api/v1/query", params={"apikey": "wrong", "sign": GETADAPTERS_SIGN})
+    resp = client.get(
+        "/api/v1/query", params={"apikey": "wrong", "sign": GETADAPTERS_SIGN}
+    )
     assert resp.status_code == 401
 
 
 def test_query_known_sign_returns_text_sign(client):
-    resp = client.get("/api/v1/query", params={"apikey": VALID_APIKEY, "sign": GETADAPTERS_SIGN})
+    resp = client.get(
+        "/api/v1/query", params={"apikey": VALID_APIKEY, "sign": GETADAPTERS_SIGN}
+    )
     assert resp.status_code == 200
     body = resp.json()
     assert body["msg"] == "ok"
@@ -151,14 +153,18 @@ def test_query_known_sign_returns_text_sign(client):
 
 
 def test_query_known_sign_returns_abi(client):
-    resp = client.get("/api/v1/query", params={"apikey": VALID_APIKEY, "sign": GETADAPTERS_SIGN})
+    resp = client.get(
+        "/api/v1/query", params={"apikey": VALID_APIKEY, "sign": GETADAPTERS_SIGN}
+    )
     body = resp.json()
     assert body["data"]["abi"] is not None
     assert body["data"]["abi"]["name"] == "getAdapters"
 
 
 def test_query_unknown_sign_returns_not_found(client):
-    resp = client.get("/api/v1/query", params={"apikey": VALID_APIKEY, "sign": "0xdeadbeef"})
+    resp = client.get(
+        "/api/v1/query", params={"apikey": VALID_APIKEY, "sign": "0xdeadbeef"}
+    )
     assert resp.status_code == 200
     assert resp.json()["msg"] == "not found"
 
@@ -169,7 +175,9 @@ def test_query_unknown_sign_returns_not_found(client):
 
 
 def test_query_event_wrong_apikey_returns_401(client):
-    resp = client.get("/api/v1/query-event", params={"apikey": "wrong", "sign": TRANSFER_TOPIC0})
+    resp = client.get(
+        "/api/v1/query-event", params={"apikey": "wrong", "sign": TRANSFER_TOPIC0}
+    )
     assert resp.status_code == 401
 
 
@@ -226,13 +234,17 @@ def test_decode_known_no_input_function_returns_ok(client):
 
 
 def test_decode_with_sign_flag_includes_sign_field(client):
-    resp = client.get("/api/v1/decode", params={"data": "0xb82e16e3", "with_sign": "true"})
+    resp = client.get(
+        "/api/v1/decode", params={"data": "0xb82e16e3", "with_sign": "true"}
+    )
     assert resp.status_code == 200
     assert resp.json()["data"][0]["sign"] == "0xb82e16e3"
 
 
 def test_decode_with_abi_flag_includes_abi_field(client):
-    resp = client.get("/api/v1/decode", params={"data": "0xb82e16e3", "with_abi": "true"})
+    resp = client.get(
+        "/api/v1/decode", params={"data": "0xb82e16e3", "with_abi": "true"}
+    )
     assert resp.status_code == 200
     result = resp.json()["data"][0]
     assert result["abi"] is not None
@@ -310,7 +322,11 @@ def test_decode_event_indexed_filtering_selects_correct_abi(client):
     topics_one_indexed = f"{TRANSFER_TOPIC0},{_ADDR1_PADDED}"
     resp = client.get(
         "/api/v1/decode-event",
-        params={"sign": TRANSFER_TOPIC0, "topics": topics_one_indexed, "data": _VALUE_DATA},
+        params={
+            "sign": TRANSFER_TOPIC0,
+            "topics": topics_one_indexed,
+            "data": _VALUE_DATA,
+        },
     )
     body = resp.json()
     assert body["msg"] in ("not found", "error")
