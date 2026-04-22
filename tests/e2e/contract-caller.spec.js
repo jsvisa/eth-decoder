@@ -3,14 +3,21 @@ import { test, expect } from '@playwright/test'
 test.describe('Contract Caller page', () => {
   test('loads and shows the chain selector', async ({ page }) => {
     await page.goto('/contract-caller')
-    // The page renders a list of chain buttons/options
-    await expect(page.getByText('Ethereum')).toBeVisible()
+    // Chains render inside <select> elements; verify the main chain select is visible
+    // and defaults to 'ethereum'
+    const chainSelect = page.locator('select').first()
+    await expect(chainSelect).toBeVisible()
+    await expect(chainSelect).toHaveValue('ethereum')
   })
 
   test('shows all built-in chains', async ({ page }) => {
     await page.goto('/contract-caller')
-    for (const chain of ['Ethereum', 'Arbitrum', 'Base', 'Polygon', 'BSC']) {
-      await expect(page.getByText(chain)).toBeVisible()
+    // Options inside <select> are hidden per Playwright's visibility model;
+    // verify each chain value is present as an option in the DOM
+    const chainSelect = page.locator('select').first()
+    await expect(chainSelect).toBeVisible()
+    for (const value of ['ethereum', 'arbitrum', 'base', 'polygon', 'bsc']) {
+      await expect(chainSelect.locator(`option[value="${value}"]`)).toHaveCount(1)
     }
   })
 
