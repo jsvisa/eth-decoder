@@ -1299,6 +1299,21 @@ export default function ContractCaller() {
     }
   }, [])
 
+  // Sync URL with current chain and address
+  useEffect(() => {
+    if (!address) {
+      const params = new URLSearchParams(window.location.search)
+      if (params.has('chain') || params.has('address')) {
+        window.history.replaceState(null, '', window.location.pathname)
+      }
+      return
+    }
+    const params = new URLSearchParams(window.location.search)
+    params.set('chain', chain)
+    params.set('address', address)
+    window.history.replaceState(null, '', `${window.location.pathname}?${params}`)
+  }, [chain, address])
+
   // Auto-load cached ABI when address or chain changes
   useEffect(() => {
     if (!isValidEthAddress(address)) {
