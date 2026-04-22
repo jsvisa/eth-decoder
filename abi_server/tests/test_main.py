@@ -9,8 +9,6 @@ def test_get_db_connection_uses_sqlite(db_path):
     conn.close()
 
 
-import json
-
 from main import (
     decode_event_log,
     extract_output_sign,
