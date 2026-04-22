@@ -102,6 +102,7 @@ describe('GET /api/fetch-abi', () => {
     const fnNames = body.abi.map(item => item.name)
     expect(fnNames).toContain('upgradeTo') // from proxy ABI
     expect(fnNames).toContain('transfer')  // from implementation ABI
+    expect(body.implContractName).toBe('ERC20Implementation')
   })
 
   it('returns 400 when both Etherscan and Sourcify fail', async () => {

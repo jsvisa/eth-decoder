@@ -56,6 +56,7 @@ describe('GET /api/decode', () => {
     expect(calledUrl).toContain('data=0x12345678')
     expect(calledUrl).toContain('multicall=true')
     expect(calledUrl).toContain('with_abi=true')
+    expect(calledUrl).toContain('with_sign=false')
   })
 
   it('returns 500 with an error message when the backend returns a non-OK status', async () => {
@@ -69,6 +70,7 @@ describe('GET /api/decode', () => {
     const res = await GET(makeRequest({ data: '0x12345678' }))
     expect(res.status).toBe(500)
     const body = await res.json()
-    expect(body.error).toBeDefined()
+    expect(typeof body.error).toBe('string')
+    expect(body.error.length).toBeGreaterThan(0)
   })
 })
