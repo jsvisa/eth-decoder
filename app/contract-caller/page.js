@@ -1222,23 +1222,40 @@ export default function ContractCaller() {
     const urlFrom = params.get('from')
     const urlValue = params.get('value')
 
-    if (urlAddress) {
-      // Set chain first if provided - check both built-in and custom chains
-      if (urlChain) {
-        const isBuiltIn = CHAINS.some(c => c.id === urlChain)
-        let isCustom = false
-        try {
-          const savedCustomChains = localStorage.getItem(CUSTOM_CHAINS_KEY)
-          if (savedCustomChains) {
-            const parsed = JSON.parse(savedCustomChains)
-            isCustom = parsed.some(c => c.id === urlChain)
+    // Set chain if provided - check both built-in and custom chains
+    if (urlChain) {
+      let resolvedChain = urlChain
+      const isBuiltIn = CHAINS.some(c => c.id === urlChain)
+      let isCustom = false
+      let savedParsedChains = []
+      try {
+        const savedCustomChains = localStorage.getItem(CUSTOM_CHAINS_KEY)
+        if (savedCustomChains) {
+          savedParsedChains = JSON.parse(savedCustomChains)
+          isCustom = savedParsedChains.some(c => c.id === urlChain)
+        }
+      } catch (e) {}
+
+      if (!isBuiltIn && !isCustom) {
+        // Try matching by numeric chain ID
+        const numericId = parseInt(urlChain, 10)
+        if (!isNaN(numericId) && String(numericId) === urlChain) {
+          const builtInEntry = Object.entries(BUILT_IN_CHAIN_IDS).find(([, id]) => id === numericId)
+          if (builtInEntry) {
+            resolvedChain = builtInEntry[0]
+          } else {
+            const customMatch = savedParsedChains.find(c => c.chainId === numericId)
+            if (customMatch) resolvedChain = customMatch.id
           }
-        } catch (e) {}
-        if (isBuiltIn || isCustom) {
-          setChain(urlChain)
         }
       }
 
+      if (resolvedChain !== urlChain || isBuiltIn || isCustom) {
+        setChain(resolvedChain)
+      }
+    }
+
+    if (urlAddress) {
       setAddress(urlAddress)
 
       // Store pending args to be applied after ABI loads
