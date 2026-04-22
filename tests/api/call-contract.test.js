@@ -92,10 +92,19 @@ describe('POST /api/call-contract', () => {
   })
 
   it('returns 500 when the RPC call fails', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      headers: { get: (name) => name.toLowerCase() === 'content-type' ? 'application/json' : null },
-      json: async () => ({ jsonrpc: '2.0', id: 1, error: { code: -32000, message: 'execution reverted' } }),
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (_url, options) => {
+      const body = JSON.parse(options.body)
+      const reqs = Array.isArray(body) ? body : [body]
+      const responses = reqs.map(req => ({
+        jsonrpc: '2.0',
+        id: req.id,
+        error: { code: -32000, message: 'execution reverted' },
+      }))
+      return {
+        ok: true,
+        headers: { get: (name) => name.toLowerCase() === 'content-type' ? 'application/json' : null },
+        json: async () => Array.isArray(body) ? responses : responses[0],
+      }
     }))
     const res = await POST(makeRequest({
       chain: 'ethereum',
