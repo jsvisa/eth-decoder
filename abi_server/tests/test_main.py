@@ -1,4 +1,10 @@
 import main as main_module
+from main import (
+    decode_event_log,
+    extract_output_sign,
+    is_valid_hex_data,
+    serialize_value,
+)
 
 
 def test_get_db_connection_uses_sqlite(db_path):
@@ -7,14 +13,6 @@ def test_get_db_connection_uses_sqlite(db_path):
     conn = main_module.get_db_connection()
     assert isinstance(conn, sqlite3.Connection)
     conn.close()
-
-
-from main import (
-    decode_event_log,
-    extract_output_sign,
-    is_valid_hex_data,
-    serialize_value,
-)
 
 # ---------------------------------------------------------------------------
 # is_valid_hex_data
@@ -169,11 +167,9 @@ def test_query_unknown_sign_returns_not_found(client):
 # GET /api/v1/query-event
 # ---------------------------------------------------------------------------
 
-QUERY_TRANSFER_TOPIC0 = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-
 
 def test_query_event_wrong_apikey_returns_401(client):
-    resp = client.get("/api/v1/query-event", params={"apikey": "wrong", "sign": QUERY_TRANSFER_TOPIC0})
+    resp = client.get("/api/v1/query-event", params={"apikey": "wrong", "sign": TRANSFER_TOPIC0})
     assert resp.status_code == 401
 
 
@@ -184,7 +180,7 @@ def test_query_event_missing_sign_returns_400(client):
 
 def test_query_event_known_transfer_sign_returns_text_sign(client):
     resp = client.get(
-        "/api/v1/query-event", params={"apikey": VALID_APIKEY, "sign": QUERY_TRANSFER_TOPIC0}
+        "/api/v1/query-event", params={"apikey": VALID_APIKEY, "sign": TRANSFER_TOPIC0}
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -197,7 +193,7 @@ def test_query_event_known_transfer_sign_returns_text_sign(client):
 # ---------------------------------------------------------------------------
 
 
-def test_decode_too_short_returns_400(client):
+def test_decode_too_short_returns_422(client):
     # FastAPI's Query(min_length=8) returns 422 for strings shorter than 8 chars;
     # "0x1234" is 6 chars, so the framework rejects it before the handler runs.
     resp = client.get("/api/v1/decode", params={"data": "0x1234"})
