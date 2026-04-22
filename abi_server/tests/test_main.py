@@ -237,3 +237,80 @@ def test_decode_with_abi_flag_includes_abi_field(client):
     result = resp.json()["data"][0]
     assert result["abi"] is not None
     assert result["abi"]["name"] == "getAdapters"
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/decode-event
+# ---------------------------------------------------------------------------
+
+APPROVAL_TOPIC0 = "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"
+_ADDR1_PADDED = "0x000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+_ADDR2_PADDED = "0x000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+_VALUE_DATA = "0x00000000000000000000000000000000000000000000000000000000000f4240"
+_TOKENID_DATA = "0x000000000000000000000000000000000000000000000000000000000000002a"
+
+
+def test_decode_event_missing_sign_returns_400(client):
+    resp = client.get("/api/v1/decode-event")
+    assert resp.status_code == 400
+
+
+def test_decode_event_unknown_sign_returns_not_found(client):
+    resp = client.get("/api/v1/decode-event", params={"sign": "0xdeadbeef" + "00" * 28})
+    assert resp.status_code == 200
+    assert resp.json()["msg"] == "not found"
+
+
+def test_decode_event_transfer_returns_event_name(client):
+    topics = f"{TRANSFER_TOPIC0},{_ADDR1_PADDED},{_ADDR2_PADDED}"
+    resp = client.get(
+        "/api/v1/decode-event",
+        params={"sign": TRANSFER_TOPIC0, "topics": topics, "data": _VALUE_DATA},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["msg"] == "ok"
+    assert body["data"]["event"] == "Transfer"
+
+
+def test_decode_event_transfer_decodes_value(client):
+    topics = f"{TRANSFER_TOPIC0},{_ADDR1_PADDED},{_ADDR2_PADDED}"
+    resp = client.get(
+        "/api/v1/decode-event",
+        params={"sign": TRANSFER_TOPIC0, "topics": topics, "data": _VALUE_DATA},
+    )
+    assert resp.json()["data"]["args"]["value"] == "1000000"
+
+
+def test_decode_event_transfer_includes_abi_inputs(client):
+    topics = f"{TRANSFER_TOPIC0},{_ADDR1_PADDED},{_ADDR2_PADDED}"
+    resp = client.get(
+        "/api/v1/decode-event",
+        params={"sign": TRANSFER_TOPIC0, "topics": topics, "data": _VALUE_DATA},
+    )
+    inputs = resp.json()["data"]["inputs"]
+    assert any(inp["name"] == "value" for inp in inputs)
+
+
+def test_decode_event_approval_decodes_token_id(client):
+    topics = f"{APPROVAL_TOPIC0},{_ADDR1_PADDED},{_ADDR2_PADDED}"
+    resp = client.get(
+        "/api/v1/decode-event",
+        params={"sign": APPROVAL_TOPIC0, "topics": topics, "data": _TOKENID_DATA},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["msg"] == "ok"
+    assert body["data"]["event"] == "Approval"
+    assert body["data"]["args"]["_tokenId"] == "42"
+
+
+def test_decode_event_indexed_filtering_selects_correct_abi(client):
+    """Passing fewer indexed topics than the Transfer ABI expects (2) should not match."""
+    topics_one_indexed = f"{TRANSFER_TOPIC0},{_ADDR1_PADDED}"
+    resp = client.get(
+        "/api/v1/decode-event",
+        params={"sign": TRANSFER_TOPIC0, "topics": topics_one_indexed, "data": _VALUE_DATA},
+    )
+    body = resp.json()
+    assert body["msg"] in ("not found", "error")
