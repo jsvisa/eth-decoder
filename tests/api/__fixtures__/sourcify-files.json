@@ -1,0 +1,8 @@
+{
+  "files": [
+    {
+      "name": "metadata.json",
+      "content": "{\"output\":{\"abi\":[{\"type\":\"function\",\"name\":\"decimals\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\"}],\"stateMutability\":\"view\"}]},\"settings\":{\"compilationTarget\":{\"contracts/Token.sol\":\"SourcifyToken\"}}}"
+    }
+  ]
+}

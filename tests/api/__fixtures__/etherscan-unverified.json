@@ -1,0 +1,13 @@
+{
+  "status": "1",
+  "message": "OK",
+  "result": [
+    {
+      "ABI": "Contract source code not verified",
+      "ContractName": "",
+      "CompilerVersion": "",
+      "Proxy": "0",
+      "Implementation": ""
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "status": "1",
+  "message": "OK",
+  "result": [
+    {
+      "ABI": "[{\"type\":\"function\",\"name\":\"upgradeTo\",\"inputs\":[{\"name\":\"newImplementation\",\"type\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"}]",
+      "ContractName": "TransparentUpgradeableProxy",
+      "CompilerVersion": "v0.8.20+commit.a1b79de6",
+      "Proxy": "1",
+      "Implementation": "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"
+    }
+  ]
+}
