@@ -129,3 +129,115 @@ def test_decode_event_log_decodes_indexed_address():
         TRANSFER_DATA,
     )
     assert result["args"]["fromAddress"].lower() == "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/query
+# ---------------------------------------------------------------------------
+
+VALID_APIKEY = ")"  # default value of ABI_SERVER_APIKEY in main.py
+GETADAPTERS_SIGN = "0xb82e16e3"  # getAdapters() — present in evm.func_sign.csv
+
+
+def test_query_wrong_apikey_returns_401(client):
+    resp = client.get("/api/v1/query", params={"apikey": "wrong", "sign": GETADAPTERS_SIGN})
+    assert resp.status_code == 401
+
+
+def test_query_known_sign_returns_text_sign(client):
+    resp = client.get("/api/v1/query", params={"apikey": VALID_APIKEY, "sign": GETADAPTERS_SIGN})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["msg"] == "ok"
+    assert body["data"]["text_sign"] == "getAdapters()"
+
+
+def test_query_known_sign_returns_abi(client):
+    resp = client.get("/api/v1/query", params={"apikey": VALID_APIKEY, "sign": GETADAPTERS_SIGN})
+    body = resp.json()
+    assert body["data"]["abi"] is not None
+    assert body["data"]["abi"]["name"] == "getAdapters"
+
+
+def test_query_unknown_sign_returns_not_found(client):
+    resp = client.get("/api/v1/query", params={"apikey": VALID_APIKEY, "sign": "0xdeadbeef"})
+    assert resp.status_code == 200
+    assert resp.json()["msg"] == "not found"
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/query-event
+# ---------------------------------------------------------------------------
+
+QUERY_TRANSFER_TOPIC0 = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+
+
+def test_query_event_wrong_apikey_returns_401(client):
+    resp = client.get("/api/v1/query-event", params={"apikey": "wrong", "sign": QUERY_TRANSFER_TOPIC0})
+    assert resp.status_code == 401
+
+
+def test_query_event_missing_sign_returns_400(client):
+    resp = client.get("/api/v1/query-event", params={"apikey": VALID_APIKEY})
+    assert resp.status_code == 400
+
+
+def test_query_event_known_transfer_sign_returns_text_sign(client):
+    resp = client.get(
+        "/api/v1/query-event", params={"apikey": VALID_APIKEY, "sign": QUERY_TRANSFER_TOPIC0}
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["msg"] == "ok"
+    assert body["data"]["text_sign"] == "Transfer(address,address,uint256)"
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/decode
+# ---------------------------------------------------------------------------
+
+
+def test_decode_too_short_returns_400(client):
+    # FastAPI's Query(min_length=8) returns 422 for strings shorter than 8 chars;
+    # "0x1234" is 6 chars, so the framework rejects it before the handler runs.
+    resp = client.get("/api/v1/decode", params={"data": "0x1234"})
+    assert resp.status_code == 422
+
+
+def test_decode_invalid_hex_returns_400(client):
+    resp = client.get("/api/v1/decode", params={"data": "0xzzzzzzzz"})
+    assert resp.status_code == 400
+
+
+def test_decode_unknown_sign_returns_empty_ok(client):
+    # 0xdeadbeef is not in the DB; decode_with_data returns [] (no errors, no
+    # decoded results), so the endpoint responds with msg="ok" and data=[].
+    resp = client.get("/api/v1/decode", params={"data": "0xdeadbeef"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["msg"] == "ok"
+    assert body["data"] == []
+
+
+def test_decode_known_no_input_function_returns_ok(client):
+    # getAdapters() has no inputs — calldata is just the 4-byte selector.
+    # The "func" field is the text_sign stored in the DB, i.e. "getAdapters()".
+    resp = client.get("/api/v1/decode", params={"data": "0xb82e16e3"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["msg"] == "ok"
+    assert body["data"][0]["func"] == "getAdapters()"
+
+
+def test_decode_with_sign_flag_includes_sign_field(client):
+    resp = client.get("/api/v1/decode", params={"data": "0xb82e16e3", "with_sign": "true"})
+    assert resp.status_code == 200
+    assert resp.json()["data"][0]["sign"] == "0xb82e16e3"
+
+
+def test_decode_with_abi_flag_includes_abi_field(client):
+    resp = client.get("/api/v1/decode", params={"data": "0xb82e16e3", "with_abi": "true"})
+    assert resp.status_code == 200
+    result = resp.json()["data"][0]
+    assert result["abi"] is not None
+    assert result["abi"]["name"] == "getAdapters"
