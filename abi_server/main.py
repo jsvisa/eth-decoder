@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import json
 import os
 import logging
 import uvicorn
@@ -18,6 +19,24 @@ logging.basicConfig(
 MAX_BODY_SIZE = 10 * 1024 * 1024
 DB_URL = os.getenv("POSTGRES_DATABASE_URL")
 APIKEY = os.getenv("ABI_SERVER_APIKEY", ")")
+
+
+def _param():
+    """SQL parameter placeholder: ? for SQLite, %s for Postgres."""
+    return "?" if (DB_URL and DB_URL.startswith("sqlite:///")) else "%s"
+
+
+def _table():
+    """Table name without schema prefix for SQLite."""
+    return "func_signs" if (DB_URL and DB_URL.startswith("sqlite:///")) else "evm.func_signs"
+
+
+def _parse_abi(val):
+    """Normalize ABI field: sqlite3 returns TEXT strings, psycopg2 JSONB returns dicts."""
+    if isinstance(val, str):
+        return json.loads(val)
+    return val
+
 
 app = FastAPI()
 
@@ -44,24 +63,27 @@ CREATE INDEX IF NOT EXISTS evm_func_signs_t_idx ON evm.func_signs (split_part(te
 
 
 def get_db_connection():
-    conn = psycopg2.connect(DB_URL)
-    return conn
+    if DB_URL and DB_URL.startswith("sqlite:///"):
+        import sqlite3
+        return sqlite3.connect(DB_URL[len("sqlite:///"):])
+    return psycopg2.connect(DB_URL)
 
 
 def get_abi_by_sign(sign, count=1):
     if count > 10:
         count = 10
+    p = _param()
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
-        "SELECT text_sign, abi FROM evm.func_signs "
-        "WHERE byte_sign = %s ORDER BY score DESC LIMIT %s",
+        f"SELECT text_sign, abi FROM {_table()} "
+        f"WHERE byte_sign = {p} ORDER BY score DESC LIMIT {p}",
         (sign, count),
     )
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    return rows
+    return [(row[0], _parse_abi(row[1])) for row in rows]
 
 
 def extract_output_sign(abi: Dict) -> str:
@@ -172,42 +194,36 @@ def decode_with_data(data, count=1, with_abi=False, with_sign=False) -> List[Dic
 
 
 def get_event_abi_by_topic(topic0: str, count: int = 1, num_indexed: int | None = None):
-    """Look up event ABI by topic0 hash. Events share the evm.func_signs table,
-    distinguished by their 32-byte byte_sign (vs 4-byte for functions).
+    """Look up event ABI by topic0 hash.
 
-    When num_indexed is provided, only rows whose ABI has exactly that many
-    indexed inputs are returned — this ensures the ABI matches the actual log
-    (topics count - 1 == number of indexed fields).
+    Fetches up to 50 candidates from the DB, then filters by indexed field
+    count in Python (removes the Postgres-specific JSONB dependency).
     """
     if count > 10:
         count = 10
+    p = _param()
     conn = get_db_connection()
     cur = conn.cursor()
-    if num_indexed is not None:
-        # Filter by indexed field count using a JSONB aggregate subquery
-        cur.execute(
-            """
-            SELECT text_sign, abi FROM evm.func_signs
-            WHERE byte_sign = %s
-              AND (
-                SELECT COUNT(*)
-                FROM jsonb_array_elements(abi->'inputs') AS inp
-                WHERE (inp->>'indexed')::boolean = true
-              ) = %s
-            ORDER BY score DESC LIMIT %s
-            """,
-            (topic0.lower(), num_indexed, count),
-        )
-    else:
-        cur.execute(
-            "SELECT text_sign, abi FROM evm.func_signs "
-            "WHERE byte_sign = %s ORDER BY score DESC LIMIT %s",
-            (topic0.lower(), count),
-        )
+    cur.execute(
+        f"SELECT text_sign, abi FROM {_table()} "
+        f"WHERE byte_sign = {p} ORDER BY score DESC LIMIT {p}",
+        (topic0.lower(), 50),
+    )
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    return rows
+
+    rows = [(row[0], _parse_abi(row[1])) for row in rows]
+
+    if num_indexed is not None:
+        rows = [
+            row for row in rows
+            if row[1] and sum(
+                1 for inp in row[1].get("inputs", []) if inp.get("indexed")
+            ) == num_indexed
+        ]
+
+    return rows[:count]
 
 
 def serialize_value(value):
