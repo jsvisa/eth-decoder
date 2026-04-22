@@ -34,7 +34,10 @@ def _table():
 def _parse_abi(val):
     """Normalize ABI field: sqlite3 returns TEXT strings, psycopg2 JSONB returns dicts."""
     if isinstance(val, str):
-        return json.loads(val)
+        try:
+            return json.loads(val)
+        except json.JSONDecodeError:
+            return None
     return val
 
 
@@ -159,6 +162,8 @@ async def decode_abi(
 def is_valid_hex_data(data: str) -> bool:
     if data.startswith("0x"):
         data = data[2:]
+    if not data:
+        return False
     try:
         bytes.fromhex(data)
         return True
