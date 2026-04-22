@@ -54,11 +54,12 @@ describe('setCachedAbi / getCachedAbi', () => {
 describe('buildAbiCacheFromStorage', () => {
   const abi = [{ type: 'function', name: 'balanceOf' }]
 
-  it('returns only entries for the requested chain', () => {
+  it('returns only entries for the requested chain with their ABI', () => {
     setCachedAbi('ethereum', '0x1111111111111111111111111111111111111111', abi)
     setCachedAbi('base', '0x2222222222222222222222222222222222222222', abi)
     const cache = buildAbiCacheFromStorage('ethereum')
     expect(cache.has('0x1111111111111111111111111111111111111111')).toBe(true)
+    expect(cache.get('0x1111111111111111111111111111111111111111')).toEqual(abi)
     expect(cache.has('0x2222222222222222222222222222222222222222')).toBe(false)
   })
 

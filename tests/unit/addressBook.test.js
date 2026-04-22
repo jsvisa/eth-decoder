@@ -46,6 +46,13 @@ describe('addToAddressBook', () => {
     const result = addToAddressBook({ address: VALID_ADDRESS_2, label: 'Second' })
     expect(result).toHaveLength(2)
   })
+
+  it('prepends new entries so the most recent is first', () => {
+    addToAddressBook({ address: VALID_ADDRESS, label: 'First' })
+    const result = addToAddressBook({ address: VALID_ADDRESS_2, label: 'Second' })
+    expect(result[0].label).toBe('Second')
+    expect(result[1].label).toBe('First')
+  })
 })
 
 describe('removeFromAddressBook', () => {
