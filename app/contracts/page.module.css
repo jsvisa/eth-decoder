@@ -34,6 +34,30 @@
   flex-wrap: wrap;
 }
 
+.importButton,
+.exportButton {
+  padding: 0.625rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background-color: var(--bg-hover);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.importButton:hover,
+.exportButton:hover {
+  background-color: #e8e8e8;
+  border-color: #ccc;
+}
+
+.exportButton:disabled {
+  color: #999;
+  cursor: not-allowed;
+}
+
 .deleteAllButton {
   padding: 0.625rem 1.25rem;
   font-size: 0.9rem;
@@ -61,6 +85,7 @@
   background-color: white;
 }
 
+.error,
 .success {
   padding: 1rem 1.25rem;
   border-radius: 6px;
@@ -68,6 +93,15 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.error {
+  background-color: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+.success {
   background-color: #d1fae5;
   border: 1px solid #a7f3d0;
   color: #059669;
@@ -375,6 +409,127 @@
   border-color: #dc2626;
 }
 
+/* Modal styles */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.modalTitle {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.25rem;
+  color: #333;
+}
+
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modalField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.importInfo {
+  margin: 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.csvFormat {
+  display: block;
+  padding: 0.75rem 1rem;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: #333;
+  word-break: break-all;
+}
+
+.importNote {
+  margin: 0;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #555;
+  cursor: pointer;
+}
+
+.checkboxLabel input {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+.fileInput {
+  display: none;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.modalCancelButton {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #666;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modalCancelButton:hover {
+  background-color: #e8e8e8;
+}
+
+.modalSaveButton {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: white;
+  background-color: #0070f3;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.modalSaveButton:hover {
+  background-color: #0051cc;
+}
+
 @media (max-width: 900px) {
   .container {
     padding: 1rem;
@@ -383,6 +538,16 @@
   .header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .headerActions {
+    width: 100%;
+  }
+
+  .importButton,
+  .exportButton,
+  .deleteAllButton {
+    flex: 1;
   }
 
   .filterRow {

@@ -1,9 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import styles from './page.module.css'
+import {
+  ABI_CACHE_PREFIX,
+  exportContractsToCSV,
+  importContractsFromCSV,
+} from '../utils/contractsCache'
 
-const ABI_CACHE_PREFIX = 'abi-'
 const CUSTOM_CHAINS_KEY = 'custom_chains'
 
 // Built-in chains for display
@@ -132,6 +136,10 @@ export default function Contracts() {
   const [searchFilter, setSearchFilter] = useState('')
   const [chainFilter, setChainFilter] = useState('')
   const [success, setSuccess] = useState(null)
+  const [error, setError] = useState(null)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importOverwrite, setImportOverwrite] = useState(false)
+  const fileInputRef = useRef(null)
 
   // Load contracts and custom chains on mount
   useEffect(() => {
@@ -212,6 +220,67 @@ export default function Contracts() {
     }
   }
 
+  // Export contracts to CSV (respects active chain + search filters)
+  const handleExport = () => {
+    const csv = exportContractsToCSV(filteredContracts)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `cached-contracts-${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    setSuccess('Contracts exported successfully')
+    setTimeout(() => setSuccess(null), 3000)
+  }
+
+  // Handle file selection for import
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      try {
+        const csvContent = event.target.result
+        const imported = importContractsFromCSV(csvContent)
+
+        if (imported.length === 0) {
+          setError('No valid entries found in CSV file')
+          return
+        }
+
+        let newCount = 0
+        let updatedCount = 0
+        imported.forEach(({ key, data }) => {
+          const existing = localStorage.getItem(key)
+          if (!existing) {
+            newCount++
+            localStorage.setItem(key, JSON.stringify(data))
+          } else if (importOverwrite) {
+            updatedCount++
+            localStorage.setItem(key, JSON.stringify(data))
+          }
+        })
+
+        const chains = loadCustomChains()
+        setContracts(getCachedContracts(chains))
+        setShowImportModal(false)
+        setSuccess(`Imported ${newCount + updatedCount} contracts (${newCount} new${updatedCount > 0 ? `, ${updatedCount} updated` : ''})`)
+        setTimeout(() => setSuccess(null), 5000)
+      } catch (err) {
+        setError(`Import failed: ${err.message}`)
+      }
+    }
+    reader.readAsText(file)
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
   // Format timestamp
   const formatDate = (timestamp) => {
     if (!timestamp) return '-'
@@ -237,6 +306,19 @@ export default function Contracts() {
           <h1 className={styles.title}>Cached Contracts</h1>
           <div className={styles.headerActions}>
             <button
+              onClick={() => setShowImportModal(true)}
+              className={styles.importButton}
+            >
+              Import CSV
+            </button>
+            <button
+              onClick={handleExport}
+              className={styles.exportButton}
+              disabled={filteredContracts.length === 0}
+            >
+              Export CSV
+            </button>
+            <button
               onClick={handleDeleteAll}
               className={styles.deleteAllButton}
               disabled={contracts.length === 0}
@@ -245,6 +327,13 @@ export default function Contracts() {
             </button>
           </div>
         </div>
+
+        {error && (
+          <div className={styles.error}>
+            {error}
+            <button onClick={() => setError(null)} className={styles.dismissButton}>x</button>
+          </div>
+        )}
 
         {success && !success.includes('copied') && (
           <div className={styles.success}>
@@ -373,6 +462,58 @@ export default function Contracts() {
           </div>
         )}
       </div>
+      {/* Hidden file input for import */}
+      <input
+        type="file"
+        accept=".csv"
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        className={styles.fileInput}
+      />
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowImportModal(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.modalTitle}>Import Contracts from CSV</h3>
+            <div className={styles.modalBody}>
+              <p className={styles.importInfo}>
+                Upload a CSV file with the following columns:
+              </p>
+              <code className={styles.csvFormat}>
+                chain, address, contractName, implContractName, implAddress, isProxy, timestamp, abi
+              </code>
+              <p className={styles.importNote}>
+                The <strong>chain</strong> and <strong>address</strong> columns are required. Use <strong>Export CSV</strong> to see the exact format.
+              </p>
+              <div className={styles.modalField}>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={importOverwrite}
+                    onChange={(e) => setImportOverwrite(e.target.checked)}
+                  />
+                  Overwrite existing entries with same chain + address
+                </label>
+              </div>
+            </div>
+            <div className={styles.modalActions}>
+              <button
+                onClick={() => setShowImportModal(false)}
+                className={styles.modalCancelButton}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className={styles.modalSaveButton}
+              >
+                Select File
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
