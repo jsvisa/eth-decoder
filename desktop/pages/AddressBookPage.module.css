@@ -1,0 +1,65 @@
+/* desktop/pages/AddressBookPage.module.css */
+.root { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.toolbar {
+  height: 44px; min-height: 44px;
+  display: flex; align-items: center; gap: 6px; padding: 0 14px;
+  background: var(--surface-1); border-bottom: 0.5px solid var(--border);
+  -webkit-app-region: drag;
+}
+
+.toolbarTitle { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.spacer { flex: 1; }
+
+.tbarBtn {
+  padding: 4px 10px; border-radius: 5px;
+  background: var(--surface-hover);
+  border: none; font-size: 11px; color: var(--text-secondary);
+  cursor: pointer; -webkit-app-region: no-drag;
+}
+.tbarBtn:hover { color: var(--text-primary); }
+
+.search {
+  background: var(--surface-hover);
+  border: 0.5px solid var(--border); border-radius: 5px;
+  padding: 4px 8px; font-size: 12px; color: var(--text-primary);
+  outline: none; width: 200px; -webkit-app-region: no-drag;
+}
+.search::placeholder { color: var(--text-muted); }
+.search:focus { border-color: var(--accent); }
+
+.content { flex: 1; overflow-y: auto; }
+
+.table { width: 100%; border-collapse: collapse; }
+.table th {
+  text-align: left; padding: 8px 14px;
+  font-size: 10px; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--text-muted); font-weight: 500;
+  border-bottom: 0.5px solid var(--border);
+  position: sticky; top: 0; background: var(--surface-0);
+}
+.table td {
+  padding: 8px 14px; border-bottom: 0.5px solid var(--border-subtle);
+  font-size: 12px; color: var(--text-primary);
+}
+.table tr:hover td { background: var(--surface-hover); }
+
+.mono { font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px; color: var(--text-muted); }
+
+.editInput {
+  background: var(--accent-bg); border: 0.5px solid var(--accent);
+  border-radius: 4px; padding: 2px 6px; font-size: 12px;
+  color: var(--text-primary); outline: none; width: 100%;
+}
+
+.actionBtn {
+  padding: 2px 7px; border-radius: 4px;
+  background: none; border: 0.5px solid var(--border);
+  font-size: 11px; color: var(--text-muted); cursor: pointer; margin-right: 4px;
+}
+.actionBtn:hover { color: var(--accent-error); border-color: var(--accent-error); }
+
+.empty {
+  display: flex; align-items: center; justify-content: center;
+  height: 200px; color: var(--text-muted); font-size: 13px;
+}
