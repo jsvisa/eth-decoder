@@ -75,7 +75,8 @@ jobs:
           EOF
 
       - name: Start abi_server
-        run: nohup abi-server > /tmp/abi_server.log 2>&1 &
+        working-directory: abi_server
+        run: nohup python -m uvicorn main:app --host 0.0.0.0 --port 8000 > /tmp/abi_server.log 2>&1 &
         env:
           POSTGRES_DATABASE_URL: sqlite:////tmp/abi_server.db
 
@@ -99,6 +100,12 @@ jobs:
         run: npm run test:e2e
         env:
           CI: true
+
+      - name: Dump server logs on failure
+        if: failure()
+        run: |
+          echo "=== abi_server ===" && cat /tmp/abi_server.log || true
+          echo "=== nextjs ===" && cat /tmp/nextjs.log || true
 
       - uses: actions/upload-artifact@v4
         if: always()
