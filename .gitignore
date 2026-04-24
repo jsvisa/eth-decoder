@@ -36,3 +36,9 @@ test-results/*
 
 # git worktrees
 .worktrees/
+
+# desktop build output
+desktop/dist/
+
+# Tauri build output
+src-tauri/target/
