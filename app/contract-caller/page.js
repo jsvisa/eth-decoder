@@ -12,6 +12,7 @@ import {
   getBookmarkedAddress,
 } from '../utils/addressBook'
 import { simulateWithTevm, redecodeLogs, redecodeCallTrace, decodeLogsViaServer, decodeCallTraceLogsViaServer } from '../utils/tevmSimulator'
+import { fetchAbi as platformFetchAbi, callContract as platformCallContract, simulate as platformSimulate, getLogs as platformGetLogs } from '../utils/platform'
 import { buildAbiCacheFromStorage, fetchAbisForAddresses } from '../utils/abiCache'
 import { isValidEthAddress, isValidForkBlock, isValidNumber, isValidPositiveInteger } from '../utils/validation'
 
@@ -891,7 +892,7 @@ export default function ContractCaller() {
 
         const topic0 = toEventSelector(event)
 
-        const params = new URLSearchParams({
+        const logsParams = {
           address,
           chain,
           topic0,
@@ -899,19 +900,18 @@ export default function ContractCaller() {
           toBlock,
           page: logsPage.toString(),
           offset: logsOffset.toString(),
-        })
+        }
 
         if (apiKeys.etherscan) {
-          params.set('apiKey', apiKeys.etherscan)
+          logsParams.apiKey = apiKeys.etherscan
         }
 
         const chainIdForApi = getChainId(chain)
         if (chainIdForApi) {
-          params.set('chainId', chainIdForApi.toString())
+          logsParams.chainId = chainIdForApi.toString()
         }
 
-        const response = await fetch(`/api/get-logs?${params}`)
-        const data = await response.json()
+        const data = await platformGetLogs(logsParams)
 
         if (data.error) {
           throw new Error(data.error)
@@ -1458,21 +1458,16 @@ export default function ContractCaller() {
     const newSymbols = { ...tokenSymbols }
     const fetchPromises = Array.from(transferAddresses).map(async (addr) => {
       try {
-        const response = await fetch('/api/call-contract', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chain,
-            address: addr,
-            functionName: 'symbol',
-            args: [],
-            abi: ERC20_SYMBOL_ABI,
-            rpcUrl: rpcSettings[chain] || undefined,
-            chainId: chainId,
-          }),
+        const data = await platformCallContract({
+          chain,
+          address: addr,
+          functionName: 'symbol',
+          args: [],
+          abi: ERC20_SYMBOL_ABI,
+          rpcUrl: rpcSettings[chain] || undefined,
+          chainId: chainId,
         })
-        const data = await response.json()
-        if (response.ok && data.decoded && data.decoded.length > 0) {
+        if (data.decoded && data.decoded.length > 0) {
           const symbol = data.decoded[0].value
           newSymbols[addr] = symbol
           setCachedTokenSymbol(chain, addr, symbol)
@@ -1510,28 +1505,13 @@ export default function ContractCaller() {
     setError(null)
 
     try {
-      const params = new URLSearchParams({ address, chain })
-      if (apiKeys.etherscan) {
-        params.set('apiKey', apiKeys.etherscan)
-      }
-      // Pass custom RPC if configured for this chain
-      if (rpcSettings[chain]) {
-        params.set('rpcUrl', rpcSettings[chain])
-      }
       // Pass chain ID for custom chains
       const chainIdForApi = getChainId(chain)
-      if (chainIdForApi) {
-        params.set('chainId', chainIdForApi.toString())
-      }
-      if (detectProxy) {
-        params.set('detectProxy', 'true')
-      }
-      const response = await fetch(`/api/fetch-abi?${params}`)
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch ABI')
-      }
+      const data = await platformFetchAbi(address, chain, apiKeys.etherscan || undefined, {
+        rpcUrl: rpcSettings[chain] || undefined,
+        chainId: chainIdForApi || undefined,
+        detectProxy,
+      })
 
       // Cache the fetched ABI
       setCachedAbi(chain, address, data.abi, data.isProxy, data.implAddress, data.contractName, data.implContractName)
@@ -2166,8 +2146,6 @@ export default function ContractCaller() {
         setCachedAddresses(getCachedAddresses())
       } else {
         // Use API for read functions or Tenderly for write functions
-        const apiEndpoint = isWrite ? '/api/simulate' : '/api/call-contract'
-
         const requestBody = {
           chain,
           address,
@@ -2226,17 +2204,7 @@ export default function ContractCaller() {
           }
         }
 
-        const response = await fetch(apiEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody),
-        })
-
-        data = await response.json()
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to call contract')
-        }
+        data = isWrite ? await platformSimulate(requestBody) : await platformCallContract(requestBody)
       }
 
       // For simulation, check if it was successful

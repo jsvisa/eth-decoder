@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import yaml from 'js-yaml'
 import styles from './page.module.css'
+import { decode as platformDecode } from '../utils/platform'
 
 const STORAGE_KEY = 'evm_decoder_history'
 const MAX_HISTORY_ITEMS = 100
@@ -250,20 +251,12 @@ export default function Home() {
     setResult(null)
 
     try {
-      const params = new URLSearchParams({
-        data: inputData,
-        multicall: multicall,
-        with_abi: withAbi,
-        with_sign: withSign
+      const data = await platformDecode(inputData, {
+        count: 3,
+        multicall,
+        withAbi: withAbi,
+        withSign: withSign,
       })
-
-      const response = await fetch(`/api/decode?${params}`)
-
-      if (!response.ok) {
-        throw new Error(`Error: ${response.status} ${response.statusText}`)
-      }
-
-      const data = await response.json()
 
       // Check if response has the expected structure
       let resultToDisplay

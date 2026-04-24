@@ -16,9 +16,12 @@ export async function decode(data, { count = 3, multicall = false, withAbi = fal
   return res.json()
 }
 
-export async function fetchAbi(address, chain, apiKey) {
+export async function fetchAbi(address, chain, apiKey, { rpcUrl, chainId, detectProxy } = {}) {
   const params = new URLSearchParams({ address, chain })
   if (apiKey) params.set('apiKey', apiKey)
+  if (rpcUrl) params.set('rpcUrl', rpcUrl)
+  if (chainId) params.set('chainId', chainId.toString())
+  if (detectProxy) params.set('detectProxy', 'true')
   const res = await fetch(`/api/fetch-abi?${params}`)
   if (!res.ok) throw new Error(`Fetch ABI failed: ${res.status} ${res.statusText}`)
   return res.json()
