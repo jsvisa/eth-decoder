@@ -53,6 +53,17 @@ describe('platform (web) — fetchAbi', () => {
     expect(url).toContain('chain=ethereum')
     expect(url).toContain('apiKey=key123')
   })
+
+  it('does not add apiKey to the URL when not provided', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ abi: [] }),
+    }))
+    const { fetchAbi } = await import('../../app/utils/platform.js')
+    await fetchAbi('0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', 'ethereum')
+    const url = fetch.mock.calls[0][0]
+    expect(url).not.toContain('apiKey')
+  })
 })
 
 describe('platform (web) — callContract', () => {
