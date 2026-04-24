@@ -12,14 +12,15 @@ export async function decode(data, { count = 3, multicall = false, withAbi = fal
     with_sign: withSign,
   })
   const res = await fetch(`/api/decode?${params}`)
-  if (!res.ok) throw new Error(`Decode failed: ${res.statusText}`)
+  if (!res.ok) throw new Error(`Decode failed: ${res.status} ${res.statusText}`)
   return res.json()
 }
 
 export async function fetchAbi(address, chain, apiKey) {
-  const params = new URLSearchParams({ address, chain, apiKey })
+  const params = new URLSearchParams({ address, chain })
+  if (apiKey) params.set('apiKey', apiKey)
   const res = await fetch(`/api/fetch-abi?${params}`)
-  if (!res.ok) throw new Error(`Fetch ABI failed: ${res.statusText}`)
+  if (!res.ok) throw new Error(`Fetch ABI failed: ${res.status} ${res.statusText}`)
   return res.json()
 }
 
@@ -29,7 +30,7 @@ export async function callContract(body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`Call contract failed: ${res.statusText}`)
+  if (!res.ok) throw new Error(`Call contract failed: ${res.status} ${res.statusText}`)
   return res.json()
 }
 
@@ -39,13 +40,13 @@ export async function simulate(body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`Simulate failed: ${res.statusText}`)
+  if (!res.ok) throw new Error(`Simulate failed: ${res.status} ${res.statusText}`)
   return res.json()
 }
 
 export async function getLogs(params) {
   const qs = new URLSearchParams(params)
   const res = await fetch(`/api/get-logs?${qs}`)
-  if (!res.ok) throw new Error(`Get logs failed: ${res.statusText}`)
+  if (!res.ok) throw new Error(`Get logs failed: ${res.status} ${res.statusText}`)
   return res.json()
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => vi.unstubAllGlobals())
 
 describe('platform (web) — decode', () => {
   it('calls /api/decode with the data param', async () => {
@@ -25,6 +25,17 @@ describe('platform (web) — decode', () => {
     expect(url).toContain('multicall=true')
     expect(url).toContain('with_abi=true')
     expect(url).toContain('with_sign=true')
+  })
+
+  it('forwards the default count=3 param to the URL', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ msg: 'ok', data: [] }),
+    }))
+    const { decode } = await import('../../app/utils/platform.js')
+    await decode('0xb82e16e3')
+    const url = fetch.mock.calls[0][0]
+    expect(url).toContain('count=3')
   })
 })
 
@@ -55,6 +66,7 @@ describe('platform (web) — callContract', () => {
     await callContract(body)
     expect(fetch).toHaveBeenCalledWith('/api/call-contract', expect.objectContaining({
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }))
   })
@@ -71,6 +83,7 @@ describe('platform (web) — simulate', () => {
     await simulate(body)
     expect(fetch).toHaveBeenCalledWith('/api/simulate', expect.objectContaining({
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }))
   })
@@ -88,5 +101,6 @@ describe('platform (web) — getLogs', () => {
     expect(url).toContain('/api/get-logs')
     expect(url).toContain('address=0x1234')
     expect(url).toContain('fromBlock=1000')
+    expect(url).toContain('toBlock=latest')
   })
 })
