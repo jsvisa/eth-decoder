@@ -1274,11 +1274,6 @@ export default function ContractCaller() {
           args: parsedArgs,
           timestamp: Date.now()
         }
-
-        // Set selected function (will be applied after ABI loads)
-        setTimeout(() => {
-          setSelectedFunction(urlFunction)
-        }, 100)
       }
 
       if (urlFrom) {
@@ -1366,9 +1361,20 @@ export default function ContractCaller() {
       })
 
       setFunctions(allFunctions)
-      // Don't reset selectedFunction if we have pending history waiting
+      // Apply pending function + args (from URL params or history navigation)
       if (pendingHistoryRef.current) {
-        setSelectedFunction(pendingHistoryRef.current.functionName)
+        const pending = pendingHistoryRef.current
+        const func = parsed.find(item => item.type === 'function' && item.name === pending.functionName)
+        setSelectedFunction(pending.functionName)
+        if (func) {
+          const pendingArgs = pending.args || []
+          if (pendingArgs.length === (func.inputs?.length || 0)) {
+            setArgs(pendingArgs)
+            pendingHistoryRef.current = null
+          }
+          // If arg count doesn't match, leave pendingHistoryRef set so
+          // [selectedFunction, parsedAbi] effect can still try later.
+        }
       } else {
         setSelectedFunction('')
         setArgs([])
