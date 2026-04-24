@@ -249,6 +249,8 @@ function decodeRevertData(hexData, abi = []) {
 const decodeRevertReason = (hexData) => decodeRevertData(hexData)
 const decodeCustomError = (hexData, abi) => decodeRevertData(hexData, abi)
 
+export { decodeRevertData }
+
 // Try to decode a single raw log object ({ address, topics, data }) using the event ABI map.
 // Returns the enriched log with { name, decoded, inputs } fields.
 function tryDecodeLog(log, eventAbisByAddress) {
