@@ -43,20 +43,57 @@ jobs:
           node-version: 20
           cache: npm
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Install abi_server
+        run: pip install -e "."
+        working-directory: abi_server
+
+      - name: Create SQLite DB from CSV
+        run: |
+          python3 - <<'EOF'
+          import csv, sqlite3
+          conn = sqlite3.connect("/tmp/abi_server.db")
+          conn.execute("""
+            CREATE TABLE func_signs (
+              pkey TEXT PRIMARY KEY, byte_sign TEXT NOT NULL,
+              text_sign TEXT NOT NULL, abi TEXT, score INTEGER DEFAULT 0
+            )
+          """)
+          conn.execute("CREATE INDEX idx_byte_sign ON func_signs (byte_sign)")
+          with open("evm.func_sign.csv") as f:
+            rows = [(r["pkey"],r["byte_sign"],r["text_sign"],r["abi"],int(r["score"])) for r in csv.DictReader(f)]
+          conn.executemany("INSERT OR IGNORE INTO func_signs VALUES (?,?,?,?,?)", rows)
+          conn.commit()
+          conn.close()
+          print(f"Loaded {len(rows)} rows")
+          EOF
+
+      - name: Start abi_server
+        run: nohup abi-server > /tmp/abi_server.log 2>&1 &
+        env:
+          POSTGRES_DATABASE_URL: sqlite:////tmp/abi_server.db
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
       - name: Build production app
         run: npm run build
+        env:
+          BACKEND_URL: http://localhost:8000
 
       - name: Start production server
         run: nohup npm run start > /tmp/nextjs.log 2>&1 &
+        env:
+          BACKEND_URL: http://localhost:8000
 
-      - name: Wait for server to be ready
-        run: npx wait-on http://localhost:3000 --timeout 30000
+      - name: Wait for servers to be ready
+        run: npx wait-on http://localhost:3000 http://localhost:8000 --timeout 30000
 
       - name: Run E2E tests
         run: npm run test:e2e
