@@ -1,6 +1,7 @@
 import './globals.css'
 import { ThemeProvider } from './contexts/ThemeContext'
 import Nav from './components/Nav'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 
 export const metadata = {
   title: 'EVM Tools',
@@ -15,6 +16,7 @@ export default function RootLayout({ children }) {
           <Nav />
           {children}
         </ThemeProvider>
+        <SpeedInsights />
       </body>
     </html>
   )
