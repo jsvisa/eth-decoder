@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-dialog": "^2.7.0",
     "@vercel/speed-insights": "^2.0.0",
     "js-yaml": "^4.1.0",
     "next": "^15.3.3",

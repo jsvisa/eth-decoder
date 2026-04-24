@@ -1,5 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import Sidebar from './components/Sidebar'
+import SetupScreen from './components/SetupScreen'
+import UpdateChecker from './components/UpdateChecker'
 import styles from './styles/Layout.module.css'
 
 import DecoderPage from '@app/page.js'
@@ -16,6 +19,20 @@ const PAGES = {
 
 export default function App() {
   const [activePage, setActivePage] = useState('decoder')
+  const [dbReady, setDbReady] = useState(null) // null=loading, true=ready, false=needs setup
+
+  useEffect(() => {
+    invoke('get_db_stats')
+      .then(stats => setDbReady(stats.row_count > 0))
+      .catch(() => setDbReady(false))
+  }, [])
+
+  if (dbReady === null) return null // brief loading flash, no spinner needed
+
+  if (!dbReady) {
+    return <SetupScreen onComplete={() => setDbReady(true)} />
+  }
+
   const PageComponent = PAGES[activePage]
 
   return (
@@ -24,6 +41,7 @@ export default function App() {
       <main className={styles.content}>
         <PageComponent />
       </main>
+      <UpdateChecker />
     </div>
   )
 }
