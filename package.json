@@ -13,6 +13,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@vercel/speed-insights": "^2.0.0",
     "js-yaml": "^4.1.0",
     "next": "^15.3.3",
     "react": "^19.0.0",
