@@ -8,8 +8,7 @@ from fastapi.testclient import TestClient
 import main as main_module
 from main import app
 
-# evm.func_sign.csv lives at the repo root (two levels above abi_server/tests/)
-CSV_PATH = Path(__file__).parent.parent.parent / "evm.func_sign.csv"
+CSV_PATH = Path(__file__).parent / "evm.func_sign.csv"
 
 
 @pytest.fixture(scope="session")

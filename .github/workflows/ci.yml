@@ -66,7 +66,7 @@ jobs:
             )
           """)
           conn.execute("CREATE INDEX idx_byte_sign ON func_signs (byte_sign)")
-          with open("evm.func_sign.csv") as f:
+          with open("abi_server/tests/evm.func_sign.csv") as f:
             rows = [(r["pkey"],r["byte_sign"],r["text_sign"],r["abi"],int(r["score"])) for r in csv.DictReader(f)]
           conn.executemany("INSERT OR IGNORE INTO func_signs VALUES (?,?,?,?,?)", rows)
           conn.commit()
