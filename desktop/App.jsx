@@ -1,3 +1,4 @@
+// desktop/App.jsx
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import Sidebar from './components/Sidebar'
@@ -5,10 +6,10 @@ import SetupScreen from './components/SetupScreen'
 import UpdateChecker from './components/UpdateChecker'
 import styles from './styles/Layout.module.css'
 
-import DecoderPage from '@app/page.js'
-import ContractCallerPage from '@app/contract-caller/page.js'
-import ContractsPage from '@app/contracts/page.js'
-import AddressBookPage from '@app/address-book/page.js'
+import DecoderPage from './pages/DecoderPage'
+import ContractCallerPage from './pages/ContractCallerPage'
+import ContractsPage from './pages/ContractsPage'
+import AddressBookPage from './pages/AddressBookPage'
 
 const PAGES = {
   'decoder':         DecoderPage,
@@ -19,7 +20,8 @@ const PAGES = {
 
 export default function App() {
   const [activePage, setActivePage] = useState('decoder')
-  const [dbReady, setDbReady] = useState(null) // null=loading, true=ready, false=needs setup
+  const [dbReady, setDbReady] = useState(null)
+  const [recentItems, setRecentItems] = useState([])
 
   useEffect(() => {
     invoke('get_db_stats')
@@ -27,7 +29,7 @@ export default function App() {
       .catch(() => setDbReady(false))
   }, [])
 
-  if (dbReady === null) return null // brief loading flash, no spinner needed
+  if (dbReady === null) return null
 
   if (!dbReady) {
     return <SetupScreen onComplete={() => setDbReady(true)} />
@@ -37,9 +39,13 @@ export default function App() {
 
   return (
     <div className={styles.root}>
-      <Sidebar activePage={activePage} onNavigate={setActivePage} />
+      <Sidebar
+        activePage={activePage}
+        onNavigate={setActivePage}
+        recentItems={recentItems}
+      />
       <main className={styles.content}>
-        <PageComponent />
+        <PageComponent onRecentChange={setRecentItems} onNavigate={setActivePage} />
       </main>
       <UpdateChecker />
     </div>
