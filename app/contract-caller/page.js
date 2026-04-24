@@ -1303,11 +1303,18 @@ export default function ContractCaller() {
       }
       return
     }
-    const params = new URLSearchParams(window.location.search)
+    const params = new URLSearchParams()
     params.set('chain', chain)
     params.set('address', address)
+    if (selectedFunction) {
+      params.set('function', selectedFunction)
+      params.set('args', JSON.stringify(args))
+    }
+    if (fromAddress) {
+      params.set('from', fromAddress)
+    }
     window.history.replaceState(null, '', `${window.location.pathname}?${params}`)
-  }, [chain, address])
+  }, [chain, address, selectedFunction, args, fromAddress])
 
   // Auto-load cached ABI when address or chain changes
   useEffect(() => {
