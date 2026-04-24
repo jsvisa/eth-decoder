@@ -1,0 +1,59 @@
+.root {
+  display: flex;
+  height: 100vh;
+  background: var(--bg, #1a1a1a);
+  color: var(--fg, #e0e0e0);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+}
+
+.sidebar {
+  width: 200px;
+  min-width: 200px;
+  background: rgba(30, 30, 30, 0.85);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+}
+
+/* Leave space for macOS traffic-light buttons */
+.sidebarHeader {
+  height: 28px;
+  -webkit-app-region: drag;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+  margin: 1px 6px;
+  width: calc(100% - 12px);
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 13px;
+  transition: background 0.1s;
+}
+
+.navItem:hover {
+  background: rgba(255,255,255,0.07);
+}
+
+.navItemActive {
+  background: rgba(255,255,255,0.12);
+}
+
+.navIcon { font-size: 15px; width: 20px; text-align: center; }
+.navLabel { font-size: 13px; }
+
+.content {
+  flex: 1;
+  overflow: auto;
+  padding-top: 28px;
+}
