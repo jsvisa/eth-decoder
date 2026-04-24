@@ -1,0 +1,48 @@
+/* desktop/components/Toolbar.module.css */
+.toolbar {
+  height: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  background: var(--surface-1);
+  border-bottom: 0.5px solid var(--border);
+  -webkit-app-region: drag;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  background: var(--surface-hover);
+  border: none;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  color: var(--text-primary);
+  filter: brightness(1.15);
+}
+
+.btnActive {
+  background: var(--accent-write-bg);
+  color: var(--accent-write);
+}
+
+.sep {
+  width: 0.5px;
+  height: 18px;
+  background: var(--border);
+  flex-shrink: 0;
+}
