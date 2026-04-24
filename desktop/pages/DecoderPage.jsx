@@ -44,7 +44,7 @@ export default function DecoderPage({ onRecentChange }) {
     setError(null)
     setResult(null)
     try {
-      const res = await decode(d, { count: 3, multicall, withAbi: true })
+      const res = await decode(d, { count: 3, withAbi: true })
       if (res.msg === 'ok' && res.data?.length > 0) {
         const item = res.data[0]
         setResult(item)
