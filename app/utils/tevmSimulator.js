@@ -1,5 +1,5 @@
 import { createMemoryClient, http } from 'tevm'
-import { encodeFunctionData, decodeFunctionData, decodeFunctionResult, parseEther, decodeEventLog, keccak256, bytesToHex, toFunctionSelector } from 'viem'
+import { encodeFunctionData, decodeFunctionData, decodeFunctionResult, decodeErrorResult, parseEther, decodeEventLog, keccak256, bytesToHex, toFunctionSelector } from 'viem'
 import { isValidEthAddress } from './validation'
 
 // Create an http transport with or without JSON-RPC batching.
@@ -212,38 +212,42 @@ export async function decodeCallTraceLogsViaServer(node) {
   await Promise.all((node.calls || []).map(child => decodeCallTraceLogsViaServer(child)))
 }
 
-// Decode Solidity revert reason from return data bytes (hex string)
-// Handles Error(string) and Panic(uint256) encodings, matching the forge/geth approach.
-function decodeRevertReason(hexData) {
+// Decode revert data into a human-readable string.
+// Handles Error(string), Panic(uint256), and custom ABI errors via viem's decodeErrorResult.
+// Uses viem throughout — avoids Buffer.from which is unreliable in browser bundles.
+function decodeRevertData(hexData, abi = []) {
   if (!hexData || hexData.length < 10) return null
-  const selector = hexData.slice(0, 10).toLowerCase()
-  // Error(string) → 0x08c379a0
-  if (selector === '0x08c379a0') {
-    try {
-      const body = hexData.slice(10) // strip selector
-      // ABI layout: offset (32 bytes) | length (32 bytes) | utf8 data
-      const dataStart = parseInt(body.slice(0, 64), 16) * 2
-      const length = parseInt(body.slice(dataStart, dataStart + 64), 16)
-      const strHex = body.slice(dataStart + 64, dataStart + 64 + length * 2)
-      return Buffer.from(strHex, 'hex').toString('utf8')
-    } catch { return null }
+  const PANIC_CODES = {
+    0x00: 'generic panic', 0x01: 'assert failed',
+    0x11: 'arithmetic overflow/underflow', 0x12: 'division by zero',
+    0x21: 'invalid enum value', 0x22: 'corrupted storage array',
+    0x31: 'pop on empty array', 0x32: 'array index out of bounds',
+    0x41: 'out of memory', 0x51: 'zero function pointer',
   }
-  // Panic(uint256) → 0x4e487b71
-  if (selector === '0x4e487b71') {
-    try {
-      const code = parseInt(hexData.slice(10, 74), 16)
-      const reasons = {
-        0x00: 'generic panic', 0x01: 'assert failed',
-        0x11: 'arithmetic overflow/underflow', 0x12: 'division by zero',
-        0x21: 'invalid enum value', 0x22: 'corrupted storage array',
-        0x31: 'pop on empty array', 0x32: 'array index out of bounds',
-        0x41: 'out of memory', 0x51: 'zero function pointer',
-      }
-      return `Panic: ${reasons[code] ?? `code 0x${code.toString(16)}`}`
-    } catch { return null }
+  try {
+    const errorAbis = (abi || []).filter(item => item.type === 'error')
+    // decodeErrorResult handles Error(string) and Panic(uint256) natively
+    // even with an empty ABI array; custom errors need their definition.
+    const { errorName, args } = decodeErrorResult({ abi: errorAbis, data: hexData })
+    if (errorName === 'Error') return String(args?.[0] ?? '')
+    if (errorName === 'Panic') {
+      const code = Number(args?.[0] ?? 0)
+      return `Panic: ${PANIC_CODES[code] ?? `code 0x${code.toString(16)}`}`
+    }
+    // Custom error
+    if (!args?.length) return errorName
+    const formatted = args.map(a => {
+      const s = serializeValue(a)
+      return typeof s === 'object' ? JSON.stringify(s) : String(s)
+    }).join(', ')
+    return `${errorName}(${formatted})`
+  } catch {
+    return null
   }
-  return null
 }
+// Back-compat aliases used at multiple call sites below
+const decodeRevertReason = (hexData) => decodeRevertData(hexData)
+const decodeCustomError = (hexData, abi) => decodeRevertData(hexData, abi)
 
 // Try to decode a single raw log object ({ address, topics, data }) using the event ABI map.
 // Returns the enriched log with { name, decoded, inputs } fields.
@@ -737,7 +741,13 @@ export async function simulateWithTevm({
         node.error = result.execResult.exceptionError.error
           || String(result.execResult.exceptionError)
         if (result.execResult.returnValue?.length >= 4) {
-          node.errorReason = decodeRevertReason(bytesToHex(result.execResult.returnValue))
+          const revertHex = bytesToHex(result.execResult.returnValue)
+          // For the root call use the full ABI (includes error defs); sub-calls
+          // use abiCache keyed by their target address, falling back to root ABI.
+          const nodeAbi = node === callTraceRoot
+            ? abi
+            : (abiCache.get(node.to?.toLowerCase()) ?? abi)
+          node.errorReason = decodeRevertData(revertHex, nodeAbi)
         }
       }
       next?.()
@@ -812,6 +822,7 @@ export async function simulateWithTevm({
       data: callData,
       value: valueInWei,
       createAccessList: true,
+      throwOnFail: false,   // return errors in result instead of throwing, so rawData is accessible
       onBeforeMessage,
       onAfterMessage,
       onStep,
@@ -919,11 +930,33 @@ export async function simulateWithTevm({
         address: item.address,
         storageKeys: item.storageKeys || [],
       })),
-      error: success ? null : (callResult.errors?.[0]?.message || 'Transaction reverted'),
+      error: success ? null : (() => {
+        // callTraceRoot.errorReason is set by onAfterMessage via decodeRevertData.
+        // Fall back to decoding rawOutput directly in case the hook path was skipped.
+        const reason = callTraceRoot?.errorReason || decodeRevertData(rawOutput, abi)
+        return reason ? `Revert: ${reason}` : 'Transaction reverted'
+      })(),
       undecodedAddresses: Array.from(undecodedAddresses),
     }
   } catch (error) {
     console.error('Tevm simulation error:', error)
+
+    // Try to extract a human-readable reason from the thrown error.
+    // tevm's RevertError embeds the raw return data in error.data?.returnData or error._data.
+    let errorMessage = 'Failed to simulate transaction'
+    const rawRevertData = error?.data?.returnData ?? error?.returnData
+    if (rawRevertData) {
+      const hex = typeof rawRevertData === 'string'
+        ? rawRevertData
+        : bytesToHex(rawRevertData)
+      const reason = decodeRevertData(hex, abi)
+      if (reason) errorMessage = `Revert: ${reason}`
+      else errorMessage = 'Transaction reverted'
+    } else if (error.message && !error.message.includes('https://tevm.sh')) {
+      errorMessage = error.message
+    } else if (error.message?.includes('revert')) {
+      errorMessage = 'Transaction reverted'
+    }
 
     return {
       success: false,
@@ -937,7 +970,7 @@ export async function simulateWithTevm({
       logs: [],
       callTrace: null,
       stateChanges: [],
-      error: error.message || 'Failed to simulate transaction',
+      error: errorMessage,
       undecodedAddresses: [],
     }
   }
