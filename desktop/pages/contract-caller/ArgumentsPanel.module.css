@@ -1,0 +1,117 @@
+/* desktop/pages/contract-caller/ArgumentsPanel.module.css */
+.root {
+  width: 300px;
+  min-width: 260px;
+  border-right: 0.5px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+
+.scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 12px;
+}
+
+.fnTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.fnDesc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  line-height: 1.4;
+}
+
+.field { margin-bottom: 12px; }
+
+.fieldLabel {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.typeTag {
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--surface-hover);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.input {
+  width: 100%;
+  background: var(--surface-hover);
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Menlo', monospace;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.disclosure {
+  background: none;
+  border: none;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.disclosure:hover { color: var(--text-primary); }
+
+.footer {
+  padding: 10px 12px;
+  border-top: 0.5px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.callBtn {
+  width: 100%;
+  padding: 8px 0;
+  border: none;
+  border-radius: 7px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.callBtnRead  { background: var(--accent); }
+.callBtnWrite { background: var(--accent-write); }
+.callBtn:hover { filter: brightness(1.08); }
+.callBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.noFn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 20px;
+  text-align: center;
+}
