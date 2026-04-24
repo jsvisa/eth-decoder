@@ -7,14 +7,21 @@ const host = process.env.TAURI_DEV_HOST
 const appDir = resolve(__dirname, '../app')
 
 // Plugin: redirect unresolvable '../utils/' imports from app/ pages
-// to app/utils/ (fixes incorrect relative paths introduced in Task 2 refactor)
+// to app/utils/ (fixes incorrect relative paths introduced in Task 2 refactor).
+// Special case: '../utils/platform' is redirected to desktop/platform.js so the
+// Tauri adapter is used instead of the web adapter.
 function appUtilsRedirectPlugin() {
+  const desktopDir = __dirname
   return {
     name: 'app-utils-redirect',
     resolveId(source, importer) {
       if (!importer || !importer.startsWith(appDir)) return null
       if (!source.match(/^(\.\.\/)+utils\//)) return null
       const utilsPath = source.replace(/^(\.\.\/)+utils\//, '')
+      // Redirect platform imports to the desktop adapter
+      if (utilsPath === 'platform' || utilsPath === 'platform.js') {
+        return resolve(desktopDir, 'platform.js')
+      }
       const target = resolve(appDir, 'utils', utilsPath)
       if (existsSync(target) || existsSync(target + '.js')) {
         return target.endsWith('.js') || target.endsWith('.jsx') ? target : target + '.js'
@@ -41,6 +48,7 @@ export default defineConfig({
   },
   resolve: {
     alias: [
+      { find: '@app/utils/platform', replacement: resolve(__dirname, './platform.js') },
       { find: '@app', replacement: resolve(__dirname, '../app') },
       { find: 'next/navigation', replacement: resolve(__dirname, './shims/next-navigation.js') },
       { find: 'next/link', replacement: resolve(__dirname, './shims/next-link.jsx') },

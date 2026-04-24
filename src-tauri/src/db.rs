@@ -15,7 +15,8 @@ pub struct DbStats {
 
 pub fn init_schema(conn: &Connection) -> Result<()> {
     conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS func_signs (
+        "PRAGMA journal_mode=WAL;
+        CREATE TABLE IF NOT EXISTS func_signs (
             pkey      TEXT PRIMARY KEY,
             byte_sign TEXT NOT NULL,
             text_sign TEXT NOT NULL,
@@ -73,12 +74,12 @@ pub fn import_csv(conn: &Connection, file_path: &str) -> std::result::Result<Imp
         let text_sign = r.get(2).unwrap_or("");
         let abi       = r.get(3).filter(|s| !s.is_empty() && *s != "null");
         let score: i64 = r.get(4).and_then(|s| s.parse().ok()).unwrap_or(0);
-        tx.execute(
+        let inserted = tx.execute(
             "INSERT OR IGNORE INTO func_signs (pkey, byte_sign, text_sign, abi, score)
              VALUES (?1, ?2, ?3, ?4, ?5)",
             rusqlite::params![pkey, byte_sign, text_sign, abi, score],
         )?;
-        count += 1;
+        count += inserted as u64;
     }
     tx.commit()?;
     Ok(ImportResult { rows_imported: count })
@@ -210,7 +211,7 @@ mod tests {
         import_csv(&conn, tmp.path().to_str().unwrap()).unwrap();
         // Import same file again — duplicate pkey must be ignored
         let result = import_csv(&conn, tmp.path().to_str().unwrap()).unwrap();
-        assert_eq!(result.rows_imported, 1); // 1 row processed from CSV
+        assert_eq!(result.rows_imported, 0); // 0 NEW rows inserted (all were duplicates)
         assert_eq!(get_stats(&conn).unwrap().row_count, 1); // still only 1 in db
     }
 
