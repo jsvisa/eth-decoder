@@ -57,13 +57,31 @@ pub fn get_stats(conn: &Connection) -> Result<DbStats> {
     Ok(DbStats { row_count })
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ImportResult {
-    pub rows_imported: usize,
+    pub rows_imported: u64,
 }
 
-/// Stub — replaced by Task 5 with the real CSV import implementation.
-pub fn import_csv(_conn: &Connection, _file_path: &str) -> Result<ImportResult> {
-    Ok(ImportResult { rows_imported: 0 })
+pub fn import_csv(conn: &Connection, file_path: &str) -> std::result::Result<ImportResult, Box<dyn std::error::Error>> {
+    let mut rdr = csv::Reader::from_path(file_path)?;
+    let tx = conn.unchecked_transaction()?;
+    let mut count: u64 = 0;
+    for record in rdr.records() {
+        let r = record?;
+        let pkey      = r.get(0).unwrap_or("");
+        let byte_sign = r.get(1).unwrap_or("");
+        let text_sign = r.get(2).unwrap_or("");
+        let abi       = r.get(3).filter(|s| !s.is_empty() && *s != "null");
+        let score: i64 = r.get(4).and_then(|s| s.parse().ok()).unwrap_or(0);
+        tx.execute(
+            "INSERT OR IGNORE INTO func_signs (pkey, byte_sign, text_sign, abi, score)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params![pkey, byte_sign, text_sign, abi, score],
+        )?;
+        count += 1;
+    }
+    tx.commit()?;
+    Ok(ImportResult { rows_imported: count })
 }
 
 #[cfg(test)]
@@ -167,5 +185,44 @@ mod tests {
         let conn = setup();
         let stats = get_stats(&conn).unwrap();
         assert_eq!(stats.row_count, 0);
+    }
+
+    #[test]
+    fn import_csv_inserts_rows() {
+        use std::io::Write;
+        let conn = setup();
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        writeln!(tmp, "pkey,byte_sign,text_sign,abi,score").unwrap();
+        writeln!(tmp, r#"abc123,0xb82e16e3,getAdapters(),"{{""name"":""getAdapters""}}",1"#).unwrap();
+        writeln!(tmp, r#"def456,0xa9059cbb,"transfer(address,uint256)",,5"#).unwrap();
+        let result = import_csv(&conn, tmp.path().to_str().unwrap()).unwrap();
+        assert_eq!(result.rows_imported, 2);
+        assert_eq!(get_stats(&conn).unwrap().row_count, 2);
+    }
+
+    #[test]
+    fn import_csv_skips_duplicate_pkeys() {
+        use std::io::Write;
+        let conn = setup();
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        writeln!(tmp, "pkey,byte_sign,text_sign,abi,score").unwrap();
+        writeln!(tmp, "abc123,0xb82e16e3,getAdapters(),,1").unwrap();
+        import_csv(&conn, tmp.path().to_str().unwrap()).unwrap();
+        // Import same file again — duplicate pkey must be ignored
+        let result = import_csv(&conn, tmp.path().to_str().unwrap()).unwrap();
+        assert_eq!(result.rows_imported, 1); // 1 row processed from CSV
+        assert_eq!(get_stats(&conn).unwrap().row_count, 1); // still only 1 in db
+    }
+
+    #[test]
+    fn import_csv_handles_extra_columns() {
+        use std::io::Write;
+        let conn = setup();
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        // Full CSV with created_at and updated_at columns (should be ignored)
+        writeln!(tmp, "pkey,byte_sign,text_sign,abi,score,created_at,updated_at").unwrap();
+        writeln!(tmp, "abc123,0xb82e16e3,getAdapters(),,1,2024-01-01,2024-01-01").unwrap();
+        let result = import_csv(&conn, tmp.path().to_str().unwrap()).unwrap();
+        assert_eq!(result.rows_imported, 1);
     }
 }
