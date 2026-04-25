@@ -23,7 +23,6 @@ export default function DecoderPage({ onRecentChange }) {
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const [isDecoding, setIsDecoding] = useState(false)
-  const [multicall, setMulticall] = useState(false)
   const [history, setHistory] = useState(loadHistory)
 
   useEffect(() => {
@@ -61,7 +60,7 @@ export default function DecoderPage({ onRecentChange }) {
     } finally {
       setIsDecoding(false)
     }
-  }, [inputData, multicall])
+  }, [inputData])
 
   useEffect(() => {
     function onKey(e) {
@@ -85,11 +84,6 @@ export default function DecoderPage({ onRecentChange }) {
     <div className={styles.root}>
       <div className={styles.toolbar}>
         <span className={styles.toolbarTitle}>Decoder</span>
-        <label className={styles.toggleLabel}>
-          <input type="checkbox" checked={multicall} onChange={e => setMulticall(e.target.checked)} />
-          <span className={styles.togglePill} />
-          Multicall
-        </label>
         <div className={styles.spacer} />
         <button className={styles.hintBtn}><kbd>⌘K</kbd> Quick open</button>
       </div>

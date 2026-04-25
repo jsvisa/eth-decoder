@@ -1,0 +1,54 @@
+/* desktop/components/SetupScreen.module.css */
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+}
+
+.inner {
+  max-width: 480px;
+  width: 100%;
+  text-align: center;
+  padding: 40px;
+}
+
+.title { font-size: 20px; font-weight: 600; margin-bottom: 12px; }
+
+.desc { color: var(--text-secondary); line-height: 1.6; margin-bottom: 8px; }
+
+.downloadLink { font-size: 13px; color: var(--text-muted); margin-bottom: 0; }
+
+.link { color: var(--accent); text-decoration: none; }
+
+.btn {
+  margin-top: 24px;
+  padding: 10px 24px;
+  background: var(--accent);
+  border: none;
+  border-radius: 7px;
+  color: var(--on-accent);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn:hover { filter: brightness(1.08); }
+
+.message { margin-top: 24px; font-size: 13px; color: var(--text-secondary); }
+.success  { color: var(--accent-success); }
+.error    { color: var(--accent-error); }
+
+.skip {
+  margin-top: 32px;
+  display: block;
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.skip:hover { color: var(--text-secondary); }

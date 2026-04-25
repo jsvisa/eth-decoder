@@ -90,7 +90,7 @@
   padding: 8px 0;
   border: none;
   border-radius: 7px;
-  color: #fff;
+  color: var(--on-accent);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;

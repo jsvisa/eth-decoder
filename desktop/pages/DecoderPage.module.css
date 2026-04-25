@@ -25,50 +25,6 @@
   color: var(--text-primary);
 }
 
-.toggleLabel {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  color: var(--text-muted);
-  cursor: pointer;
-  -webkit-app-region: no-drag;
-  user-select: none;
-}
-
-.toggleLabel input { display: none; }
-
-.togglePill {
-  width: 28px;
-  height: 16px;
-  border-radius: 8px;
-  background: var(--surface-hover);
-  position: relative;
-  transition: background 0.15s;
-  flex-shrink: 0;
-}
-
-.togglePill::after {
-  content: '';
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  top: 2px;
-  left: 2px;
-  background: var(--text-muted);
-  border-radius: 50%;
-  transition: transform 0.15s, background 0.15s;
-}
-
-.toggleLabel input:checked + .togglePill {
-  background: var(--accent-bg);
-}
-
-.toggleLabel input:checked + .togglePill::after {
-  transform: translateX(12px);
-  background: var(--accent);
-}
-
 .spacer { flex: 1; }
 
 .hintBtn {
@@ -140,7 +96,7 @@
   background: var(--accent);
   border: none;
   border-radius: 6px;
-  color: #fff;
+  color: var(--on-accent);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -183,7 +139,7 @@
 .errorCard {
   margin: 16px;
   padding: 12px 14px;
-  background: rgba(255, 69, 58, 0.08);
+  background: var(--accent-error-bg);
   border-left: 3px solid var(--accent-error);
   border-radius: 6px;
   font-size: 12px;

@@ -63,3 +63,23 @@
   display: flex; align-items: center; justify-content: center;
   height: 200px; color: var(--text-muted); font-size: 13px;
 }
+
+.addForm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 0.5px solid var(--border-subtle);
+  background: var(--accent-bg);
+}
+
+.addInput {
+  background: var(--surface-2);
+  border: 0.5px solid var(--accent);
+  border-radius: 5px;
+  padding: 5px 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+  outline: none;
+  flex: 1;
+}

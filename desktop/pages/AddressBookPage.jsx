@@ -11,6 +11,9 @@ export default function AddressBookPage() {
   const [query, setQuery] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [editLabel, setEditLabel] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [newLabel, setNewLabel] = useState('')
+  const [newAddress, setNewAddress] = useState('')
 
   const filtered = useMemo(() => {
     if (!query) return entries
@@ -22,10 +25,14 @@ export default function AddressBookPage() {
 
   function refresh() { setEntries(getAddressBook()) }
 
-  function handleAdd() {
-    const label = prompt('Label:')
-    const address = prompt('Address (0x…):')
-    if (label && address) { addToAddressBook({ label, address }); refresh() }
+  function commitAdd() {
+    if (newLabel.trim() && newAddress.trim()) {
+      addToAddressBook({ label: newLabel.trim(), address: newAddress.trim() })
+      setNewLabel('')
+      setNewAddress('')
+      setAdding(false)
+      refresh()
+    }
   }
 
   function commitEdit(id) {
@@ -72,10 +79,33 @@ export default function AddressBookPage() {
           value={query}
           onChange={e => setQuery(e.target.value)}
         />
-        <button className={styles.tbarBtn} onClick={handleAdd}>+ Add</button>
+        <button className={styles.tbarBtn} onClick={() => setAdding(v => !v)}>
+          {adding ? 'Cancel' : '+ Add'}
+        </button>
         <button className={styles.tbarBtn} onClick={handleImport}>Import CSV</button>
         <button className={styles.tbarBtn} onClick={handleExport}>Export CSV</button>
       </div>
+
+      {adding && (
+        <div className={styles.addForm}>
+          <input
+            className={styles.addInput}
+            autoFocus
+            placeholder="Label"
+            value={newLabel}
+            onChange={e => setNewLabel(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') commitAdd(); if (e.key === 'Escape') setAdding(false) }}
+          />
+          <input
+            className={styles.addInput}
+            placeholder="0x… address"
+            value={newAddress}
+            onChange={e => setNewAddress(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') commitAdd(); if (e.key === 'Escape') setAdding(false) }}
+          />
+          <button className={styles.tbarBtn} onClick={commitAdd}>Save</button>
+        </div>
+      )}
 
       <div className={styles.content}>
         {filtered.length === 0 ? (
