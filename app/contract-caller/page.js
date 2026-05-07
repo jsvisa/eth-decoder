@@ -692,11 +692,17 @@ export default function ContractCaller() {
     return ''
   }
 
+  // Canonical signature for a function ABI item, e.g. "transfer(address,uint256)"
+  const getFunctionSig = (func) => {
+    const types = func.inputs?.map(i => i.type).join(',') || ''
+    return `${func.name}(${types})`
+  }
+
   // Get selected function object
   const getSelectedFunction = () => {
     if (!selectedFunction || !parsedAbi) return null
     return parsedAbi.find(
-      (item) => item.type === 'function' && item.name === selectedFunction
+      (item) => item.type === 'function' && getFunctionSig(item) === selectedFunction
     )
   }
 
@@ -1270,7 +1276,7 @@ export default function ContractCaller() {
         }
 
         pendingHistoryRef.current = {
-          functionName: urlFunction,
+          functionSig: urlFunction,
           args: parsedArgs,
           timestamp: Date.now()
         }
@@ -1371,8 +1377,15 @@ export default function ContractCaller() {
       // Apply pending function + args (from URL params or history navigation)
       if (pendingHistoryRef.current) {
         const pending = pendingHistoryRef.current
-        const func = parsed.find(item => item.type === 'function' && item.name === pending.functionName)
-        setSelectedFunction(pending.functionName)
+        // pending.functionSig is the canonical sig (new items) or just a name (old items)
+        const func = parsed.find(item =>
+          item.type === 'function' && (
+            getFunctionSig(item) === pending.functionSig ||
+            item.name === pending.functionSig
+          )
+        )
+        const sigToSet = func ? getFunctionSig(func) : pending.functionSig
+        setSelectedFunction(sigToSet)
         if (func) {
           const pendingArgs = pending.args || []
           if (pendingArgs.length === (func.inputs?.length || 0)) {
@@ -1405,7 +1418,7 @@ export default function ContractCaller() {
     }
 
     const func = parsedAbi.find(
-      (item) => item.type === 'function' && item.name === selectedFunction
+      (item) => item.type === 'function' && getFunctionSig(item) === selectedFunction
     )
 
     // If we have pending args from history, try to apply them
@@ -1414,7 +1427,7 @@ export default function ContractCaller() {
       const pendingArgs = pending.args || []
 
       // Check if this is the function we're waiting for
-      if (pending.functionName === selectedFunction && func) {
+      if (pending.functionSig === selectedFunction && func) {
         const expectedInputs = func.inputs?.length || 0
 
         // If args count matches, apply them
@@ -1586,15 +1599,16 @@ export default function ContractCaller() {
   }
 
   const saveToHistory = (callData, output, isWrite) => {
-    // Create unique key for dedup (chain + address + function + args)
+    // Create unique key for dedup (chain + address + function sig + args)
     const callKey = `${chain}-${address.toLowerCase()}-${selectedFunction}-${JSON.stringify(args)}`
 
     // Check if same call exists and update timestamp, or add new
     const existingIndex = history.findIndex(item => {
-      const itemKey = `${item.chain}-${item.address.toLowerCase()}-${item.functionName}-${JSON.stringify(item.args)}`
+      const itemKey = `${item.chain}-${item.address.toLowerCase()}-${item.functionSig || item.functionName}-${JSON.stringify(item.args)}`
       return itemKey === callKey
     })
 
+    const func = getSelectedFunction()
     let newHistory
     if (existingIndex !== -1) {
       // Update existing item with new timestamp and output, move to top
@@ -1616,7 +1630,8 @@ export default function ContractCaller() {
         id: Date.now(),
         chain,
         address,
-        functionName: selectedFunction,
+        functionName: func?.name || selectedFunction,
+        functionSig: selectedFunction,
         args: [...args],
         fromAddress,
         output,
@@ -1638,8 +1653,9 @@ export default function ContractCaller() {
 
   const loadFromHistory = (item) => {
     const historyArgs = item.args || []
+    const itemSig = item.functionSig || item.functionName
     const sameContract = address && item.address && address.toLowerCase() === item.address.toLowerCase()
-    const sameFunction = selectedFunction === item.functionName
+    const sameFunction = selectedFunction === itemSig
 
     // If same contract and same function, directly set args
     if (sameContract && sameFunction) {
@@ -1653,7 +1669,7 @@ export default function ContractCaller() {
 
     // Store pending history for the useEffect to handle after state updates
     pendingHistoryRef.current = {
-      functionName: item.functionName,
+      functionSig: itemSig,
       args: historyArgs,
       timestamp: Date.now()
     }
@@ -1661,7 +1677,7 @@ export default function ContractCaller() {
     setChain(item.chain)
     setAddress(item.address)
     setFromAddress(item.fromAddress || '')
-    setSelectedFunction(item.functionName)
+    setSelectedFunction(itemSig)
     setResult(item.output)
     setError(null)
   }
@@ -2272,7 +2288,7 @@ export default function ContractCaller() {
   const getSelectedFunctionInputs = () => {
     if (!selectedFunction || !parsedAbi) return []
     const func = parsedAbi.find(
-      (item) => item.type === 'function' && item.name === selectedFunction
+      (item) => item.type === 'function' && getFunctionSig(item) === selectedFunction
     )
     return func?.inputs || []
   }
@@ -3272,7 +3288,7 @@ export default function ContractCaller() {
                         onClick={async () => {
                           const func = getSelectedFunction()
                           const outputs = func.outputs && func.outputs.length > 0 ? ` → ${func.outputs.map(o => o.type).join(', ')}` : ''
-                          const sig = `${selectedFunction}(${func.inputs.map(i => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})${outputs}`
+                          const sig = `${func.name}(${func.inputs.map(i => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})${outputs}`
                           await navigator.clipboard.writeText(sig)
                           setCopiedItem('signature')
                           setTimeout(() => setCopiedItem(null), 1500)
@@ -3282,7 +3298,7 @@ export default function ContractCaller() {
                         {copiedItem === 'signature' ? '✓ Copied!' : (() => {
                           const func = getSelectedFunction()
                           const outputs = func.outputs && func.outputs.length > 0 ? ` → ${func.outputs.map(o => o.type).join(', ')}` : ''
-                          return `${selectedFunction}(${func.inputs.map(i => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})${outputs}`
+                          return `${func.name}(${func.inputs.map(i => `${i.type}${i.name ? ' ' + i.name : ''}`).join(', ')})${outputs}`
                         })()}
                       </span>
                       <button
@@ -3334,10 +3350,10 @@ export default function ContractCaller() {
                       )}
                       {getFilteredFunctions().map((func) => (
                         <div
-                          key={func.name}
-                          className={`${styles.functionItem} ${selectedFunction === func.name ? styles.functionItemSelected : ''}`}
+                          key={getFunctionSig(func)}
+                          className={`${styles.functionItem} ${selectedFunction === getFunctionSig(func) ? styles.functionItemSelected : ''}`}
                           onClick={() => {
-                            setSelectedFunction(func.name)
+                            setSelectedFunction(getFunctionSig(func))
                             setFunctionFilter('')
                             setShowFunctionList(false)
                           }}

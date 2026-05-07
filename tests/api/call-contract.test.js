@@ -91,6 +91,102 @@ describe('POST /api/call-contract', () => {
     expect(body.error).toMatch(/not found in abi/i)
   })
 
+  describe('overloaded functions', () => {
+    // Two overloads: getValue(uint256) → uint256, getValue(address) → bytes32
+    const OVERLOADED_ABI = [
+      {
+        type: 'function',
+        name: 'getValue',
+        inputs: [{ name: 'index', type: 'uint256' }],
+        outputs: [{ name: '', type: 'uint256' }],
+        stateMutability: 'view',
+      },
+      {
+        type: 'function',
+        name: 'getValue',
+        inputs: [{ name: 'user', type: 'address' }],
+        outputs: [{ name: '', type: 'bytes32' }],
+        stateMutability: 'view',
+      },
+    ]
+
+    // uint256 42 padded to 32 bytes
+    const UINT256_RESPONSE = '0x000000000000000000000000000000000000000000000000000000000000002a'
+    // bytes32 value
+    const BYTES32_RESPONSE = '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+
+    it('selects getValue(uint256) overload via full signature', async () => {
+      stubRpc({
+        eth_call: () => UINT256_RESPONSE,
+        eth_chainId: () => '0x1',
+      })
+
+      const res = await POST(makeRequest({
+        chain: 'ethereum',
+        address: VALID_ADDRESS,
+        functionName: 'getValue(uint256)',
+        abi: OVERLOADED_ABI,
+        args: ['1'],
+      }))
+
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.decoded[0].type).toBe('uint256')
+      expect(body.decoded[0].value).toBe('42')
+    })
+
+    it('selects getValue(address) overload via full signature', async () => {
+      stubRpc({
+        eth_call: () => BYTES32_RESPONSE,
+        eth_chainId: () => '0x1',
+      })
+
+      const res = await POST(makeRequest({
+        chain: 'ethereum',
+        address: VALID_ADDRESS,
+        functionName: 'getValue(address)',
+        abi: OVERLOADED_ABI,
+        args: [VALID_ADDRESS],
+      }))
+
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.decoded[0].type).toBe('bytes32')
+    })
+
+    it('returns 400 when the signature matches no overload', async () => {
+      const res = await POST(makeRequest({
+        chain: 'ethereum',
+        address: VALID_ADDRESS,
+        functionName: 'getValue(bool)',
+        abi: OVERLOADED_ABI,
+        args: [],
+      }))
+      expect(res.status).toBe(400)
+      const body = await res.json()
+      expect(body.error).toMatch(/not found in abi/i)
+    })
+
+    it('still resolves a plain name when there is no ambiguity', async () => {
+      stubRpc({
+        eth_call: () => '0x00000000000000000000000000000000000000000000000000000000000f4240',
+        eth_chainId: () => '0x1',
+      })
+
+      const res = await POST(makeRequest({
+        chain: 'ethereum',
+        address: VALID_ADDRESS,
+        functionName: 'balanceOf',
+        abi: BALANCE_OF_ABI,
+        args: [VALID_ADDRESS],
+      }))
+
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.decoded[0].type).toBe('uint256')
+    })
+  })
+
   it('returns 500 when the RPC call fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation(async (_url, options) => {
       const body = JSON.parse(options.body)

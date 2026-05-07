@@ -47,10 +47,15 @@ export async function POST(request) {
       )
     }
 
-    // Find the function in ABI
-    const functionAbi = abi.find(
-      (item) => item.type === 'function' && item.name === functionName
-    )
+    // Find the function in ABI — supports both plain name and full signature (e.g. "transfer(address,uint256)")
+    const functionAbi = abi.find((item) => {
+      if (item.type !== 'function') return false
+      if (functionName.includes('(')) {
+        const types = item.inputs?.map(i => i.type).join(',') || ''
+        return `${item.name}(${types})` === functionName
+      }
+      return item.name === functionName
+    })
 
     if (!functionAbi) {
       return NextResponse.json(
@@ -87,7 +92,7 @@ export async function POST(request) {
     // Encode function data
     const callData = encodeFunctionData({
       abi: [functionAbi],
-      functionName,
+      functionName: functionAbi.name,
       args: parsedArgs,
     })
 
@@ -242,7 +247,7 @@ export async function POST(request) {
         const { decodeFunctionResult } = await import('viem')
         const decoded = decodeFunctionResult({
           abi: [functionAbi],
-          functionName,
+          functionName: functionAbi.name,
           data: rawOutput,
         })
 

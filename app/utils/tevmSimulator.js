@@ -594,10 +594,15 @@ export async function simulateWithTevm({
       throw new Error('Invalid address format')
     }
 
-    // Find the function in ABI
-    const functionAbi = abi.find(
-      (item) => item.type === 'function' && item.name === functionName
-    )
+    // Find the function in ABI — supports both plain name and full signature (e.g. "transfer(address,uint256)")
+    const functionAbi = abi.find((item) => {
+      if (item.type !== 'function') return false
+      if (functionName.includes('(')) {
+        const types = item.inputs?.map(i => i.type).join(',') || ''
+        return `${item.name}(${types})` === functionName
+      }
+      return item.name === functionName
+    })
 
     if (!functionAbi) {
       throw new Error(`Function ${functionName} not found in ABI`)
@@ -633,7 +638,7 @@ export async function simulateWithTevm({
     // Encode the function call
     const callData = encodeFunctionData({
       abi: [functionAbi],
-      functionName,
+      functionName: functionAbi.name,
       args: parsedArgs,
     })
 
@@ -840,7 +845,7 @@ export async function simulateWithTevm({
       try {
         const decoded = decodeFunctionResult({
           abi: [functionAbi],
-          functionName,
+          functionName: functionAbi.name,
           data: rawOutput,
         })
 
