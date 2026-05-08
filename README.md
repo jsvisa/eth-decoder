@@ -91,6 +91,56 @@ The app requires API keys for full functionality:
 
 All API keys are stored locally in your browser and never sent to our servers.
 
+## Public API
+
+The app exposes a versioned public API at `/api/v1/` that can be used by external tools and scripts.
+
+### `GET /api/v1/decode`
+
+Decode EVM transaction calldata. Proxies to the configured `BACKEND_URL`.
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `data` | Yes | Hex-encoded calldata (with or without `0x` prefix) |
+| `multicall` | No | `true` to recursively decode multicall inner calls |
+| `with_abi` | No | `true` to include the matched ABI in the response |
+| `with_sign` | No | `true` to include the 4-byte selector in the response |
+
+```
+GET /api/v1/decode?data=0xa9059cbb000000000000000000000000...
+```
+
+### `GET /api/v1/decode-event`
+
+Decode an EVM event log. Proxies to the configured `BACKEND_URL`.
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `sign` | Yes | `topic0` — the 32-byte keccak256 hash of the event signature |
+| `topics` | No | Comma-separated list of all log topics (including `topic0`) |
+| `data` | No | Hex-encoded log data (defaults to `0x`) |
+
+```
+GET /api/v1/decode-event?sign=0xddf252ad...&topics=0xddf252ad...,0x000...&data=0x000...
+```
+
+### `GET /api/v1/fetch-abi`
+
+Fetch the verified ABI for a contract from Etherscan or Sourcify. Automatically detects proxy contracts and merges the implementation ABI.
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `address` | Yes | Contract address |
+| `chain` | No | Chain name: `ethereum` (default), `arbitrum`, `base`, `polygon`, `bsc` |
+| `apiKey` | No | Etherscan API key (falls back to `ETHERSCAN_API_KEY` env var) |
+| `detectProxy` | No | `true` to force on-chain proxy detection via storage slots |
+
+```
+GET /api/v1/fetch-abi?address=0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48&chain=ethereum&apiKey=YOUR_KEY
+```
+
+> `/api/v1/decode` and `/api/v1/decode-event` require `BACKEND_URL` to be set. `/api/v1/fetch-abi` is self-contained.
+
 ## Deploy to Vercel
 
 ### Method 1: Deploy via Vercel CLI
@@ -155,8 +205,8 @@ This architecture keeps the backend endpoints secure and hidden from the client-
 
 ## Tech Stack
 
-- **Framework**: Next.js 14 (App Router)
-- **Runtime**: React 18
+- **Framework**: Next.js 15 (App Router)
+- **Runtime**: React 19
 - **Blockchain**: viem (for ABI encoding/decoding)
 - **Deployment**: Vercel
 - **Styling**: CSS Modules
@@ -167,6 +217,10 @@ This architecture keeps the backend endpoints secure and hidden from the client-
 decoder/
 ├── app/
 │   ├── api/
+│   │   ├── v1/
+│   │   │   ├── decode/route.js        # Public API: tx calldata decode
+│   │   │   ├── decode-event/route.js  # Public API: event log decode
+│   │   │   └── fetch-abi/route.js     # Public API: ABI fetch
 │   │   ├── decode/
 │   │   │   └── route.js           # Transaction decode API proxy
 │   │   ├── call-contract/
