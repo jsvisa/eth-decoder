@@ -237,6 +237,154 @@ describe('POST /api/call-contract', () => {
     expect(body.decoded[0].value).toBe('1000000')
   })
 
+  describe('bytes / bytesN argument validation', () => {
+    const BYTES32_ABI = [{
+      type: 'function',
+      name: 'verify',
+      inputs: [{ name: 'hash', type: 'bytes32' }],
+      outputs: [{ name: '', type: 'bool' }],
+      stateMutability: 'view',
+    }]
+
+    const BYTES_ABI = [{
+      type: 'function',
+      name: 'process',
+      inputs: [{ name: 'data', type: 'bytes' }],
+      outputs: [{ name: '', type: 'bool' }],
+      stateMutability: 'view',
+    }]
+
+    const BYTES32_ARRAY_ABI = [{
+      type: 'function',
+      name: 'submitProofs',
+      inputs: [{ name: 'proofs', type: 'bytes32[]' }],
+      outputs: [{ name: '', type: 'bool' }],
+      stateMutability: 'view',
+    }]
+
+    const VALID_BYTES32 = '0xb8f00eedc238b5599a1a0789f5c6388292540315cb3bbc2970596d97772e6448'
+    const HEX_WITHOUT_PREFIX = 'b8f00eedc238b5599a1a0789f5c6388292540315cb3bbc2970596d97772e6448'
+
+    it('rejects bytes32 without 0x and hints the fix when value looks like hex', async () => {
+      const res = await POST(makeRequest({
+        chain: 'ethereum',
+        address: VALID_ADDRESS,
+        functionName: 'verify',
+        abi: BYTES32_ABI,
+        args: [HEX_WITHOUT_PREFIX],
+      }))
+      expect(res.status).toBe(400)
+      const body = await res.json()
+      expect(body.error).toMatch(/missing the "0x" prefix/i)
+      expect(body.error).toContain(`0x${HEX_WITHOUT_PREFIX}`)
+    })
+
+    it('rejects bytes32 without 0x with a generic error when value has non-hex chars', async () => {
+      const res = await POST(makeRequest({
+        chain: 'ethereum',
+        address: VALID_ADDRESS,
+        functionName: 'verify',
+        abi: BYTES32_ABI,
+        args: ['not-a-hex-string'],
+      }))
+      expect(res.status).toBe(400)
+      const body = await res.json()
+      expect(body.error).toMatch(/expected a "0x"-prefixed hex string/i)
+    })
+
+    it('accepts bytes32 with 0x prefix', async () => {
+      stubRpc({
+        eth_call: () => '0x0000000000000000000000000000000000000000000000000000000000000001',
+        eth_chainId: () => '0x1',
+      })
+      const res = await POST(makeRequest({
+        chain: 'ethereum',
+        address: VALID_ADDRESS,
+        functionName: 'verify',
+        abi: BYTES32_ABI,
+        args: [VALID_BYTES32],
+      }))
+      expect(res.status).toBe(200)
+    })
+
+    it('rejects dynamic bytes without 0x and hints the fix when value looks like hex', async () => {
+      const res = await POST(makeRequest({
+        chain: 'ethereum',
+        address: VALID_ADDRESS,
+        functionName: 'process',
+        abi: BYTES_ABI,
+        args: [HEX_WITHOUT_PREFIX],
+      }))
+      expect(res.status).toBe(400)
+      const body = await res.json()
+      expect(body.error).toMatch(/missing the "0x" prefix/i)
+      expect(body.error).toContain(`0x${HEX_WITHOUT_PREFIX}`)
+    })
+
+    it('accepts dynamic bytes with 0x prefix', async () => {
+      stubRpc({
+        eth_call: () => '0x0000000000000000000000000000000000000000000000000000000000000001',
+        eth_chainId: () => '0x1',
+      })
+      const res = await POST(makeRequest({
+        chain: 'ethereum',
+        address: VALID_ADDRESS,
+        functionName: 'process',
+        abi: BYTES_ABI,
+        args: [VALID_BYTES32],
+      }))
+      expect(res.status).toBe(200)
+    })
+
+    it('rejects bytes32[] where any element is missing the 0x prefix', async () => {
+      const res = await POST(makeRequest({
+        chain: 'ethereum',
+        address: VALID_ADDRESS,
+        functionName: 'submitProofs',
+        abi: BYTES32_ARRAY_ABI,
+        args: [[VALID_BYTES32, HEX_WITHOUT_PREFIX]],
+      }))
+      expect(res.status).toBe(400)
+      const body = await res.json()
+      expect(body.error).toMatch(/missing the "0x" prefix/i)
+    })
+
+    it('rejects fixed-size bytes32[2] where any element is missing the 0x prefix', async () => {
+      const FIXED_ARRAY_ABI = [{
+        type: 'function',
+        name: 'verifyPair',
+        inputs: [{ name: 'pair', type: 'bytes32[2]' }],
+        outputs: [{ name: '', type: 'bool' }],
+        stateMutability: 'view',
+      }]
+      const res = await POST(makeRequest({
+        chain: 'ethereum',
+        address: VALID_ADDRESS,
+        functionName: 'verifyPair',
+        abi: FIXED_ARRAY_ABI,
+        args: [[VALID_BYTES32, HEX_WITHOUT_PREFIX]],
+      }))
+      expect(res.status).toBe(400)
+      const body = await res.json()
+      expect(body.error).toMatch(/missing the "0x" prefix/i)
+    })
+
+    it('accepts bytes32[] where all elements have 0x prefix', async () => {
+      stubRpc({
+        eth_call: () => '0x0000000000000000000000000000000000000000000000000000000000000001',
+        eth_chainId: () => '0x1',
+      })
+      const res = await POST(makeRequest({
+        chain: 'ethereum',
+        address: VALID_ADDRESS,
+        functionName: 'submitProofs',
+        abi: BYTES32_ARRAY_ABI,
+        args: [[VALID_BYTES32, VALID_BYTES32]],
+      }))
+      expect(res.status).toBe(200)
+    })
+  })
+
   it('resolves a custom chain by numeric chainId and rpcUrl', async () => {
     stubRpc({
       eth_call: () => '0x00000000000000000000000000000000000000000000000000000000000f4240',

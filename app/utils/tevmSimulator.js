@@ -125,8 +125,27 @@ const parseArgValue = (arg, input) => {
     return tupleValue
   }
 
-  // Handle array types (e.g., address[], uint256[])
-  if (type.endsWith('[]')) {
+  // Handle bytes / bytesN - require 0x-prefixed hex.
+  // The regex /^bytes\d+$/ matches bytes32, bytes16 etc. but NOT bytes32[] or
+  // bytes32[N] because $ anchors before the brackets, so array types fall
+  // through to the branch below correctly.
+  if (type === 'bytes' || /^bytes\d+$/.test(type)) {
+    if (typeof arg === 'string' && arg !== '' && !arg.startsWith('0x')) {
+      const isHexChars = /^[0-9a-fA-F]+$/.test(arg)
+      if (isHexChars) {
+        throw new Error(`Invalid ${type}: value looks like a hex string missing the "0x" prefix. Try "0x${arg}".`)
+      }
+      throw new Error(`Invalid ${type}: expected a "0x"-prefixed hex string.`)
+    }
+    return arg
+  }
+
+  // Handle dynamic arrays (type[]) and fixed-size arrays (type[N]).
+  // Strips the outermost bracket pair and recurses, so bytes32[6] is treated
+  // the same as bytes32[].
+  const arrayMatch = type.match(/^(.+)\[(\d*)\]$/)
+  if (arrayMatch) {
+    const baseType = arrayMatch[1]
     let arrayValue = arg
     if (typeof arg === 'string') {
       try {
@@ -138,8 +157,6 @@ const parseArgValue = (arg, input) => {
     if (!Array.isArray(arrayValue)) {
       return arg
     }
-    // Get the base type (remove [])
-    const baseType = type.slice(0, -2)
     return arrayValue.map(item => parseArgValue(item, { ...input, type: baseType }))
   }
 

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createPublicClient, http, decodeFunctionResult, encodeFunctionData, defineChain } from 'viem'
 import { mainnet, arbitrum, base, polygon, bsc } from 'viem/chains'
 import { isValidEthAddress } from '../../utils/validation'
+import { normalizeArg, ArgValidationError } from '../../utils/normalizeArg'
 
 const CHAINS = {
   ethereum: mainnet,
@@ -99,28 +100,7 @@ export async function POST(request) {
     const parsedArgs = (args || []).map((arg, index) => {
       const input = functionAbi.inputs[index]
       if (!input) return arg
-
-      // Handle different types
-      if (input.type.startsWith('uint') || input.type.startsWith('int')) {
-        // Convert to BigInt for integer types
-        try {
-          return BigInt(arg)
-        } catch {
-          return arg
-        }
-      }
-      if (input.type === 'bool') {
-        return arg === 'true' || arg === true
-      }
-      if (input.type.endsWith('[]')) {
-        // Array type - try to parse as JSON
-        try {
-          return typeof arg === 'string' ? JSON.parse(arg) : arg
-        } catch {
-          return arg
-        }
-      }
-      return arg
+      return normalizeArg(arg, input.type, input.components)
     })
 
     // Encode function data
@@ -200,6 +180,9 @@ export async function POST(request) {
       simulated: simulate || false,
     })
   } catch (error) {
+    if (error instanceof ArgValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     console.error('Call contract error:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to call contract' },

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { encodeFunctionData } from 'viem'
 import { isValidEthAddress } from '../../utils/validation'
+import { normalizeArg, ArgValidationError } from '../../utils/normalizeArg'
 
 // Tenderly network IDs for simulation API
 const TENDERLY_NETWORK_IDS = {
@@ -68,25 +69,7 @@ export async function POST(request) {
     const parsedArgs = (args || []).map((arg, index) => {
       const input = functionAbi.inputs[index]
       if (!input) return arg
-
-      if (input.type.startsWith('uint') || input.type.startsWith('int')) {
-        try {
-          return BigInt(arg)
-        } catch {
-          return arg
-        }
-      }
-      if (input.type === 'bool') {
-        return arg === 'true' || arg === true
-      }
-      if (input.type.endsWith('[]')) {
-        try {
-          return typeof arg === 'string' ? JSON.parse(arg) : arg
-        } catch {
-          return arg
-        }
-      }
-      return arg
+      return normalizeArg(arg, input.type, input.components)
     })
 
     // Encode function data
@@ -457,6 +440,9 @@ export async function POST(request) {
       error: success ? null : (transaction?.error_message || 'Transaction reverted'),
     })
   } catch (error) {
+    if (error instanceof ArgValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     console.error('Simulation error:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to simulate transaction' },
