@@ -71,7 +71,14 @@ export async function POST(request) {
       }
       if (type === 'bool') return value === 'true' || value === true
       if (type === 'bytes' || /^bytes\d+$/.test(type)) {
-        if (typeof value === 'string' && !value.startsWith('0x')) return '0x' + value
+        if (typeof value === 'string' && value !== '' && !value.startsWith('0x')) {
+          const expectedBytes = type === 'bytes' ? null : parseInt(type.slice(5))
+          const isHexChars = /^[0-9a-fA-F]+$/.test(value)
+          if (isHexChars && expectedBytes !== null && value.length === expectedBytes * 2) {
+            throw new Error(`Invalid ${type}: value looks like a hex string missing the "0x" prefix. Try "0x${value}".`)
+          }
+          throw new Error(`Invalid ${type}: expected a "0x"-prefixed hex string.`)
+        }
         return value
       }
       if (type.endsWith('[]')) {
