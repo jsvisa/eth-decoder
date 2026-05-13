@@ -125,6 +125,14 @@ const parseArgValue = (arg, input) => {
     return tupleValue
   }
 
+  // Handle bytes types (bytes, bytes32, bytes16, etc.) - require 0x prefix
+  if (type === 'bytes' || /^bytes\d+$/.test(type)) {
+    if (typeof arg === 'string' && arg !== '' && !arg.startsWith('0x')) {
+      return '0x' + arg
+    }
+    return arg
+  }
+
   // Handle array types (e.g., address[], uint256[])
   if (type.endsWith('[]')) {
     let arrayValue = arg

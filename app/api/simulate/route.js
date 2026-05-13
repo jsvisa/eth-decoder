@@ -64,29 +64,34 @@ export async function POST(request) {
       )
     }
 
+    const normalizeArg = (value, type, components) => {
+      if (value === undefined || value === null || value === '') return value
+      if (type.startsWith('uint') || type.startsWith('int')) {
+        try { return BigInt(value) } catch { return value }
+      }
+      if (type === 'bool') return value === 'true' || value === true
+      if (type === 'bytes' || /^bytes\d+$/.test(type)) {
+        if (typeof value === 'string' && !value.startsWith('0x')) return '0x' + value
+        return value
+      }
+      if (type.endsWith('[]')) {
+        let arr = value
+        try { arr = typeof value === 'string' ? JSON.parse(value) : value } catch { return value }
+        if (!Array.isArray(arr)) return value
+        const baseType = type.slice(0, -2)
+        return arr.map(v => normalizeArg(v, baseType, components))
+      }
+      if (type === 'tuple' && components && Array.isArray(value)) {
+        return value.map((v, i) => normalizeArg(v, components[i]?.type, components[i]?.components))
+      }
+      return value
+    }
+
     // Parse args
     const parsedArgs = (args || []).map((arg, index) => {
       const input = functionAbi.inputs[index]
       if (!input) return arg
-
-      if (input.type.startsWith('uint') || input.type.startsWith('int')) {
-        try {
-          return BigInt(arg)
-        } catch {
-          return arg
-        }
-      }
-      if (input.type === 'bool') {
-        return arg === 'true' || arg === true
-      }
-      if (input.type.endsWith('[]')) {
-        try {
-          return typeof arg === 'string' ? JSON.parse(arg) : arg
-        } catch {
-          return arg
-        }
-      }
-      return arg
+      return normalizeArg(arg, input.type, input.components)
     })
 
     // Encode function data
