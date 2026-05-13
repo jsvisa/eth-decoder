@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createPublicClient, http, decodeFunctionResult, encodeFunctionData, defineChain } from 'viem'
 import { mainnet, arbitrum, base, polygon, bsc } from 'viem/chains'
 import { isValidEthAddress } from '../../utils/validation'
+import { normalizeArg, ArgValidationError } from '../../utils/normalizeArg'
 
 const CHAINS = {
   ethereum: mainnet,
@@ -95,35 +96,6 @@ export async function POST(request) {
       transport: http(rpcUrl),
     })
 
-    const normalizeArg = (value, type, components) => {
-      if (value === undefined || value === null || value === '') return value
-      if (type.startsWith('uint') || type.startsWith('int')) {
-        try { return BigInt(value) } catch { return value }
-      }
-      if (type === 'bool') return value === 'true' || value === true
-      if (type === 'bytes' || /^bytes\d+$/.test(type)) {
-        if (typeof value === 'string' && value !== '' && !value.startsWith('0x')) {
-          const isHexChars = /^[0-9a-fA-F]+$/.test(value)
-          if (isHexChars) {
-            throw new Error(`Invalid ${type}: value looks like a hex string missing the "0x" prefix. Try "0x${value}".`)
-          }
-          throw new Error(`Invalid ${type}: expected a "0x"-prefixed hex string.`)
-        }
-        return value
-      }
-      if (type.endsWith('[]')) {
-        let arr = value
-        try { arr = typeof value === 'string' ? JSON.parse(value) : value } catch { return value }
-        if (!Array.isArray(arr)) return value
-        const baseType = type.slice(0, -2)
-        return arr.map(v => normalizeArg(v, baseType, components))
-      }
-      if (type === 'tuple' && components && Array.isArray(value)) {
-        return value.map((v, i) => normalizeArg(v, components[i]?.type, components[i]?.components))
-      }
-      return value
-    }
-
     // Parse args if they're strings that should be other types
     const parsedArgs = (args || []).map((arg, index) => {
       const input = functionAbi.inputs[index]
@@ -208,6 +180,9 @@ export async function POST(request) {
       simulated: simulate || false,
     })
   } catch (error) {
+    if (error instanceof ArgValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     console.error('Call contract error:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to call contract' },

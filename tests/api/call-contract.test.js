@@ -273,6 +273,7 @@ describe('POST /api/call-contract', () => {
         abi: BYTES32_ABI,
         args: [HEX_WITHOUT_PREFIX],
       }))
+      expect(res.status).toBe(400)
       const body = await res.json()
       expect(body.error).toMatch(/missing the "0x" prefix/i)
       expect(body.error).toContain(`0x${HEX_WITHOUT_PREFIX}`)
@@ -286,6 +287,7 @@ describe('POST /api/call-contract', () => {
         abi: BYTES32_ABI,
         args: ['not-a-hex-string'],
       }))
+      expect(res.status).toBe(400)
       const body = await res.json()
       expect(body.error).toMatch(/expected a "0x"-prefixed hex string/i)
     })
@@ -313,6 +315,7 @@ describe('POST /api/call-contract', () => {
         abi: BYTES_ABI,
         args: [HEX_WITHOUT_PREFIX],
       }))
+      expect(res.status).toBe(400)
       const body = await res.json()
       expect(body.error).toMatch(/missing the "0x" prefix/i)
       expect(body.error).toContain(`0x${HEX_WITHOUT_PREFIX}`)
@@ -341,6 +344,27 @@ describe('POST /api/call-contract', () => {
         abi: BYTES32_ARRAY_ABI,
         args: [[VALID_BYTES32, HEX_WITHOUT_PREFIX]],
       }))
+      expect(res.status).toBe(400)
+      const body = await res.json()
+      expect(body.error).toMatch(/missing the "0x" prefix/i)
+    })
+
+    it('rejects fixed-size bytes32[2] where any element is missing the 0x prefix', async () => {
+      const FIXED_ARRAY_ABI = [{
+        type: 'function',
+        name: 'verifyPair',
+        inputs: [{ name: 'pair', type: 'bytes32[2]' }],
+        outputs: [{ name: '', type: 'bool' }],
+        stateMutability: 'view',
+      }]
+      const res = await POST(makeRequest({
+        chain: 'ethereum',
+        address: VALID_ADDRESS,
+        functionName: 'verifyPair',
+        abi: FIXED_ARRAY_ABI,
+        args: [[VALID_BYTES32, HEX_WITHOUT_PREFIX]],
+      }))
+      expect(res.status).toBe(400)
       const body = await res.json()
       expect(body.error).toMatch(/missing the "0x" prefix/i)
     })

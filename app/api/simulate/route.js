@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { encodeFunctionData } from 'viem'
 import { isValidEthAddress } from '../../utils/validation'
+import { normalizeArg, ArgValidationError } from '../../utils/normalizeArg'
 
 // Tenderly network IDs for simulation API
 const TENDERLY_NETWORK_IDS = {
@@ -62,35 +63,6 @@ export async function POST(request) {
         { error: `Function ${functionName} not found in ABI` },
         { status: 400 }
       )
-    }
-
-    const normalizeArg = (value, type, components) => {
-      if (value === undefined || value === null || value === '') return value
-      if (type.startsWith('uint') || type.startsWith('int')) {
-        try { return BigInt(value) } catch { return value }
-      }
-      if (type === 'bool') return value === 'true' || value === true
-      if (type === 'bytes' || /^bytes\d+$/.test(type)) {
-        if (typeof value === 'string' && value !== '' && !value.startsWith('0x')) {
-          const isHexChars = /^[0-9a-fA-F]+$/.test(value)
-          if (isHexChars) {
-            throw new Error(`Invalid ${type}: value looks like a hex string missing the "0x" prefix. Try "0x${value}".`)
-          }
-          throw new Error(`Invalid ${type}: expected a "0x"-prefixed hex string.`)
-        }
-        return value
-      }
-      if (type.endsWith('[]')) {
-        let arr = value
-        try { arr = typeof value === 'string' ? JSON.parse(value) : value } catch { return value }
-        if (!Array.isArray(arr)) return value
-        const baseType = type.slice(0, -2)
-        return arr.map(v => normalizeArg(v, baseType, components))
-      }
-      if (type === 'tuple' && components && Array.isArray(value)) {
-        return value.map((v, i) => normalizeArg(v, components[i]?.type, components[i]?.components))
-      }
-      return value
     }
 
     // Parse args
@@ -468,6 +440,9 @@ export async function POST(request) {
       error: success ? null : (transaction?.error_message || 'Transaction reverted'),
     })
   } catch (error) {
+    if (error instanceof ArgValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     console.error('Simulation error:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to simulate transaction' },
