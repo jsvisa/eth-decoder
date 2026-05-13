@@ -944,6 +944,11 @@
 
 .arrayItemContent {
   flex: 1;
+  width: 100%;
+}
+
+.arrayItemContent .input {
+  width: 100%;
 }
 
 .arrayRemoveButton {
