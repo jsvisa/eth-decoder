@@ -40,6 +40,7 @@ export async function POST(request) {
       rpcUrl: customRpcUrl,
       blockNumber,
       chainId: customChainId,
+      callData: rawCallData,
     } = body;
 
     if (!address || !functionName || !abi) {
@@ -115,19 +116,22 @@ export async function POST(request) {
       transport: http(rpcUrl),
     });
 
-    // Parse args if they're strings that should be other types
-    const parsedArgs = (args || []).map((arg, index) => {
-      const input = functionAbi.inputs[index];
-      if (!input) return arg;
-      return normalizeArg(arg, input.type, input.components);
-    });
-
-    // Encode function data
-    const data = encodeFunctionData({
-      abi: [functionAbi],
-      functionName: functionAbi.name,
-      args: parsedArgs,
-    });
+    // Encode function data (or use raw calldata if provided)
+    let data;
+    if (rawCallData) {
+      data = rawCallData;
+    } else {
+      const parsedArgs = (args || []).map((arg, index) => {
+        const input = functionAbi.inputs[index];
+        if (!input) return arg;
+        return normalizeArg(arg, input.type, input.components);
+      });
+      data = encodeFunctionData({
+        abi: [functionAbi],
+        functionName: functionAbi.name,
+        args: parsedArgs,
+      });
+    }
 
     // Make the call (works for both read and simulate)
     const callParams = {

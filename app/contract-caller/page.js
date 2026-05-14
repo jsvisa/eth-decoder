@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   toFunctionSelector,
   encodeFunctionData,
+  decodeFunctionData,
   toEventSelector,
   decodeEventLog,
 } from "viem";
@@ -33,6 +34,7 @@ import {
   isValidNumber,
   isValidPositiveInteger,
 } from "../utils/validation";
+import { normalizeArg } from "../utils/normalizeArg";
 
 const CHAINS = [
   {
@@ -684,6 +686,8 @@ export default function ContractCaller() {
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const [addressFilter, setAddressFilter] = useState("");
   const [fromAddress, setFromAddress] = useState("");
+  const [rawCalldataMode, setRawCalldataMode] = useState(false);
+  const [rawCalldata, setRawCalldata] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [tenderlySettings, setTenderlySettings] = useState({
     accessKey: "",
@@ -1664,6 +1668,8 @@ export default function ContractCaller() {
     } else {
       setArgs([]);
     }
+    setRawCalldata("");
+    setRawCalldataMode(false);
   }, [selectedFunction, parsedAbi, address]);
 
   // Fetch token symbols for Transfer events
@@ -2328,7 +2334,7 @@ export default function ContractCaller() {
     }
 
     // Validate function arguments (addresses in all types including tuples)
-    if (selectedFunc && selectedFunc.inputs) {
+    if (!rawCalldataMode && selectedFunc && selectedFunc.inputs) {
       const argErrors = [];
       selectedFunc.inputs.forEach((input, index) => {
         const argValue = args[index];
@@ -2336,6 +2342,14 @@ export default function ContractCaller() {
       });
       if (argErrors.length > 0) {
         errors.argErrors = argErrors;
+      }
+    }
+
+    // Validate raw calldata format when in raw mode
+    if (rawCalldataMode) {
+      const hex = rawCalldata.trim();
+      if (!hex || !hex.startsWith("0x") || hex.length < 10) {
+        errors.rawCalldata = true;
       }
     }
 
@@ -2361,6 +2375,10 @@ export default function ContractCaller() {
       if (errors.warpTimestamp)
         errorMessages.push("Warp timestamp must be a valid positive integer");
       if (errors.argErrors) errorMessages.push(...errors.argErrors);
+      if (errors.rawCalldata)
+        errorMessages.push(
+          "Raw calldata must be a hex string starting with 0x (at least 4 bytes)",
+        );
       setError(errorMessages.join("; "));
       return;
     }
@@ -2426,6 +2444,7 @@ export default function ContractCaller() {
           onProgress: (pct) => setSimProgress(pct),
           abortSignal: abortController.signal,
           rpcBatchSize,
+          callData: rawCalldataMode ? rawCalldata.trim() : undefined,
         });
         setSimProgress(100);
 
@@ -2540,6 +2559,11 @@ export default function ContractCaller() {
               timestamp: timestampOverride,
             };
           }
+        }
+
+        // Pass raw calldata directly if in raw mode (skips server-side encoding)
+        if (rawCalldataMode) {
+          requestBody.callData = rawCalldata.trim();
         }
 
         const response = await fetch(apiEndpoint, {
@@ -2826,6 +2850,84 @@ export default function ContractCaller() {
     } catch (err) {
       console.error("Failed to copy share URL:", err);
     }
+  };
+
+  // Convert a viem-decoded value back to the internal arg state format used by ArgInput components.
+  // viem returns BigInt for integers, booleans, hex strings for bytes, and objects/arrays for tuples.
+  const viemDecodedToArgValue = (value, input) => {
+    if (value === undefined || value === null) return getDefaultValue(input);
+    const type = input.type;
+
+    // Array types: type[] or type[N]
+    const arrayMatch = type.match(/^(.+)\[(\d*)\]$/);
+    if (arrayMatch) {
+      const baseType = arrayMatch[1];
+      const baseInput =
+        baseType === "tuple"
+          ? { type: "tuple", components: input.components }
+          : { type: baseType };
+      return Array.isArray(value)
+        ? value.map((v) => viemDecodedToArgValue(v, baseInput))
+        : [];
+    }
+
+    // Tuple type: stored as array of component values
+    if (type === "tuple" && input.components) {
+      return input.components.map((comp, i) => {
+        const compValue = Array.isArray(value) ? value[i] : value[comp.name];
+        return viemDecodedToArgValue(compValue, comp);
+      });
+    }
+
+    if (typeof value === "bigint") return value.toString();
+    if (typeof value === "boolean") return value.toString();
+    return String(value);
+  };
+
+  const handleRawModeToggle = () => {
+    const func = getSelectedFunction();
+    if (!func) return;
+
+    if (!rawCalldataMode) {
+      // Switching TO Raw: encode current args → calldata
+      try {
+        const parsedArgs = func.inputs.map((input, i) =>
+          normalizeArg(
+            args[i] ?? getDefaultValue(input),
+            input.type,
+            input.components,
+          ),
+        );
+        const encoded = encodeFunctionData({
+          abi: [func],
+          functionName: func.name,
+          args: parsedArgs,
+        });
+        setRawCalldata(encoded);
+      } catch {
+        // args incomplete/invalid — switch to raw with empty input
+        setRawCalldata("");
+      }
+    } else {
+      // Switching FROM Raw: decode calldata → args
+      const hex = rawCalldata.trim();
+      if (hex && hex.startsWith("0x") && hex.length >= 10) {
+        try {
+          const { args: decoded } = decodeFunctionData({
+            abi: [func],
+            data: hex,
+          });
+          const newArgs = func.inputs.map((input, i) =>
+            viemDecodedToArgValue(decoded?.[i], input),
+          );
+          setArgs(newArgs);
+        } catch {
+          // calldata doesn't match selected function — keep current args
+        }
+      }
+    }
+
+    setRawCalldataMode(!rawCalldataMode);
   };
 
   const handleCopyCalldata = async () => {
@@ -4416,6 +4518,15 @@ export default function ContractCaller() {
                       <div className={styles.argsSection}>
                         <div className={styles.argsSectionHeader}>
                           <label className={styles.label}>Arguments</label>
+                          <button
+                            type="button"
+                            className={`${styles.rawModeToggle} ${rawCalldataMode ? styles.rawModeActive : ""}`}
+                            onClick={handleRawModeToggle}
+                            disabled={loading}
+                            title="Toggle raw calldata input mode"
+                          >
+                            Raw
+                          </button>
                           {/* Block number for read-only functions */}
                           {isReadOnly(getSelectedFunction()) && (
                             <div className={styles.readBlockInline}>
@@ -4437,32 +4548,51 @@ export default function ContractCaller() {
                             </div>
                           )}
                         </div>
-                        {getSelectedFunctionInputs().map((input, index) => (
-                          <div key={index} className={styles.argField}>
-                            <label className={styles.argLabel}>
-                              {input.name || `arg${index}`} ({input.type})
-                            </label>
-                            <ArgInput
-                              input={input}
-                              value={args[index]}
-                              onChange={(value) => {
-                                const newArgs = [...args];
-                                newArgs[index] = value;
-                                setArgs(newArgs);
-                                if (fieldErrors[`arg_${index}`]) {
-                                  setFieldErrors((prev) => ({
-                                    ...prev,
-                                    [`arg_${index}`]: false,
-                                  }));
-                                }
-                              }}
-                              addressBook={addressBook}
-                              disabled={loading}
-                              onBookmarkClick={handleOpenBookmarkModal}
-                              error={fieldErrors[`arg_${index}`]}
-                            />
-                          </div>
-                        ))}
+                        {rawCalldataMode ? (
+                          <textarea
+                            className={`${styles.textarea} ${fieldErrors.rawCalldata ? styles.inputError : ""}`}
+                            value={rawCalldata}
+                            onChange={(e) => {
+                              setRawCalldata(e.target.value);
+                              if (fieldErrors.rawCalldata) {
+                                setFieldErrors((prev) => ({
+                                  ...prev,
+                                  rawCalldata: false,
+                                }));
+                              }
+                            }}
+                            placeholder="0x{4-byte selector}{encoded args}"
+                            disabled={loading}
+                            rows={4}
+                          />
+                        ) : (
+                          getSelectedFunctionInputs().map((input, index) => (
+                            <div key={index} className={styles.argField}>
+                              <label className={styles.argLabel}>
+                                {input.name || `arg${index}`} ({input.type})
+                              </label>
+                              <ArgInput
+                                input={input}
+                                value={args[index]}
+                                onChange={(value) => {
+                                  const newArgs = [...args];
+                                  newArgs[index] = value;
+                                  setArgs(newArgs);
+                                  if (fieldErrors[`arg_${index}`]) {
+                                    setFieldErrors((prev) => ({
+                                      ...prev,
+                                      [`arg_${index}`]: false,
+                                    }));
+                                  }
+                                }}
+                                addressBook={addressBook}
+                                disabled={loading}
+                                onBookmarkClick={handleOpenBookmarkModal}
+                                error={fieldErrors[`arg_${index}`]}
+                              />
+                            </div>
+                          ))
+                        )}
                       </div>
                     )}
 

@@ -742,6 +742,7 @@ export async function simulateWithTevm({
   onProgress = null, // (percent: 0-100) => void
   abortSignal = null, // AbortSignal
   rpcBatchSize = 1, // JSON-RPC batch size; 1 = no batching, N>1 = batch array
+  callData: rawCallData = null, // optional raw calldata hex, bypasses encoding
 }) {
   try {
     // Validate inputs
@@ -808,12 +809,14 @@ export async function simulateWithTevm({
       });
     }
 
-    // Encode the function call
-    const callData = encodeFunctionData({
-      abi: [functionAbi],
-      functionName: functionAbi.name,
-      args: parsedArgs,
-    });
+    // Encode the function call (or use raw calldata if provided)
+    const callData =
+      rawCallData ||
+      encodeFunctionData({
+        abi: [functionAbi],
+        functionName: functionAbi.name,
+        args: parsedArgs,
+      });
 
     // Convert value to wei based on unit
     let valueInWei = 0n;
