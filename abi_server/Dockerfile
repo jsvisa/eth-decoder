@@ -6,7 +6,6 @@ COPY . /tmp/app/
 
 RUN pip install --no-cache-dir \
     fastapi uvicorn psycopg2 multicall-py \
-    git+https://github.com/jsvisa/multicall.py@upgrade-eth-abi \
     git+https://github.com/jsvisa/eth-abi@decode-less-strict && \
     pip install --no-cache-dir /tmp/app
 
