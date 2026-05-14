@@ -476,4 +476,31 @@ describe("POST /api/call-contract", () => {
     const body = await res.json();
     expect(body.decoded[0].value).toBe("1000000");
   });
+
+  it("uses raw callData directly when provided, bypassing arg encoding", async () => {
+    // Pre-encoded balanceOf(VALID_ADDRESS) — selector 0x70a08231 + padded address
+    const rawCalldata =
+      "0x70a08231000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
+    let capturedData;
+    stubRpc({
+      eth_call: (req) => {
+        capturedData = req.params[0].data;
+        return "0x00000000000000000000000000000000000000000000000000000000000f4240";
+      },
+      eth_chainId: () => "0x1",
+    });
+
+    const res = await POST(
+      makeRequest({
+        chain: "ethereum",
+        address: VALID_ADDRESS,
+        functionName: "balanceOf",
+        abi: BALANCE_OF_ABI,
+        callData: rawCalldata,
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(capturedData).toBe(rawCalldata);
+  });
 });

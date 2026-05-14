@@ -13,9 +13,24 @@ npm run dev      # Start dev server (http://localhost:3000)
 npm run build    # Production build
 npm run start    # Start production server
 npm run lint     # ESLint via next lint
+npm test         # Vitest unit + API tests (vitest run)
+npm run test:watch    # Vitest in watch mode
+npm run test:coverage # Vitest with v8 coverage
+npm run test:e2e      # Playwright end-to-end tests
 ```
 
-No test framework is configured.
+## Test Framework
+
+**Vitest** for unit and API tests; **Playwright** for e2e.
+
+```
+tests/
+  unit/   # jsdom environment — pure utils (abiCache, addressBook, normalizeArg, tevmSimulator, validation, ...)
+  api/    # node environment — Next.js route handlers (call-contract, simulate, decode, fetch-abi, ...)
+  e2e/    # Playwright — full browser flows (decoder, contract-caller, address-book)
+```
+
+API tests import route handlers directly and mock `global.fetch` via `vi.stubGlobal` to intercept RPC/external calls without a running server.
 
 ## Environment Variables
 
