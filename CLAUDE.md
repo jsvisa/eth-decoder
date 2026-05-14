@@ -20,15 +20,18 @@ No test framework is configured.
 ## Environment Variables
 
 Copy `.env.example` to `.env.local`. Required:
+
 - `BACKEND_URL` - Backend API endpoint for transaction decoding (proxied through `/api/decode`)
 
 User-provided API keys (stored in browser localStorage, not in env):
+
 - Etherscan API key (for ABI fetching from block explorers)
 - Tenderly credentials (access key, account slug, project slug) for write function simulation
 
 ## Architecture
 
 ### Tech Stack
+
 - **Next.js 15 / React 19** (JavaScript, no TypeScript)
 - **viem** - EVM ABI encoding/decoding, RPC calls, chain definitions
 - **tevm** - Local EVM simulation (in-browser fork of chain state)
@@ -37,22 +40,22 @@ User-provided API keys (stored in browser localStorage, not in env):
 
 ### Routing (App Router)
 
-| Route | Page | Purpose |
-|-------|------|---------|
-| `/` | `app/page.js` | Transaction decoder - hex input, decode via backend API |
-| `/contract-caller` | `app/contract-caller/page.js` | Contract interaction UI (~1500 lines, largest file) |
-| `/address-book` | `app/address-book/page.js` | Manage saved addresses with CSV import/export |
-| `/contracts` | `app/contracts/page.js` | Browse cached contract ABIs across chains |
+| Route              | Page                          | Purpose                                                 |
+| ------------------ | ----------------------------- | ------------------------------------------------------- |
+| `/`                | `app/page.js`                 | Transaction decoder - hex input, decode via backend API |
+| `/contract-caller` | `app/contract-caller/page.js` | Contract interaction UI (~1500 lines, largest file)     |
+| `/address-book`    | `app/address-book/page.js`    | Manage saved addresses with CSV import/export           |
+| `/contracts`       | `app/contracts/page.js`       | Browse cached contract ABIs across chains               |
 
 ### API Routes (server-side, under `app/api/`)
 
-| Route | Method | Purpose |
-|-------|--------|---------|
-| `/api/decode` | GET | Proxies to `BACKEND_URL/api/v1/decode` - hides backend from client |
-| `/api/fetch-abi` | GET | Fetches ABI from Etherscan V2 API, falls back to Sourcify. Detects proxy contracts (EIP-1967, beacon, OZ legacy) and merges implementation ABI |
-| `/api/call-contract` | POST | Executes read-only contract calls via RPC using viem |
-| `/api/simulate` | POST | Simulates write functions via Tenderly API, returns decoded logs/traces/state changes |
-| `/api/get-logs` | GET | Fetches event logs from Etherscan V2 API |
+| Route                | Method | Purpose                                                                                                                                        |
+| -------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/decode`        | GET    | Proxies to `BACKEND_URL/api/v1/decode` - hides backend from client                                                                             |
+| `/api/fetch-abi`     | GET    | Fetches ABI from Etherscan V2 API, falls back to Sourcify. Detects proxy contracts (EIP-1967, beacon, OZ legacy) and merges implementation ABI |
+| `/api/call-contract` | POST   | Executes read-only contract calls via RPC using viem                                                                                           |
+| `/api/simulate`      | POST   | Simulates write functions via Tenderly API, returns decoded logs/traces/state changes                                                          |
+| `/api/get-logs`      | GET    | Fetches event logs from Etherscan V2 API                                                                                                       |
 
 ### Client-side Simulation (tevm)
 
@@ -61,6 +64,7 @@ User-provided API keys (stored in browser localStorage, not in env):
 ### State Management
 
 All state is React `useState` hooks + `localStorage`. No external state library. Key localStorage keys:
+
 - `evm_decoder_history` - Recent decode history
 - `contract_caller_history` - Recent contract call history
 - `abi-{chain}-{address}` - Cached contract ABIs

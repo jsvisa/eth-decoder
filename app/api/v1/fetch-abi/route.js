@@ -1,1 +1,1 @@
-export { GET } from '../../fetch-abi/route.js'
+export { GET } from "../../fetch-abi/route.js";

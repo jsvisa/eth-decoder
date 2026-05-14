@@ -1,7 +1,11 @@
 .main {
   min-height: 100vh;
   padding: 2rem;
-  background: linear-gradient(to bottom, var(--bg-primary), var(--bg-secondary));
+  background: linear-gradient(
+    to bottom,
+    var(--bg-primary),
+    var(--bg-secondary)
+  );
 }
 
 .container {
@@ -273,7 +277,7 @@
 
 /* Address */
 .address {
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.85rem;
   color: var(--accent-blue);
   cursor: pointer;

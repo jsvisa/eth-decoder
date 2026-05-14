@@ -1,7 +1,11 @@
 .main {
   min-height: 100vh;
   padding: 2rem;
-  background: linear-gradient(to bottom, var(--bg-primary), var(--bg-secondary));
+  background: linear-gradient(
+    to bottom,
+    var(--bg-primary),
+    var(--bg-secondary)
+  );
 }
 
 .container {
@@ -421,7 +425,7 @@
 }
 
 .suggestionAddress {
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.8rem;
   color: #666;
 }
@@ -566,7 +570,7 @@
 
 /* Function selector badge */
 .funcSelector {
-  font-family: 'Menlo', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Menlo", "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.75rem;
   color: #6366f1;
   background-color: #eef2ff;
@@ -610,7 +614,7 @@
 
 .selectedFunctionText {
   flex: 1;
-  font-family: 'Menlo', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Menlo", "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.9rem;
   color: #333;
   cursor: pointer;
@@ -811,7 +815,7 @@
 .textarea {
   padding: 1rem;
   font-size: 0.9rem;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   border: 2px solid var(--border-primary);
   border-radius: 6px;
   resize: vertical;
@@ -853,7 +857,11 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.25rem 0.5rem;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.08) 0%,
+    rgba(16, 185, 129, 0.08) 100%
+  );
   border: 1px solid rgba(34, 197, 94, 0.3);
   border-radius: 6px;
 }
@@ -863,7 +871,11 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.08) 0%,
+    rgba(16, 185, 129, 0.08) 100%
+  );
   border: 1px solid rgba(34, 197, 94, 0.3);
   border-radius: 6px;
 }
@@ -877,7 +889,7 @@
 .argLabel {
   font-size: 0.875rem;
   color: var(--text-secondary);
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
 }
 
 /* Tuple input styles */
@@ -900,7 +912,7 @@
 .tupleLabel {
   font-size: 0.8rem;
   color: var(--text-secondary);
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
 }
 
 .tupleType {
@@ -939,7 +951,7 @@
 .arrayIndex {
   font-size: 0.75rem;
   color: var(--text-muted);
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
 }
 
 .arrayItemContent {
@@ -1137,7 +1149,7 @@
   padding: 1.5rem;
   border-radius: 6px;
   overflow-x: auto;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 1rem;
   line-height: 1.6;
   margin: 0;
@@ -1260,7 +1272,7 @@
 }
 
 .historyFunc {
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.9rem;
   color: #0070f3;
   font-weight: 600;
@@ -1287,7 +1299,7 @@
 }
 
 .historyAddress {
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.85rem;
   color: #666;
   margin-bottom: 0.25rem;
@@ -1344,14 +1356,14 @@
 
 .decodedName {
   color: #4ec9b0;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-weight: 600;
   font-size: 0.95rem;
 }
 
 .decodedType {
   color: #808080;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.85rem;
   background-color: #1e1e1e;
   padding: 0.2rem 0.5rem;
@@ -1360,7 +1372,7 @@
 
 .decodedValue {
   color: #ce9178;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.95rem;
   word-break: break-all;
   white-space: pre-wrap;
@@ -1376,7 +1388,7 @@
 
 .rawData {
   color: #808080;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.85rem;
   word-break: break-all;
   background-color: #2d2d2d;
@@ -1425,12 +1437,12 @@
 .txInfoValue {
   color: #d4d4d4;
   word-break: break-all;
-  font-family: 'Menlo', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Menlo", "Consolas", "Monaco", "Courier New", monospace;
 }
 
 .txInfoValueMono {
   color: #ce9178;
-  font-family: 'Menlo', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Menlo", "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.8rem;
   word-break: break-all;
 }
@@ -1468,7 +1480,7 @@
 }
 
 .txInfoTooltip::before {
-  content: '';
+  content: "";
   position: absolute;
   top: -10px;
   left: 0;
@@ -1542,7 +1554,7 @@
 
 .logName {
   color: #4ec9b0;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-weight: 600;
   font-size: 0.95rem;
 }
@@ -1555,7 +1567,7 @@
 
 .logAddress {
   color: #808080;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.8rem;
 }
 
@@ -1579,13 +1591,13 @@
 
 .logInputName {
   color: #9cdcfe;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.85rem;
 }
 
 .logInputType {
   color: #808080;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.75rem;
 }
 
@@ -1601,13 +1613,13 @@
 
 .logInputValue {
   color: #ce9178;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.85rem;
   word-break: break-all;
 }
 
 .logTopics {
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.8rem;
 }
 
@@ -1659,7 +1671,7 @@
 }
 
 .balanceAddress {
-  font-family: 'Monaco', 'Menlo', monospace;
+  font-family: "Monaco", "Menlo", monospace;
   font-size: 0.85rem;
   color: #a78bfa;
 }
@@ -1668,7 +1680,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-family: 'Monaco', 'Menlo', monospace;
+  font-family: "Monaco", "Menlo", monospace;
   font-size: 0.85rem;
 }
 
@@ -1724,7 +1736,7 @@
 
 .stateAddress {
   color: #4ec9b0;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.9rem;
   font-weight: 600;
   margin-bottom: 0.75rem;
@@ -1744,7 +1756,7 @@
 
 .stateSlot {
   color: #808080;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.8rem;
   word-break: break-all;
   margin-bottom: 0.5rem;
@@ -1756,7 +1768,7 @@
 
 .stateOriginal {
   color: #ce9178;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.8rem;
   word-break: break-all;
   opacity: 0.7;
@@ -1764,7 +1776,7 @@
 
 .stateDirty {
   color: #b5cea8;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.8rem;
   word-break: break-all;
 }
@@ -1799,7 +1811,7 @@
   border-radius: 6px;
   padding: 0.75rem 1rem;
   border-left: 3px solid #6b7280;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.85rem;
 }
 
@@ -1909,7 +1921,7 @@
   border-radius: 6px;
   padding: 1rem;
   border-left: 3px solid #10b981;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.85rem;
 }
 
@@ -1948,7 +1960,7 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.8rem;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
 }
 
 .assetFrom {
@@ -1989,7 +2001,7 @@
 }
 
 .traceTree {
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.85rem;
 }
 
@@ -2086,7 +2098,7 @@
 
 /* Bridge to prevent tooltip from disappearing when moving mouse */
 .traceTooltip::before {
-  content: '';
+  content: "";
   position: absolute;
   top: -10px;
   left: 0;
@@ -2275,7 +2287,7 @@
 }
 
 .modalAddress {
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.85rem;
   color: #666;
   background-color: #f5f5f5;
@@ -2483,7 +2495,7 @@
 }
 
 .addressArgAddr {
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.8rem;
   color: #666;
   flex-shrink: 0;
@@ -2803,7 +2815,9 @@
   border: 1px solid #e5e7eb;
   border-radius: 6px;
   outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .abiSearchInput:focus {
@@ -2877,7 +2891,7 @@
   gap: 0.5rem;
   padding: 0.4rem 0.75rem;
   font-size: 0.8rem;
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
   border-bottom: 1px solid #f3f4f6;
   transition: background-color 0.1s ease;
 }
@@ -2885,7 +2899,6 @@
 .abiItem:last-child {
   border-bottom: none;
 }
-
 
 .abiItemBadge {
   display: inline-flex;
@@ -2951,14 +2964,22 @@
   background: rgba(34, 197, 94, 0.15);
   padding: 0.15rem 0.4rem;
   border-radius: 4px;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 /* Simulation Options Section */
 .simOptionsSection {
   margin-bottom: 1rem;
   padding: 0.75rem 1rem;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(168, 85, 247, 0.08) 50%, rgba(236, 72, 153, 0.08) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.08) 0%,
+    rgba(168, 85, 247, 0.08) 50%,
+    rgba(236, 72, 153, 0.08) 100%
+  );
   border: 1px solid rgba(139, 92, 246, 0.3);
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(139, 92, 246, 0.1);
@@ -3215,7 +3236,11 @@
   gap: 0.75rem;
   margin-bottom: 1rem;
   padding: 0.6rem 1rem;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.08) 0%,
+    rgba(16, 185, 129, 0.08) 100%
+  );
   border: 1px solid rgba(34, 197, 94, 0.3);
   border-radius: 8px;
 }
@@ -3760,7 +3785,7 @@
   width: 110px;
   padding: 0.375rem 0.5rem;
   font-size: 0.8rem;
-  font-family: 'Monaco', 'Menlo', monospace;
+  font-family: "Monaco", "Menlo", monospace;
   border: 1px solid var(--border-primary);
   border-radius: 4px;
   background-color: var(--bg-input);
@@ -3895,7 +3920,7 @@
   min-width: 150px;
   padding: 0.375rem 0.75rem;
   font-size: 0.8rem;
-  font-family: 'Monaco', 'Menlo', monospace;
+  font-family: "Monaco", "Menlo", monospace;
   border: 1px solid var(--border-primary);
   border-radius: 4px;
   background-color: var(--bg-input);
@@ -3994,7 +4019,7 @@
   background-color: var(--bg-code);
   padding: 0.15rem 0.4rem;
   border-radius: 4px;
-  font-family: 'Monaco', 'Menlo', monospace;
+  font-family: "Monaco", "Menlo", monospace;
   font-size: 0.85rem;
   color: #9333ea;
   font-weight: 600;
@@ -4006,7 +4031,7 @@
   border-top: 1px solid var(--border-primary);
   font-size: 0.85rem;
   color: var(--text-muted);
-  font-family: 'Monaco', 'Menlo', monospace;
+  font-family: "Monaco", "Menlo", monospace;
 }
 
 .downloadCsvButton {
@@ -4075,7 +4100,7 @@
 .logTxHash a {
   color: var(--accent-blue);
   text-decoration: none;
-  font-family: 'Monaco', 'Menlo', monospace;
+  font-family: "Monaco", "Menlo", monospace;
   font-size: 0.8rem;
 }
 
@@ -4098,7 +4123,7 @@
   background-color: var(--bg-secondary);
   border-radius: 4px;
   font-size: 0.75rem;
-  font-family: 'Monaco', 'Menlo', monospace;
+  font-family: "Monaco", "Menlo", monospace;
   overflow-x: auto;
   white-space: pre-wrap;
   word-break: break-all;
@@ -4106,6 +4131,6 @@
 
 .logRawData {
   color: var(--text-muted);
-  font-family: 'Monaco', 'Menlo', monospace;
+  font-family: "Monaco", "Menlo", monospace;
   font-size: 0.8rem;
 }

@@ -8,9 +8,9 @@
  * @returns {boolean} - True if valid, false otherwise
  */
 export const isValidEthAddress = (address) => {
-  if (!address) return false
-  return /^0x[a-fA-F0-9]{40}$/.test(address)
-}
+  if (!address) return false;
+  return /^0x[a-fA-F0-9]{40}$/.test(address);
+};
 
 /**
  * Check if a value is a valid fork block (empty, 'latest', or a positive integer)
@@ -18,10 +18,10 @@ export const isValidEthAddress = (address) => {
  * @returns {boolean} - True if valid, false otherwise
  */
 export const isValidForkBlock = (value) => {
-  if (!value || value === '') return true // empty is valid (means latest)
-  if (value.toLowerCase() === 'latest') return true
-  return /^\d+$/.test(value) // valid positive integer
-}
+  if (!value || value === "") return true; // empty is valid (means latest)
+  if (value.toLowerCase() === "latest") return true;
+  return /^\d+$/.test(value); // valid positive integer
+};
 
 /**
  * Check if a value is a valid number (integer or decimal)
@@ -29,9 +29,9 @@ export const isValidForkBlock = (value) => {
  * @returns {boolean} - True if valid, false otherwise
  */
 export const isValidNumber = (value) => {
-  if (!value || value === '') return true // empty is valid
-  return /^-?\d*\.?\d+$/.test(value) && !isNaN(parseFloat(value))
-}
+  if (!value || value === "") return true; // empty is valid
+  return /^-?\d*\.?\d+$/.test(value) && !isNaN(parseFloat(value));
+};
 
 /**
  * Check if a value is a valid positive integer
@@ -39,6 +39,6 @@ export const isValidNumber = (value) => {
  * @returns {boolean} - True if valid, false otherwise
  */
 export const isValidPositiveInteger = (value) => {
-  if (!value || value === '') return true // empty is valid
-  return /^\d+$/.test(value)
-}
+  if (!value || value === "") return true; // empty is valid
+  return /^\d+$/.test(value);
+};

@@ -1,17 +1,14 @@
-import {
-  decodeFunctionData,
-  decodeEventLog as viemDecodeEventLog,
-} from 'viem'
+import { decodeFunctionData, decodeEventLog as viemDecodeEventLog } from "viem";
 
 /**
  * Returns true if the string is valid hex data (with or without 0x prefix).
  * Equivalent to the Python server's is_valid_hex_data().
  */
 export function isValidHexData(data) {
-  if (!data) return false
-  const hex = data.startsWith('0x') ? data.slice(2) : data
-  if (!hex) return false
-  return /^[0-9a-fA-F]+$/.test(hex)
+  if (!data) return false;
+  const hex = data.startsWith("0x") ? data.slice(2) : data;
+  if (!hex) return false;
+  return /^[0-9a-fA-F]+$/.test(hex);
 }
 
 /**
@@ -19,14 +16,14 @@ export function isValidHexData(data) {
  * Equivalent to the Python server's serialize_value().
  */
 export function serializeValue(value) {
-  if (typeof value === 'bigint') return value.toString()
-  if (Array.isArray(value)) return value.map(serializeValue)
-  if (value !== null && typeof value === 'object') {
+  if (typeof value === "bigint") return value.toString();
+  if (Array.isArray(value)) return value.map(serializeValue);
+  if (value !== null && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value).map(([k, v]) => [k, serializeValue(v)]),
-    )
+    );
   }
-  return value
+  return value;
 }
 
 /**
@@ -34,12 +31,12 @@ export function serializeValue(value) {
  * expanding tuple types to "(type1,type2,...)" notation.
  */
 function collapseType(param) {
-  if (param.type === 'tuple' || param.type.startsWith('tuple[')) {
-    const inner = param.components.map(collapseType).join(',')
-    const suffix = param.type.slice('tuple'.length) // '' | '[]' | '[N]'
-    return `(${inner})${suffix}`
+  if (param.type === "tuple" || param.type.startsWith("tuple[")) {
+    const inner = param.components.map(collapseType).join(",");
+    const suffix = param.type.slice("tuple".length); // '' | '[]' | '[N]'
+    return `(${inner})${suffix}`;
   }
-  return param.type
+  return param.type;
 }
 
 /**
@@ -48,8 +45,8 @@ function collapseType(param) {
  * Equivalent to the Python server's extract_output_sign().
  */
 export function extractOutputSign(abi) {
-  const types = (abi.outputs || []).map(collapseType)
-  return `(${types.join(',')})`
+  const types = (abi.outputs || []).map(collapseType);
+  return `(${types.join(",")})`;
 }
 
 /**
@@ -62,23 +59,23 @@ export function extractOutputSign(abi) {
  * @throws if the 4-byte selector does not match the ABI item
  */
 export function decodeFunctionCalldata(abiItem, data) {
-  if (!data.startsWith('0x')) data = '0x' + data
+  if (!data.startsWith("0x")) data = "0x" + data;
 
   const { functionName, args } = decodeFunctionData({
     abi: [abiItem],
     data,
-  })
+  });
 
-  const inputs = abiItem.inputs || []
-  const paramTypes = inputs.map(collapseType).join(',')
-  const func = `${functionName}(${paramTypes})`
+  const inputs = abiItem.inputs || [];
+  const paramTypes = inputs.map(collapseType).join(",");
+  const func = `${functionName}(${paramTypes})`;
 
-  const argsObj = {}
+  const argsObj = {};
   inputs.forEach((inp, i) => {
-    argsObj[inp.name || `arg${i}`] = serializeValue(args[i])
-  })
+    argsObj[inp.name || `arg${i}`] = serializeValue(args[i]);
+  });
 
-  return { func, args: argsObj }
+  return { func, args: argsObj };
 }
 
 /**
@@ -95,11 +92,11 @@ export function decodeEventLog(abiItem, topics, data) {
   const { eventName, args } = viemDecodeEventLog({
     abi: [abiItem],
     topics,
-    data: data || '0x',
-  })
+    data: data || "0x",
+  });
 
   return {
     event: eventName,
     args: serializeValue(args || {}),
-  }
+  };
 }
