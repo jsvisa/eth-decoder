@@ -138,6 +138,6 @@ describe("simulateWithClient", () => {
         functionName: "transfer",
         abi: [],
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow("Missing required parameters");
   });
 });

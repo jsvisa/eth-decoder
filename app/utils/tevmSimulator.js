@@ -726,6 +726,7 @@ async function prefetchAccountsFromAccessList({
  */
 async function _runSimulationOnClient(client, pinnedBlock, params) {
   const {
+    chain,
     address,
     functionName,
     args,
@@ -831,9 +832,9 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     // accounts the tx will touch, then fetching all of them in parallel before
     // the EVM starts. Accounts already in tevm's cache are never fetched again.
     const resolvedBlockTag =
-      !blockNumber || blockNumber === "latest"
+      !pinnedBlock || pinnedBlock === "latest"
         ? "latest"
-        : String(blockNumber).trim();
+        : String(pinnedBlock).trim();
 
     await prefetchAccountsFromAccessList({
       client,
