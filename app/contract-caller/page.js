@@ -19,6 +19,9 @@ import {
 } from "../utils/addressBook";
 import {
   simulateWithTevm,
+  // eslint-disable-next-line no-unused-vars
+  simulateWithClient,
+  createTevmClient,
   redecodeLogs,
   redecodeCallTrace,
   decodeLogsViaServer,
@@ -768,6 +771,13 @@ export default function ContractCaller() {
   const [latestBlockCache, setLatestBlockCache] = useState(null); // Cached latest block number
   const [logsFetched, setLogsFetched] = useState(false); // Track if fetch was attempted
   const [eventListCollapsed, setEventListCollapsed] = useState(false); // Collapse event selection list
+  // Session mode: single tevm fork kept alive across multiple calls
+  const sessionClientRef = useRef(null); // tevm MemoryClient
+  const [sessionActive, setSessionActive] = useState(false);
+  const [sessionBlock, setSessionBlock] = useState(null); // pinned block string for display
+  // eslint-disable-next-line no-unused-vars
+  const [sessionHistory, setSessionHistory] = useState([]); // [{id, address, contractName, functionName, success, gasUsed, timestamp}]
+  const [sessionStarting, setSessionStarting] = useState(false);
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null); // { functionName, args, timestamp }
   const bookmarkInputRef = useRef(null);
@@ -2250,6 +2260,36 @@ export default function ContractCaller() {
       return { value: undefined, unit: ethValueUnit };
     }
     return { value: ethValue, unit: ethValueUnit };
+  };
+
+  const handleStartSession = async () => {
+    setSessionStarting(true);
+    setError(null);
+    try {
+      const chainIdForSimulation = getChainId(chain);
+      const { client, blockNumber: pinnedBlock } = await createTevmClient(
+        chain,
+        rpcSettings[chain] || undefined,
+        forkBlockNumber || "latest",
+        chainIdForSimulation,
+        rpcBatchSize,
+      );
+      sessionClientRef.current = client;
+      setSessionBlock(pinnedBlock === "latest" ? "latest" : String(pinnedBlock));
+      setSessionHistory([]);
+      setSessionActive(true);
+    } catch (err) {
+      setError(`Failed to start session: ${err.message}`);
+    } finally {
+      setSessionStarting(false);
+    }
+  };
+
+  const handleResetSession = () => {
+    sessionClientRef.current = null;
+    setSessionActive(false);
+    setSessionBlock(null);
+    setSessionHistory([]);
   };
 
   const handleCall = async () => {
@@ -4912,6 +4952,34 @@ export default function ContractCaller() {
                     </div>
                   )}
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* Session mode banner — only shown in local simulation mode */}
+          {useLocalSimulation && (
+            <div className={styles.sessionBanner}>
+              {sessionActive ? (
+                <>
+                  <span className={styles.sessionActiveDot} />
+                  <span className={styles.sessionBannerText}>
+                    Session active &nbsp;·&nbsp; Block: {sessionBlock}
+                  </span>
+                  <button
+                    className={styles.sessionResetBtn}
+                    onClick={handleResetSession}
+                  >
+                    Reset
+                  </button>
+                </>
+              ) : (
+                <button
+                  className={styles.sessionStartBtn}
+                  onClick={handleStartSession}
+                  disabled={sessionStarting || loading}
+                >
+                  {sessionStarting ? "Starting..." : "Start Session"}
+                </button>
               )}
             </div>
           )}

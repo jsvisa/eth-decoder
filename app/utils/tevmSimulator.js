@@ -735,7 +735,6 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     value,
     valueUnit = "ETH",
     rpcUrl,
-    blockNumber = "latest",
     cheatcodes = {},
     abiCache = new Map(),
     onProgress = null,
