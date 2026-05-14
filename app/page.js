@@ -136,7 +136,7 @@ export default function Home() {
       .replace(/>/g, "&gt;");
 
     return json.replace(
-      /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+      /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
       (match) => {
         let cls = styles.jsonNumber;
         if (/^"/.test(match)) {
@@ -189,7 +189,7 @@ export default function Home() {
 
           // Regular numbers (only if not already wrapped)
           value = value.replace(
-            /(?<!<[^>]*)\b(-?\d+(?:\.\d+)?(?:[eE][+\-]?\d+)?)\b(?![^<]*<\/span>)/g,
+            /(?<!<[^>]*)\b(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b(?![^<]*<\/span>)/g,
             (match) => {
               return `<span class="${styles.yamlNumber}">${escapeHtml(match)}</span>`;
             },

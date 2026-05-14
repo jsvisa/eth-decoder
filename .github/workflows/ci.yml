@@ -23,7 +23,7 @@ jobs:
         run: npx prettier --check "app/**/*.{js,json}" "tests/**/*.js" "**/*.md" "*.json"
 
       - name: Lint
-        run: npx eslint app/utils/ app/api/ tests/
+        run: npx eslint app/ tests/
 
   test:
     name: Unit & API Tests

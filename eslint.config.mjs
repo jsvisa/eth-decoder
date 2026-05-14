@@ -9,10 +9,24 @@ export default [
         ...globals.node,
         ...globals.browser,
       },
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+      },
     },
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_', caughtErrors: 'none' }],
       'no-empty': ['error', { allowEmptyCatch: true }],
+    },
+  },
+  {
+    // React components (PascalCase) used as JSX elements are not counted as
+    // variable references by ESLint flat config without a React plugin.
+    files: ['app/**/*.js'],
+    rules: {
+      'no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', caughtErrors: 'none', varsIgnorePattern: '^[A-Z]' },
+      ],
     },
   },
   {

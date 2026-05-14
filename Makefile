@@ -1,7 +1,7 @@
 .PHONY: lint test format e2e
 
 lint:
-	npx eslint app/utils/ app/api/ tests/
+	npx eslint app/ tests/
 
 test:
 	npm test
