@@ -2274,7 +2274,9 @@ export default function ContractCaller() {
         rpcBatchSize,
       );
       sessionClientRef.current = client;
-      setSessionBlock(pinnedBlock === "latest" ? "latest" : String(pinnedBlock));
+      setSessionBlock(
+        pinnedBlock === "latest" ? "latest" : String(pinnedBlock),
+      );
       setSessionHistory([]);
       setSessionActive(true);
     } catch (err) {
@@ -5620,7 +5622,10 @@ export default function ContractCaller() {
           <div className={styles.sessionHistorySection}>
             <div className={styles.sessionHistoryHeader}>
               <span>Session History</span>
-              <span>{sessionHistory.length} tx{sessionHistory.length !== 1 ? "s" : ""}</span>
+              <span>
+                {sessionHistory.length} tx
+                {sessionHistory.length !== 1 ? "s" : ""}
+              </span>
             </div>
             <div className={styles.sessionHistoryList}>
               {sessionHistory.map((item, idx) => {
@@ -5628,7 +5633,9 @@ export default function ContractCaller() {
                 const toggle = () =>
                   setExpandedHistoryIds((prev) => {
                     const next = new Set(prev);
-                    next.has(item.id) ? next.delete(item.id) : next.add(item.id);
+                    next.has(item.id)
+                      ? next.delete(item.id)
+                      : next.add(item.id);
                     return next;
                   });
                 const abbrev = (v) => {
@@ -5643,7 +5650,9 @@ export default function ContractCaller() {
                       className={styles.sessionHistoryItemHeader}
                       onClick={toggle}
                     >
-                      <span className={styles.sessionHistoryIndex}>#{idx + 1}</span>
+                      <span className={styles.sessionHistoryIndex}>
+                        #{idx + 1}
+                      </span>
                       <span
                         className={`${styles.sessionHistoryBadge} ${
                           item.type === "read"
@@ -5667,17 +5676,29 @@ export default function ContractCaller() {
                       <div className={styles.sessionHistoryExpanded}>
                         {item.inputs.length > 0 && (
                           <div className={styles.sessionHistoryArgBlock}>
-                            <span className={styles.sessionHistoryArgLabel}>in</span>
+                            <span className={styles.sessionHistoryArgLabel}>
+                              in
+                            </span>
                             <div className={styles.sessionHistoryArgRows}>
                               {item.inputs.map((inp, i) => (
-                                <div key={i} className={styles.sessionHistoryArgRow}>
-                                  <span className={styles.sessionHistoryArgName}>
+                                <div
+                                  key={i}
+                                  className={styles.sessionHistoryArgRow}
+                                >
+                                  <span
+                                    className={styles.sessionHistoryArgName}
+                                  >
                                     {inp.name}
-                                    <span className={styles.sessionHistoryArgType}>
-                                      {" "}({inp.type})
+                                    <span
+                                      className={styles.sessionHistoryArgType}
+                                    >
+                                      {" "}
+                                      ({inp.type})
                                     </span>
                                   </span>
-                                  <span className={styles.sessionHistoryArgValue}>
+                                  <span
+                                    className={styles.sessionHistoryArgValue}
+                                  >
                                     {String(inp.value)}
                                   </span>
                                 </div>
@@ -5686,24 +5707,38 @@ export default function ContractCaller() {
                           </div>
                         )}
                         <div className={styles.sessionHistoryArgBlock}>
-                          <span className={styles.sessionHistoryArgLabel}>out</span>
+                          <span className={styles.sessionHistoryArgLabel}>
+                            out
+                          </span>
                           <div className={styles.sessionHistoryArgRows}>
                             {item.outputs.length > 0 ? (
                               item.outputs.map((out, i) => (
-                                <div key={i} className={styles.sessionHistoryArgRow}>
-                                  <span className={styles.sessionHistoryArgName}>
+                                <div
+                                  key={i}
+                                  className={styles.sessionHistoryArgRow}
+                                >
+                                  <span
+                                    className={styles.sessionHistoryArgName}
+                                  >
                                     {out.name || "result"}
-                                    <span className={styles.sessionHistoryArgType}>
-                                      {" "}({out.type})
+                                    <span
+                                      className={styles.sessionHistoryArgType}
+                                    >
+                                      {" "}
+                                      ({out.type})
                                     </span>
                                   </span>
-                                  <span className={styles.sessionHistoryArgValue}>
+                                  <span
+                                    className={styles.sessionHistoryArgValue}
+                                  >
                                     {String(out.value)}
                                   </span>
                                 </div>
                               ))
                             ) : (
-                              <span className={styles.sessionHistoryArgType}>void</span>
+                              <span className={styles.sessionHistoryArgType}>
+                                void
+                              </span>
                             )}
                           </div>
                         </div>
@@ -5754,35 +5789,61 @@ export default function ContractCaller() {
                         return s.length > 16 ? s.slice(0, 14) + "…" : s;
                       };
                       return (
-                        <div key={item.id} className={`${styles.historyItem} ${styles.sessionBundleItem}`}>
+                        <div
+                          key={item.id}
+                          className={`${styles.historyItem} ${styles.sessionBundleItem}`}
+                        >
                           <div className={styles.historyTop}>
                             <div className={styles.historyChain}>
                               {getChainInfo(item.chain)?.name || item.chain}
                             </div>
-                            <span className={styles.sessionBundleBadge}>Session</span>
+                            <span className={styles.sessionBundleBadge}>
+                              Session
+                            </span>
                             <div className={styles.historyFunc}>
-                              Block {item.block} &middot; {item.txs.length} tx{item.txs.length !== 1 ? "s" : ""}
+                              Block {item.block} &middot; {item.txs.length} tx
+                              {item.txs.length !== 1 ? "s" : ""}
                             </div>
                           </div>
                           <div className={styles.sessionBundleTxList}>
                             {item.txs.map((tx, i) => (
-                              <div key={tx.id} className={styles.sessionBundleTx}>
-                                <span className={styles.sessionHistoryIndex}>#{i + 1}</span>
-                                <span className={`${styles.sessionHistoryBadge} ${
-                                  tx.type === "read"
-                                    ? styles.sessionHistoryBadgeRead
+                              <div
+                                key={tx.id}
+                                className={styles.sessionBundleTx}
+                              >
+                                <span className={styles.sessionHistoryIndex}>
+                                  #{i + 1}
+                                </span>
+                                <span
+                                  className={`${styles.sessionHistoryBadge} ${
+                                    tx.type === "read"
+                                      ? styles.sessionHistoryBadgeRead
+                                      : tx.success
+                                        ? styles.sessionHistoryBadgeSuccess
+                                        : styles.sessionHistoryBadgeFail
+                                  }`}
+                                >
+                                  {tx.type === "read"
+                                    ? "R"
                                     : tx.success
-                                      ? styles.sessionHistoryBadgeSuccess
-                                      : styles.sessionHistoryBadgeFail
-                                }`}>
-                                  {tx.type === "read" ? "R" : tx.success ? "✓" : "✗"}
+                                      ? "✓"
+                                      : "✗"}
                                 </span>
                                 <span className={styles.sessionBundleTxFunc}>
                                   {tx.contractName} · {tx.functionName}(
-                                  {tx.inputs.map((inp) => abbrev(inp.value)).join(", ")})
+                                  {tx.inputs
+                                    .map((inp) => abbrev(inp.value))
+                                    .join(", ")}
+                                  )
                                   {tx.outputs.length > 0 && (
-                                    <span className={styles.sessionBundleTxOutput}>
-                                      {" "}→ {tx.outputs.map((o) => abbrev(o.value)).join(", ")}
+                                    <span
+                                      className={styles.sessionBundleTxOutput}
+                                    >
+                                      {" "}
+                                      →{" "}
+                                      {tx.outputs
+                                        .map((o) => abbrev(o.value))
+                                        .join(", ")}
                                     </span>
                                   )}
                                 </span>
@@ -5796,67 +5857,67 @@ export default function ContractCaller() {
                       );
                     }
                     return (
-                    <div
-                      key={item.id}
-                      className={styles.historyItem}
-                      onClick={() => loadFromHistory(item)}
-                    >
-                      <div className={styles.historyTop}>
-                        <div className={styles.historyChain}>
-                          {getChainInfo(item.chain)?.name || item.chain}
+                      <div
+                        key={item.id}
+                        className={styles.historyItem}
+                        onClick={() => loadFromHistory(item)}
+                      >
+                        <div className={styles.historyTop}>
+                          <div className={styles.historyChain}>
+                            {getChainInfo(item.chain)?.name || item.chain}
+                          </div>
+                          <span
+                            className={
+                              item.isWrite
+                                ? styles.historyWriteBadge
+                                : styles.historyReadBadge
+                            }
+                          >
+                            {item.isWrite ? "W" : "R"}
+                          </span>
+                          <div
+                            className={styles.historyFunc}
+                            title={(() => {
+                              const argsStr = (item.args || []).join(", ");
+                              const funcCall = `${item.functionName}(${argsStr})`;
+                              const decoded = item.output?.decoded || [];
+                              const outputStr =
+                                decoded.length > 0
+                                  ? `(${decoded.map((d) => d.value).join(", ")})`
+                                  : "";
+                              return outputStr
+                                ? `${funcCall} -> ${outputStr}`
+                                : funcCall;
+                            })()}
+                          >
+                            {(() => {
+                              const argsStr = (item.args || []).join(", ");
+                              const funcCall = `${item.functionName}(${argsStr})`;
+                              const decoded = item.output?.decoded || [];
+                              const outputStr =
+                                decoded.length > 0
+                                  ? `(${decoded.map((d) => d.value).join(", ")})`
+                                  : "";
+                              const fullStr = outputStr
+                                ? `${funcCall} -> ${outputStr}`
+                                : funcCall;
+                              const maxLen = 90;
+                              return fullStr.length > maxLen
+                                ? fullStr.slice(0, maxLen) + "..."
+                                : fullStr;
+                            })()}
+                          </div>
                         </div>
-                        <span
-                          className={
-                            item.isWrite
-                              ? styles.historyWriteBadge
-                              : styles.historyReadBadge
-                          }
-                        >
-                          {item.isWrite ? "W" : "R"}
-                        </span>
-                        <div
-                          className={styles.historyFunc}
-                          title={(() => {
-                            const argsStr = (item.args || []).join(", ");
-                            const funcCall = `${item.functionName}(${argsStr})`;
-                            const decoded = item.output?.decoded || [];
-                            const outputStr =
-                              decoded.length > 0
-                                ? `(${decoded.map((d) => d.value).join(", ")})`
-                                : "";
-                            return outputStr
-                              ? `${funcCall} -> ${outputStr}`
-                              : funcCall;
-                          })()}
-                        >
-                          {(() => {
-                            const argsStr = (item.args || []).join(", ");
-                            const funcCall = `${item.functionName}(${argsStr})`;
-                            const decoded = item.output?.decoded || [];
-                            const outputStr =
-                              decoded.length > 0
-                                ? `(${decoded.map((d) => d.value).join(", ")})`
-                                : "";
-                            const fullStr = outputStr
-                              ? `${funcCall} -> ${outputStr}`
-                              : funcCall;
-                            const maxLen = 90;
-                            return fullStr.length > maxLen
-                              ? fullStr.slice(0, maxLen) + "..."
-                              : fullStr;
-                          })()}
+                        <div className={styles.historyContract}>
+                          {item.contractName || "Unknown Contract"}
+                        </div>
+                        <div className={styles.historyAddress}>
+                          {item.address}
+                        </div>
+                        <div className={styles.historyTime}>
+                          {new Date(item.timestamp).toLocaleString()}
                         </div>
                       </div>
-                      <div className={styles.historyContract}>
-                        {item.contractName || "Unknown Contract"}
-                      </div>
-                      <div className={styles.historyAddress}>
-                        {item.address}
-                      </div>
-                      <div className={styles.historyTime}>
-                        {new Date(item.timestamp).toLocaleString()}
-                      </div>
-                    </div>
                     );
                   })}
               </div>
