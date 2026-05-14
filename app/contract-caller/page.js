@@ -19,6 +19,8 @@ import {
 } from "../utils/addressBook";
 import {
   simulateWithTevm,
+  simulateWithClient,
+  createTevmClient,
   redecodeLogs,
   redecodeCallTrace,
   decodeLogsViaServer,
@@ -768,6 +770,13 @@ export default function ContractCaller() {
   const [latestBlockCache, setLatestBlockCache] = useState(null); // Cached latest block number
   const [logsFetched, setLogsFetched] = useState(false); // Track if fetch was attempted
   const [eventListCollapsed, setEventListCollapsed] = useState(false); // Collapse event selection list
+  // Session mode: single tevm fork kept alive across multiple calls
+  const sessionClientRef = useRef(null); // tevm MemoryClient
+  const [sessionActive, setSessionActive] = useState(false);
+  const [sessionBlock, setSessionBlock] = useState(null); // pinned block string for display
+  const [sessionHistory, setSessionHistory] = useState([]); // [{id, address, contractName, functionName, type, success, inputs, outputs, timestamp}]
+  const [sessionStarting, setSessionStarting] = useState(false);
+  const [expandedHistoryIds, setExpandedHistoryIds] = useState(new Set());
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null); // { functionName, args, timestamp }
   const bookmarkInputRef = useRef(null);
@@ -2252,6 +2261,65 @@ export default function ContractCaller() {
     return { value: ethValue, unit: ethValueUnit };
   };
 
+  const handleStartSession = async () => {
+    setSessionStarting(true);
+    setError(null);
+    try {
+      const chainIdForSimulation = getChainId(chain);
+      const { client, blockNumber: pinnedBlock } = await createTevmClient(
+        chain,
+        rpcSettings[chain] || undefined,
+        forkBlockNumber || "latest",
+        chainIdForSimulation,
+        rpcBatchSize,
+      );
+      sessionClientRef.current = client;
+      setSessionBlock(
+        pinnedBlock === "latest" ? "latest" : String(pinnedBlock),
+      );
+      setSessionHistory([]);
+      setSessionActive(true);
+    } catch (err) {
+      setError(`Failed to start session: ${err.message}`);
+    } finally {
+      setSessionStarting(false);
+    }
+  };
+
+  const handleResetSession = () => {
+    if (sessionHistory.length > 0) {
+      const bundle = {
+        id: Date.now(),
+        type: "session",
+        chain,
+        block: sessionBlock,
+        txs: [...sessionHistory],
+        timestamp: new Date().toISOString(),
+      };
+      const newHistory = [bundle, ...history].slice(0, MAX_HISTORY_ITEMS);
+      setHistory(newHistory);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory));
+      } catch (err) {
+        console.error("Failed to save session bundle:", err);
+      }
+    }
+    sessionClientRef.current = null;
+    setSessionActive(false);
+    setSessionBlock(null);
+    setSessionHistory([]);
+    setExpandedHistoryIds(new Set());
+    setError(null);
+  };
+
+  useEffect(() => {
+    sessionClientRef.current = null;
+    setSessionActive(false);
+    setSessionBlock(null);
+    setSessionHistory([]);
+    setError(null);
+  }, [chain, forkBlockNumber]);
+
   const handleCall = async () => {
     // Clear previous field errors
     setFieldErrors({});
@@ -2383,6 +2451,12 @@ export default function ContractCaller() {
       return;
     }
 
+    // Guard: don't allow calls while session is being created
+    if (sessionStarting) {
+      setError("Session is still starting, please wait");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setResult(null);
@@ -2390,8 +2464,9 @@ export default function ContractCaller() {
     try {
       let data;
 
-      // Use local Tevm simulation for write functions if enabled
-      if (isWrite && useLocalSimulation) {
+      // Use local Tevm for write functions, and for ALL functions when session is active
+      // (reads must go through the fork so they see state mutated by prior session writes)
+      if (useLocalSimulation && (isWrite || sessionActive)) {
         // Build cheatcodes object
         const activeCheatcodes = {};
         if (
@@ -2427,7 +2502,7 @@ export default function ContractCaller() {
         simAbortRef.current = abortController;
         setSimProgress(0);
 
-        data = await simulateWithTevm({
+        const simParams = {
           chain,
           address,
           functionName: selectedFunction,
@@ -2445,8 +2520,37 @@ export default function ContractCaller() {
           abortSignal: abortController.signal,
           rpcBatchSize,
           callData: rawCalldataMode ? rawCalldata.trim() : undefined,
-        });
+        };
+
+        if (sessionActive && sessionClientRef.current) {
+          data = await simulateWithClient(
+            sessionClientRef.current,
+            sessionBlock,
+            { ...simParams, persistState: isWrite },
+          );
+        } else {
+          data = await simulateWithTevm(simParams);
+        }
         setSimProgress(100);
+
+        // Append to session history if session is active
+        if (sessionActive) {
+          const ts = Date.now();
+          setSessionHistory((prev) => [
+            ...prev,
+            {
+              id: ts,
+              address,
+              contractName: contractName || address.slice(0, 8) + "...",
+              functionName: selectedFunction,
+              type: isWrite ? "write" : "read",
+              success: data.success,
+              inputs: data.callTrace?.decodedInputs || [],
+              outputs: data.decoded || [],
+              timestamp: ts,
+            },
+          ]);
+        }
 
         // If there are undecoded addresses, fetch their ABIs and re-decode
         if (data.undecodedAddresses && data.undecodedAddresses.length > 0) {
@@ -4916,12 +5020,40 @@ export default function ContractCaller() {
             </div>
           )}
 
+          {/* Session mode banner — only shown in local simulation mode */}
+          {useLocalSimulation && (
+            <div className={styles.sessionBanner}>
+              {sessionActive ? (
+                <>
+                  <span className={styles.sessionActiveDot} />
+                  <span className={styles.sessionBannerText}>
+                    Session active &nbsp;·&nbsp; Block: {sessionBlock}
+                  </span>
+                  <button
+                    className={styles.sessionResetBtn}
+                    onClick={handleResetSession}
+                  >
+                    Reset
+                  </button>
+                </>
+              ) : (
+                <button
+                  className={styles.sessionStartBtn}
+                  onClick={handleStartSession}
+                  disabled={sessionStarting || loading}
+                >
+                  {sessionStarting ? "Starting..." : "Start Session"}
+                </button>
+              )}
+            </div>
+          )}
+
           {activeTab === "functions" && (
             <div className={styles.buttonGroup}>
               <button
                 onClick={handleCall}
                 className={`${styles.button} ${selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? styles.simulateButton : ""}`}
-                disabled={loading || !selectedFunction}
+                disabled={loading || !selectedFunction || sessionStarting}
               >
                 {loading ? (
                   selectedFunction &&
@@ -4935,7 +5067,7 @@ export default function ContractCaller() {
                   getSelectedFunction() &&
                   !isReadOnly(getSelectedFunction()) ? (
                   <>
-                    Simulate Call{" "}
+                    {sessionActive ? "Execute in Session" : "Simulate Call"}{" "}
                     <span className={styles.simModeTag}>
                       {useLocalSimulation ? "L" : "T"}
                     </span>
@@ -5485,6 +5617,140 @@ export default function ContractCaller() {
           </div>
         )}
 
+        {/* Session history strip */}
+        {sessionActive && sessionHistory.length > 0 && (
+          <div className={styles.sessionHistorySection}>
+            <div className={styles.sessionHistoryHeader}>
+              <span>Session History</span>
+              <span>
+                {sessionHistory.length} tx
+                {sessionHistory.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <div className={styles.sessionHistoryList}>
+              {sessionHistory.map((item, idx) => {
+                const expanded = expandedHistoryIds.has(item.id);
+                const toggle = () =>
+                  setExpandedHistoryIds((prev) => {
+                    const next = new Set(prev);
+                    next.has(item.id)
+                      ? next.delete(item.id)
+                      : next.add(item.id);
+                    return next;
+                  });
+                const abbrev = (v) => {
+                  const s = String(v);
+                  if (s.startsWith("0x") && s.length === 42)
+                    return s.slice(0, 6) + "…" + s.slice(-4);
+                  return s.length > 16 ? s.slice(0, 14) + "…" : s;
+                };
+                return (
+                  <div key={item.id} className={styles.sessionHistoryItem}>
+                    <div
+                      className={styles.sessionHistoryItemHeader}
+                      onClick={toggle}
+                    >
+                      <span className={styles.sessionHistoryIndex}>
+                        #{idx + 1}
+                      </span>
+                      <span
+                        className={`${styles.sessionHistoryBadge} ${
+                          item.type === "read"
+                            ? styles.sessionHistoryBadgeRead
+                            : item.success
+                              ? styles.sessionHistoryBadgeSuccess
+                              : styles.sessionHistoryBadgeFail
+                        }`}
+                      >
+                        {item.type === "read" ? "R" : item.success ? "✓" : "✗"}
+                      </span>
+                      <span className={styles.sessionHistoryFunc}>
+                        {item.contractName} · {item.functionName}(
+                        {item.inputs.map((i) => abbrev(i.value)).join(", ")})
+                      </span>
+                      <span className={styles.sessionHistoryChevron}>
+                        {expanded ? "▲" : "▼"}
+                      </span>
+                    </div>
+                    {expanded && (
+                      <div className={styles.sessionHistoryExpanded}>
+                        {item.inputs.length > 0 && (
+                          <div className={styles.sessionHistoryArgBlock}>
+                            <span className={styles.sessionHistoryArgLabel}>
+                              in
+                            </span>
+                            <div className={styles.sessionHistoryArgRows}>
+                              {item.inputs.map((inp, i) => (
+                                <div
+                                  key={i}
+                                  className={styles.sessionHistoryArgRow}
+                                >
+                                  <span
+                                    className={styles.sessionHistoryArgName}
+                                  >
+                                    {inp.name}
+                                    <span
+                                      className={styles.sessionHistoryArgType}
+                                    >
+                                      {" "}
+                                      ({inp.type})
+                                    </span>
+                                  </span>
+                                  <span
+                                    className={styles.sessionHistoryArgValue}
+                                  >
+                                    {String(inp.value)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div className={styles.sessionHistoryArgBlock}>
+                          <span className={styles.sessionHistoryArgLabel}>
+                            out
+                          </span>
+                          <div className={styles.sessionHistoryArgRows}>
+                            {item.outputs.length > 0 ? (
+                              item.outputs.map((out, i) => (
+                                <div
+                                  key={i}
+                                  className={styles.sessionHistoryArgRow}
+                                >
+                                  <span
+                                    className={styles.sessionHistoryArgName}
+                                  >
+                                    {out.name || "result"}
+                                    <span
+                                      className={styles.sessionHistoryArgType}
+                                    >
+                                      {" "}
+                                      ({out.type})
+                                    </span>
+                                  </span>
+                                  <span
+                                    className={styles.sessionHistoryArgValue}
+                                  >
+                                    {String(out.value)}
+                                  </span>
+                                </div>
+                              ))
+                            ) : (
+                              <span className={styles.sessionHistoryArgType}>
+                                void
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {history.filter((item) => item.chain === chain).length > 0 && (
           <div className={styles.historySection}>
             <div className={styles.historyHeader}>
@@ -5514,69 +5780,146 @@ export default function ContractCaller() {
               <div className={styles.historyList}>
                 {history
                   .filter((item) => item.chain === chain)
-                  .map((item) => (
-                    <div
-                      key={item.id}
-                      className={styles.historyItem}
-                      onClick={() => loadFromHistory(item)}
-                    >
-                      <div className={styles.historyTop}>
-                        <div className={styles.historyChain}>
-                          {getChainInfo(item.chain)?.name || item.chain}
-                        </div>
-                        <span
-                          className={
-                            item.isWrite
-                              ? styles.historyWriteBadge
-                              : styles.historyReadBadge
-                          }
-                        >
-                          {item.isWrite ? "W" : "R"}
-                        </span>
+                  .map((item) => {
+                    if (item.type === "session") {
+                      const abbrev = (v) => {
+                        const s = String(v);
+                        if (s.startsWith("0x") && s.length === 42)
+                          return s.slice(0, 6) + "…" + s.slice(-4);
+                        return s.length > 16 ? s.slice(0, 14) + "…" : s;
+                      };
+                      return (
                         <div
-                          className={styles.historyFunc}
-                          title={(() => {
-                            const argsStr = (item.args || []).join(", ");
-                            const funcCall = `${item.functionName}(${argsStr})`;
-                            const decoded = item.output?.decoded || [];
-                            const outputStr =
-                              decoded.length > 0
-                                ? `(${decoded.map((d) => d.value).join(", ")})`
-                                : "";
-                            return outputStr
-                              ? `${funcCall} -> ${outputStr}`
-                              : funcCall;
-                          })()}
+                          key={item.id}
+                          className={`${styles.historyItem} ${styles.sessionBundleItem}`}
                         >
-                          {(() => {
-                            const argsStr = (item.args || []).join(", ");
-                            const funcCall = `${item.functionName}(${argsStr})`;
-                            const decoded = item.output?.decoded || [];
-                            const outputStr =
-                              decoded.length > 0
-                                ? `(${decoded.map((d) => d.value).join(", ")})`
-                                : "";
-                            const fullStr = outputStr
-                              ? `${funcCall} -> ${outputStr}`
-                              : funcCall;
-                            const maxLen = 90;
-                            return fullStr.length > maxLen
-                              ? fullStr.slice(0, maxLen) + "..."
-                              : fullStr;
-                          })()}
+                          <div className={styles.historyTop}>
+                            <div className={styles.historyChain}>
+                              {getChainInfo(item.chain)?.name || item.chain}
+                            </div>
+                            <span className={styles.sessionBundleBadge}>
+                              Session
+                            </span>
+                            <div className={styles.historyFunc}>
+                              Block {item.block} &middot; {item.txs.length} tx
+                              {item.txs.length !== 1 ? "s" : ""}
+                            </div>
+                          </div>
+                          <div className={styles.sessionBundleTxList}>
+                            {item.txs.map((tx, i) => (
+                              <div
+                                key={tx.id}
+                                className={styles.sessionBundleTx}
+                              >
+                                <span className={styles.sessionHistoryIndex}>
+                                  #{i + 1}
+                                </span>
+                                <span
+                                  className={`${styles.sessionHistoryBadge} ${
+                                    tx.type === "read"
+                                      ? styles.sessionHistoryBadgeRead
+                                      : tx.success
+                                        ? styles.sessionHistoryBadgeSuccess
+                                        : styles.sessionHistoryBadgeFail
+                                  }`}
+                                >
+                                  {tx.type === "read"
+                                    ? "R"
+                                    : tx.success
+                                      ? "✓"
+                                      : "✗"}
+                                </span>
+                                <span className={styles.sessionBundleTxFunc}>
+                                  {tx.contractName} · {tx.functionName}(
+                                  {tx.inputs
+                                    .map((inp) => abbrev(inp.value))
+                                    .join(", ")}
+                                  )
+                                  {tx.outputs.length > 0 && (
+                                    <span
+                                      className={styles.sessionBundleTxOutput}
+                                    >
+                                      {" "}
+                                      →{" "}
+                                      {tx.outputs
+                                        .map((o) => abbrev(o.value))
+                                        .join(", ")}
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className={styles.historyTime}>
+                            {new Date(item.timestamp).toLocaleString()}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div
+                        key={item.id}
+                        className={styles.historyItem}
+                        onClick={() => loadFromHistory(item)}
+                      >
+                        <div className={styles.historyTop}>
+                          <div className={styles.historyChain}>
+                            {getChainInfo(item.chain)?.name || item.chain}
+                          </div>
+                          <span
+                            className={
+                              item.isWrite
+                                ? styles.historyWriteBadge
+                                : styles.historyReadBadge
+                            }
+                          >
+                            {item.isWrite ? "W" : "R"}
+                          </span>
+                          <div
+                            className={styles.historyFunc}
+                            title={(() => {
+                              const argsStr = (item.args || []).join(", ");
+                              const funcCall = `${item.functionName}(${argsStr})`;
+                              const decoded = item.output?.decoded || [];
+                              const outputStr =
+                                decoded.length > 0
+                                  ? `(${decoded.map((d) => d.value).join(", ")})`
+                                  : "";
+                              return outputStr
+                                ? `${funcCall} -> ${outputStr}`
+                                : funcCall;
+                            })()}
+                          >
+                            {(() => {
+                              const argsStr = (item.args || []).join(", ");
+                              const funcCall = `${item.functionName}(${argsStr})`;
+                              const decoded = item.output?.decoded || [];
+                              const outputStr =
+                                decoded.length > 0
+                                  ? `(${decoded.map((d) => d.value).join(", ")})`
+                                  : "";
+                              const fullStr = outputStr
+                                ? `${funcCall} -> ${outputStr}`
+                                : funcCall;
+                              const maxLen = 90;
+                              return fullStr.length > maxLen
+                                ? fullStr.slice(0, maxLen) + "..."
+                                : fullStr;
+                            })()}
+                          </div>
+                        </div>
+                        <div className={styles.historyContract}>
+                          {item.contractName || "Unknown Contract"}
+                        </div>
+                        <div className={styles.historyAddress}>
+                          {item.address}
+                        </div>
+                        <div className={styles.historyTime}>
+                          {new Date(item.timestamp).toLocaleString()}
                         </div>
                       </div>
-                      <div className={styles.historyContract}>
-                        {item.contractName || "Unknown Contract"}
-                      </div>
-                      <div className={styles.historyAddress}>
-                        {item.address}
-                      </div>
-                      <div className={styles.historyTime}>
-                        {new Date(item.timestamp).toLocaleString()}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
             )}
           </div>

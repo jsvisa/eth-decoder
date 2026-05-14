@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { decodeRevertData } from "../../app/utils/tevmSimulator.js";
+import {
+  decodeRevertData,
+  simulateWithClient,
+} from "../../app/utils/tevmSimulator.js";
 
 // Pre-encoded revert payloads (selector + ABI-encoded args).
 // Generated with viem: keccak256(sig).slice(0,10) + encodeAbiParameters(...)
@@ -109,5 +112,32 @@ describe("decodeRevertData", () => {
     it("returns null for data shorter than 4 bytes", () => {
       expect(decodeRevertData("0x08c379")).toBeNull();
     });
+  });
+});
+
+describe("simulateWithClient", () => {
+  it("is exported", () => {
+    expect(typeof simulateWithClient).toBe("function");
+  });
+
+  it("throws when client is null", async () => {
+    await expect(
+      simulateWithClient(null, "latest", {
+        address: "0x0000000000000000000000000000000000000001",
+        functionName: "transfer",
+        abi: [],
+      }),
+    ).rejects.toThrow("client is required");
+  });
+
+  it("throws when required params are missing", async () => {
+    const fakeClient = {};
+    await expect(
+      simulateWithClient(fakeClient, "latest", {
+        address: "",
+        functionName: "transfer",
+        abi: [],
+      }),
+    ).rejects.toThrow("Missing required parameters");
   });
 });

@@ -720,42 +720,40 @@ async function prefetchAccountsFromAccessList({
 }
 
 /**
- * Simulate a contract call using Tevm
- * @param {Object} params - Simulation parameters
- * @param {Map<string, Array>} params.abiCache - Optional map of lowercase address -> ABI array for decoding logs from multiple contracts
- * @returns {Object} Simulation result including `undecodedAddresses` - addresses that emitted logs but couldn't be decoded
+ * Inner simulation body. Accepts an already-created tevm client and runs the
+ * full simulation on it. Not exported — callers use simulateWithTevm or
+ * simulateWithClient.
  */
-export async function simulateWithTevm({
-  chain,
-  address,
-  functionName,
-  args,
-  abi,
-  fromAddress,
-  value,
-  valueUnit = "ETH",
-  rpcUrl,
-  blockNumber = "latest",
-  cheatcodes = {},
-  customChainId = null,
-  abiCache = new Map(),
-  onProgress = null, // (percent: 0-100) => void
-  abortSignal = null, // AbortSignal
-  rpcBatchSize = 1, // JSON-RPC batch size; 1 = no batching, N>1 = batch array
-  callData: rawCallData = null, // optional raw calldata hex, bypasses encoding
-}) {
+async function _runSimulationOnClient(client, pinnedBlock, params) {
+  const {
+    chain,
+    address,
+    functionName,
+    args,
+    abi,
+    fromAddress,
+    value,
+    valueUnit = "ETH",
+    rpcUrl,
+    cheatcodes = {},
+    abiCache = new Map(),
+    onProgress = null,
+    abortSignal = null,
+    rpcBatchSize = 1,
+    callData: rawCallData = null,
+    persistState = false,
+  } = params;
+
+  // Validate inputs before the try/catch so callers receive a rejected promise
+  // rather than a resolved { success: false } for programmer errors.
+  if (!address || !functionName || !abi) {
+    throw new Error("Missing required parameters: address, functionName, abi");
+  }
+  if (!isValidEthAddress(address)) {
+    throw new Error("Invalid address format");
+  }
+
   try {
-    // Validate inputs
-    if (!address || !functionName || !abi) {
-      throw new Error(
-        "Missing required parameters: address, functionName, abi",
-      );
-    }
-
-    if (!isValidEthAddress(address)) {
-      throw new Error("Invalid address format");
-    }
-
     // Find the function in ABI — supports both plain name and full signature (e.g. "transfer(address,uint256)")
     const functionAbi = abi.find((item) => {
       if (item.type !== "function") return false;
@@ -776,15 +774,6 @@ export async function simulateWithTevm({
       if (!input) return arg;
       return parseArgValue(arg, input);
     });
-
-    // Create Tevm client with the specified block
-    const { client, blockNumber: actualBlock } = await createTevmClient(
-      chain,
-      rpcUrl,
-      blockNumber,
-      customChainId,
-      rpcBatchSize,
-    );
 
     // Apply cheatcodes
     const { prankAddress } = await applyCheatcodes(client, cheatcodes);
@@ -843,9 +832,9 @@ export async function simulateWithTevm({
     // accounts the tx will touch, then fetching all of them in parallel before
     // the EVM starts. Accounts already in tevm's cache are never fetched again.
     const resolvedBlockTag =
-      !blockNumber || blockNumber === "latest"
+      !pinnedBlock || pinnedBlock === "latest"
         ? "latest"
-        : String(blockNumber).trim();
+        : String(pinnedBlock).trim();
 
     await prefetchAccountsFromAccessList({
       client,
@@ -1030,10 +1019,18 @@ export async function simulateWithTevm({
       value: valueInWei,
       createAccessList: true,
       throwOnFail: false, // return errors in result instead of throwing, so rawData is accessible
+      // Commit state changes into tevm's in-memory layer on success (session mode writes).
+      // Without this, tevmCall is a dry-run and subsequent calls still see pre-call state.
+      createTransaction: persistState ? "on-success" : undefined,
       onBeforeMessage,
       onAfterMessage,
       onStep,
     });
+
+    // Mine the pending transaction so the state diff is visible to subsequent calls.
+    if (persistState) {
+      await client.tevmMine({ blockCount: 1 });
+    }
 
     // Check for errors
     const success = !callResult.errors || callResult.errors.length === 0;
@@ -1142,7 +1139,7 @@ export async function simulateWithTevm({
       success,
       simulated: true,
       localSimulation: true,
-      blockNumber: actualBlock,
+      blockNumber: pinnedBlock,
       rawData: rawOutput,
       decoded: decodedOutputs,
       gasUsed,
@@ -1203,6 +1200,42 @@ export async function simulateWithTevm({
       undecodedAddresses: [],
     };
   }
+}
+
+/**
+ * Simulate a contract call using Tevm
+ * @param {Object} params - Simulation parameters
+ * @param {Map<string, Array>} params.abiCache - Optional map of lowercase address -> ABI array for decoding logs from multiple contracts
+ * @returns {Object} Simulation result including `undecodedAddresses` - addresses that emitted logs but couldn't be decoded
+ */
+export async function simulateWithTevm(params) {
+  const {
+    chain,
+    rpcUrl,
+    blockNumber = "latest",
+    customChainId = null,
+    rpcBatchSize = 1,
+  } = params;
+  const { client, blockNumber: actualBlock } = await createTevmClient(
+    chain,
+    rpcUrl,
+    blockNumber,
+    customChainId,
+    rpcBatchSize,
+  );
+  return _runSimulationOnClient(client, actualBlock, params);
+}
+
+/**
+ * Simulate a contract call using an existing tevm client (session mode).
+ * The caller is responsible for creating and managing the client lifecycle.
+ * @param {object} client - An existing tevm memory client
+ * @param {string} pinnedBlock - The block number/tag the client was forked at
+ * @param {Object} params - Same simulation parameters as simulateWithTevm (chain/rpcUrl/blockNumber are ignored)
+ */
+export async function simulateWithClient(client, pinnedBlock, params) {
+  if (!client) throw new Error("client is required");
+  return _runSimulationOnClient(client, pinnedBlock, params);
 }
 
 /**
