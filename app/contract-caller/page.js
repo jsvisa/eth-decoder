@@ -2292,9 +2292,11 @@ export default function ContractCaller() {
   };
 
   useEffect(() => {
-    if (sessionActive) {
-      handleResetSession();
-    }
+    sessionClientRef.current = null;
+    setSessionActive(false);
+    setSessionBlock(null);
+    setSessionHistory([]);
+    setError(null);
   }, [chain, forkBlockNumber]);
 
   const handleCall = async () => {
