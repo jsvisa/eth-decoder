@@ -684,6 +684,8 @@ export default function ContractCaller() {
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const [addressFilter, setAddressFilter] = useState("");
   const [fromAddress, setFromAddress] = useState("");
+  const [rawCalldataMode, setRawCalldataMode] = useState(false);
+  const [rawCalldata, setRawCalldata] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [tenderlySettings, setTenderlySettings] = useState({
     accessKey: "",
@@ -1664,6 +1666,8 @@ export default function ContractCaller() {
     } else {
       setArgs([]);
     }
+    setRawCalldata("");
+    setRawCalldataMode(false);
   }, [selectedFunction, parsedAbi, address]);
 
   // Fetch token symbols for Transfer events
@@ -2328,7 +2332,7 @@ export default function ContractCaller() {
     }
 
     // Validate function arguments (addresses in all types including tuples)
-    if (selectedFunc && selectedFunc.inputs) {
+    if (!rawCalldataMode && selectedFunc && selectedFunc.inputs) {
       const argErrors = [];
       selectedFunc.inputs.forEach((input, index) => {
         const argValue = args[index];
@@ -2336,6 +2340,14 @@ export default function ContractCaller() {
       });
       if (argErrors.length > 0) {
         errors.argErrors = argErrors;
+      }
+    }
+
+    // Validate raw calldata format when in raw mode
+    if (rawCalldataMode) {
+      const hex = rawCalldata.trim();
+      if (!hex || !hex.startsWith("0x") || hex.length < 10) {
+        errors.rawCalldata = true;
       }
     }
 
@@ -2361,6 +2373,10 @@ export default function ContractCaller() {
       if (errors.warpTimestamp)
         errorMessages.push("Warp timestamp must be a valid positive integer");
       if (errors.argErrors) errorMessages.push(...errors.argErrors);
+      if (errors.rawCalldata)
+        errorMessages.push(
+          "Raw calldata must be a hex string starting with 0x (at least 4 bytes)",
+        );
       setError(errorMessages.join("; "));
       return;
     }
@@ -2426,6 +2442,7 @@ export default function ContractCaller() {
           onProgress: (pct) => setSimProgress(pct),
           abortSignal: abortController.signal,
           rpcBatchSize,
+          callData: rawCalldataMode ? rawCalldata.trim() : undefined,
         });
         setSimProgress(100);
 
@@ -2540,6 +2557,11 @@ export default function ContractCaller() {
               timestamp: timestampOverride,
             };
           }
+        }
+
+        // Pass raw calldata directly if in raw mode (skips server-side encoding)
+        if (rawCalldataMode) {
+          requestBody.callData = rawCalldata.trim();
         }
 
         const response = await fetch(apiEndpoint, {

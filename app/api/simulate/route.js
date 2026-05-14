@@ -30,6 +30,7 @@ export async function POST(request) {
       blockNumber,
       stateOverrides,
       blockHeaderOverrides,
+      callData: rawCallData,
     } = body;
 
     if (!address || !functionName || !abi) {
@@ -83,19 +84,22 @@ export async function POST(request) {
       );
     }
 
-    // Parse args
-    const parsedArgs = (args || []).map((arg, index) => {
-      const input = functionAbi.inputs[index];
-      if (!input) return arg;
-      return normalizeArg(arg, input.type, input.components);
-    });
-
-    // Encode function data
-    const callData = encodeFunctionData({
-      abi: [functionAbi],
-      functionName: functionAbi.name,
-      args: parsedArgs,
-    });
+    // Encode function data (or use raw calldata if provided)
+    let callData;
+    if (rawCallData) {
+      callData = rawCallData;
+    } else {
+      const parsedArgs = (args || []).map((arg, index) => {
+        const input = functionAbi.inputs[index];
+        if (!input) return arg;
+        return normalizeArg(arg, input.type, input.components);
+      });
+      callData = encodeFunctionData({
+        abi: [functionAbi],
+        functionName: functionAbi.name,
+        args: parsedArgs,
+      });
+    }
 
     // Default from address if not provided
     const sender = fromAddress || "0x0000000000000000000000000000000000000001";
