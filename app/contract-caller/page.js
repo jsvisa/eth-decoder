@@ -2505,7 +2505,7 @@ export default function ContractCaller() {
           data = await simulateWithClient(
             sessionClientRef.current,
             sessionBlock,
-            simParams,
+            { ...simParams, persistState: isWrite },
           );
         } else {
           data = await simulateWithTevm(simParams);

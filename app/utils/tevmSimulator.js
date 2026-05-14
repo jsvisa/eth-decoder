@@ -741,6 +741,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     abortSignal = null,
     rpcBatchSize = 1,
     callData: rawCallData = null,
+    persistState = false,
   } = params;
 
   // Validate inputs before the try/catch so callers receive a rejected promise
@@ -1018,10 +1019,18 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       value: valueInWei,
       createAccessList: true,
       throwOnFail: false, // return errors in result instead of throwing, so rawData is accessible
+      // Commit state changes into tevm's in-memory layer on success (session mode writes).
+      // Without this, tevmCall is a dry-run and subsequent calls still see pre-call state.
+      createTransaction: persistState ? "on-success" : undefined,
       onBeforeMessage,
       onAfterMessage,
       onStep,
     });
+
+    // Mine the pending transaction so the state diff is visible to subsequent calls.
+    if (persistState) {
+      await client.tevmMine({ blockCount: 1 });
+    }
 
     // Check for errors
     const success = !callResult.errors || callResult.errors.length === 0;
