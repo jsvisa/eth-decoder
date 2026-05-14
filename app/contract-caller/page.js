@@ -774,7 +774,6 @@ export default function ContractCaller() {
   const sessionClientRef = useRef(null); // tevm MemoryClient
   const [sessionActive, setSessionActive] = useState(false);
   const [sessionBlock, setSessionBlock] = useState(null); // pinned block string for display
-  // eslint-disable-next-line no-unused-vars
   const [sessionHistory, setSessionHistory] = useState([]); // [{id, address, contractName, functionName, success, gasUsed, timestamp}]
   const [sessionStarting, setSessionStarting] = useState(false);
   // Store pending args with context to handle race conditions when switching contracts
@@ -5041,7 +5040,7 @@ export default function ContractCaller() {
                   getSelectedFunction() &&
                   !isReadOnly(getSelectedFunction()) ? (
                   <>
-                    Simulate Call{" "}
+                    {sessionActive ? "Execute in Session" : "Simulate Call"}{" "}
                     <span className={styles.simModeTag}>
                       {useLocalSimulation ? "L" : "T"}
                     </span>
@@ -5588,6 +5587,38 @@ export default function ContractCaller() {
                 )}
               </>
             )}
+          </div>
+        )}
+
+        {/* Session history strip */}
+        {sessionActive && sessionHistory.length > 0 && (
+          <div className={styles.sessionHistorySection}>
+            <div className={styles.sessionHistoryHeader}>
+              <span>Session History</span>
+              <span>{sessionHistory.length} tx{sessionHistory.length !== 1 ? "s" : ""}</span>
+            </div>
+            <div className={styles.sessionHistoryList}>
+              {sessionHistory.map((item, idx) => (
+                <div key={item.id} className={styles.sessionHistoryItem}>
+                  <span className={styles.sessionHistoryGas}>#{idx + 1}</span>
+                  <span
+                    className={`${styles.sessionHistoryBadge} ${
+                      item.success
+                        ? styles.sessionHistoryBadgeSuccess
+                        : styles.sessionHistoryBadgeFail
+                    }`}
+                  >
+                    {item.success ? "✓" : "✗"}
+                  </span>
+                  <span className={styles.sessionHistoryFunc}>
+                    {item.contractName} · {item.functionName}
+                  </span>
+                  <span className={styles.sessionHistoryGas}>
+                    {item.gasUsed ? item.gasUsed.toLocaleString() + " gas" : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
