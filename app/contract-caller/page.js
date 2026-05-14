@@ -774,8 +774,9 @@ export default function ContractCaller() {
   const sessionClientRef = useRef(null); // tevm MemoryClient
   const [sessionActive, setSessionActive] = useState(false);
   const [sessionBlock, setSessionBlock] = useState(null); // pinned block string for display
-  const [sessionHistory, setSessionHistory] = useState([]); // [{id, address, contractName, functionName, success, gasUsed, timestamp}]
+  const [sessionHistory, setSessionHistory] = useState([]); // [{id, address, contractName, functionName, type, success, inputs, outputs, timestamp}]
   const [sessionStarting, setSessionStarting] = useState(false);
+  const [expandedHistoryIds, setExpandedHistoryIds] = useState(new Set());
   // Store pending args with context to handle race conditions when switching contracts
   const pendingHistoryRef = useRef(null); // { functionName, args, timestamp }
   const bookmarkInputRef = useRef(null);
@@ -2514,17 +2515,19 @@ export default function ContractCaller() {
 
         // Append to session history if session is active
         if (sessionActive) {
+          const ts = Date.now();
           setSessionHistory((prev) => [
             ...prev,
             {
-              id: Date.now(),
+              id: ts,
               address,
               contractName: contractName || address.slice(0, 8) + "...",
               functionName: selectedFunction,
               type: isWrite ? "write" : "read",
               success: data.success,
-              gasUsed: data.gasUsed,
-              timestamp: Date.now(),
+              inputs: data.callTrace?.decodedInputs || [],
+              outputs: data.decoded || [],
+              timestamp: ts,
             },
           ]);
         }
@@ -5602,28 +5605,95 @@ export default function ContractCaller() {
               <span>{sessionHistory.length} tx{sessionHistory.length !== 1 ? "s" : ""}</span>
             </div>
             <div className={styles.sessionHistoryList}>
-              {sessionHistory.map((item, idx) => (
-                <div key={item.id} className={styles.sessionHistoryItem}>
-                  <span className={styles.sessionHistoryIndex}>#{idx + 1}</span>
-                  <span
-                    className={`${styles.sessionHistoryBadge} ${
-                      item.type === "read"
-                        ? styles.sessionHistoryBadgeRead
-                        : item.success
-                          ? styles.sessionHistoryBadgeSuccess
-                          : styles.sessionHistoryBadgeFail
-                    }`}
-                  >
-                    {item.type === "read" ? "R" : item.success ? "✓" : "✗"}
-                  </span>
-                  <span className={styles.sessionHistoryFunc}>
-                    {item.contractName} · {item.functionName}
-                  </span>
-                  <span className={styles.sessionHistoryGas}>
-                    {item.gasUsed ? item.gasUsed.toLocaleString() + " gas" : ""}
-                  </span>
-                </div>
-              ))}
+              {sessionHistory.map((item, idx) => {
+                const expanded = expandedHistoryIds.has(item.id);
+                const toggle = () =>
+                  setExpandedHistoryIds((prev) => {
+                    const next = new Set(prev);
+                    next.has(item.id) ? next.delete(item.id) : next.add(item.id);
+                    return next;
+                  });
+                const abbrev = (v) => {
+                  const s = String(v);
+                  if (s.startsWith("0x") && s.length === 42)
+                    return s.slice(0, 6) + "…" + s.slice(-4);
+                  return s.length > 16 ? s.slice(0, 14) + "…" : s;
+                };
+                return (
+                  <div key={item.id} className={styles.sessionHistoryItem}>
+                    <div
+                      className={styles.sessionHistoryItemHeader}
+                      onClick={toggle}
+                    >
+                      <span className={styles.sessionHistoryIndex}>#{idx + 1}</span>
+                      <span
+                        className={`${styles.sessionHistoryBadge} ${
+                          item.type === "read"
+                            ? styles.sessionHistoryBadgeRead
+                            : item.success
+                              ? styles.sessionHistoryBadgeSuccess
+                              : styles.sessionHistoryBadgeFail
+                        }`}
+                      >
+                        {item.type === "read" ? "R" : item.success ? "✓" : "✗"}
+                      </span>
+                      <span className={styles.sessionHistoryFunc}>
+                        {item.contractName} · {item.functionName}(
+                        {item.inputs.map((i) => abbrev(i.value)).join(", ")})
+                      </span>
+                      <span className={styles.sessionHistoryChevron}>
+                        {expanded ? "▲" : "▼"}
+                      </span>
+                    </div>
+                    {expanded && (
+                      <div className={styles.sessionHistoryExpanded}>
+                        {item.inputs.length > 0 && (
+                          <div className={styles.sessionHistoryArgBlock}>
+                            <span className={styles.sessionHistoryArgLabel}>in</span>
+                            <div className={styles.sessionHistoryArgRows}>
+                              {item.inputs.map((inp, i) => (
+                                <div key={i} className={styles.sessionHistoryArgRow}>
+                                  <span className={styles.sessionHistoryArgName}>
+                                    {inp.name}
+                                    <span className={styles.sessionHistoryArgType}>
+                                      {" "}({inp.type})
+                                    </span>
+                                  </span>
+                                  <span className={styles.sessionHistoryArgValue}>
+                                    {String(inp.value)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div className={styles.sessionHistoryArgBlock}>
+                          <span className={styles.sessionHistoryArgLabel}>out</span>
+                          <div className={styles.sessionHistoryArgRows}>
+                            {item.outputs.length > 0 ? (
+                              item.outputs.map((out, i) => (
+                                <div key={i} className={styles.sessionHistoryArgRow}>
+                                  <span className={styles.sessionHistoryArgName}>
+                                    {out.name || "result"}
+                                    <span className={styles.sessionHistoryArgType}>
+                                      {" "}({out.type})
+                                    </span>
+                                  </span>
+                                  <span className={styles.sessionHistoryArgValue}>
+                                    {String(out.value)}
+                                  </span>
+                                </div>
+                              ))
+                            ) : (
+                              <span className={styles.sessionHistoryArgType}>void</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
