@@ -810,11 +810,13 @@ export async function simulateWithTevm({
     }
 
     // Encode the function call (or use raw calldata if provided)
-    const callData = rawCallData || encodeFunctionData({
-      abi: [functionAbi],
-      functionName: functionAbi.name,
-      args: parsedArgs,
-    });
+    const callData =
+      rawCallData ||
+      encodeFunctionData({
+        abi: [functionAbi],
+        functionName: functionAbi.name,
+        args: parsedArgs,
+      });
 
     // Convert value to wei based on unit
     let valueInWei = 0n;
