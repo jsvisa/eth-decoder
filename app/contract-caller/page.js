@@ -2285,10 +2285,28 @@ export default function ContractCaller() {
   };
 
   const handleResetSession = () => {
+    if (sessionHistory.length > 0) {
+      const bundle = {
+        id: Date.now(),
+        type: "session",
+        chain,
+        block: sessionBlock,
+        txs: [...sessionHistory],
+        timestamp: new Date().toISOString(),
+      };
+      const newHistory = [bundle, ...history].slice(0, MAX_HISTORY_ITEMS);
+      setHistory(newHistory);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory));
+      } catch (err) {
+        console.error("Failed to save session bundle:", err);
+      }
+    }
     sessionClientRef.current = null;
     setSessionActive(false);
     setSessionBlock(null);
     setSessionHistory([]);
+    setExpandedHistoryIds(new Set());
     setError(null);
   };
 
@@ -5727,7 +5745,57 @@ export default function ContractCaller() {
               <div className={styles.historyList}>
                 {history
                   .filter((item) => item.chain === chain)
-                  .map((item) => (
+                  .map((item) => {
+                    if (item.type === "session") {
+                      const abbrev = (v) => {
+                        const s = String(v);
+                        if (s.startsWith("0x") && s.length === 42)
+                          return s.slice(0, 6) + "…" + s.slice(-4);
+                        return s.length > 16 ? s.slice(0, 14) + "…" : s;
+                      };
+                      return (
+                        <div key={item.id} className={`${styles.historyItem} ${styles.sessionBundleItem}`}>
+                          <div className={styles.historyTop}>
+                            <div className={styles.historyChain}>
+                              {getChainInfo(item.chain)?.name || item.chain}
+                            </div>
+                            <span className={styles.sessionBundleBadge}>Session</span>
+                            <div className={styles.historyFunc}>
+                              Block {item.block} &middot; {item.txs.length} tx{item.txs.length !== 1 ? "s" : ""}
+                            </div>
+                          </div>
+                          <div className={styles.sessionBundleTxList}>
+                            {item.txs.map((tx, i) => (
+                              <div key={tx.id} className={styles.sessionBundleTx}>
+                                <span className={styles.sessionHistoryIndex}>#{i + 1}</span>
+                                <span className={`${styles.sessionHistoryBadge} ${
+                                  tx.type === "read"
+                                    ? styles.sessionHistoryBadgeRead
+                                    : tx.success
+                                      ? styles.sessionHistoryBadgeSuccess
+                                      : styles.sessionHistoryBadgeFail
+                                }`}>
+                                  {tx.type === "read" ? "R" : tx.success ? "✓" : "✗"}
+                                </span>
+                                <span className={styles.sessionBundleTxFunc}>
+                                  {tx.contractName} · {tx.functionName}(
+                                  {tx.inputs.map((inp) => abbrev(inp.value)).join(", ")})
+                                  {tx.outputs.length > 0 && (
+                                    <span className={styles.sessionBundleTxOutput}>
+                                      {" "}→ {tx.outputs.map((o) => abbrev(o.value)).join(", ")}
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className={styles.historyTime}>
+                            {new Date(item.timestamp).toLocaleString()}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
                     <div
                       key={item.id}
                       className={styles.historyItem}
@@ -5789,7 +5857,8 @@ export default function ContractCaller() {
                         {new Date(item.timestamp).toLocaleString()}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
               </div>
             )}
           </div>

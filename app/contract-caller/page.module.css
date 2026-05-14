@@ -4368,3 +4368,50 @@
   color: var(--text-secondary, #aaa);
   flex-shrink: 0;
 }
+
+/* ── Session bundle history card ───────────────────────────── */
+.sessionBundleItem {
+  cursor: default;
+}
+
+.sessionBundleItem:hover {
+  background: inherit;
+}
+
+.sessionBundleBadge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+  letter-spacing: 0.03em;
+}
+
+.sessionBundleTxList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 6px 0 4px;
+  padding-left: 4px;
+  border-left: 2px solid var(--border-color, #2a2a2a);
+}
+
+.sessionBundleTx {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  font-family: monospace;
+}
+
+.sessionBundleTxFunc {
+  color: var(--text-secondary, #aaa);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessionBundleTxOutput {
+  color: var(--text-secondary, #666);
+}
