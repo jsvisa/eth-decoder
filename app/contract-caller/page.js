@@ -2290,7 +2290,14 @@ export default function ContractCaller() {
     setSessionActive(false);
     setSessionBlock(null);
     setSessionHistory([]);
+    setError(null);
   };
+
+  useEffect(() => {
+    if (sessionActive) {
+      handleResetSession();
+    }
+  }, [chain, forkBlockNumber]);
 
   const handleCall = async () => {
     // Clear previous field errors
