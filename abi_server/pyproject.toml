@@ -12,7 +12,7 @@ dependencies = [
   "psycopg2-binary",
   "eth-utils<6",
   "eth-abi @ git+https://github.com/jsvisa/eth-abi@decode-less-strict",
-  "multicall-py @ git+https://github.com/jsvisa/multicall.py@upgrade-eth-abi",
+  "multicall-py",
 ]
 
 [project.optional-dependencies]
