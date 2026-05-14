@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server'
-import { createPublicClient, http, defineChain } from 'viem'
-import { mainnet, arbitrum, base, polygon, bsc } from 'viem/chains'
-import { isValidEthAddress } from '../../utils/validation'
+import { NextResponse } from "next/server";
+import { createPublicClient, http, defineChain } from "viem";
+import { mainnet, arbitrum, base, polygon, bsc } from "viem/chains";
+import { isValidEthAddress } from "../../utils/validation";
 
 // Etherscan V2 API uses chain IDs (built-in chains)
 const BUILT_IN_CHAIN_IDS = {
@@ -10,7 +10,7 @@ const BUILT_IN_CHAIN_IDS = {
   base: 8453,
   polygon: 137,
   bsc: 56,
-}
+};
 
 const CHAINS = {
   ethereum: mainnet,
@@ -18,59 +18,63 @@ const CHAINS = {
   base: base,
   polygon: polygon,
   bsc: bsc,
-}
+};
 
 const RPC_URLS = {
-  ethereum: 'https://eth.llamarpc.com',
-  arbitrum: 'https://arb1.arbitrum.io/rpc',
-  base: 'https://mainnet.base.org',
-  polygon: 'https://polygon-rpc.com',
-  bsc: 'https://bsc-dataseed.binance.org',
-}
+  ethereum: "https://eth.llamarpc.com",
+  arbitrum: "https://arb1.arbitrum.io/rpc",
+  base: "https://mainnet.base.org",
+  polygon: "https://polygon-rpc.com",
+  bsc: "https://bsc-dataseed.binance.org",
+};
 
-const ETHERSCAN_V2_API = 'https://api.etherscan.io/v2/api'
+const ETHERSCAN_V2_API = "https://api.etherscan.io/v2/api";
 
 // EIP-1967 implementation slot
-const EIP1967_IMPL_SLOT = '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc'
+const EIP1967_IMPL_SLOT =
+  "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 // EIP-1967 beacon slot
-const EIP1967_BEACON_SLOT = '0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50'
+const EIP1967_BEACON_SLOT =
+  "0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50";
 // OpenZeppelin legacy implementation slot
-const OZ_IMPL_SLOT = '0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3'
+const OZ_IMPL_SLOT =
+  "0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3";
 
 // Fetch ABI and contract name from Etherscan
 async function fetchContractInfoFromEtherscan(address, chainId, apiKey) {
   const params = new URLSearchParams({
     chainid: chainId,
-    module: 'contract',
-    action: 'getsourcecode',
+    module: "contract",
+    action: "getsourcecode",
     address: address,
     apikey: apiKey,
-  })
+  });
 
-  const response = await fetch(`${ETHERSCAN_V2_API}?${params}`)
+  const response = await fetch(`${ETHERSCAN_V2_API}?${params}`);
 
   if (!response.ok) {
-    return null
+    return null;
   }
 
-  const data = await response.json()
+  const data = await response.json();
 
-  if (data.status !== '1' || !data.result || !data.result[0]) {
-    return null
+  if (data.status !== "1" || !data.result || !data.result[0]) {
+    return null;
   }
 
-  const result = data.result[0]
-  const abi = result.ABI && result.ABI !== 'Contract source code not verified'
-    ? JSON.parse(result.ABI)
-    : null
+  const result = data.result[0];
+  const abi =
+    result.ABI && result.ABI !== "Contract source code not verified"
+      ? JSON.parse(result.ABI)
+      : null;
 
   return {
     abi,
     contractName: result.ContractName || null,
-    isProxy: result.Proxy === '1',
+    isProxy: result.Proxy === "1",
     implementation: result.Implementation || null,
-    source: 'etherscan',
-  }
+    source: "etherscan",
+  };
 }
 
 // Fetch ABI from Sourcify (fallback for unverified contracts on Etherscan)
@@ -78,81 +82,89 @@ async function fetchContractInfoFromSourcify(address, chainId) {
   try {
     // Check if contract is verified on Sourcify
     const checkResponse = await fetch(
-      `https://sourcify.dev/server/check-by-addresses?addresses=${address}&chainIds=${chainId}`
-    )
+      `https://sourcify.dev/server/check-by-addresses?addresses=${address}&chainIds=${chainId}`,
+    );
 
     if (!checkResponse.ok) {
-      return null
+      return null;
     }
 
-    const checkData = await checkResponse.json()
+    const checkData = await checkResponse.json();
 
     // Check if we have a match (perfect or partial)
     if (!checkData || !checkData[0] || !checkData[0].chainIds) {
-      return null
+      return null;
     }
 
-    const match = checkData[0].chainIds.find(c => c.chainId === String(chainId))
-    if (!match || (match.status !== 'perfect' && match.status !== 'partial')) {
-      return null
+    const match = checkData[0].chainIds.find(
+      (c) => c.chainId === String(chainId),
+    );
+    if (!match || (match.status !== "perfect" && match.status !== "partial")) {
+      return null;
     }
 
     // Fetch the metadata which contains the ABI
     const filesResponse = await fetch(
-      `https://sourcify.dev/server/files/${chainId}/${address}`
-    )
+      `https://sourcify.dev/server/files/${chainId}/${address}`,
+    );
 
     if (!filesResponse.ok) {
-      return null
+      return null;
     }
 
-    const filesData = await filesResponse.json()
+    const filesData = await filesResponse.json();
 
     // Find metadata.json which contains the ABI
-    const metadataFile = filesData.files?.find(f => f.name === 'metadata.json')
+    const metadataFile = filesData.files?.find(
+      (f) => f.name === "metadata.json",
+    );
     if (!metadataFile || !metadataFile.content) {
-      return null
+      return null;
     }
 
-    const metadata = JSON.parse(metadataFile.content)
-    const abi = metadata.output?.abi
+    const metadata = JSON.parse(metadataFile.content);
+    const abi = metadata.output?.abi;
 
     if (!abi) {
-      return null
+      return null;
     }
 
     // Try to get contract name from metadata
     const contractName = metadata.settings?.compilationTarget
       ? Object.values(metadata.settings.compilationTarget)[0]
-      : null
+      : null;
 
     return {
       abi,
       contractName,
-      source: 'sourcify',
-    }
+      source: "sourcify",
+    };
   } catch (e) {
-    console.error('Sourcify fetch error:', e)
-    return null
+    console.error("Sourcify fetch error:", e);
+    return null;
   }
 }
 
 // Try to fetch contract info from multiple sources
 async function fetchContractInfo(address, chainId, apiKey) {
   // Try Etherscan first
-  const etherscanInfo = await fetchContractInfoFromEtherscan(address, chainId, apiKey)
+  const etherscanInfo = await fetchContractInfoFromEtherscan(
+    address,
+    chainId,
+    apiKey,
+  );
   if (etherscanInfo && etherscanInfo.abi) {
-    return etherscanInfo
+    return etherscanInfo;
   }
 
   // Fallback to Sourcify
-  const sourcifyInfo = await fetchContractInfoFromSourcify(address, chainId)
+  const sourcifyInfo = await fetchContractInfoFromSourcify(address, chainId);
   if (sourcifyInfo && sourcifyInfo.abi) {
-    return sourcifyInfo
+    return sourcifyInfo;
   }
 
   // Return Etherscan info even if no ABI (for contract name)
-  return etherscanInfo
+  return etherscanInfo;
 }
 
 // Get implementation address from proxy
@@ -162,12 +174,16 @@ async function getImplementationAddress(client, proxyAddress) {
     const implSlotData = await client.getStorageAt({
       address: proxyAddress,
       slot: EIP1967_IMPL_SLOT,
-    })
+    });
 
-    if (implSlotData && implSlotData !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
-      const implAddress = '0x' + implSlotData.slice(-40)
-      if (implAddress !== '0x0000000000000000000000000000000000000000') {
-        return implAddress
+    if (
+      implSlotData &&
+      implSlotData !==
+        "0x0000000000000000000000000000000000000000000000000000000000000000"
+    ) {
+      const implAddress = "0x" + implSlotData.slice(-40);
+      if (implAddress !== "0x0000000000000000000000000000000000000000") {
+        return implAddress;
       }
     }
   } catch (e) {
@@ -179,19 +195,23 @@ async function getImplementationAddress(client, proxyAddress) {
     const beaconSlotData = await client.getStorageAt({
       address: proxyAddress,
       slot: EIP1967_BEACON_SLOT,
-    })
+    });
 
-    if (beaconSlotData && beaconSlotData !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
-      const beaconAddress = '0x' + beaconSlotData.slice(-40)
-      if (beaconAddress !== '0x0000000000000000000000000000000000000000') {
+    if (
+      beaconSlotData &&
+      beaconSlotData !==
+        "0x0000000000000000000000000000000000000000000000000000000000000000"
+    ) {
+      const beaconAddress = "0x" + beaconSlotData.slice(-40);
+      if (beaconAddress !== "0x0000000000000000000000000000000000000000") {
         // Call implementation() on the beacon
         try {
           const implData = await client.call({
             to: beaconAddress,
-            data: '0x5c60da1b', // implementation()
-          })
+            data: "0x5c60da1b", // implementation()
+          });
           if (implData.data && implData.data.length >= 66) {
-            return '0x' + implData.data.slice(-40)
+            return "0x" + implData.data.slice(-40);
           }
         } catch (e) {
           // Beacon call failed
@@ -207,12 +227,16 @@ async function getImplementationAddress(client, proxyAddress) {
     const ozSlotData = await client.getStorageAt({
       address: proxyAddress,
       slot: OZ_IMPL_SLOT,
-    })
+    });
 
-    if (ozSlotData && ozSlotData !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
-      const implAddress = '0x' + ozSlotData.slice(-40)
-      if (implAddress !== '0x0000000000000000000000000000000000000000') {
-        return implAddress
+    if (
+      ozSlotData &&
+      ozSlotData !==
+        "0x0000000000000000000000000000000000000000000000000000000000000000"
+    ) {
+      const implAddress = "0x" + ozSlotData.slice(-40);
+      if (implAddress !== "0x0000000000000000000000000000000000000000") {
+        return implAddress;
       }
     }
   } catch (e) {
@@ -223,16 +247,20 @@ async function getImplementationAddress(client, proxyAddress) {
   try {
     const slot0Data = await client.getStorageAt({
       address: proxyAddress,
-      slot: '0x0000000000000000000000000000000000000000000000000000000000000000',
-    })
+      slot: "0x0000000000000000000000000000000000000000000000000000000000000000",
+    });
 
-    if (slot0Data && slot0Data !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
-      const candidateAddress = '0x' + slot0Data.slice(-40)
-      if (candidateAddress !== '0x0000000000000000000000000000000000000000') {
+    if (
+      slot0Data &&
+      slot0Data !==
+        "0x0000000000000000000000000000000000000000000000000000000000000000"
+    ) {
+      const candidateAddress = "0x" + slot0Data.slice(-40);
+      if (candidateAddress !== "0x0000000000000000000000000000000000000000") {
         // Verify it's actually a contract to avoid false positives
-        const code = await client.getCode({ address: candidateAddress })
-        if (code && code !== '0x') {
-          return candidateAddress
+        const code = await client.getCode({ address: candidateAddress });
+        if (code && code !== "0x") {
+          return candidateAddress;
         }
       }
     }
@@ -243,17 +271,17 @@ async function getImplementationAddress(client, proxyAddress) {
   // Try EIP-1167 Minimal Proxy (Clone) - implementation address embedded in bytecode
   // Runtime bytecode pattern: 363d3d373d3d3d363d73<20-byte address>5af43d82803e903d91602b57fd5bf3
   try {
-    const code = await client.getCode({ address: proxyAddress })
+    const code = await client.getCode({ address: proxyAddress });
     if (code && code.length > 2) {
-      const bytecode = code.toLowerCase()
-      const prefix = '363d3d373d3d3d363d73'
-      const suffix = '5af43d82803e903d91602b57fd5bf3'
-      const prefixIndex = bytecode.indexOf(prefix)
+      const bytecode = code.toLowerCase();
+      const prefix = "363d3d373d3d3d363d73";
+      const suffix = "5af43d82803e903d91602b57fd5bf3";
+      const prefixIndex = bytecode.indexOf(prefix);
       if (prefixIndex !== -1) {
-        const addrStart = prefixIndex + prefix.length
-        const addrEnd = addrStart + 40
+        const addrStart = prefixIndex + prefix.length;
+        const addrEnd = addrStart + 40;
         if (bytecode.substring(addrEnd, addrEnd + suffix.length) === suffix) {
-          return '0x' + bytecode.substring(addrStart, addrEnd)
+          return "0x" + bytecode.substring(addrStart, addrEnd);
         }
       }
     }
@@ -261,145 +289,151 @@ async function getImplementationAddress(client, proxyAddress) {
     // Ignore
   }
 
-  return null
+  return null;
 }
 
 // Merge two ABIs, preferring items from the second ABI for duplicates
 function mergeAbis(proxyAbi, implAbi) {
-  const seen = new Map()
+  const seen = new Map();
 
   // Helper to create a unique key for ABI items
   const getKey = (item) => {
-    if (item.type === 'function') {
-      return `function:${item.name}`
+    if (item.type === "function") {
+      return `function:${item.name}`;
     }
-    if (item.type === 'event') {
-      return `event:${item.name}`
+    if (item.type === "event") {
+      return `event:${item.name}`;
     }
-    if (item.type === 'error') {
-      return `error:${item.name}`
+    if (item.type === "error") {
+      return `error:${item.name}`;
     }
-    return `${item.type}:${item.name || ''}`
-  }
+    return `${item.type}:${item.name || ""}`;
+  };
 
   // Add implementation ABI items first (they take priority)
   for (const item of implAbi) {
-    const key = getKey(item)
-    seen.set(key, item)
+    const key = getKey(item);
+    seen.set(key, item);
   }
 
   // Add proxy ABI items (only if not already present)
   for (const item of proxyAbi) {
-    const key = getKey(item)
+    const key = getKey(item);
     if (!seen.has(key)) {
-      seen.set(key, item)
+      seen.set(key, item);
     }
   }
 
-  return Array.from(seen.values())
+  return Array.from(seen.values());
 }
 
 export async function GET(request) {
   try {
-    const { searchParams } = new URL(request.url)
-    const address = searchParams.get('address')
-    const chain = searchParams.get('chain') || 'ethereum'
+    const { searchParams } = new URL(request.url);
+    const address = searchParams.get("address");
+    const chain = searchParams.get("chain") || "ethereum";
 
     if (!address) {
       return NextResponse.json(
-        { error: 'Missing address parameter' },
-        { status: 400 }
-      )
+        { error: "Missing address parameter" },
+        { status: 400 },
+      );
     }
 
     // Validate address format
     if (!isValidEthAddress(address)) {
       return NextResponse.json(
-        { error: 'Invalid address format' },
-        { status: 400 }
-      )
+        { error: "Invalid address format" },
+        { status: 400 },
+      );
     }
 
     // Use custom RPC if provided, otherwise use default
-    const customRpcUrl = searchParams.get('rpcUrl')
+    const customRpcUrl = searchParams.get("rpcUrl");
     // Get custom chain ID from query params (for non-built-in chains)
-    const customChainIdParam = searchParams.get('chainId')
+    const customChainIdParam = searchParams.get("chainId");
 
     // Determine chain ID and config
-    let chainId = BUILT_IN_CHAIN_IDS[chain]
-    let chainConfig = CHAINS[chain]
-    let rpcUrl = customRpcUrl || RPC_URLS[chain]
+    let chainId = BUILT_IN_CHAIN_IDS[chain];
+    let chainConfig = CHAINS[chain];
+    let rpcUrl = customRpcUrl || RPC_URLS[chain];
 
     // Handle custom chains (chain IDs starting with "chain-")
     if (!chainId && customChainIdParam && customRpcUrl) {
-      chainId = parseInt(customChainIdParam, 10)
+      chainId = parseInt(customChainIdParam, 10);
       // Create a custom chain config for non-built-in chains
       chainConfig = defineChain({
         id: chainId,
         name: chain,
-        nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+        nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
         rpcUrls: {
           default: { http: [customRpcUrl] },
         },
-      })
-      rpcUrl = customRpcUrl
+      });
+      rpcUrl = customRpcUrl;
     }
 
     if (!chainId || !chainConfig || !rpcUrl) {
       return NextResponse.json(
-        { error: `Unsupported chain: ${chain}. Please configure an RPC URL for this chain.` },
-        { status: 400 }
-      )
+        {
+          error: `Unsupported chain: ${chain}. Please configure an RPC URL for this chain.`,
+        },
+        { status: 400 },
+      );
     }
 
     // Get API key from query param (user-provided) or fall back to env var
-    const apiKey = searchParams.get('apiKey') || process.env.ETHERSCAN_API_KEY || ''
+    const apiKey =
+      searchParams.get("apiKey") || process.env.ETHERSCAN_API_KEY || "";
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'Etherscan API key not configured. Please add your API key in Settings.' },
-        { status: 400 }
-      )
+        {
+          error:
+            "Etherscan API key not configured. Please add your API key in Settings.",
+        },
+        { status: 400 },
+      );
     }
 
     // Fetch the contract's ABI and name
-    const proxyInfo = await fetchContractInfo(address, chainId, apiKey)
+    const proxyInfo = await fetchContractInfo(address, chainId, apiKey);
 
     if (!proxyInfo || !proxyInfo.abi) {
       return NextResponse.json(
-        { error: 'Failed to fetch ABI. Contract may not be verified.' },
-        { status: 400 }
-      )
+        { error: "Failed to fetch ABI. Contract may not be verified." },
+        { status: 400 },
+      );
     }
 
     // Determine implementation address: prefer Etherscan's proxy info,
     // only fall back to on-chain detection when explicitly requested
-    const detectProxy = searchParams.get('detectProxy') === 'true'
-    let implAddress = null
+    const detectProxy = searchParams.get("detectProxy") === "true";
+    let implAddress = null;
 
     if (proxyInfo.isProxy && proxyInfo.implementation) {
-      implAddress = proxyInfo.implementation
+      implAddress = proxyInfo.implementation;
     } else if (detectProxy) {
       const client = createPublicClient({
         chain: chainConfig,
         transport: http(rpcUrl),
-      })
-      implAddress = await getImplementationAddress(client, address)
+      });
+      implAddress = await getImplementationAddress(client, address);
     }
 
     if (implAddress) {
       // It's a proxy! Fetch implementation ABI and merge
-      const implInfo = await fetchContractInfo(implAddress, chainId, apiKey)
+      const implInfo = await fetchContractInfo(implAddress, chainId, apiKey);
 
       if (implInfo && implInfo.abi) {
-        const mergedAbi = mergeAbis(proxyInfo.abi, implInfo.abi)
+        const mergedAbi = mergeAbis(proxyInfo.abi, implInfo.abi);
         return NextResponse.json({
           abi: mergedAbi,
           contractName: proxyInfo.contractName,
           implContractName: implInfo.contractName,
           isProxy: true,
           implAddress: implAddress,
-        })
+        });
       }
     }
 
@@ -408,12 +442,12 @@ export async function GET(request) {
       abi: proxyInfo.abi,
       contractName: proxyInfo.contractName,
       isProxy: false,
-    })
+    });
   } catch (error) {
-    console.error('Fetch ABI error:', error)
+    console.error("Fetch ABI error:", error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch ABI' },
-      { status: 500 }
-    )
+      { error: error.message || "Failed to fetch ABI" },
+      { status: 500 },
+    );
   }
 }

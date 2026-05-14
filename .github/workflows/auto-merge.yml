@@ -1,0 +1,59 @@
+name: Auto Merge
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  auto-merge:
+    name: Auto merge on approval command
+    runs-on: ubuntu-latest
+    # Only run on PR comments matching approval commands
+    if: |
+      github.event.issue.pull_request &&
+      (
+        startsWith(github.event.comment.body, '/sgtm') ||
+        startsWith(github.event.comment.body, '/lgtm') ||
+        startsWith(github.event.comment.body, '/approve') ||
+        startsWith(github.event.comment.body, '/merge')
+      )
+    permissions:
+      pull-requests: write
+      contents: write
+
+    steps:
+      - name: Check commenter has write access
+        id: check-perms
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              username: context.payload.comment.user.login,
+            });
+            const allowed = ['admin', 'write'].includes(data.permission);
+            core.setOutput('allowed', String(allowed));
+            if (!allowed) {
+              core.info(`Ignoring: ${context.payload.comment.user.login} has '${data.permission}' permission`);
+            }
+
+      - name: React to comment
+        if: steps.check-perms.outputs.allowed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'rocket',
+            });
+
+      - name: Enable auto-merge
+        if: steps.check-perms.outputs.allowed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr merge --auto --squash ${{ github.event.issue.number }} \
+            --repo ${{ github.repository }}

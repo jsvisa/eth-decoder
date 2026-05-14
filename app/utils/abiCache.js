@@ -5,7 +5,7 @@
  * Stores ABIs in localStorage with chain-address keys.
  */
 
-const ABI_CACHE_PREFIX = 'abi-'
+const ABI_CACHE_PREFIX = "abi-";
 
 /**
  * Generate localStorage key for ABI cache
@@ -14,8 +14,8 @@ const ABI_CACHE_PREFIX = 'abi-'
  * @returns {string} Cache key
  */
 export const getAbiCacheKey = (chain, address) => {
-  return `${ABI_CACHE_PREFIX}${chain}-${address.toLowerCase()}`
-}
+  return `${ABI_CACHE_PREFIX}${chain}-${address.toLowerCase()}`;
+};
 
 /**
  * Retrieve cached ABI from localStorage
@@ -24,19 +24,19 @@ export const getAbiCacheKey = (chain, address) => {
  * @returns {object|null} Cached ABI data or null if not found
  */
 export const getCachedAbi = (chain, address) => {
-  if (typeof window === 'undefined') return null
+  if (typeof window === "undefined") return null;
 
   try {
-    const key = getAbiCacheKey(chain, address)
-    const cached = localStorage.getItem(key)
+    const key = getAbiCacheKey(chain, address);
+    const cached = localStorage.getItem(key);
     if (cached) {
-      return JSON.parse(cached)
+      return JSON.parse(cached);
     }
   } catch (err) {
-    console.error('Failed to load cached ABI:', err)
+    console.error("Failed to load cached ABI:", err);
   }
-  return null
-}
+  return null;
+};
 
 /**
  * Store ABI in localStorage cache
@@ -48,23 +48,34 @@ export const getCachedAbi = (chain, address) => {
  * @param {string|null} contractName - Contract name
  * @param {string|null} implContractName - Implementation contract name if proxy
  */
-export const setCachedAbi = (chain, address, abi, isProxy = false, implAddress = null, contractName = null, implContractName = null) => {
-  if (typeof window === 'undefined') return
+export const setCachedAbi = (
+  chain,
+  address,
+  abi,
+  isProxy = false,
+  implAddress = null,
+  contractName = null,
+  implContractName = null,
+) => {
+  if (typeof window === "undefined") return;
 
   try {
-    const key = getAbiCacheKey(chain, address)
-    localStorage.setItem(key, JSON.stringify({
-      abi,
-      isProxy,
-      implAddress,
-      contractName,
-      implContractName,
-      timestamp: Date.now()
-    }))
+    const key = getAbiCacheKey(chain, address);
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        abi,
+        isProxy,
+        implAddress,
+        contractName,
+        implContractName,
+        timestamp: Date.now(),
+      }),
+    );
   } catch (err) {
-    console.error('Failed to cache ABI:', err)
+    console.error("Failed to cache ABI:", err);
   }
-}
+};
 
 /**
  * Build an ABI cache map from localStorage for a given chain
@@ -72,36 +83,36 @@ export const setCachedAbi = (chain, address, abi, isProxy = false, implAddress =
  * @returns {Map<string, Array>} Map of lowercase address -> ABI array
  */
 export const buildAbiCacheFromStorage = (chain) => {
-  const cache = new Map()
+  const cache = new Map();
 
-  if (typeof window === 'undefined') return cache
+  if (typeof window === "undefined") return cache;
 
   try {
     for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
+      const key = localStorage.key(i);
       if (key && key.startsWith(ABI_CACHE_PREFIX)) {
-        const [, chainAndAddress] = key.split(ABI_CACHE_PREFIX)
-        const dashIndex = chainAndAddress.indexOf('-')
-        if (dashIndex === -1) continue
+        const [, chainAndAddress] = key.split(ABI_CACHE_PREFIX);
+        const dashIndex = chainAndAddress.indexOf("-");
+        if (dashIndex === -1) continue;
 
-        const cachedChain = chainAndAddress.substring(0, dashIndex)
-        const cachedAddress = chainAndAddress.substring(dashIndex + 1)
+        const cachedChain = chainAndAddress.substring(0, dashIndex);
+        const cachedAddress = chainAndAddress.substring(dashIndex + 1);
 
         // Only include ABIs for the requested chain
         if (cachedChain === chain) {
-          const cached = JSON.parse(localStorage.getItem(key))
+          const cached = JSON.parse(localStorage.getItem(key));
           if (cached && cached.abi) {
-            cache.set(cachedAddress.toLowerCase(), cached.abi)
+            cache.set(cachedAddress.toLowerCase(), cached.abi);
           }
         }
       }
     }
   } catch (err) {
-    console.error('Failed to build ABI cache from storage:', err)
+    console.error("Failed to build ABI cache from storage:", err);
   }
 
-  return cache
-}
+  return cache;
+};
 
 /**
  * Fetch ABI from API and cache it
@@ -112,34 +123,41 @@ export const buildAbiCacheFromStorage = (chain) => {
  * @param {number|string} chainId - Optional chain ID for custom chains
  * @returns {Promise<Array|null>} The ABI array or null if fetch failed
  */
-export const fetchAndCacheAbi = async (chain, address, apiKey, rpcUrl, chainId, { detectProxy = false } = {}) => {
+export const fetchAndCacheAbi = async (
+  chain,
+  address,
+  apiKey,
+  rpcUrl,
+  chainId,
+  { detectProxy = false } = {},
+) => {
   try {
     // Check cache first
-    const cached = getCachedAbi(chain, address)
+    const cached = getCachedAbi(chain, address);
     if (cached && cached.abi) {
-      return cached.abi
+      return cached.abi;
     }
 
     // Build API params
-    const params = new URLSearchParams({ address, chain })
+    const params = new URLSearchParams({ address, chain });
     if (apiKey) {
-      params.set('apiKey', apiKey)
+      params.set("apiKey", apiKey);
     }
     if (rpcUrl) {
-      params.set('rpcUrl', rpcUrl)
+      params.set("rpcUrl", rpcUrl);
     }
     if (chainId) {
-      params.set('chainId', chainId.toString())
+      params.set("chainId", chainId.toString());
     }
     if (detectProxy) {
-      params.set('detectProxy', 'true')
+      params.set("detectProxy", "true");
     }
 
-    const response = await fetch(`/api/fetch-abi?${params}`)
-    const data = await response.json()
+    const response = await fetch(`/api/fetch-abi?${params}`);
+    const data = await response.json();
 
     if (!response.ok || !data.abi) {
-      return null
+      return null;
     }
 
     // Cache the fetched ABI
@@ -150,15 +168,15 @@ export const fetchAndCacheAbi = async (chain, address, apiKey, rpcUrl, chainId, 
       data.isProxy || false,
       data.implAddress || null,
       data.contractName || null,
-      data.implContractName || null
-    )
+      data.implContractName || null,
+    );
 
-    return data.abi
+    return data.abi;
   } catch (err) {
-    console.error(`Failed to fetch ABI for ${address}:`, err)
-    return null
+    console.error(`Failed to fetch ABI for ${address}:`, err);
+    return null;
   }
-}
+};
 
 /**
  * Fetch ABIs for multiple addresses in parallel
@@ -169,19 +187,25 @@ export const fetchAndCacheAbi = async (chain, address, apiKey, rpcUrl, chainId, 
  * @param {number|string} chainId - Optional chain ID for custom chains
  * @returns {Promise<Map<string, Array>>} Map of lowercase address -> ABI array
  */
-export const fetchAbisForAddresses = async (chain, addresses, apiKey, rpcUrl, chainId) => {
-  const results = new Map()
+export const fetchAbisForAddresses = async (
+  chain,
+  addresses,
+  apiKey,
+  rpcUrl,
+  chainId,
+) => {
+  const results = new Map();
 
   // Fetch all ABIs in parallel
   const fetchPromises = addresses.map(async (address) => {
-    const normalizedAddress = address.toLowerCase()
-    const abi = await fetchAndCacheAbi(chain, address, apiKey, rpcUrl, chainId)
+    const normalizedAddress = address.toLowerCase();
+    const abi = await fetchAndCacheAbi(chain, address, apiKey, rpcUrl, chainId);
     if (abi) {
-      results.set(normalizedAddress, abi)
+      results.set(normalizedAddress, abi);
     }
-  })
+  });
 
-  await Promise.all(fetchPromises)
+  await Promise.all(fetchPromises);
 
-  return results
-}
+  return results;
+};

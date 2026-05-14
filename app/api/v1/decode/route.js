@@ -1,1 +1,1 @@
-export { GET } from '../../decode/route.js'
+export { GET } from "../../decode/route.js";
