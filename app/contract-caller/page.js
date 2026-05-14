@@ -19,7 +19,6 @@ import {
 } from "../utils/addressBook";
 import {
   simulateWithTevm,
-  // eslint-disable-next-line no-unused-vars
   simulateWithClient,
   createTevmClient,
   redecodeLogs,
@@ -2430,6 +2429,12 @@ export default function ContractCaller() {
       return;
     }
 
+    // Guard: don't allow calls while session is being created
+    if (sessionStarting) {
+      setError("Session is still starting, please wait");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setResult(null);
@@ -2474,7 +2479,7 @@ export default function ContractCaller() {
         simAbortRef.current = abortController;
         setSimProgress(0);
 
-        data = await simulateWithTevm({
+        const simParams = {
           chain,
           address,
           functionName: selectedFunction,
@@ -2492,8 +2497,34 @@ export default function ContractCaller() {
           abortSignal: abortController.signal,
           rpcBatchSize,
           callData: rawCalldataMode ? rawCalldata.trim() : undefined,
-        });
+        };
+
+        if (sessionActive && sessionClientRef.current) {
+          data = await simulateWithClient(
+            sessionClientRef.current,
+            sessionBlock,
+            simParams,
+          );
+        } else {
+          data = await simulateWithTevm(simParams);
+        }
         setSimProgress(100);
+
+        // Append to session history if session is active
+        if (sessionActive) {
+          setSessionHistory((prev) => [
+            ...prev,
+            {
+              id: Date.now(),
+              address,
+              contractName: contractName || address.slice(0, 8) + "...",
+              functionName: selectedFunction,
+              success: data.success,
+              gasUsed: data.gasUsed,
+              timestamp: Date.now(),
+            },
+          ]);
+        }
 
         // If there are undecoded addresses, fetch their ABIs and re-decode
         if (data.undecodedAddresses && data.undecodedAddresses.length > 0) {
