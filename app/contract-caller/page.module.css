@@ -4277,6 +4277,11 @@
   color: #ef4444;
 }
 
+.sessionHistoryBadgeRead {
+  background: rgba(99, 179, 237, 0.15);
+  color: #63b3ed;
+}
+
 .sessionHistoryFunc {
   flex: 1;
   color: var(--text-primary, #eee);

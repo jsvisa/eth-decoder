@@ -2443,8 +2443,9 @@ export default function ContractCaller() {
     try {
       let data;
 
-      // Use local Tevm simulation for write functions if enabled
-      if (isWrite && useLocalSimulation) {
+      // Use local Tevm for write functions, and for ALL functions when session is active
+      // (reads must go through the fork so they see state mutated by prior session writes)
+      if (useLocalSimulation && (isWrite || sessionActive)) {
         // Build cheatcodes object
         const activeCheatcodes = {};
         if (
@@ -2520,6 +2521,7 @@ export default function ContractCaller() {
               address,
               contractName: contractName || address.slice(0, 8) + "...",
               functionName: selectedFunction,
+              type: isWrite ? "write" : "read",
               success: data.success,
               gasUsed: data.gasUsed,
               timestamp: Date.now(),
@@ -5605,12 +5607,14 @@ export default function ContractCaller() {
                   <span className={styles.sessionHistoryIndex}>#{idx + 1}</span>
                   <span
                     className={`${styles.sessionHistoryBadge} ${
-                      item.success
-                        ? styles.sessionHistoryBadgeSuccess
-                        : styles.sessionHistoryBadgeFail
+                      item.type === "read"
+                        ? styles.sessionHistoryBadgeRead
+                        : item.success
+                          ? styles.sessionHistoryBadgeSuccess
+                          : styles.sessionHistoryBadgeFail
                     }`}
                   >
-                    {item.success ? "✓" : "✗"}
+                    {item.type === "read" ? "R" : item.success ? "✓" : "✗"}
                   </span>
                   <span className={styles.sessionHistoryFunc}>
                     {item.contractName} · {item.functionName}
