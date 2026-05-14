@@ -852,6 +852,36 @@
   gap: 1rem;
 }
 
+.rawModeToggle {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.rawModeToggle:hover:not(:disabled) {
+  border-color: var(--border-focus);
+  color: var(--text-primary);
+}
+
+.rawModeToggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rawModeActive {
+  color: #2563eb;
+  border-color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+}
+
 .readBlockInline {
   display: flex;
   align-items: center;
