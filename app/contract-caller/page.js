@@ -5027,7 +5027,7 @@ export default function ContractCaller() {
               <button
                 onClick={handleCall}
                 className={`${styles.button} ${selectedFunction && getSelectedFunction() && !isReadOnly(getSelectedFunction()) ? styles.simulateButton : ""}`}
-                disabled={loading || !selectedFunction}
+                disabled={loading || !selectedFunction || sessionStarting}
               >
                 {loading ? (
                   selectedFunction &&
