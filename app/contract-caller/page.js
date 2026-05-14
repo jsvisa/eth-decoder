@@ -5600,7 +5600,7 @@ export default function ContractCaller() {
             <div className={styles.sessionHistoryList}>
               {sessionHistory.map((item, idx) => (
                 <div key={item.id} className={styles.sessionHistoryItem}>
-                  <span className={styles.sessionHistoryGas}>#{idx + 1}</span>
+                  <span className={styles.sessionHistoryIndex}>#{idx + 1}</span>
                   <span
                     className={`${styles.sessionHistoryBadge} ${
                       item.success

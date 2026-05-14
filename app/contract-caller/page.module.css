@@ -4289,3 +4289,8 @@
   color: var(--text-secondary, #aaa);
   flex-shrink: 0;
 }
+
+.sessionHistoryIndex {
+  color: var(--text-secondary, #aaa);
+  flex-shrink: 0;
+}
