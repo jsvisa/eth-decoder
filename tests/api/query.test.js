@@ -78,7 +78,11 @@ describe("GET /api/query", () => {
       msg: "ok",
       data: [
         { text_sign: "transfer(address,uint256)", output: "()", abi: null },
-        { text_sign: "transfer(address,uint256,bytes)", output: "()", abi: null },
+        {
+          text_sign: "transfer(address,uint256,bytes)",
+          output: "()",
+          abi: null,
+        },
       ],
     };
     global.fetch.mockResolvedValueOnce({
