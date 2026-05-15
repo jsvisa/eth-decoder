@@ -131,21 +131,11 @@ def test_decode_event_log_decodes_indexed_address():
 # GET /api/v1/query
 # ---------------------------------------------------------------------------
 
-VALID_APIKEY = ")"  # default value of ABI_SERVER_APIKEY in main.py
 GETADAPTERS_SIGN = "0xb82e16e3"  # getAdapters() — present in evm.func_sign.csv
 
 
-def test_query_wrong_apikey_returns_401(client):
-    resp = client.get(
-        "/api/v1/query", params={"apikey": "wrong", "sign": GETADAPTERS_SIGN}
-    )
-    assert resp.status_code == 401
-
-
 def test_query_known_sign_returns_text_sign(client):
-    resp = client.get(
-        "/api/v1/query", params={"apikey": VALID_APIKEY, "sign": GETADAPTERS_SIGN}
-    )
+    resp = client.get("/api/v1/query", params={"sign": GETADAPTERS_SIGN})
     assert resp.status_code == 200
     body = resp.json()
     assert body["msg"] == "ok"
@@ -153,18 +143,14 @@ def test_query_known_sign_returns_text_sign(client):
 
 
 def test_query_known_sign_returns_abi(client):
-    resp = client.get(
-        "/api/v1/query", params={"apikey": VALID_APIKEY, "sign": GETADAPTERS_SIGN}
-    )
+    resp = client.get("/api/v1/query", params={"sign": GETADAPTERS_SIGN})
     body = resp.json()
     assert body["data"]["abi"] is not None
     assert body["data"]["abi"]["name"] == "getAdapters"
 
 
 def test_query_unknown_sign_returns_not_found(client):
-    resp = client.get(
-        "/api/v1/query", params={"apikey": VALID_APIKEY, "sign": "0xdeadbeef"}
-    )
+    resp = client.get("/api/v1/query", params={"sign": "0xdeadbeef"})
     assert resp.status_code == 200
     assert resp.json()["msg"] == "not found"
 
@@ -174,22 +160,13 @@ def test_query_unknown_sign_returns_not_found(client):
 # ---------------------------------------------------------------------------
 
 
-def test_query_event_wrong_apikey_returns_401(client):
-    resp = client.get(
-        "/api/v1/query-event", params={"apikey": "wrong", "sign": TRANSFER_TOPIC0}
-    )
-    assert resp.status_code == 401
-
-
 def test_query_event_missing_sign_returns_400(client):
-    resp = client.get("/api/v1/query-event", params={"apikey": VALID_APIKEY})
+    resp = client.get("/api/v1/query-event", params={})
     assert resp.status_code == 400
 
 
 def test_query_event_known_transfer_sign_returns_text_sign(client):
-    resp = client.get(
-        "/api/v1/query-event", params={"apikey": VALID_APIKEY, "sign": TRANSFER_TOPIC0}
-    )
+    resp = client.get("/api/v1/query-event", params={"sign": TRANSFER_TOPIC0})
     assert resp.status_code == 200
     body = resp.json()
     assert body["msg"] == "ok"
