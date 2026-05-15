@@ -19,7 +19,6 @@ logging.basicConfig(
 # eg https://etherscan.io/tx/0xe0b20e4bc3dd2c5af2d365c9c9af190756699de5155bc9251196532a2a869d5e
 MAX_BODY_SIZE = 10 * 1024 * 1024
 DB_URL = os.getenv("POSTGRES_DATABASE_URL")
-APIKEY = os.getenv("ABI_SERVER_APIKEY", ")")
 
 
 def _param():
@@ -99,12 +98,9 @@ def extract_output_sign(abi: Dict) -> str:
 
 @app.get("/api/v1/query")
 async def get_abi(
-    apikey: str = Query(None, description="API Key"),
     sign: str = Query(None, description="Signature string"),
     count: int = Query(1, description="Number of results to return"),
 ):
-    if apikey != APIKEY:
-        raise HTTPException(status_code=401, detail="Unauthorized")
     rows = get_abi_by_sign(sign, count)
     if len(rows) == 0:
         return {"msg": "not found", "data": None}
@@ -257,14 +253,11 @@ def decode_event_log(abi: Dict, topics: List[str], data: str) -> Dict:
 
 @app.get("/api/v1/query-event")
 async def query_event(
-    apikey: str = Query(None, description="API Key"),
     sign: str = Query(
         None, description="topic0 hex (32-byte keccak256 of event signature)"
     ),
     count: int = Query(1, description="Number of results to return"),
 ):
-    if apikey != APIKEY:
-        raise HTTPException(status_code=401, detail="Unauthorized")
     if not sign:
         raise HTTPException(status_code=400, detail="sign is required")
     rows = get_event_abi_by_topic(sign, count)
