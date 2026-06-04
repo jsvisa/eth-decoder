@@ -3,16 +3,48 @@
 import { useState, useEffect } from "react";
 import yaml from "js-yaml";
 import styles from "./page.module.css";
+import { decodeUniversalRouter } from "./utils/universalRouter.js";
+import { decodeMulticall } from "./utils/multicallDecoder.js";
 
 const STORAGE_KEY = "evm_decoder_history";
 const MAX_HISTORY_ITEMS = 100;
+
+const UR_SELECTORS = new Set(["0x24856bc3", "0x3593564c"]);
+
+// Decode each inner call's `data` field via /api/decode and patch result state.
+// Fires all requests in parallel; each resolved call updates state immediately.
+async function decodeInnerCallsAsync(innerCalls, setResult) {
+  await Promise.all(
+    innerCalls.map(async (call, idx) => {
+      const d = call.data;
+      if (!d || d === "0x" || d.length < 10) return;
+      try {
+        const resp = await fetch(
+          `/api/decode?${new URLSearchParams({ data: d })}`,
+        );
+        if (!resp.ok) return;
+        const json = await resp.json();
+        const decoded =
+          json?.msg === "ok" && json?.data?.[0] ? json.data[0] : null;
+        if (!decoded) return;
+        setResult((prev) => {
+          if (!prev?.inner_calls) return prev;
+          const updated = [...prev.inner_calls];
+          updated[idx] = { ...updated[idx], decoded };
+          return { ...prev, inner_calls: updated };
+        });
+      } catch {
+        // best-effort — leave call as-is
+      }
+    }),
+  );
+}
 
 export default function Home() {
   const [inputData, setInputData] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [multicall, setMulticall] = useState(false);
   const [withAbi, setWithAbi] = useState(false);
   const [withSign, setWithSign] = useState(false);
   const [isYaml, setIsYaml] = useState(false);
@@ -42,7 +74,6 @@ export default function Home() {
       setInputData(urlData);
 
       // Set options from URL if provided
-      if (params.get("multicall") === "true") setMulticall(true);
       if (params.get("with_abi") === "true") setWithAbi(true);
       if (params.get("with_sign") === "true") setWithSign(true);
 
@@ -80,7 +111,6 @@ export default function Home() {
   const loadFromHistory = (item) => {
     setInputData(item.input);
     setResult(item.output);
-    setMulticall(item.options.multicall);
     setWithAbi(item.options.withAbi);
     setWithSign(item.options.withSign);
     setError(null);
@@ -271,7 +301,6 @@ export default function Home() {
     try {
       const params = new URLSearchParams({
         data: inputData,
-        multicall: multicall,
         with_abi: withAbi,
         with_sign: withSign,
       });
@@ -298,16 +327,38 @@ export default function Home() {
         resultToDisplay = data;
       }
 
+      // Augment result with client-side multicall inner-call decoding
+      const hex = inputData.trim().toLowerCase();
+      const selector = (hex.startsWith("0x") ? hex : "0x" + hex).slice(0, 10);
+      if (UR_SELECTORS.has(selector)) {
+        const urDecoded = decodeUniversalRouter(inputData);
+        if (urDecoded?.inner_calls) {
+          resultToDisplay = {
+            ...resultToDisplay,
+            inner_calls: urDecoded.inner_calls,
+          };
+        }
+      } else {
+        const mcDecoded = decodeMulticall(inputData);
+        if (mcDecoded?.inner_calls) {
+          resultToDisplay = {
+            ...resultToDisplay,
+            inner_calls: mcDecoded.inner_calls,
+          };
+        }
+      }
+
       setResult(resultToDisplay);
       setIsYaml(false); // Reset to JSON format on new result
       setCopied(false); // Reset copied state
 
       // Save to history
-      saveToHistory(inputData, resultToDisplay, {
-        multicall,
-        withAbi,
-        withSign,
-      });
+      saveToHistory(inputData, resultToDisplay, { withAbi, withSign });
+
+      // Progressively decode each inner call's data and update the result
+      if (resultToDisplay.inner_calls?.length > 0) {
+        decodeInnerCallsAsync(resultToDisplay.inner_calls, setResult);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -380,7 +431,6 @@ export default function Home() {
         data: inputData,
       });
 
-      if (multicall) params.append("multicall", "true");
       if (withAbi) params.append("with_abi", "true");
       if (withSign) params.append("with_sign", "true");
 
@@ -426,16 +476,6 @@ export default function Home() {
           />
 
           <div className={styles.options}>
-            <label className={styles.checkbox}>
-              <input
-                type="checkbox"
-                checked={multicall}
-                onChange={(e) => setMulticall(e.target.checked)}
-                disabled={loading}
-              />
-              <span>Multicall</span>
-            </label>
-
             <label className={styles.checkbox}>
               <input
                 type="checkbox"
@@ -552,11 +592,8 @@ export default function Home() {
                       <span className={styles.historyTime}>
                         {new Date(item.timestamp).toLocaleString()}
                       </span>
-                      {(item.options.multicall ||
-                        item.options.withAbi ||
-                        item.options.withSign) && (
+                      {(item.options.withAbi || item.options.withSign) && (
                         <span className={styles.historyOptions}>
-                          {item.options.multicall && "M"}
                           {item.options.withAbi && "A"}
                           {item.options.withSign && "S"}
                         </span>

@@ -8,12 +8,15 @@ A web application for decoding EVM transaction input data and interacting with s
 
 - Hex string validation and input field for EVM transaction data
 - Real-time decoding via proxied API
+- **Auto multicall detection**: recognises all standard multicall selectors by their 4-byte signature — no manual toggle needed
+- **Deep inner-call decoding**: for `tuple_array`, `bytes_array`, and Universal Router variants, each inner call's `data` field is decoded and shown as `inner_calls[].decoded`
+- **Universal Router support**: commands byte is split into named sub-commands (`V3_SWAP_EXACT_IN`, `WRAP_ETH`, `SWEEP`, …) with their decoded arguments
 - JSON and YAML formatted output with syntax highlighting
 - Copy to clipboard functionality
-- Shareable URLs - generate links to share decoded transactions
+- Shareable URLs — generate links to share decoded transactions
 - Recent decode history (stores up to 100 items in browser localStorage)
 - Click history items to quickly reload previous decodes
-- Support for multicall, ABI, and signature decoding options
+- ABI and signature decoding options
 
 ### Contract Caller
 
@@ -46,15 +49,16 @@ A web application for decoding EVM transaction input data and interacting with s
 You can share decode results by using URL parameters:
 
 ```
-https://your-domain.vercel.app/?data=0x1234abcd...&multicall=true&with_abi=true&with_sign=true
+https://your-domain.vercel.app/?data=0x1234abcd...&with_abi=true&with_sign=true
 ```
 
 Parameters:
 
 - `data` (required): Hex string to decode
-- `multicall` (optional): Set to `true` to enable multicall option
-- `with_abi` (optional): Set to `true` to enable ABI option
-- `with_sign` (optional): Set to `true` to enable signature option
+- `with_abi` (optional): Set to `true` to include the matched ABI in the response
+- `with_sign` (optional): Set to `true` to include the 4-byte selector in the response
+
+Multicall is detected automatically from the function selector — no parameter needed.
 
 The app will automatically populate the input and trigger decoding when these parameters are present.
 
@@ -102,18 +106,30 @@ The app exposes a versioned public API at `/api/v1/` that can be used by externa
 
 ### `GET /api/v1/decode`
 
-Decode EVM transaction calldata. Proxies to the configured `BACKEND_URL`.
+Decode EVM transaction calldata. For known multicall selectors the response always includes `inner_calls` — no extra parameter needed.
 
 | Parameter   | Required | Description                                           |
 | ----------- | -------- | ----------------------------------------------------- |
 | `data`      | Yes      | Hex-encoded calldata (with or without `0x` prefix)    |
-| `multicall` | No       | `true` to recursively decode multicall inner calls    |
 | `with_abi`  | No       | `true` to include the matched ABI in the response     |
 | `with_sign` | No       | `true` to include the 4-byte selector in the response |
 
 ```
 GET /api/v1/decode?data=0xa9059cbb000000000000000000000000...
 ```
+
+**Multicall auto-detection.** The following selectors are recognised automatically and the response includes an `inner_calls` array:
+
+| Selector     | Function                                            | Type             |
+| ------------ | --------------------------------------------------- | ---------------- |
+| `0xac9650d8` | `multicall(bytes[])`                                | bytes_array      |
+| `0x60fc8466` | `multicall((bool,bytes)[])`                         | tuple_array      |
+| `0x374f435d` | `multicall((address,bytes,uint256,bool,bytes32)[])` | tuple_array      |
+| `0x82ad56cb` | `aggregate3((address,bool,bytes)[])`                | tuple_array      |
+| `0x24856bc3` | `execute(bytes,bytes[])`                            | Universal Router |
+| `0x3593564c` | `execute(bytes,bytes[],uint256)`                    | Universal Router |
+
+Each element of `inner_calls` contains at minimum `index`, `selector`, and `data`. For `tuple_array` variants the target address and extra fields (`value`, `skipRevert`, …) are included. For Universal Router commands, `name` (e.g. `V3_SWAP_EXACT_IN`) and decoded `args` are included instead. When the inner selector is known to OpenChain, a `decoded` object with `func` and `args` is attached.
 
 ### `GET /api/v1/decode-event`
 
@@ -199,10 +215,12 @@ vercel --prod
 
 ### Transaction Decoder
 
-1. User enters transaction data in the input field
-2. Frontend sends request to `/api/decode` (Next.js API route)
-3. API route proxies the request to the backend endpoint (hidden from frontend)
-4. Response is returned and displayed to the user
+1. User pastes calldata into the input field
+2. The 4-byte selector is checked against known multicall signatures — if matched, inner-call decoding is enabled automatically
+3. Frontend sends a request to `/api/decode`
+4. The route queries the backend; if the backend has the contract in its DB it returns the decoded outer call, otherwise OpenChain is used as a fallback
+5. For recognised multicall selectors the route decodes inner calls client-side (no extra round-trip): Universal Router commands use hardcoded command ABIs; `bytes_array` / `tuple_array` variants look up each inner selector via OpenChain
+6. The fully decoded response — outer `func`/`args` plus `inner_calls` — is returned to the browser
 
 ### Contract Caller
 
