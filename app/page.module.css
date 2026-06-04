@@ -52,6 +52,45 @@
   cursor: not-allowed;
 }
 
+.addressRow {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.addressInput {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.addressInput:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.addressInput:disabled {
+  background-color: var(--bg-hover);
+  cursor: not-allowed;
+}
+
+.chainSelect {
+  padding: 0.5rem 0.5rem;
+  font-size: 0.875rem;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.chainSelect:disabled {
+  cursor: not-allowed;
+}
+
 .options {
   display: flex;
   gap: 1.25rem;

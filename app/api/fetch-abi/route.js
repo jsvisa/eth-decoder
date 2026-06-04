@@ -2,15 +2,10 @@ import { NextResponse } from "next/server";
 import { createPublicClient, http, defineChain } from "viem";
 import { mainnet, arbitrum, base, polygon, bsc } from "viem/chains";
 import { isValidEthAddress } from "../../utils/validation";
-
-// Etherscan V2 API uses chain IDs (built-in chains)
-const BUILT_IN_CHAIN_IDS = {
-  ethereum: 1,
-  arbitrum: 42161,
-  base: 8453,
-  polygon: 137,
-  bsc: 56,
-};
+import {
+  BUILT_IN_CHAIN_IDS,
+  fetchContractInfo,
+} from "../../utils/contractInfo.js";
 
 const CHAINS = {
   ethereum: mainnet,
@@ -28,8 +23,6 @@ const RPC_URLS = {
   bsc: "https://bsc-dataseed.binance.org",
 };
 
-const ETHERSCAN_V2_API = "https://api.etherscan.io/v2/api";
-
 // EIP-1967 implementation slot
 const EIP1967_IMPL_SLOT =
   "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
@@ -39,133 +32,6 @@ const EIP1967_BEACON_SLOT =
 // OpenZeppelin legacy implementation slot
 const OZ_IMPL_SLOT =
   "0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3";
-
-// Fetch ABI and contract name from Etherscan
-async function fetchContractInfoFromEtherscan(address, chainId, apiKey) {
-  const params = new URLSearchParams({
-    chainid: chainId,
-    module: "contract",
-    action: "getsourcecode",
-    address: address,
-    apikey: apiKey,
-  });
-
-  const response = await fetch(`${ETHERSCAN_V2_API}?${params}`);
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const data = await response.json();
-
-  if (data.status !== "1" || !data.result || !data.result[0]) {
-    return null;
-  }
-
-  const result = data.result[0];
-  const abi =
-    result.ABI && result.ABI !== "Contract source code not verified"
-      ? JSON.parse(result.ABI)
-      : null;
-
-  return {
-    abi,
-    contractName: result.ContractName || null,
-    isProxy: result.Proxy === "1",
-    implementation: result.Implementation || null,
-    source: "etherscan",
-  };
-}
-
-// Fetch ABI from Sourcify (fallback for unverified contracts on Etherscan)
-async function fetchContractInfoFromSourcify(address, chainId) {
-  try {
-    // Check if contract is verified on Sourcify
-    const checkResponse = await fetch(
-      `https://sourcify.dev/server/check-by-addresses?addresses=${address}&chainIds=${chainId}`,
-    );
-
-    if (!checkResponse.ok) {
-      return null;
-    }
-
-    const checkData = await checkResponse.json();
-
-    // Check if we have a match (perfect or partial)
-    if (!checkData || !checkData[0] || !checkData[0].chainIds) {
-      return null;
-    }
-
-    const match = checkData[0].chainIds.find(
-      (c) => c.chainId === String(chainId),
-    );
-    if (!match || (match.status !== "perfect" && match.status !== "partial")) {
-      return null;
-    }
-
-    // Fetch the metadata which contains the ABI
-    const filesResponse = await fetch(
-      `https://sourcify.dev/server/files/${chainId}/${address}`,
-    );
-
-    if (!filesResponse.ok) {
-      return null;
-    }
-
-    const filesData = await filesResponse.json();
-
-    // Find metadata.json which contains the ABI
-    const metadataFile = filesData.files?.find(
-      (f) => f.name === "metadata.json",
-    );
-    if (!metadataFile || !metadataFile.content) {
-      return null;
-    }
-
-    const metadata = JSON.parse(metadataFile.content);
-    const abi = metadata.output?.abi;
-
-    if (!abi) {
-      return null;
-    }
-
-    // Try to get contract name from metadata
-    const contractName = metadata.settings?.compilationTarget
-      ? Object.values(metadata.settings.compilationTarget)[0]
-      : null;
-
-    return {
-      abi,
-      contractName,
-      source: "sourcify",
-    };
-  } catch (e) {
-    console.error("Sourcify fetch error:", e);
-    return null;
-  }
-}
-
-// Try to fetch contract info from multiple sources
-async function fetchContractInfo(address, chainId, apiKey) {
-  // Try Etherscan first
-  const etherscanInfo = await fetchContractInfoFromEtherscan(
-    address,
-    chainId,
-    apiKey,
-  );
-  if (etherscanInfo && etherscanInfo.abi) {
-    return etherscanInfo;
-  }
-
-  // Fallback to Sourcify
-  const sourcifyInfo = await fetchContractInfoFromSourcify(address, chainId);
-  if (sourcifyInfo && sourcifyInfo.abi) {
-    return sourcifyInfo;
-  }
-
-  // Return Etherscan info even if no ABI (for contract name)
-  return etherscanInfo;
-}
 
 // Get implementation address from proxy
 async function getImplementationAddress(client, proxyAddress) {

@@ -47,6 +47,8 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [withAbi, setWithAbi] = useState(false);
   const [withSign, setWithSign] = useState(false);
+  const [contractAddress, setContractAddress] = useState("");
+  const [contractChain, setContractChain] = useState("ethereum");
   const [isYaml, setIsYaml] = useState(false);
   const [copied, setCopied] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
@@ -76,6 +78,8 @@ export default function Home() {
       // Set options from URL if provided
       if (params.get("with_abi") === "true") setWithAbi(true);
       if (params.get("with_sign") === "true") setWithSign(true);
+      if (params.get("address")) setContractAddress(params.get("address"));
+      if (params.get("chain")) setContractChain(params.get("chain"));
 
       // Auto-decode after a short delay to ensure state is set
       setTimeout(() => {
@@ -304,6 +308,10 @@ export default function Home() {
         with_abi: withAbi,
         with_sign: withSign,
       });
+      if (contractAddress.trim()) {
+        params.set("address", contractAddress.trim());
+        if (contractChain !== "ethereum") params.set("chain", contractChain);
+      }
 
       const response = await fetch(`/api/decode?${params}`);
 
@@ -433,6 +441,10 @@ export default function Home() {
 
       if (withAbi) params.append("with_abi", "true");
       if (withSign) params.append("with_sign", "true");
+      if (contractAddress.trim()) {
+        params.append("address", contractAddress.trim());
+        if (contractChain !== "ethereum") params.append("chain", contractChain);
+      }
 
       const shareUrl = `${window.location.origin}${window.location.pathname}?${params}`;
 
@@ -474,6 +486,29 @@ export default function Home() {
             className={styles.input}
             disabled={loading}
           />
+
+          <div className={styles.addressRow}>
+            <input
+              type="text"
+              value={contractAddress}
+              onChange={(e) => setContractAddress(e.target.value)}
+              placeholder="Contract address (optional — enables Sourcify ABI decode)"
+              className={styles.addressInput}
+              disabled={loading}
+            />
+            <select
+              value={contractChain}
+              onChange={(e) => setContractChain(e.target.value)}
+              className={styles.chainSelect}
+              disabled={loading}
+            >
+              <option value="ethereum">Ethereum</option>
+              <option value="arbitrum">Arbitrum</option>
+              <option value="base">Base</option>
+              <option value="polygon">Polygon</option>
+              <option value="bsc">BSC</option>
+            </select>
+          </div>
 
           <div className={styles.options}>
             <label className={styles.checkbox}>

@@ -179,3 +179,108 @@ describe("GET /api/decode — OpenChain fallback", () => {
     expect(body.data).toEqual([]);
   });
 });
+
+// Minimal ABI with just the transfer function (named params)
+const SOURCIFY_TRANSFER_ABI = [
+  {
+    type: "function",
+    name: "transfer",
+    inputs: [
+      { name: "recipient", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+  },
+];
+
+function sourcifyCheckResponse(address, chainId) {
+  return {
+    ok: true,
+    json: async () => [
+      { address, chainIds: [{ chainId: String(chainId), status: "perfect" }] },
+    ],
+  };
+}
+
+function sourcifyFilesResponse(abi) {
+  return {
+    ok: true,
+    json: async () => ({
+      files: [
+        {
+          name: "metadata.json",
+          content: JSON.stringify({
+            output: { abi },
+            settings: { compilationTarget: { "Token.sol": "Token" } },
+          }),
+        },
+      ],
+    }),
+  };
+}
+
+describe("GET /api/decode — Sourcify ABI path", () => {
+  it("decodes with named params from Sourcify when address is provided", async () => {
+    process.env.BACKEND_URL = "https://backend.test";
+    global.fetch
+      // 1. backend returns empty
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ msg: "ok", data: [] }),
+      })
+      // 2. Sourcify check-by-addresses
+      .mockResolvedValueOnce(
+        sourcifyCheckResponse("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", 1),
+      )
+      // 3. Sourcify files
+      .mockResolvedValueOnce(sourcifyFilesResponse(SOURCIFY_TRANSFER_ABI));
+
+    const res = await GET(
+      makeRequest({
+        data: TRANSFER_CALLDATA,
+        address: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data[0].func).toBe("transfer(address,uint256)");
+    // Named params from Sourcify ABI instead of generic arg0/arg1
+    expect(body.data[0].args.recipient).toBeDefined();
+    expect(body.data[0].args.amount).toBe("1000000");
+    expect(body.data[0].source).toBe("sourcify");
+  });
+
+  it("falls back to OpenChain when Sourcify has no match for the address", async () => {
+    process.env.BACKEND_URL = "https://backend.test";
+    global.fetch
+      // 1. backend empty
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ msg: "ok", data: [] }),
+      })
+      // 2. Sourcify check — no match
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ address: "0xa0b...", chainIds: [] }],
+      })
+      // 3. Etherscan — no ABI
+      .mockResolvedValueOnce({ ok: false })
+      // 4. OpenChain
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => OPENCHAIN_TRANSFER_RESPONSE,
+      });
+
+    const res = await GET(
+      makeRequest({
+        data: TRANSFER_CALLDATA,
+        address: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data[0].func).toBe("transfer(address,uint256)");
+    expect(body.data[0].source).toBe("openchain");
+  });
+});

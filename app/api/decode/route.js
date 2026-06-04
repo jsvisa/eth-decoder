@@ -7,6 +7,10 @@ import { decodeFunctionCalldata } from "../../utils/decoder.js";
 import { isMulticallData } from "../../utils/multicall.js";
 import { decodeMulticall } from "../../utils/multicallDecoder.js";
 import { decodeUniversalRouter } from "../../utils/universalRouter.js";
+import {
+  BUILT_IN_CHAIN_IDS,
+  fetchContractAbi,
+} from "../../utils/contractInfo.js";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -33,6 +37,8 @@ export async function GET(request) {
 
   const withAbi = searchParams.get("with_abi") === "true";
   const withSign = searchParams.get("with_sign") === "true";
+  const address = searchParams.get("address") ?? null;
+  const chain = searchParams.get("chain") || "ethereum";
 
   const params = new URLSearchParams({
     data,
@@ -58,12 +64,12 @@ export async function GET(request) {
     if (result?.msg === "ok" && backendDecoded)
       return NextResponse.json(await augmentMulticall(data, result));
 
-    const fallback = await buildFallback(data);
+    const fallback = await buildFallback(data, address, chain);
     if (fallback) return NextResponse.json(fallback);
 
     return NextResponse.json(result);
   } catch (error) {
-    const fallback = await buildFallback(data);
+    const fallback = await buildFallback(data, address, chain);
     if (fallback) return NextResponse.json(fallback);
 
     console.error("Decode API error:", error);
@@ -87,15 +93,17 @@ async function augmentMulticall(data, backendResult) {
 
   const ur = decodeUniversalRouter(data);
   if (ur?.inner_calls?.length) {
-    return { ...backendResult, data: [{ ...d0, inner_calls: ur.inner_calls }] };
+    return {
+      ...backendResult,
+      data: [{ ...d0, inner_calls: ur.inner_calls }],
+    };
   }
 
   return backendResult;
 }
 
-// For known multicall/UR selectors: decode fully client-side.
-// Falls through to OpenChain for everything else.
-async function buildFallback(data) {
+// Priority: multicall/UR client-side → Sourcify/Etherscan ABI (if address known) → OpenChain.
+async function buildFallback(data, address, chain) {
   if (isMulticallData(data)) {
     const mc = decodeMulticall(data);
     if (mc) {
@@ -108,7 +116,33 @@ async function buildFallback(data) {
       return { msg: "ok", data: [{ ...ur, source: "client" }] };
     }
   }
+
+  // When a contract address is provided, try Sourcify then Etherscan for a
+  // verified ABI with named parameters before falling back to OpenChain.
+  if (address) {
+    const chainId = BUILT_IN_CHAIN_IDS[chain] ?? BUILT_IN_CHAIN_IDS.ethereum;
+    const info = await fetchContractAbi(address, chainId, null);
+    if (info?.abi) {
+      const result = tryDecodeWithAbi(info.abi, data, info.source);
+      if (result) return result;
+    }
+  }
+
   return tryOpenChainFunctionFallback(data);
+}
+
+// Try each function in the ABI until one matches the calldata selector.
+function tryDecodeWithAbi(abi, data, source) {
+  for (const abiItem of abi) {
+    if (abiItem.type !== "function") continue;
+    try {
+      const decoded = decodeFunctionCalldata(abiItem, data);
+      return { msg: "ok", data: [{ ...decoded, source }] };
+    } catch {
+      // selector mismatch — try next
+    }
+  }
+  return null;
 }
 
 // Decode each inner call's data via OpenChain (parallel, best-effort).
