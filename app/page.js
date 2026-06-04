@@ -12,6 +12,35 @@ const MAX_HISTORY_ITEMS = 100;
 
 const UR_SELECTORS = new Set(["0x24856bc3", "0x3593564c"]);
 
+// Decode each inner call's `data` field via /api/decode and patch result state.
+// Fires all requests in parallel; each resolved call updates state immediately.
+async function decodeInnerCallsAsync(innerCalls, setResult) {
+  await Promise.all(
+    innerCalls.map(async (call, idx) => {
+      const d = call.data;
+      if (!d || d === "0x" || d.length < 10) return;
+      try {
+        const resp = await fetch(
+          `/api/decode?${new URLSearchParams({ data: d })}`,
+        );
+        if (!resp.ok) return;
+        const json = await resp.json();
+        const decoded =
+          json?.msg === "ok" && json?.data?.[0] ? json.data[0] : null;
+        if (!decoded) return;
+        setResult((prev) => {
+          if (!prev?.inner_calls) return prev;
+          const updated = [...prev.inner_calls];
+          updated[idx] = { ...updated[idx], decoded };
+          return { ...prev, inner_calls: updated };
+        });
+      } catch {
+        // best-effort — leave call as-is
+      }
+    }),
+  );
+}
+
 export default function Home() {
   const [inputData, setInputData] = useState("");
   const [result, setResult] = useState(null);
@@ -328,6 +357,11 @@ export default function Home() {
         withAbi,
         withSign,
       });
+
+      // Progressively decode each inner call's data and update the result
+      if (resultToDisplay.inner_calls?.length > 0) {
+        decodeInnerCallsAsync(resultToDisplay.inner_calls, setResult);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
