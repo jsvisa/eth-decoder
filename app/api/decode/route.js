@@ -6,6 +6,7 @@ import {
 import { decodeFunctionCalldata } from "../../utils/decoder.js";
 import { isMulticallData } from "../../utils/multicall.js";
 import { decodeMulticall } from "../../utils/multicallDecoder.js";
+import { decodeUniversalRouter } from "../../utils/universalRouter.js";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -33,13 +34,8 @@ export async function GET(request) {
   const withAbi = searchParams.get("with_abi") === "true";
   const withSign = searchParams.get("with_sign") === "true";
 
-  // Never forward multicall=true to the backend: the backend's multicall mode
-  // is for WAF rule recursion and changes the response format — it drops the
-  // outer func/args entirely, returning only inner decoded calls (or [[]] when
-  // the contract isn't in its DB).  We do inner-call decoding ourselves.
   const params = new URLSearchParams({
     data,
-    multicall: false,
     with_abi: withAbi,
     with_sign: withSign,
   });
@@ -55,22 +51,18 @@ export async function GET(request) {
 
     const result = await response.json();
 
-    // data[0] must be a non-empty object (not an empty array like [[]] from the
-    // backend's multicall mode leaking through)
+    // data[0] must be a non-empty object with func (not [[]] from backend multicall mode)
     const d0 = result?.data?.[0];
     const backendDecoded =
       d0 && typeof d0 === "object" && !Array.isArray(d0) && d0.func;
     if (result?.msg === "ok" && backendDecoded)
       return NextResponse.json(await augmentMulticall(data, result));
 
-    // Backend returned ok but empty — use our decoder for known multicall types,
-    // otherwise fall back to OpenChain
     const fallback = await buildFallback(data);
     if (fallback) return NextResponse.json(fallback);
 
     return NextResponse.json(result);
   } catch (error) {
-    // Backend unreachable — same fallback chain
     const fallback = await buildFallback(data);
     if (fallback) return NextResponse.json(fallback);
 
@@ -82,45 +74,53 @@ export async function GET(request) {
   }
 }
 
-// When backend successfully decoded the outer call, augment with inner_calls
-// for known multicall types (outer func/args stay from backend).
+// When backend decoded the outer call, augment with inner_calls.
 async function augmentMulticall(data, backendResult) {
   if (!isMulticallData(data)) return backendResult;
+  const d0 = backendResult.data[0];
+
   const mc = decodeMulticall(data);
-  if (!mc?.inner_calls?.length) return backendResult;
-  const inner_calls = await Promise.all(
-    mc.inner_calls.map(async (call) => {
+  if (mc?.inner_calls?.length) {
+    const inner_calls = await decodeInnerCalls(mc.inner_calls);
+    return { ...backendResult, data: [{ ...d0, inner_calls }] };
+  }
+
+  const ur = decodeUniversalRouter(data);
+  if (ur?.inner_calls?.length) {
+    return { ...backendResult, data: [{ ...d0, inner_calls: ur.inner_calls }] };
+  }
+
+  return backendResult;
+}
+
+// For known multicall/UR selectors: decode fully client-side.
+// Falls through to OpenChain for everything else.
+async function buildFallback(data) {
+  if (isMulticallData(data)) {
+    const mc = decodeMulticall(data);
+    if (mc) {
+      const inner_calls = await decodeInnerCalls(mc.inner_calls);
+      return { msg: "ok", data: [{ ...mc, inner_calls, source: "client" }] };
+    }
+
+    const ur = decodeUniversalRouter(data);
+    if (ur) {
+      return { msg: "ok", data: [{ ...ur, source: "client" }] };
+    }
+  }
+  return tryOpenChainFunctionFallback(data);
+}
+
+// Decode each inner call's data via OpenChain (parallel, best-effort).
+async function decodeInnerCalls(inner_calls) {
+  return Promise.all(
+    inner_calls.map(async (call) => {
       const d = call.data;
       if (!d || d === "0x" || d.length < 10) return call;
       const decoded = await tryOpenChainFunctionFallback(d);
       return decoded?.data?.[0] ? { ...call, decoded: decoded.data[0] } : call;
     }),
   );
-  const d0 = backendResult.data[0];
-  return { ...backendResult, data: [{ ...d0, inner_calls }] };
-}
-
-// For known multicall selectors: decode outer structure with named fields,
-// then decode each inner call's data via OpenChain.
-// Falls through to plain OpenChain for everything else.
-async function buildFallback(data) {
-  if (isMulticallData(data)) {
-    const mc = decodeMulticall(data);
-    if (mc) {
-      const inner_calls = await Promise.all(
-        mc.inner_calls.map(async (call) => {
-          const d = call.data;
-          if (!d || d === "0x" || d.length < 10) return call;
-          const decoded = await tryOpenChainFunctionFallback(d);
-          return decoded?.data?.[0]
-            ? { ...call, decoded: decoded.data[0] }
-            : call;
-        }),
-      );
-      return { msg: "ok", data: [{ ...mc, inner_calls, source: "client" }] };
-    }
-  }
-  return tryOpenChainFunctionFallback(data);
 }
 
 async function tryOpenChainFunctionFallback(data) {

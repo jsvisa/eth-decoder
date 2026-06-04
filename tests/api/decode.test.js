@@ -49,7 +49,7 @@ describe("GET /api/decode", () => {
     expect(body.error).toMatch(/backend url/i);
   });
 
-  it("forwards data, with_abi, with_sign params to the backend (multicall always false)", async () => {
+  it("forwards data, with_abi, with_sign params to the backend (multicall not forwarded)", async () => {
     process.env.BACKEND_URL = "https://backend.test";
     const mockResult = { function: "transfer", params: [] };
     global.fetch.mockResolvedValueOnce({
@@ -71,7 +71,7 @@ describe("GET /api/decode", () => {
 
     const calledUrl = global.fetch.mock.calls[0][0];
     expect(calledUrl).toContain("data=0x12345678");
-    expect(calledUrl).toContain("multicall=false");
+    expect(calledUrl).not.toContain("multicall");
     expect(calledUrl).toContain("with_abi=true");
     expect(calledUrl).toContain("with_sign=false");
   });
