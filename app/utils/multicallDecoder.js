@@ -143,5 +143,27 @@ export function decodeMulticall(data) {
     return entry;
   });
 
-  return { func: config.abi.name, inner_calls };
+  // Build named outer args (e.g. { bundle: [...] }) with serialized values
+  const outerArgs = {
+    [config.arrayParam]: calls.map((call) => {
+      if (config.isBytesArray) return serializeValue(call);
+      const obj = {};
+      for (const [k, v] of Object.entries(call)) obj[k] = serializeValue(v);
+      return obj;
+    }),
+  };
+
+  const funcSig =
+    config.abi.name +
+    "(" +
+    config.abi.inputs
+      .map((inp) =>
+        inp.components
+          ? "(" + inp.components.map((c) => c.type).join(",") + ")[]"
+          : inp.type,
+      )
+      .join(",") +
+    ")";
+
+  return { func: funcSig, args: outerArgs, inner_calls };
 }

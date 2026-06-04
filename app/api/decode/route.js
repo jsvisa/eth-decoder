@@ -5,6 +5,7 @@ import {
 } from "../../utils/openchain.js";
 import { decodeFunctionCalldata } from "../../utils/decoder.js";
 import { isMulticallData } from "../../utils/multicall.js";
+import { decodeMulticall } from "../../utils/multicallDecoder.js";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -29,7 +30,8 @@ export async function GET(request) {
     );
   }
 
-  const multicall = searchParams.get("multicall") === "true" || isMulticallData(data);
+  const multicall =
+    searchParams.get("multicall") === "true" || isMulticallData(data);
   const withAbi = searchParams.get("with_abi") === "true";
   const withSign = searchParams.get("with_sign") === "true";
 
@@ -54,14 +56,15 @@ export async function GET(request) {
     if (result?.msg === "ok" && result?.data?.length > 0)
       return NextResponse.json(result);
 
-    // Backend returned ok but empty data (signature not in DB) — try OpenChain
-    const fallback = await tryOpenChainFunctionFallback(data);
+    // Backend returned ok but empty — use our decoder for known multicall types,
+    // otherwise fall back to OpenChain
+    const fallback = await buildFallback(data);
     if (fallback) return NextResponse.json(fallback);
 
     return NextResponse.json(result);
   } catch (error) {
-    // Backend unreachable — try OpenChain before giving up
-    const fallback = await tryOpenChainFunctionFallback(data);
+    // Backend unreachable — same fallback chain
+    const fallback = await buildFallback(data);
     if (fallback) return NextResponse.json(fallback);
 
     console.error("Decode API error:", error);
@@ -70,6 +73,29 @@ export async function GET(request) {
       { status: 500 },
     );
   }
+}
+
+// For known multicall selectors: decode outer structure with named fields,
+// then decode each inner call's data via OpenChain.
+// Falls through to plain OpenChain for everything else.
+async function buildFallback(data) {
+  if (isMulticallData(data)) {
+    const mc = decodeMulticall(data);
+    if (mc) {
+      const inner_calls = await Promise.all(
+        mc.inner_calls.map(async (call) => {
+          const d = call.data;
+          if (!d || d === "0x" || d.length < 10) return call;
+          const decoded = await tryOpenChainFunctionFallback(d);
+          return decoded?.data?.[0]
+            ? { ...call, decoded: decoded.data[0] }
+            : call;
+        }),
+      );
+      return { msg: "ok", data: [{ ...mc, inner_calls, source: "client" }] };
+    }
+  }
+  return tryOpenChainFunctionFallback(data);
 }
 
 async function tryOpenChainFunctionFallback(data) {
