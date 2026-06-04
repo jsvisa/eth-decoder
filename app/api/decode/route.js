@@ -30,14 +30,16 @@ export async function GET(request) {
     );
   }
 
-  const multicall =
-    searchParams.get("multicall") === "true" || isMulticallData(data);
   const withAbi = searchParams.get("with_abi") === "true";
   const withSign = searchParams.get("with_sign") === "true";
 
+  // Never forward multicall=true to the backend: the backend's multicall mode
+  // is for WAF rule recursion and changes the response format — it drops the
+  // outer func/args entirely, returning only inner decoded calls (or [[]] when
+  // the contract isn't in its DB).  We do inner-call decoding ourselves.
   const params = new URLSearchParams({
     data,
-    multicall,
+    multicall: false,
     with_abi: withAbi,
     with_sign: withSign,
   });
@@ -53,8 +55,13 @@ export async function GET(request) {
 
     const result = await response.json();
 
-    if (result?.msg === "ok" && result?.data?.length > 0)
-      return NextResponse.json(result);
+    // data[0] must be a non-empty object (not an empty array like [[]] from the
+    // backend's multicall mode leaking through)
+    const d0 = result?.data?.[0];
+    const backendDecoded =
+      d0 && typeof d0 === "object" && !Array.isArray(d0) && d0.func;
+    if (result?.msg === "ok" && backendDecoded)
+      return NextResponse.json(await augmentMulticall(data, result));
 
     // Backend returned ok but empty — use our decoder for known multicall types,
     // otherwise fall back to OpenChain
@@ -73,6 +80,24 @@ export async function GET(request) {
       { status: 500 },
     );
   }
+}
+
+// When backend successfully decoded the outer call, augment with inner_calls
+// for known multicall types (outer func/args stay from backend).
+async function augmentMulticall(data, backendResult) {
+  if (!isMulticallData(data)) return backendResult;
+  const mc = decodeMulticall(data);
+  if (!mc?.inner_calls?.length) return backendResult;
+  const inner_calls = await Promise.all(
+    mc.inner_calls.map(async (call) => {
+      const d = call.data;
+      if (!d || d === "0x" || d.length < 10) return call;
+      const decoded = await tryOpenChainFunctionFallback(d);
+      return decoded?.data?.[0] ? { ...call, decoded: decoded.data[0] } : call;
+    }),
+  );
+  const d0 = backendResult.data[0];
+  return { ...backendResult, data: [{ ...d0, inner_calls }] };
 }
 
 // For known multicall selectors: decode outer structure with named fields,
