@@ -129,7 +129,7 @@ function decodeV3Path(pathHex) {
 /**
  * Decodes a Uniswap Universal Router execute() call.
  * Returns null if data is not a recognised UR selector or decoding fails.
- * On success returns { func, args, ur_commands: [{index, name, allow_revert, args}] }.
+ * On success returns { func, args, inner_calls: [{index, name, allow_revert, args}] }.
  */
 export function decodeUniversalRouter(data) {
   const hex = data.startsWith("0x") ? data : "0x" + data;
@@ -152,7 +152,7 @@ export function decodeUniversalRouter(data) {
   const cmdHex = (typeof commandsBytes === "string" ? commandsBytes : "")
     .replace(/^0x/i, "");
   const cmdArray = cmdHex.match(/.{2}/g)?.map((b) => parseInt(b, 16)) ?? [];
-  const ur_commands = cmdArray.map((cmdByte, idx) => {
+  const inner_calls = cmdArray.map((cmdByte, idx) => {
     const cmd = cmdByte & 0x3f;
     const allow_revert = !!(cmdByte & 0x80);
     const name =
@@ -194,5 +194,5 @@ export function decodeUniversalRouter(data) {
   };
   if (deadline !== undefined) outerArgs.deadline = serializeValue(deadline);
 
-  return { func: funcName, args: outerArgs, ur_commands };
+  return { func: funcName, args: outerArgs, inner_calls };
 }

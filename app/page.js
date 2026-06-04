@@ -332,8 +332,8 @@ export default function Home() {
       const selector = (hex.startsWith("0x") ? hex : "0x" + hex).slice(0, 10);
       if (UR_SELECTORS.has(selector)) {
         const urDecoded = decodeUniversalRouter(inputData);
-        if (urDecoded?.ur_commands) {
-          resultToDisplay = { ...resultToDisplay, ur_commands: urDecoded.ur_commands };
+        if (urDecoded?.inner_calls) {
+          resultToDisplay = { ...resultToDisplay, inner_calls: urDecoded.inner_calls };
         }
       } else {
         const mcDecoded = decodeMulticall(inputData);
