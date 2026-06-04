@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import yaml from "js-yaml";
 import styles from "./page.module.css";
-import { isMulticallData } from "./utils/multicall.js";
 import { decodeUniversalRouter } from "./utils/universalRouter.js";
 import { decodeMulticall } from "./utils/multicallDecoder.js";
 
@@ -46,7 +45,6 @@ export default function Home() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [multicall, setMulticall] = useState(false);
   const [withAbi, setWithAbi] = useState(false);
   const [withSign, setWithSign] = useState(false);
   const [isYaml, setIsYaml] = useState(false);
@@ -75,8 +73,7 @@ export default function Home() {
     if (urlData) {
       setInputData(urlData);
 
-      // Set options from URL if provided; also auto-detect multicall by selector
-      if (params.get("multicall") === "true" || isMulticallData(urlData)) setMulticall(true);
+      // Set options from URL if provided
       if (params.get("with_abi") === "true") setWithAbi(true);
       if (params.get("with_sign") === "true") setWithSign(true);
 
@@ -114,7 +111,6 @@ export default function Home() {
   const loadFromHistory = (item) => {
     setInputData(item.input);
     setResult(item.output);
-    setMulticall(item.options.multicall);
     setWithAbi(item.options.withAbi);
     setWithSign(item.options.withSign);
     setError(null);
@@ -305,7 +301,6 @@ export default function Home() {
     try {
       const params = new URLSearchParams({
         data: inputData,
-        multicall: multicall,
         with_abi: withAbi,
         with_sign: withSign,
       });
@@ -352,11 +347,7 @@ export default function Home() {
       setCopied(false); // Reset copied state
 
       // Save to history
-      saveToHistory(inputData, resultToDisplay, {
-        multicall,
-        withAbi,
-        withSign,
-      });
+      saveToHistory(inputData, resultToDisplay, { withAbi, withSign });
 
       // Progressively decode each inner call's data and update the result
       if (resultToDisplay.inner_calls?.length > 0) {
@@ -434,7 +425,6 @@ export default function Home() {
         data: inputData,
       });
 
-      if (multicall) params.append("multicall", "true");
       if (withAbi) params.append("with_abi", "true");
       if (withSign) params.append("with_sign", "true");
 
@@ -473,27 +463,13 @@ export default function Home() {
           <input
             type="text"
             value={inputData}
-            onChange={(e) => {
-              const val = e.target.value;
-              setInputData(val);
-              if (isMulticallData(val)) setMulticall(true);
-            }}
+            onChange={(e) => setInputData(e.target.value)}
             placeholder="Enter hex data to decode (e.g., 0x1234abcd...)"
             className={styles.input}
             disabled={loading}
           />
 
           <div className={styles.options}>
-            <label className={styles.checkbox}>
-              <input
-                type="checkbox"
-                checked={multicall}
-                onChange={(e) => setMulticall(e.target.checked)}
-                disabled={loading}
-              />
-              <span>Multicall</span>
-            </label>
-
             <label className={styles.checkbox}>
               <input
                 type="checkbox"
@@ -610,11 +586,8 @@ export default function Home() {
                       <span className={styles.historyTime}>
                         {new Date(item.timestamp).toLocaleString()}
                       </span>
-                      {(item.options.multicall ||
-                        item.options.withAbi ||
-                        item.options.withSign) && (
+                      {(item.options.withAbi || item.options.withSign) && (
                         <span className={styles.historyOptions}>
-                          {item.options.multicall && "M"}
                           {item.options.withAbi && "A"}
                           {item.options.withSign && "S"}
                         </span>
