@@ -148,8 +148,10 @@ export function decodeUniversalRouter(data) {
 
   const [commandsBytes, inputsArr, deadline] = outerDecoded.args;
 
-  // commandsBytes is a Uint8Array from viem
-  const cmdArray = Array.from(commandsBytes);
+  // viem returns `bytes` as a hex string "0x...", not a Uint8Array — parse manually
+  const cmdHex = (typeof commandsBytes === "string" ? commandsBytes : "")
+    .replace(/^0x/i, "");
+  const cmdArray = cmdHex.match(/.{2}/g)?.map((b) => parseInt(b, 16)) ?? [];
   const ur_commands = cmdArray.map((cmdByte, idx) => {
     const cmd = cmdByte & 0x3f;
     const allow_revert = !!(cmdByte & 0x80);
@@ -187,9 +189,7 @@ export function decodeUniversalRouter(data) {
       : "execute(bytes,bytes[])";
 
   const outerArgs = {
-    commands:
-      "0x" +
-      cmdArray.map((b) => b.toString(16).padStart(2, "0")).join(""),
+    commands: "0x" + cmdHex,
     inputs: Array.from(inputsArr),
   };
   if (deadline !== undefined) outerArgs.deadline = serializeValue(deadline);
