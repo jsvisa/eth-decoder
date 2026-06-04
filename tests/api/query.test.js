@@ -124,6 +124,95 @@ describe("GET /api/query", () => {
   });
 });
 
+describe("OpenChain fallback (backend returns not found)", () => {
+  it("falls back to OpenChain and returns its result when backend has no match", async () => {
+    process.env.BACKEND_URL = "https://backend.test";
+    global.fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ msg: "not found", data: null }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ok: true,
+          result: {
+            function: {
+              "0x341d16d9": [{ name: "claim()", filtered: false }],
+            },
+          },
+        }),
+      });
+
+    const res = await GET(makeRequest({ sign: "0x341d16d9" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.msg).toBe("ok");
+    expect(body.data.text_sign).toBe("claim()");
+  });
+
+  it("queries OpenChain with function param for 4-byte selectors", async () => {
+    process.env.BACKEND_URL = "https://backend.test";
+    global.fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ msg: "not found", data: null }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ok: true,
+          result: { function: { "0x341d16d9": [] } },
+        }),
+      });
+
+    await GET(makeRequest({ sign: "0x341d16d9" }));
+
+    const openchaindUrl = global.fetch.mock.calls[1][0];
+    expect(openchaindUrl).toContain("api.openchain.xyz");
+    expect(openchaindUrl).toContain("function=0x341d16d9");
+  });
+
+  it("returns not found when both backend and OpenChain have no match", async () => {
+    process.env.BACKEND_URL = "https://backend.test";
+    global.fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ msg: "not found", data: null }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ok: true,
+          result: { function: { "0x341d16d9": [] } },
+        }),
+      });
+
+    const res = await GET(makeRequest({ sign: "0x341d16d9" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.msg).toBe("not found");
+    expect(body.data).toBeNull();
+  });
+
+  it("returns not found when OpenChain is unreachable after backend not found", async () => {
+    process.env.BACKEND_URL = "https://backend.test";
+    global.fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ msg: "not found", data: null }),
+      })
+      .mockRejectedValueOnce(new Error("OpenChain unreachable"));
+
+    const res = await GET(makeRequest({ sign: "0x341d16d9" }));
+    // openchain.js silently swallows errors, so we degrade to "not found"
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.msg).toBe("not found");
+    expect(body.data).toBeNull();
+  });
+});
+
 describe("GET /api/v1/query", () => {
   it("re-exports the same handler as /api/query", () => {
     expect(v1GET).toBe(GET);
