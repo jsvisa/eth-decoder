@@ -7,6 +7,23 @@ import styles from "./page.module.css";
 const STORAGE_KEY = "evm_decoder_history";
 const MAX_HISTORY_ITEMS = 100;
 
+// Known multicall function selectors (keccak256(sig)[0:4]).
+// Covers all 4 decoder types: bytes_array, tuple_array, universal_router, parallel_arrays.
+const MULTICALL_SELECTORS = new Set([
+  "0xac9650d8", // multicall(bytes[])                                    — bytes_array
+  "0x60fc8466", // multicall((bool,bytes)[])                             — tuple_array
+  "0x374f435d", // multicall((address,bytes,uint256,bool,bytes32)[])     — tuple_array
+  "0x82ad56cb", // aggregate3((address,bool,bytes)[])                    — tuple_array (Multicall3)
+  "0x24856bc3", // execute(bytes,bytes[])                                — universal_router
+  "0x3593564c", // execute(bytes,bytes[],uint256)                        — universal_router
+]);
+
+function isMulticallData(data) {
+  const hex = data.trim().toLowerCase();
+  const raw = hex.startsWith("0x") ? hex : "0x" + hex;
+  return raw.length >= 10 && MULTICALL_SELECTORS.has(raw.slice(0, 10));
+}
+
 export default function Home() {
   const [inputData, setInputData] = useState("");
   const [result, setResult] = useState(null);
@@ -41,8 +58,8 @@ export default function Home() {
     if (urlData) {
       setInputData(urlData);
 
-      // Set options from URL if provided
-      if (params.get("multicall") === "true") setMulticall(true);
+      // Set options from URL if provided; also auto-detect multicall by selector
+      if (params.get("multicall") === "true" || isMulticallData(urlData)) setMulticall(true);
       if (params.get("with_abi") === "true") setWithAbi(true);
       if (params.get("with_sign") === "true") setWithSign(true);
 
@@ -419,7 +436,11 @@ export default function Home() {
           <input
             type="text"
             value={inputData}
-            onChange={(e) => setInputData(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setInputData(val);
+              if (isMulticallData(val)) setMulticall(true);
+            }}
             placeholder="Enter hex data to decode (e.g., 0x1234abcd...)"
             className={styles.input}
             disabled={loading}
