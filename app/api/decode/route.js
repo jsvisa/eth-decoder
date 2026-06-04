@@ -4,6 +4,7 @@ import {
   sigToFunctionAbi,
 } from "../../utils/openchain.js";
 import { decodeFunctionCalldata } from "../../utils/decoder.js";
+import { isMulticallData } from "../../utils/multicall.js";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -28,7 +29,7 @@ export async function GET(request) {
     );
   }
 
-  const multicall = searchParams.get("multicall") === "true";
+  const multicall = searchParams.get("multicall") === "true" || isMulticallData(data);
   const withAbi = searchParams.get("with_abi") === "true";
   const withSign = searchParams.get("with_sign") === "true";
 

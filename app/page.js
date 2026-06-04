@@ -3,26 +3,13 @@
 import { useState, useEffect } from "react";
 import yaml from "js-yaml";
 import styles from "./page.module.css";
+import { isMulticallData } from "./utils/multicall.js";
+import { decodeUniversalRouter } from "./utils/universalRouter.js";
 
 const STORAGE_KEY = "evm_decoder_history";
 const MAX_HISTORY_ITEMS = 100;
 
-// Known multicall function selectors (keccak256(sig)[0:4]).
-// Covers all 4 decoder types: bytes_array, tuple_array, universal_router, parallel_arrays.
-const MULTICALL_SELECTORS = new Set([
-  "0xac9650d8", // multicall(bytes[])                                    — bytes_array
-  "0x60fc8466", // multicall((bool,bytes)[])                             — tuple_array
-  "0x374f435d", // multicall((address,bytes,uint256,bool,bytes32)[])     — tuple_array
-  "0x82ad56cb", // aggregate3((address,bool,bytes)[])                    — tuple_array (Multicall3)
-  "0x24856bc3", // execute(bytes,bytes[])                                — universal_router
-  "0x3593564c", // execute(bytes,bytes[],uint256)                        — universal_router
-]);
-
-function isMulticallData(data) {
-  const hex = data.trim().toLowerCase();
-  const raw = hex.startsWith("0x") ? hex : "0x" + hex;
-  return raw.length >= 10 && MULTICALL_SELECTORS.has(raw.slice(0, 10));
-}
+const UR_SELECTORS = new Set(["0x24856bc3", "0x3593564c"]);
 
 export default function Home() {
   const [inputData, setInputData] = useState("");
@@ -313,6 +300,16 @@ export default function Home() {
       } else {
         // Display the full response
         resultToDisplay = data;
+      }
+
+      // For Universal Router execute() calls, augment with decoded inner commands
+      const hex = inputData.trim().toLowerCase();
+      const selector = (hex.startsWith("0x") ? hex : "0x" + hex).slice(0, 10);
+      if (UR_SELECTORS.has(selector)) {
+        const urDecoded = decodeUniversalRouter(inputData);
+        if (urDecoded?.ur_commands) {
+          resultToDisplay = { ...resultToDisplay, ur_commands: urDecoded.ur_commands };
+        }
       }
 
       setResult(resultToDisplay);
