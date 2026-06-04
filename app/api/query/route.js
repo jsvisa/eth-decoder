@@ -1,4 +1,29 @@
 import { NextResponse } from "next/server";
+import {
+  lookupFunctionSignatures,
+  lookupEventSignatures,
+} from "../../utils/openchain.js";
+
+async function fallbackToOpenchain(sign, count) {
+  // 4-byte selectors ("0x" + 8 hex chars = 10) are function selectors; longer are event topics
+  const isEvent = sign.length > 10;
+  const names = isEvent
+    ? await lookupEventSignatures(sign)
+    : await lookupFunctionSignatures(sign);
+
+  if (names.length === 0) {
+    return { msg: "not found", data: null };
+  }
+
+  const n = Math.max(1, parseInt(count, 10));
+  const items = names.slice(0, n).map((name) => ({
+    text_sign: name,
+    output: null,
+    abi: null,
+  }));
+
+  return { msg: "ok", data: n === 1 ? items[0] : items };
+}
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -27,7 +52,11 @@ export async function GET(request) {
     if (!response.ok) {
       throw new Error(`Backend returned ${response.status}`);
     }
-    return NextResponse.json(await response.json());
+    const data = await response.json();
+    if (data?.data != null) {
+      return NextResponse.json(data);
+    }
+    // Backend returned not found; fall through to OpenChain
   } catch (error) {
     console.error("query error:", error);
     return NextResponse.json(
@@ -35,4 +64,7 @@ export async function GET(request) {
       { status: 500 },
     );
   }
+
+  // OpenChain fallback when backend has no match
+  return NextResponse.json(await fallbackToOpenchain(sign, count));
 }
