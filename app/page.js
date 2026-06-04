@@ -333,12 +333,18 @@ export default function Home() {
       if (UR_SELECTORS.has(selector)) {
         const urDecoded = decodeUniversalRouter(inputData);
         if (urDecoded?.inner_calls) {
-          resultToDisplay = { ...resultToDisplay, inner_calls: urDecoded.inner_calls };
+          resultToDisplay = {
+            ...resultToDisplay,
+            inner_calls: urDecoded.inner_calls,
+          };
         }
       } else {
         const mcDecoded = decodeMulticall(inputData);
         if (mcDecoded?.inner_calls) {
-          resultToDisplay = { ...resultToDisplay, inner_calls: mcDecoded.inner_calls };
+          resultToDisplay = {
+            ...resultToDisplay,
+            inner_calls: mcDecoded.inner_calls,
+          };
         }
       }
 

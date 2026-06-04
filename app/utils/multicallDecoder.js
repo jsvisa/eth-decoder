@@ -13,7 +13,7 @@ const MULTICALL_ABIS = {
       stateMutability: "payable",
     },
     arrayParam: "data",
-    dataField: "data",   // for bytes[], the element itself is the calldata
+    dataField: "data", // for bytes[], the element itself is the calldata
     targetField: null,
     isBytesArray: true,
   },

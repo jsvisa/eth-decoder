@@ -47,7 +47,9 @@ test.describe("GET /api/decode", () => {
     expect(d0.inner_calls[2].selector).toBe("0x6ef5eeae");
     // inner calls may have .decoded if OpenChain resolves the selector
     if (d0.inner_calls[1].decoded) {
-      expect(d0.inner_calls[1].decoded.func).toBe("wrapNative(uint256,address)");
+      expect(d0.inner_calls[1].decoded.func).toBe(
+        "wrapNative(uint256,address)",
+      );
     }
     if (d0.inner_calls[2].decoded) {
       expect(d0.inner_calls[2].decoded.func).toBe(

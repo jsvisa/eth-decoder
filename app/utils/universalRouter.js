@@ -111,7 +111,9 @@ const UR_EXECUTE_WITH_DEADLINE = {
 // Decode packed Uniswap V3 path: token(20 bytes) fee(3 bytes) token(20 bytes) ...
 // Returns an array like ["0xtoken", 3000, "0xtoken", ...]
 function decodeV3Path(pathHex) {
-  const hex = (pathHex.startsWith("0x") ? pathHex.slice(2) : pathHex).toLowerCase();
+  const hex = (
+    pathHex.startsWith("0x") ? pathHex.slice(2) : pathHex
+  ).toLowerCase();
   const hops = [];
   let i = 0;
   if (hex.length < 40) return hops;
@@ -149,8 +151,9 @@ export function decodeUniversalRouter(data) {
   const [commandsBytes, inputsArr, deadline] = outerDecoded.args;
 
   // viem returns `bytes` as a hex string "0x...", not a Uint8Array — parse manually
-  const cmdHex = (typeof commandsBytes === "string" ? commandsBytes : "")
-    .replace(/^0x/i, "");
+  const cmdHex = (
+    typeof commandsBytes === "string" ? commandsBytes : ""
+  ).replace(/^0x/i, "");
   const cmdArray = cmdHex.match(/.{2}/g)?.map((b) => parseInt(b, 16)) ?? [];
   const inner_calls = cmdArray.map((cmdByte, idx) => {
     const cmd = cmdByte & 0x3f;

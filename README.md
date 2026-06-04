@@ -108,11 +108,11 @@ The app exposes a versioned public API at `/api/v1/` that can be used by externa
 
 Decode EVM transaction calldata. For known multicall selectors the response always includes `inner_calls` — no extra parameter needed.
 
-| Parameter  | Required | Description                                           |
-| ---------- | -------- | ----------------------------------------------------- |
-| `data`     | Yes      | Hex-encoded calldata (with or without `0x` prefix)    |
-| `with_abi` | No       | `true` to include the matched ABI in the response     |
-| `with_sign`| No       | `true` to include the 4-byte selector in the response |
+| Parameter   | Required | Description                                           |
+| ----------- | -------- | ----------------------------------------------------- |
+| `data`      | Yes      | Hex-encoded calldata (with or without `0x` prefix)    |
+| `with_abi`  | No       | `true` to include the matched ABI in the response     |
+| `with_sign` | No       | `true` to include the 4-byte selector in the response |
 
 ```
 GET /api/v1/decode?data=0xa9059cbb000000000000000000000000...
@@ -120,14 +120,14 @@ GET /api/v1/decode?data=0xa9059cbb000000000000000000000000...
 
 **Multicall auto-detection.** The following selectors are recognised automatically and the response includes an `inner_calls` array:
 
-| Selector     | Function                                           | Type             |
-| ------------ | -------------------------------------------------- | ---------------- |
-| `0xac9650d8` | `multicall(bytes[])`                               | bytes\_array     |
-| `0x60fc8466` | `multicall((bool,bytes)[])`                        | tuple\_array     |
-| `0x374f435d` | `multicall((address,bytes,uint256,bool,bytes32)[])` | tuple\_array     |
-| `0x82ad56cb` | `aggregate3((address,bool,bytes)[])`               | tuple\_array     |
-| `0x24856bc3` | `execute(bytes,bytes[])`                           | Universal Router |
-| `0x3593564c` | `execute(bytes,bytes[],uint256)`                   | Universal Router |
+| Selector     | Function                                            | Type             |
+| ------------ | --------------------------------------------------- | ---------------- |
+| `0xac9650d8` | `multicall(bytes[])`                                | bytes_array      |
+| `0x60fc8466` | `multicall((bool,bytes)[])`                         | tuple_array      |
+| `0x374f435d` | `multicall((address,bytes,uint256,bool,bytes32)[])` | tuple_array      |
+| `0x82ad56cb` | `aggregate3((address,bool,bytes)[])`                | tuple_array      |
+| `0x24856bc3` | `execute(bytes,bytes[])`                            | Universal Router |
+| `0x3593564c` | `execute(bytes,bytes[],uint256)`                    | Universal Router |
 
 Each element of `inner_calls` contains at minimum `index`, `selector`, and `data`. For `tuple_array` variants the target address and extra fields (`value`, `skipRevert`, …) are included. For Universal Router commands, `name` (e.g. `V3_SWAP_EXACT_IN`) and decoded `args` are included instead. When the inner selector is known to OpenChain, a `decoded` object with `func` and `args` is attached.
 
