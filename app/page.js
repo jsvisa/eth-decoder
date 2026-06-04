@@ -5,6 +5,7 @@ import yaml from "js-yaml";
 import styles from "./page.module.css";
 import { isMulticallData } from "./utils/multicall.js";
 import { decodeUniversalRouter } from "./utils/universalRouter.js";
+import { decodeMulticall } from "./utils/multicallDecoder.js";
 
 const STORAGE_KEY = "evm_decoder_history";
 const MAX_HISTORY_ITEMS = 100;
@@ -302,13 +303,18 @@ export default function Home() {
         resultToDisplay = data;
       }
 
-      // For Universal Router execute() calls, augment with decoded inner commands
+      // Augment result with client-side multicall inner-call decoding
       const hex = inputData.trim().toLowerCase();
       const selector = (hex.startsWith("0x") ? hex : "0x" + hex).slice(0, 10);
       if (UR_SELECTORS.has(selector)) {
         const urDecoded = decodeUniversalRouter(inputData);
         if (urDecoded?.ur_commands) {
           resultToDisplay = { ...resultToDisplay, ur_commands: urDecoded.ur_commands };
+        }
+      } else {
+        const mcDecoded = decodeMulticall(inputData);
+        if (mcDecoded?.inner_calls) {
+          resultToDisplay = { ...resultToDisplay, inner_calls: mcDecoded.inner_calls };
         }
       }
 
