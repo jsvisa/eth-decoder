@@ -1,4 +1,4 @@
-const OPENCHAIN_URL = "https://api.openchain.xyz/signature-database/v1/lookup";
+const OPENCHAIN_URL = "https://api.4byte.sourcify.dev/signature-database/v1/lookup";
 
 export async function lookupFunctionSignatures(selector) {
   try {
