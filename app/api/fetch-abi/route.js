@@ -80,58 +80,23 @@ async function fetchContractInfoFromEtherscan(address, chainId, apiKey) {
 // Fetch ABI from Sourcify (fallback for unverified contracts on Etherscan)
 async function fetchContractInfoFromSourcify(address, chainId) {
   try {
-    // Check if contract is verified on Sourcify
-    const checkResponse = await fetch(
-      `https://sourcify.dev/server/check-by-addresses?addresses=${address}&chainIds=${chainId}`,
+    const response = await fetch(
+      `https://sourcify.dev/server/v2/contract/${chainId}/${address}?fields=abi,metadata`,
     );
 
-    if (!checkResponse.ok) {
+    if (!response.ok) {
       return null;
     }
 
-    const checkData = await checkResponse.json();
-
-    // Check if we have a match (perfect or partial)
-    if (!checkData || !checkData[0] || !checkData[0].chainIds) {
-      return null;
-    }
-
-    const match = checkData[0].chainIds.find(
-      (c) => c.chainId === String(chainId),
-    );
-    if (!match || (match.status !== "perfect" && match.status !== "partial")) {
-      return null;
-    }
-
-    // Fetch the metadata which contains the ABI
-    const filesResponse = await fetch(
-      `https://sourcify.dev/server/files/${chainId}/${address}`,
-    );
-
-    if (!filesResponse.ok) {
-      return null;
-    }
-
-    const filesData = await filesResponse.json();
-
-    // Find metadata.json which contains the ABI
-    const metadataFile = filesData.files?.find(
-      (f) => f.name === "metadata.json",
-    );
-    if (!metadataFile || !metadataFile.content) {
-      return null;
-    }
-
-    const metadata = JSON.parse(metadataFile.content);
-    const abi = metadata.output?.abi;
+    const data = await response.json();
+    const abi = data.abi;
 
     if (!abi) {
       return null;
     }
 
-    // Try to get contract name from metadata
-    const contractName = metadata.settings?.compilationTarget
-      ? Object.values(metadata.settings.compilationTarget)[0]
+    const contractName = data.metadata?.settings?.compilationTarget
+      ? Object.values(data.metadata.settings.compilationTarget)[0]
       : null;
 
     return {
