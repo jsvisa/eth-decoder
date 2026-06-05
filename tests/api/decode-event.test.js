@@ -15,7 +15,7 @@ const ALL_TOPICS = [TRANSFER_TOPIC0, TRANSFER_TOPIC1, TRANSFER_TOPIC2].join(
   ",",
 );
 
-const OPENCHAIN_TRANSFER_EVENT_RESPONSE = {
+const SOURCIFY_TRANSFER_EVENT_RESPONSE = {
   ok: true,
   result: {
     event: {
@@ -79,8 +79,8 @@ describe("GET /api/decode-event — basics", () => {
   });
 });
 
-describe("GET /api/decode-event — OpenChain fallback", () => {
-  it("returns decoded event from OpenChain when backend returns non-OK", async () => {
+describe("GET /api/decode-event — Sourcify fallback", () => {
+  it("returns decoded event from Sourcify when backend returns non-OK", async () => {
     process.env.BACKEND_URL = "https://backend.test";
     global.fetch.mockResolvedValueOnce({
       ok: false,
@@ -89,7 +89,7 @@ describe("GET /api/decode-event — OpenChain fallback", () => {
     });
     global.fetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => OPENCHAIN_TRANSFER_EVENT_RESPONSE,
+      json: async () => SOURCIFY_TRANSFER_EVENT_RESPONSE,
     });
 
     const res = await GET(
@@ -103,10 +103,10 @@ describe("GET /api/decode-event — OpenChain fallback", () => {
     const body = await res.json();
     expect(body.msg).toBe("ok");
     expect(body.data.event).toBe("Transfer");
-    expect(body.data.source).toBe("openchain");
+    expect(body.data.source).toBe("sourcify");
   });
 
-  it("returns decoded event from OpenChain when backend returns msg !== ok", async () => {
+  it("returns decoded event from Sourcify when backend returns msg !== ok", async () => {
     process.env.BACKEND_URL = "https://backend.test";
     global.fetch.mockResolvedValueOnce({
       ok: true,
@@ -114,7 +114,7 @@ describe("GET /api/decode-event — OpenChain fallback", () => {
     });
     global.fetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => OPENCHAIN_TRANSFER_EVENT_RESPONSE,
+      json: async () => SOURCIFY_TRANSFER_EVENT_RESPONSE,
     });
 
     const res = await GET(
@@ -128,12 +128,12 @@ describe("GET /api/decode-event — OpenChain fallback", () => {
     const body = await res.json();
     expect(body.msg).toBe("ok");
     expect(body.data.event).toBe("Transfer");
-    expect(body.data.source).toBe("openchain");
+    expect(body.data.source).toBe("sourcify");
     // serialized as strings, not BigInt
     expect(body.data.args.arg2).toBe("1000000");
   });
 
-  it("returns original backend response when OpenChain also has no match", async () => {
+  it("returns original backend response when Sourcify also has no match", async () => {
     process.env.BACKEND_URL = "https://backend.test";
     global.fetch.mockResolvedValueOnce({
       ok: true,
@@ -159,7 +159,7 @@ describe("GET /api/decode-event — OpenChain fallback", () => {
     expect(body.msg).toBe("not found");
   });
 
-  it("returns 500 when backend non-OK and OpenChain also has no match", async () => {
+  it("returns 500 when backend non-OK and Sourcify also has no match", async () => {
     process.env.BACKEND_URL = "https://backend.test";
     global.fetch.mockResolvedValueOnce({
       ok: false,

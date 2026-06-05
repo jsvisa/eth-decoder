@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   lookupFunctionSignatures,
   sigToFunctionAbi,
-} from "../../utils/openchain.js";
+} from "../../utils/sourcify.js";
 import { decodeFunctionCalldata } from "../../utils/decoder.js";
 import { isMulticallData } from "../../utils/multicall.js";
 import { decodeMulticall } from "../../utils/multicallDecoder.js";
@@ -131,7 +131,7 @@ async function tryOpenChainFunctionFallback(data) {
     try {
       const abiItem = sigToFunctionAbi(sig);
       const decoded = decodeFunctionCalldata(abiItem, data);
-      return { msg: "ok", data: [{ ...decoded, source: "openchain" }] };
+      return { msg: "ok", data: [{ ...decoded, source: "sourcify" }] };
     } catch {
       // selector mismatch or ABI mismatch — try next candidate
     }

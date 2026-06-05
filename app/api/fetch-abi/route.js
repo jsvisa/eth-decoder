@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createPublicClient, http, defineChain } from "viem";
 import { mainnet, arbitrum, base, polygon, bsc } from "viem/chains";
 import { isValidEthAddress } from "../../utils/validation";
+import { fetchContractInfoFromSourcify } from "../../utils/sourcify";
 
 // Etherscan V2 API uses chain IDs (built-in chains)
 const BUILT_IN_CHAIN_IDS = {
@@ -75,74 +76,6 @@ async function fetchContractInfoFromEtherscan(address, chainId, apiKey) {
     implementation: result.Implementation || null,
     source: "etherscan",
   };
-}
-
-// Fetch ABI from Sourcify (fallback for unverified contracts on Etherscan)
-async function fetchContractInfoFromSourcify(address, chainId) {
-  try {
-    // Check if contract is verified on Sourcify
-    const checkResponse = await fetch(
-      `https://sourcify.dev/server/check-by-addresses?addresses=${address}&chainIds=${chainId}`,
-    );
-
-    if (!checkResponse.ok) {
-      return null;
-    }
-
-    const checkData = await checkResponse.json();
-
-    // Check if we have a match (perfect or partial)
-    if (!checkData || !checkData[0] || !checkData[0].chainIds) {
-      return null;
-    }
-
-    const match = checkData[0].chainIds.find(
-      (c) => c.chainId === String(chainId),
-    );
-    if (!match || (match.status !== "perfect" && match.status !== "partial")) {
-      return null;
-    }
-
-    // Fetch the metadata which contains the ABI
-    const filesResponse = await fetch(
-      `https://sourcify.dev/server/files/${chainId}/${address}`,
-    );
-
-    if (!filesResponse.ok) {
-      return null;
-    }
-
-    const filesData = await filesResponse.json();
-
-    // Find metadata.json which contains the ABI
-    const metadataFile = filesData.files?.find(
-      (f) => f.name === "metadata.json",
-    );
-    if (!metadataFile || !metadataFile.content) {
-      return null;
-    }
-
-    const metadata = JSON.parse(metadataFile.content);
-    const abi = metadata.output?.abi;
-
-    if (!abi) {
-      return null;
-    }
-
-    // Try to get contract name from metadata
-    const contractName = metadata.settings?.compilationTarget
-      ? Object.values(metadata.settings.compilationTarget)[0]
-      : null;
-
-    return {
-      abi,
-      contractName,
-      source: "sourcify",
-    };
-  } catch (e) {
-    console.error("Sourcify fetch error:", e);
-    return null;
-  }
 }
 
 // Try to fetch contract info from multiple sources

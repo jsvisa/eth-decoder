@@ -4,8 +4,7 @@ import etherscanErc20 from "./__fixtures__/etherscan-erc20.json";
 import etherscanUnverified from "./__fixtures__/etherscan-unverified.json";
 import etherscanProxy from "./__fixtures__/etherscan-proxy.json";
 import etherscanImpl from "./__fixtures__/etherscan-impl.json";
-import sourcifyCheck from "./__fixtures__/sourcify-check.json";
-import sourcifyFiles from "./__fixtures__/sourcify-files.json";
+import sourcifyV2 from "./__fixtures__/sourcify-v2.json";
 
 const VALID_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
 
@@ -78,7 +77,7 @@ describe("GET /api/fetch-abi", () => {
   });
 
   it("falls back to Sourcify when Etherscan returns an unverified ABI", async () => {
-    mockFetch([etherscanUnverified, sourcifyCheck, sourcifyFiles]);
+    mockFetch([etherscanUnverified, sourcifyV2]);
 
     const res = await GET(
       makeRequest({ address: VALID_ADDRESS, apiKey: "test-key" }),

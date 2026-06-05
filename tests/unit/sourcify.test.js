@@ -4,7 +4,7 @@ import {
   lookupEventSignatures,
   sigToFunctionAbi,
   sigToEventAbi,
-} from "../../app/utils/openchain.js";
+} from "../../app/utils/sourcify.js";
 
 beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
 afterEach(() => vi.unstubAllGlobals());

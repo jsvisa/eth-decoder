@@ -1,0 +1,16 @@
+{
+  "abi": [
+    {
+      "type": "function",
+      "name": "decimals",
+      "inputs": [],
+      "outputs": [{ "name": "", "type": "uint8" }],
+      "stateMutability": "view"
+    }
+  ],
+  "metadata": {
+    "settings": {
+      "compilationTarget": { "contracts/Token.sol": "SourcifyToken" }
+    }
+  }
+}

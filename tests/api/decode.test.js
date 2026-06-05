@@ -7,7 +7,7 @@ const TRANSFER_CALLDATA =
   "000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" +
   "00000000000000000000000000000000000000000000000000000000000f4240";
 
-const OPENCHAIN_TRANSFER_RESPONSE = {
+const SOURCIFY_TRANSFER_RESPONSE = {
   ok: true,
   result: {
     function: {
@@ -76,7 +76,7 @@ describe("GET /api/decode", () => {
     expect(calledUrl).toContain("with_sign=false");
   });
 
-  it("returns 500 with an error message when the backend returns a non-OK status and OpenChain has no match", async () => {
+  it("returns 500 with an error message when the backend returns a non-OK status and Sourcify has no match", async () => {
     process.env.BACKEND_URL = "https://backend.test";
     global.fetch.mockResolvedValueOnce({
       ok: false,
@@ -99,8 +99,8 @@ describe("GET /api/decode", () => {
   });
 });
 
-describe("GET /api/decode — OpenChain fallback", () => {
-  it("returns decoded result from OpenChain when backend returns non-OK", async () => {
+describe("GET /api/decode — Sourcify fallback", () => {
+  it("returns decoded result from Sourcify when backend returns non-OK", async () => {
     process.env.BACKEND_URL = "https://backend.test";
     global.fetch.mockResolvedValueOnce({
       ok: false,
@@ -109,7 +109,7 @@ describe("GET /api/decode — OpenChain fallback", () => {
     });
     global.fetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => OPENCHAIN_TRANSFER_RESPONSE,
+      json: async () => SOURCIFY_TRANSFER_RESPONSE,
     });
 
     const res = await GET(makeRequest({ data: TRANSFER_CALLDATA }));
@@ -117,10 +117,10 @@ describe("GET /api/decode — OpenChain fallback", () => {
     const body = await res.json();
     expect(body.msg).toBe("ok");
     expect(body.data[0].func).toBe("transfer(address,uint256)");
-    expect(body.data[0].source).toBe("openchain");
+    expect(body.data[0].source).toBe("sourcify");
   });
 
-  it("returns decoded result from OpenChain when backend returns empty data array (real behavior)", async () => {
+  it("returns decoded result from Sourcify when backend returns empty data array (real behavior)", async () => {
     process.env.BACKEND_URL = "https://backend.test";
     global.fetch.mockResolvedValueOnce({
       ok: true,
@@ -128,7 +128,7 @@ describe("GET /api/decode — OpenChain fallback", () => {
     });
     global.fetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => OPENCHAIN_TRANSFER_RESPONSE,
+      json: async () => SOURCIFY_TRANSFER_RESPONSE,
     });
 
     const res = await GET(makeRequest({ data: TRANSFER_CALLDATA }));
@@ -136,10 +136,10 @@ describe("GET /api/decode — OpenChain fallback", () => {
     const body = await res.json();
     expect(body.msg).toBe("ok");
     expect(body.data[0].func).toBe("transfer(address,uint256)");
-    expect(body.data[0].source).toBe("openchain");
+    expect(body.data[0].source).toBe("sourcify");
   });
 
-  it("returns decoded result from OpenChain when backend returns msg !== ok", async () => {
+  it("returns decoded result from Sourcify when backend returns msg !== ok", async () => {
     process.env.BACKEND_URL = "https://backend.test";
     global.fetch.mockResolvedValueOnce({
       ok: true,
@@ -147,7 +147,7 @@ describe("GET /api/decode — OpenChain fallback", () => {
     });
     global.fetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => OPENCHAIN_TRANSFER_RESPONSE,
+      json: async () => SOURCIFY_TRANSFER_RESPONSE,
     });
 
     const res = await GET(makeRequest({ data: TRANSFER_CALLDATA }));
@@ -155,10 +155,10 @@ describe("GET /api/decode — OpenChain fallback", () => {
     const body = await res.json();
     expect(body.msg).toBe("ok");
     expect(body.data[0].func).toBe("transfer(address,uint256)");
-    expect(body.data[0].source).toBe("openchain");
+    expect(body.data[0].source).toBe("sourcify");
   });
 
-  it("returns the original backend response when OpenChain also has no match", async () => {
+  it("returns the original backend response when Sourcify also has no match", async () => {
     process.env.BACKEND_URL = "https://backend.test";
     global.fetch.mockResolvedValueOnce({
       ok: true,
