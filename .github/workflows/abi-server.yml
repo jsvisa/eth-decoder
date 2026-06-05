@@ -1,0 +1,31 @@
+name: abi_server
+
+on:
+  push:
+    branches: [main]
+    paths: [abi_server/**]
+  pull_request:
+    paths: [abi_server/**]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: abi_server Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install abi_server with test deps
+        run: pip install -e ".[test]"
+        working-directory: abi_server
+
+      - name: Run abi_server tests
+        run: pytest tests/ -v
+        working-directory: abi_server
