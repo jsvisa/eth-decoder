@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { lookupEventSignatures, sigToEventAbi } from "../../utils/openchain.js";
+import { lookupEventSignatures, sigToEventAbi } from "../../utils/sourcify.js";
 import { decodeEventLog } from "../../utils/decoder.js";
 
 export async function GET(request) {
@@ -35,13 +35,13 @@ export async function GET(request) {
     const result = await response.json();
     if (result?.msg === "ok") return NextResponse.json(result);
 
-    // Backend found no match — try OpenChain
-    const fallback = await tryOpenChainEventFallback(sign, topics, data);
+    // Backend found no match — try Sourcify
+    const fallback = await trySourcifyEventFallback(sign, topics, data);
     if (fallback) return NextResponse.json(fallback);
 
     return NextResponse.json(result);
   } catch (error) {
-    const fallback = await tryOpenChainEventFallback(sign, topics, data);
+    const fallback = await trySourcifyEventFallback(sign, topics, data);
     if (fallback) return NextResponse.json(fallback);
 
     console.error("decode-event error:", error);
@@ -52,7 +52,7 @@ export async function GET(request) {
   }
 }
 
-async function tryOpenChainEventFallback(sign, topics, data) {
+async function trySourcifyEventFallback(sign, topics, data) {
   const sigs = await lookupEventSignatures(sign);
   // topics param includes topic0 as first element; count remaining for numIndexed
   const allTopics = topics ? topics.split(",") : [sign];
@@ -62,7 +62,7 @@ async function tryOpenChainEventFallback(sign, topics, data) {
     try {
       const abiItem = sigToEventAbi(sig, numIndexed);
       const decoded = decodeEventLog(abiItem, allTopics, data);
-      return { msg: "ok", data: { ...decoded, source: "openchain" } };
+      return { msg: "ok", data: { ...decoded, source: "sourcify" } };
     } catch {
       // ABI mismatch — try next candidate
     }

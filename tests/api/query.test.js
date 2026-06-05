@@ -168,12 +168,12 @@ describe("OpenChain fallback (backend returns not found)", () => {
 
     await GET(makeRequest({ sign: "0x341d16d9" }));
 
-    const openchaindUrl = global.fetch.mock.calls[1][0];
-    expect(openchaindUrl).toContain("api.openchain.xyz");
-    expect(openchaindUrl).toContain("function=0x341d16d9");
+    const sourcifyUrl = global.fetch.mock.calls[1][0];
+    expect(sourcifyUrl).toContain("api.4byte.sourcify.dev");
+    expect(sourcifyUrl).toContain("function=0x341d16d9");
   });
 
-  it("returns not found when both backend and OpenChain have no match", async () => {
+  it("returns not found when both backend and Sourcify have no match", async () => {
     process.env.BACKEND_URL = "https://backend.test";
     global.fetch
       .mockResolvedValueOnce({
@@ -195,17 +195,17 @@ describe("OpenChain fallback (backend returns not found)", () => {
     expect(body.data).toBeNull();
   });
 
-  it("returns not found when OpenChain is unreachable after backend not found", async () => {
+  it("returns not found when Sourcify is unreachable after backend not found", async () => {
     process.env.BACKEND_URL = "https://backend.test";
     global.fetch
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({ msg: "not found", data: null }),
       })
-      .mockRejectedValueOnce(new Error("OpenChain unreachable"));
+      .mockRejectedValueOnce(new Error("Sourcify unreachable"));
 
     const res = await GET(makeRequest({ sign: "0x341d16d9" }));
-    // openchain.js silently swallows errors, so we degrade to "not found"
+    // sourcify.js silently swallows errors, so we degrade to "not found"
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.msg).toBe("not found");

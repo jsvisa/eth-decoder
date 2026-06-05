@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import {
   lookupFunctionSignatures,
   lookupEventSignatures,
-} from "../../utils/openchain.js";
+} from "../../utils/sourcify.js";
 
-async function fallbackToOpenchain(sign, count) {
+async function fallbackToSourcify(sign, count) {
   // 4-byte selectors ("0x" + 8 hex chars = 10) are function selectors; longer are event topics
   const isEvent = sign.length > 10;
   const names = isEvent
@@ -56,7 +56,7 @@ export async function GET(request) {
     if (data?.data != null) {
       return NextResponse.json(data);
     }
-    // Backend returned not found; fall through to OpenChain
+    // Backend returned not found; fall through to Sourcify
   } catch (error) {
     console.error("query error:", error);
     return NextResponse.json(
@@ -65,6 +65,6 @@ export async function GET(request) {
     );
   }
 
-  // OpenChain fallback when backend has no match
-  return NextResponse.json(await fallbackToOpenchain(sign, count));
+  // Sourcify fallback when backend has no match
+  return NextResponse.json(await fallbackToSourcify(sign, count));
 }

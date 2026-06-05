@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createPublicClient, http, defineChain } from "viem";
 import { mainnet, arbitrum, base, polygon, bsc } from "viem/chains";
 import { isValidEthAddress } from "../../utils/validation";
+import { fetchContractInfoFromSourcify } from "../../utils/sourcify";
 
 // Etherscan V2 API uses chain IDs (built-in chains)
 const BUILT_IN_CHAIN_IDS = {
@@ -75,39 +76,6 @@ async function fetchContractInfoFromEtherscan(address, chainId, apiKey) {
     implementation: result.Implementation || null,
     source: "etherscan",
   };
-}
-
-// Fetch ABI from Sourcify (fallback for unverified contracts on Etherscan)
-async function fetchContractInfoFromSourcify(address, chainId) {
-  try {
-    const response = await fetch(
-      `https://sourcify.dev/server/v2/contract/${chainId}/${address}?fields=abi,metadata`,
-    );
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = await response.json();
-    const abi = data.abi;
-
-    if (!abi) {
-      return null;
-    }
-
-    const contractName = data.metadata?.settings?.compilationTarget
-      ? Object.values(data.metadata.settings.compilationTarget)[0]
-      : null;
-
-    return {
-      abi,
-      contractName,
-      source: "sourcify",
-    };
-  } catch (e) {
-    console.error("Sourcify fetch error:", e);
-    return null;
-  }
 }
 
 // Try to fetch contract info from multiple sources

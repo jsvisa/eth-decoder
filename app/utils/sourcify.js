@@ -1,8 +1,9 @@
-const OPENCHAIN_URL = "https://api.4byte.sourcify.dev/signature-database/v1/lookup";
+const SOURCIFY_LOOKUP_URL =
+  "https://api.4byte.sourcify.dev/signature-database/v1/lookup";
 
 export async function lookupFunctionSignatures(selector) {
   try {
-    const res = await fetch(`${OPENCHAIN_URL}?function=${selector}`);
+    const res = await fetch(`${SOURCIFY_LOOKUP_URL}?function=${selector}`);
     if (!res.ok) return [];
     const json = await res.json();
     if (!json.ok) return [];
@@ -14,7 +15,7 @@ export async function lookupFunctionSignatures(selector) {
 
 export async function lookupEventSignatures(topic0) {
   try {
-    const res = await fetch(`${OPENCHAIN_URL}?event=${topic0}`);
+    const res = await fetch(`${SOURCIFY_LOOKUP_URL}?event=${topic0}`);
     if (!res.ok) return [];
     const json = await res.json();
     if (!json.ok) return [];
@@ -98,4 +99,36 @@ export function sigToEventAbi(sig, numIndexed = 0) {
     })),
     anonymous: false,
   };
+}
+
+export async function fetchContractInfoFromSourcify(address, chainId) {
+  try {
+    const response = await fetch(
+      `https://sourcify.dev/server/v2/contract/${chainId}/${address}?fields=abi,metadata`,
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    const abi = data.abi;
+
+    if (!abi) {
+      return null;
+    }
+
+    const contractName = data.metadata?.settings?.compilationTarget
+      ? Object.values(data.metadata.settings.compilationTarget)[0]
+      : null;
+
+    return {
+      abi,
+      contractName,
+      source: "sourcify",
+    };
+  } catch (e) {
+    console.error("Sourcify fetch error:", e);
+    return null;
+  }
 }
