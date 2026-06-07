@@ -251,6 +251,192 @@ test.describe("Simulation result UI features", () => {
   });
 });
 
+// ── Role badge tests ─────────────────────────────────────────────────────────
+
+test.describe("Balance Changes role badges", () => {
+  // Seed a simulation where TOKEN_ADDR (the contract = `address` state) also
+  // has a balance change so the Receiver badge is exercised.
+  const CONTRACT_ADDR = TOKEN_ADDR; // address state = USDC contract
+
+  const outputWithContractChange = {
+    ...MOCK_SIMULATE_OUTPUT,
+    balanceChanges: [
+      {
+        address: FROM_ADDR,
+        before: "10000000000000000000",
+        after: "9000000000000000000",
+        diff: "-1000000000000000000",
+      },
+      // The contract itself also loses ETH (e.g. gas refund scenario)
+      {
+        address: CONTRACT_ADDR,
+        before: "5000000000000000000",
+        after: "4900000000000000000",
+        diff: "-100000000000000000",
+      },
+    ],
+  };
+
+  const historyWithContract = {
+    ...MOCK_HISTORY_ITEM,
+    address: CONTRACT_ADDR,
+    fromAddress: FROM_ADDR,
+    output: outputWithContractChange,
+  };
+
+  test("Sender badge shown for fromAddress rows", async ({ page }) => {
+    await page.addInitScript(
+      ({ hk, hi, ak, abi }) => {
+        localStorage.setItem(hk, JSON.stringify([hi]));
+        localStorage.setItem(
+          ak,
+          JSON.stringify({ abi, contractName: "MockUSDC", isProxy: false }),
+        );
+      },
+      {
+        hk: "contract_caller_history",
+        hi: historyWithContract,
+        ak: `abi-ethereum-${CONTRACT_ADDR}`,
+        abi: MOCK_ABI,
+      },
+    );
+    await mockCallContract(page);
+    await mockTokenPrice(page);
+
+    await page.goto("/contract-caller");
+    await page.locator("[class*=historyItem]").first().click();
+    await page.locator("[class*=bdSection]").waitFor({ timeout: 5000 });
+
+    const section = page.locator("[class*=bdSection]");
+    // FROM_ADDR is the sender — its row(s) carry the Sender badge
+    await expect(section.locator("text=Sender").first()).toBeVisible();
+  });
+
+  test("Receiver badge shown for contract address rows", async ({ page }) => {
+    await page.addInitScript(
+      ({ hk, hi, ak, abi }) => {
+        localStorage.setItem(hk, JSON.stringify([hi]));
+        localStorage.setItem(
+          ak,
+          JSON.stringify({ abi, contractName: "MockUSDC", isProxy: false }),
+        );
+      },
+      {
+        hk: "contract_caller_history",
+        hi: historyWithContract,
+        ak: `abi-ethereum-${CONTRACT_ADDR}`,
+        abi: MOCK_ABI,
+      },
+    );
+    await mockCallContract(page);
+    await mockTokenPrice(page);
+
+    await page.goto("/contract-caller");
+    await page.locator("[class*=historyItem]").first().click();
+    await page.locator("[class*=bdSection]").waitFor({ timeout: 5000 });
+
+    const section = page.locator("[class*=bdSection]");
+    // CONTRACT_ADDR equals `address` state → Receiver badge
+    await expect(section.locator("text=Receiver").first()).toBeVisible();
+  });
+
+  test("third-party address (transfer recipient) has no role badge", async ({
+    page,
+  }) => {
+    await seedLocalStorage(page);
+    await mockCallContract(page);
+    await mockTokenPrice(page);
+
+    await page.goto("/contract-caller");
+    await page.locator("[class*=historyItem]").first().click();
+    await page.locator("[class*=bdSection]").waitFor({ timeout: 5000 });
+    await page.waitForTimeout(2000);
+
+    // TO_ADDR is neither fromAddress nor address, so no badge cell next to it
+    // Verify TO_ADDR row exists but doesn't contain Sender or Receiver
+    const rows = page.locator("[class*=bdRow]");
+    const count = await rows.count();
+    let toAddrRowHasBadge = false;
+    for (let i = 0; i < count; i++) {
+      const rowText = await rows.nth(i).textContent();
+      const shortTo =
+        TO_ADDR.slice(0, 10) + "…" + TO_ADDR.slice(-8);
+      if (rowText.includes(shortTo) || rowText.toLowerCase().includes(TO_ADDR.toLowerCase())) {
+        if (rowText.includes("Sender") || rowText.includes("Receiver")) {
+          toAddrRowHasBadge = true;
+        }
+      }
+    }
+    expect(toAddrRowHasBadge).toBe(false);
+  });
+});
+
+// ── Click-to-expand tests ─────────────────────────────────────────────────────
+
+test.describe("Balance Changes click-to-expand", () => {
+  test("clicking address toggles between truncated and full display", async ({
+    page,
+  }) => {
+    await seedLocalStorage(page);
+    await mockCallContract(page);
+    await mockTokenPrice(page);
+
+    await page.goto("/contract-caller");
+    await page.locator("[class*=historyItem]").first().click();
+    await page.locator("[class*=bdSection]").waitFor({ timeout: 5000 });
+
+    const section = page.locator("[class*=bdSection]");
+    // Use span[class*=bdAddr] — [class*=bdAddr] alone also matches bdAddrCell (div)
+    const firstAddr = section.locator("span[class*=bdAddr]").first();
+
+    // Initially shows truncated form
+    const truncated = `${FROM_ADDR.slice(0, 10)}…${FROM_ADDR.slice(-8)}`;
+    await expect(firstAddr).toHaveText(truncated);
+
+    // Click → shows full address
+    await firstAddr.click();
+    await expect(firstAddr).toHaveText(FROM_ADDR);
+
+    // Click again → back to truncated
+    await firstAddr.click();
+    await expect(firstAddr).toHaveText(truncated);
+  });
+
+  test("clicking token cell shows contract address below symbol", async ({
+    page,
+  }) => {
+    await seedLocalStorage(page);
+    await mockCallContract(page);
+    await mockTokenPrice(page);
+
+    await page.goto("/contract-caller");
+    await page.locator("[class*=historyItem]").first().click();
+    await page.locator("[class*=bdSection]").waitFor({ timeout: 5000 });
+    await page.waitForTimeout(2000); // wait for symbol fetch
+
+    const section = page.locator("[class*=bdSection]");
+
+    // Target the USDC token cell specifically (first row is ETH which is not expandable)
+    const usdcTokenCell = section
+      .locator("[class*=bdTokenCell]")
+      .filter({ hasText: "USDC" })
+      .first();
+
+    // Token contract address span is absent before clicking
+    const tokenAddrSpan = usdcTokenCell.locator("[class*=bdTokenAddr]");
+    await expect(tokenAddrSpan).not.toBeAttached();
+
+    // Click → contract address appears
+    await usdcTokenCell.click();
+    await expect(tokenAddrSpan).toBeVisible();
+    await expect(tokenAddrSpan).toHaveText(TOKEN_ADDR);
+
+    // Click again → hidden
+    await usdcTokenCell.click();
+    await expect(tokenAddrSpan).not.toBeAttached();
+  });
+});
+
 test.describe("/api/token-price endpoint", () => {
   test("returns { price } for native ETH on Ethereum", async ({ request }) => {
     const res = await request.get(

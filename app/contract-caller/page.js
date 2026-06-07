@@ -10,6 +10,7 @@ import {
 } from "viem";
 import yaml from "js-yaml";
 import styles from "./page.module.css";
+import { formatTokenAmount } from "../utils/tokenFormatting";
 import {
   getAddressBook,
   addToAddressBook,
@@ -357,27 +358,6 @@ const ERC20_DECIMALS_ABI = [
   },
 ];
 
-// Format a raw token amount (BigInt) using its decimals, returning a human-readable string
-const formatTokenAmount = (rawValue, decimals) => {
-  try {
-    const val =
-      typeof rawValue === "bigint" ? rawValue : BigInt(String(rawValue));
-    const absVal = val < 0n ? -val : val;
-    if (decimals === 0) return absVal.toLocaleString();
-    const divisor = BigInt(10 ** decimals);
-    const whole = absVal / divisor;
-    const remainder = absVal % divisor;
-    if (remainder === 0n) return whole.toLocaleString();
-    const fracStr = remainder
-      .toString()
-      .padStart(decimals, "0")
-      .replace(/0+$/, "")
-      .slice(0, 6);
-    return `${whole.toLocaleString()}.${fracStr}`;
-  } catch {
-    return null;
-  }
-};
 
 // Get all cached contract addresses
 const getCachedAddresses = () => {
