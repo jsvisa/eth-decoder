@@ -38,34 +38,8 @@ import {
   isValidPositiveInteger,
 } from "../utils/validation";
 import { normalizeArg } from "../utils/normalizeArg";
-
-const CHAINS = [
-  {
-    id: "ethereum",
-    name: "Ethereum",
-    icon: "https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg",
-  },
-  {
-    id: "arbitrum",
-    name: "Arbitrum",
-    icon: "https://icons.llamao.fi/icons/chains/rsz_arbitrum.jpg",
-  },
-  {
-    id: "base",
-    name: "Base",
-    icon: "https://icons.llamao.fi/icons/chains/rsz_base.jpg",
-  },
-  {
-    id: "polygon",
-    name: "Polygon",
-    icon: "https://icons.llamao.fi/icons/chains/rsz_polygon.jpg",
-  },
-  {
-    id: "bsc",
-    name: "BSC",
-    icon: "https://icons.llamao.fi/icons/chains/rsz_binance.jpg",
-  },
-];
+import { useSettings } from "../contexts/SettingsContext";
+import { CHAINS, BUILT_IN_CHAIN_IDS as BUILT_IN_IDS } from "../utils/chains";
 
 const STORAGE_KEY = "contract_caller_history";
 const ABI_CACHE_PREFIX = "abi-";
@@ -73,21 +47,10 @@ const TOKEN_SYMBOL_CACHE_PREFIX = "token-symbol-";
 const TOKEN_DECIMALS_CACHE_PREFIX = "token-decimals-";
 
 const NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000";
-const TENDERLY_SETTINGS_KEY = "tenderly_settings";
-const API_KEYS_STORAGE_KEY = "api_keys_settings";
-const RPC_SETTINGS_KEY = "rpc_settings";
-const SIMULATION_SETTINGS_KEY = "simulation_settings";
 const CUSTOM_CHAINS_KEY = "custom_chains";
 const MAX_HISTORY_ITEMS = 50;
 
-// Expected chain IDs for validation (built-in chains)
-const BUILT_IN_CHAIN_IDS = {
-  ethereum: 1,
-  arbitrum: 42161,
-  base: 8453,
-  polygon: 137,
-  bsc: 56,
-};
+const BUILT_IN_CHAIN_IDS = BUILT_IN_IDS;
 
 // Recursively validate all addresses in an argument (handles tuples, arrays, nested structures)
 const validateAddressesInArg = (
@@ -734,22 +697,19 @@ export default function ContractCaller() {
   const [fromAddress, setFromAddress] = useState("");
   const [rawCalldataMode, setRawCalldataMode] = useState(false);
   const [rawCalldata, setRawCalldata] = useState("");
-  const [showSettings, setShowSettings] = useState(false);
-  const [tenderlySettings, setTenderlySettings] = useState({
-    accessKey: "",
-    account: "",
-    project: "",
-  });
-  const [apiKeys, setApiKeys] = useState({
-    etherscan: "",
-  });
-  const [rpcSettings, setRpcSettings] = useState({
-    ethereum: "",
-    arbitrum: "",
-    base: "",
-    polygon: "",
-    bsc: "",
-  });
+  const {
+    tenderlySettings,
+    apiKeys,
+    rpcSettings,
+    saveRpcSettings,
+    useLocalSimulation,
+    rpcBatchSize,
+    customChains,
+    saveCustomChains,
+    isTenderlyConfigured,
+    getChainId: getChainIdFromCtx,
+    setShowSettings,
+  } = useSettings();
   const [resultCollapsed, setResultCollapsed] = useState(false);
   const [hideTooltip, setHideTooltip] = useState(false);
   const [functionFilter, setFunctionFilter] = useState("");
@@ -759,21 +719,11 @@ export default function ContractCaller() {
   const [ethValueUnit, setEthValueUnit] = useState("ETH"); // 'ETH' or 'Wei'
   const [urlCopied, setUrlCopied] = useState(false); // For share URL feedback
   const [calldataCopied, setCalldataCopied] = useState(false); // For copy calldata feedback
-  const [testingEtherscan, setTestingEtherscan] = useState(false);
-  const [etherscanTestResult, setEtherscanTestResult] = useState(null); // 'success' | 'error' | null
-  const [testingTenderly, setTestingTenderly] = useState(false);
-  const [tenderlyTestResult, setTenderlyTestResult] = useState(null); // 'success' | 'error' | null
-  const [testingRpc, setTestingRpc] = useState({}); // { [chain]: boolean }
-  const [rpcTestResult, setRpcTestResult] = useState({}); // { [chain]: 'success' | 'error' | null }
   const [addressBook, setAddressBook] = useState([]); // Address book entries
   const [showBookmarkModal, setShowBookmarkModal] = useState(false); // Show save to address book modal
   const [bookmarkAddress, setBookmarkAddress] = useState(""); // Address being bookmarked (empty = main contract address)
   const [bookmarkLabel, setBookmarkLabel] = useState(""); // Label for new bookmark
   const [bookmarkNotes, setBookmarkNotes] = useState(""); // Notes for new bookmark
-  const [selectedRpcChain, setSelectedRpcChain] = useState("ethereum"); // For RPC settings dropdown
-  // Simulation settings
-  const [useLocalSimulation, setUseLocalSimulation] = useState(true); // Use browser-based Tevm simulation (default)
-  const [rpcBatchSize, setRpcBatchSize] = useState(1); // JSON-RPC batch size for simulation prefetch
   const [forkBlockNumber, setForkBlockNumber] = useState(""); // Block number to fork from (empty = latest)
   const [readBlockNumber, setReadBlockNumber] = useState(""); // Block number for read-only eth_call (empty = latest)
   const [cheatcodes, setCheatcodes] = useState({
@@ -791,8 +741,7 @@ export default function ContractCaller() {
   const [abiCopiedItem, setAbiCopiedItem] = useState(null); // Track which ABI item was just copied
   const [simOptionsExpanded, setSimOptionsExpanded] = useState(false); // Expand simulation options
   const [fieldErrors, setFieldErrors] = useState({}); // Track validation errors for fields
-  // Custom chains state
-  const [customChains, setCustomChains] = useState([]); // User-added chains from chainlist.org
+  // Custom chains state (managed in SettingsContext; local alias for chainlist operations)
   const [showAddChainModal, setShowAddChainModal] = useState(false); // Modal for adding custom chains
   const [chainlistData, setChainlistData] = useState([]); // Data from chainlist.org
   const [chainlistLoading, setChainlistLoading] = useState(false); // Loading chainlist data
@@ -843,14 +792,7 @@ export default function ContractCaller() {
   // Compute merged chains list (built-in + custom)
   const allChains = [...CHAINS, ...customChains];
 
-  // Compute chain IDs map (built-in + custom)
-  const getChainId = (chainId) => {
-    if (BUILT_IN_CHAIN_IDS[chainId]) {
-      return BUILT_IN_CHAIN_IDS[chainId];
-    }
-    const customChain = customChains.find((c) => c.id === chainId);
-    return customChain?.chainId || null;
-  };
+  const getChainId = getChainIdFromCtx;
 
   // Get chain info by ID
   const getChainInfo = (chainId) => {
@@ -1432,47 +1374,8 @@ export default function ContractCaller() {
       }
       setTokenSymbols(symbols);
 
-      // Load Tenderly settings
-      const savedTenderly = localStorage.getItem(TENDERLY_SETTINGS_KEY);
-      if (savedTenderly) {
-        setTenderlySettings(JSON.parse(savedTenderly));
-      }
-
-      // Load API keys
-      const savedApiKeys = localStorage.getItem(API_KEYS_STORAGE_KEY);
-      if (savedApiKeys) {
-        setApiKeys(JSON.parse(savedApiKeys));
-      }
-
-      // Load RPC settings
-      const savedRpcSettings = localStorage.getItem(RPC_SETTINGS_KEY);
-      if (savedRpcSettings) {
-        setRpcSettings(JSON.parse(savedRpcSettings));
-      }
-
-      // Load simulation settings
-      const savedSimSettings = localStorage.getItem(SIMULATION_SETTINGS_KEY);
-      if (savedSimSettings) {
-        const parsed = JSON.parse(savedSimSettings);
-        if (typeof parsed.useLocalSimulation === "boolean") {
-          setUseLocalSimulation(parsed.useLocalSimulation);
-        }
-        if (
-          typeof parsed.rpcBatchSize === "number" &&
-          parsed.rpcBatchSize >= 1
-        ) {
-          setRpcBatchSize(parsed.rpcBatchSize);
-        }
-      }
-
       // Load address book
       setAddressBook(getAddressBook());
-
-      // Load custom chains
-      const savedCustomChains = localStorage.getItem(CUSTOM_CHAINS_KEY);
-      if (savedCustomChains) {
-        setCustomChains(JSON.parse(savedCustomChains));
-      }
     } catch (err) {
       console.error("Failed to load history:", err);
     }
@@ -2081,215 +1984,6 @@ export default function ContractCaller() {
     }
   };
 
-  const saveTenderlySettings = (settings) => {
-    setTenderlySettings(settings);
-    try {
-      localStorage.setItem(TENDERLY_SETTINGS_KEY, JSON.stringify(settings));
-    } catch (err) {
-      console.error("Failed to save Tenderly settings:", err);
-    }
-  };
-
-  const saveApiKeys = (keys) => {
-    setApiKeys(keys);
-    try {
-      localStorage.setItem(API_KEYS_STORAGE_KEY, JSON.stringify(keys));
-    } catch (err) {
-      console.error("Failed to save API keys:", err);
-    }
-  };
-
-  const saveRpcSettings = (settings) => {
-    setRpcSettings(settings);
-    try {
-      localStorage.setItem(RPC_SETTINGS_KEY, JSON.stringify(settings));
-    } catch (err) {
-      console.error("Failed to save RPC settings:", err);
-    }
-  };
-
-  const exportSettings = () => {
-    const data = {};
-    const exactKeys = [
-      TENDERLY_SETTINGS_KEY,
-      API_KEYS_STORAGE_KEY,
-      RPC_SETTINGS_KEY,
-      SIMULATION_SETTINGS_KEY,
-      CUSTOM_CHAINS_KEY,
-      "address_book",
-      STORAGE_KEY,
-      "evm_decoder_history",
-    ];
-    for (const key of exactKeys) {
-      const val = localStorage.getItem(key);
-      if (val != null) data[key] = val;
-    }
-    const prefixes = [
-      ABI_CACHE_PREFIX,
-      TOKEN_SYMBOL_CACHE_PREFIX,
-      TOKEN_DECIMALS_CACHE_PREFIX,
-    ];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && prefixes.some((p) => key.startsWith(p))) {
-        data[key] = localStorage.getItem(key);
-      }
-    }
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "evm-tools-settings.json";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const importSettings = (file) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = JSON.parse(e.target.result);
-        for (const [key, value] of Object.entries(data)) {
-          if (typeof value === "string") localStorage.setItem(key, value);
-        }
-        window.location.reload();
-      } catch (err) {
-        alert("Failed to import settings: " + err.message);
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const isTenderlyConfigured = () => {
-    return (
-      tenderlySettings.accessKey &&
-      tenderlySettings.account &&
-      tenderlySettings.project
-    );
-  };
-
-  const isEtherscanConfigured = () => {
-    return !!apiKeys.etherscan;
-  };
-
-  const testEtherscanKey = async () => {
-    if (!apiKeys.etherscan) return;
-
-    setTestingEtherscan(true);
-    setEtherscanTestResult(null);
-
-    try {
-      // Test with a simple balance check using Etherscan V2 API
-      const testAddress = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
-      const response = await fetch(
-        `https://api.etherscan.io/v2/api?chainid=1&module=account&action=balance&address=${testAddress}&tag=latest&apikey=${apiKeys.etherscan}`,
-      );
-      const data = await response.json();
-
-      if (data.status === "1" || data.message === "OK") {
-        setEtherscanTestResult("success");
-      } else {
-        setEtherscanTestResult("error");
-      }
-    } catch (err) {
-      setEtherscanTestResult("error");
-    } finally {
-      setTestingEtherscan(false);
-      // Clear result after 3 seconds
-      setTimeout(() => setEtherscanTestResult(null), 3000);
-    }
-  };
-
-  const testTenderlyKey = async () => {
-    if (
-      !tenderlySettings.accessKey ||
-      !tenderlySettings.account ||
-      !tenderlySettings.project
-    )
-      return;
-
-    setTestingTenderly(true);
-    setTenderlyTestResult(null);
-
-    try {
-      // Test by fetching project info
-      const response = await fetch(
-        `https://api.tenderly.co/api/v1/account/${tenderlySettings.account}/project/${tenderlySettings.project}`,
-        {
-          headers: {
-            "X-Access-Key": tenderlySettings.accessKey,
-          },
-        },
-      );
-
-      if (response.ok) {
-        setTenderlyTestResult("success");
-      } else {
-        setTenderlyTestResult("error");
-      }
-    } catch (err) {
-      setTenderlyTestResult("error");
-    } finally {
-      setTestingTenderly(false);
-      // Clear result after 3 seconds
-      setTimeout(() => setTenderlyTestResult(null), 3000);
-    }
-  };
-
-  const testRpcEndpoint = async (chainId) => {
-    const rpcUrl = rpcSettings[chainId];
-    if (!rpcUrl) return;
-
-    setTestingRpc((prev) => ({ ...prev, [chainId]: true }));
-    setRpcTestResult((prev) => ({ ...prev, [chainId]: null }));
-
-    try {
-      // Call eth_chainId to validate the RPC endpoint
-      const response = await fetch(rpcUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          method: "eth_chainId",
-          params: [],
-          id: 1,
-        }),
-      });
-
-      if (!response.ok) {
-        setRpcTestResult((prev) => ({ ...prev, [chainId]: "error" }));
-        return;
-      }
-
-      const data = await response.json();
-
-      if (data.error) {
-        setRpcTestResult((prev) => ({ ...prev, [chainId]: "error" }));
-        return;
-      }
-
-      // Validate chain ID matches expected
-      const returnedChainId = parseInt(data.result, 16);
-      const expectedChainId = getChainId(chainId);
-
-      if (returnedChainId === expectedChainId) {
-        setRpcTestResult((prev) => ({ ...prev, [chainId]: "success" }));
-      } else {
-        setRpcTestResult((prev) => ({ ...prev, [chainId]: "mismatch" }));
-      }
-    } catch (err) {
-      setRpcTestResult((prev) => ({ ...prev, [chainId]: "error" }));
-    } finally {
-      setTestingRpc((prev) => ({ ...prev, [chainId]: false }));
-      // Clear result after 3 seconds
-      setTimeout(
-        () => setRpcTestResult((prev) => ({ ...prev, [chainId]: null })),
-        3000,
-      );
-    }
-  };
 
   // Fetch chainlist data from chainlist.org
   const fetchChainlistData = async () => {
@@ -2374,14 +2068,11 @@ export default function ContractCaller() {
     };
 
     const updatedChains = [...customChains, newChain];
-    setCustomChains(updatedChains);
+    saveCustomChains(updatedChains);
     localStorage.setItem(CUSTOM_CHAINS_KEY, JSON.stringify(updatedChains));
 
-    // Also save the RPC URL to rpcSettings
     if (bestRpc) {
-      const newRpcSettings = { ...rpcSettings, [chainId]: bestRpc };
-      setRpcSettings(newRpcSettings);
-      localStorage.setItem(RPC_SETTINGS_KEY, JSON.stringify(newRpcSettings));
+      saveRpcSettings({ ...rpcSettings, [chainId]: bestRpc });
     }
 
     return true;
@@ -2390,15 +2081,13 @@ export default function ContractCaller() {
   // Remove a custom chain
   const removeCustomChain = (chainId) => {
     const updatedChains = customChains.filter((c) => c.id !== chainId);
-    setCustomChains(updatedChains);
+    saveCustomChains(updatedChains);
     localStorage.setItem(CUSTOM_CHAINS_KEY, JSON.stringify(updatedChains));
 
-    // Also remove RPC setting if exists
     if (rpcSettings[chainId]) {
       const newRpcSettings = { ...rpcSettings };
       delete newRpcSettings[chainId];
-      setRpcSettings(newRpcSettings);
-      localStorage.setItem(RPC_SETTINGS_KEY, JSON.stringify(newRpcSettings));
+      saveRpcSettings(newRpcSettings);
     }
 
     // If current chain is removed, switch to ethereum
@@ -2507,12 +2196,6 @@ export default function ContractCaller() {
     setSessionHistory([]);
     setError(null);
   }, [chain, forkBlockNumber]);
-
-  useEffect(() => {
-    const handler = () => setShowSettings((v) => !v);
-    window.addEventListener("toggle-settings", handler);
-    return () => window.removeEventListener("toggle-settings", handler);
-  }, []);
 
   // Fetch token decimals and prices whenever a simulated result is set (including history loads)
   useEffect(() => {
@@ -3378,383 +3061,6 @@ export default function ContractCaller() {
     <main className={styles.main}>
       <div className={styles.container}>
         <h1 className={styles.title}>Contract Caller</h1>
-
-        {/* Settings Panel */}
-        <div className={styles.settingsSection}>
-          {showSettings && (
-            <div className={styles.settingsPanel}>
-              {/* Etherscan API Key */}
-              <div className={styles.settingsGroup}>
-                <h3 className={styles.settingsTitle}>
-                  Etherscan API Key
-                  {isEtherscanConfigured() && (
-                    <span className={styles.settingsCheck}>✓</span>
-                  )}
-                </h3>
-                <p className={styles.settingsDesc}>
-                  Required for fetching contract ABIs. Get your free API key
-                  from{" "}
-                  <a
-                    href="https://etherscan.io/myapikey"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Etherscan
-                  </a>
-                </p>
-                <div className={styles.settingsFieldWithTest}>
-                  <input
-                    type="password"
-                    value={apiKeys.etherscan}
-                    onChange={(e) =>
-                      saveApiKeys({ ...apiKeys, etherscan: e.target.value })
-                    }
-                    placeholder="Enter your Etherscan API key..."
-                    className={styles.settingsInput}
-                  />
-                  <button
-                    onClick={testEtherscanKey}
-                    disabled={!apiKeys.etherscan || testingEtherscan}
-                    className={`${styles.testButton} ${etherscanTestResult === "success" ? styles.testSuccess : ""} ${etherscanTestResult === "error" ? styles.testError : ""}`}
-                  >
-                    {testingEtherscan
-                      ? "Testing..."
-                      : etherscanTestResult === "success"
-                        ? "✓ Valid"
-                        : etherscanTestResult === "error"
-                          ? "✗ Invalid"
-                          : "Test"}
-                  </button>
-                </div>
-              </div>
-
-              {/* Simulation Mode */}
-              <div className={styles.settingsGroup}>
-                <h3 className={styles.settingsTitle}>
-                  Simulation Mode
-                  {useLocalSimulation && (
-                    <span className={styles.settingsCheck}>✓ Local</span>
-                  )}
-                </h3>
-                <p className={styles.settingsDesc}>
-                  Choose between local browser-based simulation (Tevm) or
-                  Tenderly API.
-                </p>
-                <div className={styles.settingsFields}>
-                  <div className={styles.settingRow}>
-                    <label className={styles.checkboxLabel}>
-                      <input
-                        type="checkbox"
-                        checked={useLocalSimulation}
-                        onChange={(e) => {
-                          const useLocal = e.target.checked;
-                          setUseLocalSimulation(useLocal);
-                          localStorage.setItem(
-                            SIMULATION_SETTINGS_KEY,
-                            JSON.stringify({
-                              useLocalSimulation: useLocal,
-                              rpcBatchSize,
-                            }),
-                          );
-                        }}
-                      />
-                      <span>
-                        Use Local Simulation (Tevm - no API keys required)
-                      </span>
-                    </label>
-                    <label className={styles.settingLabel}>
-                      Batch Size
-                      <span className={styles.settingHint}>
-                        {" "}
-                        (1 = no batching)
-                      </span>
-                      <input
-                        type="number"
-                        min="1"
-                        max="500"
-                        value={rpcBatchSize}
-                        className={styles.settingInput}
-                        onChange={(e) => {
-                          const v = Math.max(1, parseInt(e.target.value) || 1);
-                          setRpcBatchSize(v);
-                          localStorage.setItem(
-                            SIMULATION_SETTINGS_KEY,
-                            JSON.stringify({
-                              useLocalSimulation,
-                              rpcBatchSize: v,
-                            }),
-                          );
-                        }}
-                      />
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tenderly Settings */}
-              <div className={styles.settingsGroup}>
-                <h3 className={styles.settingsTitle}>
-                  Tenderly API Settings
-                  {isTenderlyConfigured() && (
-                    <span className={styles.settingsCheck}>✓</span>
-                  )}
-                </h3>
-                <p className={styles.settingsDesc}>
-                  {useLocalSimulation
-                    ? "Optional when using Local Simulation."
-                    : "Required for simulating write functions."}{" "}
-                  Get your credentials from{" "}
-                  <a
-                    href="https://dashboard.tenderly.co/account/authorization"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Tenderly Dashboard
-                  </a>
-                </p>
-                <div className={styles.settingsFields}>
-                  <div className={styles.settingsField}>
-                    <label className={styles.settingsLabel}>Access Key</label>
-                    <input
-                      type="password"
-                      value={tenderlySettings.accessKey}
-                      onChange={(e) =>
-                        saveTenderlySettings({
-                          ...tenderlySettings,
-                          accessKey: e.target.value,
-                        })
-                      }
-                      placeholder="Enter your Tenderly access key..."
-                      className={styles.settingsInput}
-                    />
-                  </div>
-                  <div className={styles.settingsField}>
-                    <label className={styles.settingsLabel}>Account Slug</label>
-                    <input
-                      type="text"
-                      value={tenderlySettings.account}
-                      onChange={(e) =>
-                        saveTenderlySettings({
-                          ...tenderlySettings,
-                          account: e.target.value,
-                        })
-                      }
-                      placeholder="Your account slug (from URL)"
-                      className={styles.settingsInput}
-                    />
-                  </div>
-                  <div className={styles.settingsField}>
-                    <label className={styles.settingsLabel}>Project Slug</label>
-                    <input
-                      type="text"
-                      value={tenderlySettings.project}
-                      onChange={(e) =>
-                        saveTenderlySettings({
-                          ...tenderlySettings,
-                          project: e.target.value,
-                        })
-                      }
-                      placeholder="Your project slug (from URL)"
-                      className={styles.settingsInput}
-                    />
-                  </div>
-                </div>
-                <button
-                  onClick={testTenderlyKey}
-                  disabled={!isTenderlyConfigured() || testingTenderly}
-                  className={`${styles.testButton} ${tenderlyTestResult === "success" ? styles.testSuccess : ""} ${tenderlyTestResult === "error" ? styles.testError : ""}`}
-                  style={{ marginTop: "1rem" }}
-                >
-                  {testingTenderly
-                    ? "Testing..."
-                    : tenderlyTestResult === "success"
-                      ? "✓ Valid"
-                      : tenderlyTestResult === "error"
-                        ? "✗ Invalid"
-                        : "Test Connection"}
-                </button>
-              </div>
-
-              {/* Custom RPC Settings */}
-              <div className={styles.settingsGroup}>
-                <h3 className={styles.settingsTitle}>
-                  Custom RPC Endpoints
-                  <span className={styles.optional}>(optional)</span>
-                </h3>
-                <p className={styles.settingsDesc}>
-                  Configure custom RPC endpoints for each chain. If not set,
-                  default public RPCs will be used.
-                </p>
-                <div className={styles.settingsFields}>
-                  <div className={styles.settingsField}>
-                    <label className={styles.settingsLabel}>Chain</label>
-                    <div className={styles.chainSelectWithIcon}>
-                      {allChains.find((c) => c.id === selectedRpcChain)
-                        ?.icon && (
-                        <img
-                          src={
-                            allChains.find((c) => c.id === selectedRpcChain)
-                              ?.icon
-                          }
-                          alt=""
-                          className={styles.chainIconSmall}
-                          onError={(e) => {
-                            e.target.style.display = "none";
-                          }}
-                        />
-                      )}
-                      <select
-                        value={selectedRpcChain}
-                        onChange={(e) => setSelectedRpcChain(e.target.value)}
-                        className={styles.select}
-                      >
-                        {[...allChains]
-                          .sort((a, b) => a.name.localeCompare(b.name))
-                          .map((c) => {
-                            const chainIdNum =
-                              c.chainId || BUILT_IN_CHAIN_IDS[c.id];
-                            return (
-                              <option key={c.id} value={c.id}>
-                                {c.name} ({chainIdNum}){" "}
-                                {rpcSettings[c.id] ? "✓" : ""}
-                              </option>
-                            );
-                          })}
-                      </select>
-                    </div>
-                  </div>
-                  <div className={styles.settingsField}>
-                    <label className={styles.settingsLabel}>RPC URL</label>
-                    <div className={styles.settingsFieldWithTest}>
-                      <input
-                        type="text"
-                        value={rpcSettings[selectedRpcChain] || ""}
-                        onChange={(e) =>
-                          saveRpcSettings({
-                            ...rpcSettings,
-                            [selectedRpcChain]: e.target.value,
-                          })
-                        }
-                        placeholder={`Custom RPC URL for ${allChains.find((c) => c.id === selectedRpcChain)?.name}...`}
-                        className={styles.settingsInput}
-                      />
-                      <button
-                        onClick={() => testRpcEndpoint(selectedRpcChain)}
-                        disabled={
-                          !rpcSettings[selectedRpcChain] ||
-                          testingRpc[selectedRpcChain]
-                        }
-                        className={`${styles.testButton} ${rpcTestResult[selectedRpcChain] === "success" ? styles.testSuccess : ""} ${rpcTestResult[selectedRpcChain] === "error" || rpcTestResult[selectedRpcChain] === "mismatch" ? styles.testError : ""}`}
-                      >
-                        {testingRpc[selectedRpcChain]
-                          ? "Testing..."
-                          : rpcTestResult[selectedRpcChain] === "success"
-                            ? "✓ Valid"
-                            : rpcTestResult[selectedRpcChain] === "mismatch"
-                              ? "✗ Wrong Chain"
-                              : rpcTestResult[selectedRpcChain] === "error"
-                                ? "✗ Failed"
-                                : "Test"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                {/* Show configured RPCs */}
-                {Object.entries(rpcSettings).filter(([_, url]) => url).length >
-                  0 && (
-                  <div className={styles.configuredRpcList}>
-                    <label
-                      className={styles.settingsLabel}
-                      style={{ marginTop: "1rem" }}
-                    >
-                      Configured RPCs:
-                    </label>
-                    {Object.entries(rpcSettings)
-                      .filter(([_, url]) => url)
-                      .map(([chainId, url]) => {
-                        const chainInfo = allChains.find(
-                          (c) => c.id === chainId,
-                        );
-                        return (
-                          <div
-                            key={chainId}
-                            className={styles.configuredRpcItem}
-                          >
-                            {chainInfo?.icon && (
-                              <img
-                                src={chainInfo.icon}
-                                alt=""
-                                className={styles.chainIconTiny}
-                              />
-                            )}
-                            <span className={styles.configuredRpcChain}>
-                              {chainInfo?.name || chainId}
-                            </span>
-                            <span
-                              className={styles.configuredRpcUrl}
-                              title={url}
-                            >
-                              {url.length > 40 ? url.slice(0, 40) + "..." : url}
-                            </span>
-                            <button
-                              className={styles.removeRpcButton}
-                              onClick={() =>
-                                saveRpcSettings({
-                                  ...rpcSettings,
-                                  [chainId]: "",
-                                })
-                              }
-                              title="Remove"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
-              </div>
-
-              {/* Sync Settings */}
-              <div className={styles.settingsGroup}>
-                <h4 className={styles.settingsTitle}>Sync Settings</h4>
-                <p className={styles.settingsDesc}>
-                  Settings and caches are stored per-origin (host). Use export
-                  / import to sync between{" "}
-                  <code>localhost</code>, <code>127.0.0.1</code>, and
-                  production.
-                </p>
-                <div className={styles.syncButtons}>
-                  <button
-                    className={styles.syncBtn}
-                    onClick={exportSettings}
-                    type="button"
-                  >
-                    Export
-                  </button>
-                  <label className={styles.syncBtn} style={{ cursor: "pointer" }}>
-                    Import
-                    <input
-                      type="file"
-                      accept=".json"
-                      style={{ display: "none" }}
-                      onChange={(e) => {
-                        if (e.target.files?.[0])
-                          importSettings(e.target.files[0]);
-                      }}
-                    />
-                  </label>
-                </div>
-              </div>
-
-              <p className={styles.settingsNote}>
-                All settings are stored locally in your browser and never sent
-                to our servers.
-              </p>
-            </div>
-          )}
-        </div>
-
         <div className={styles.form}>
           <div className={styles.row}>
             <div className={styles.field} style={{ minWidth: "200px" }}>

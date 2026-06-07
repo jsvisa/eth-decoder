@@ -1,6 +1,8 @@
 import "./globals.css";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { SettingsProvider } from "./contexts/SettingsContext";
 import Nav from "./components/Nav";
+import SettingsPanel from "./components/SettingsPanel";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata = {
@@ -13,8 +15,11 @@ export default function RootLayout({ children }) {
     <html lang="en" suppressHydrationWarning>
       <body>
         <ThemeProvider>
-          <Nav />
-          {children}
+          <SettingsProvider>
+            <Nav />
+            <SettingsPanel />
+            {children}
+          </SettingsProvider>
         </ThemeProvider>
         <SpeedInsights />
       </body>
