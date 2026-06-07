@@ -2472,6 +2472,20 @@ export default function ContractCaller() {
     setError(null);
   }, [chain, forkBlockNumber]);
 
+  // Fetch token decimals and prices whenever a simulated result is set (including history loads)
+  useEffect(() => {
+    if (!result?.simulated) return;
+    const chainNumericId = getChainId(chain);
+    if (!chainNumericId) return;
+    fetchTokenSymbolsForLogs(result.logs, chainNumericId);
+    fetchTokenDataForSimulation(
+      result.logs,
+      result.assetChanges,
+      result.balanceChanges,
+      chainNumericId,
+    );
+  }, [result]);
+
   const handleCall = async () => {
     // Clear previous field errors
     setFieldErrors({});
@@ -2845,19 +2859,7 @@ export default function ContractCaller() {
       // Auto-collapse event logs when there are many of them
       setSimLogsExpanded(!data.logs || data.logs.length <= 10);
 
-      // Fetch token symbols, decimals, and prices for simulation results (async, non-blocking)
-      const chainIdForSymbols = getChainId(chain);
-      if (data.logs && data.logs.length > 0) {
-        fetchTokenSymbolsForLogs(data.logs, chainIdForSymbols);
-      }
-      if (data.simulated && chainIdForSymbols) {
-        fetchTokenDataForSimulation(
-          data.logs,
-          data.assetChanges,
-          data.balanceChanges,
-          chainIdForSymbols,
-        );
-      }
+      // Token symbols/decimals/prices are fetched by the useEffect that watches `result`
 
       saveToHistory({ chain, address, selectedFunction, args }, data, isWrite);
     } catch (err) {
