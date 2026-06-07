@@ -18,7 +18,7 @@ import os from "os";
  * stable CSS class instead of the dynamic text. */
 async function openSettings(page) {
   await page.goto("/contract-caller");
-  await page.locator("[class*=settingsToggle]").first().click();
+  await page.locator("[class*=navSettings]").click();
   await page.locator("text=Sync Settings").waitFor({ timeout: 5000 });
 }
 
@@ -146,7 +146,7 @@ test.describe("Import settings", () => {
   async function openSettingsClean(page) {
     await page.goto("/contract-caller");
     await page.evaluate(() => localStorage.clear());
-    await page.locator("[class*=settingsToggle]").first().click();
+    await page.locator("[class*=navSettings]").click();
     await page.locator("text=Sync Settings").waitFor({ timeout: 5000 });
   }
 
@@ -163,11 +163,12 @@ test.describe("Import settings", () => {
 
     // Upload the file via the hidden <input type="file"> inside the Import label
     const fileInput = page.locator('input[type="file"][accept=".json"]');
-    // importSettings calls window.location.reload() — capture the navigation
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: "domcontentloaded" }),
-      fileInput.setInputFiles(tmpFile),
-    ]);
+    // importSettings writes to localStorage then calls window.location.reload().
+    // Wait for the reload to settle before reading localStorage.
+    await fileInput.setInputFiles(tmpFile);
+    await page.waitForLoadState("load");
+    // Wait for the page title to confirm the reload completed
+    await page.locator("text=Contract Caller").first().waitFor({ timeout: 10000 });
 
     // Verify localStorage was written with the imported values
     const stored = await page.evaluate(() =>
@@ -186,7 +187,7 @@ test.describe("Import settings", () => {
       localStorage.clear();
       localStorage.setItem("address_book", JSON.stringify([{ address: "0xexisting", name: "Bob" }]));
     });
-    await page.locator("[class*=settingsToggle]").first().click();
+    await page.locator("[class*=navSettings]").click();
     await page.locator("text=Sync Settings").waitFor({ timeout: 5000 });
 
     // Import only replaces the keys present in the file

@@ -44,15 +44,28 @@ export default function Nav() {
             Contracts
           </Link>
         </div>
-        <button
-          onClick={toggleTheme}
-          className={styles.themeToggle}
-          title={
-            theme === "light" ? "Switch to dark mode" : "Switch to light mode"
-          }
-        >
-          {theme === "light" ? "🌙" : "☀️"}
-        </button>
+        <div className={styles.navRight}>
+          {pathname === "/contract-caller" && (
+            <button
+              className={styles.navSettings}
+              title="Settings"
+              onClick={() =>
+                window.dispatchEvent(new CustomEvent("toggle-settings"))
+              }
+            >
+              ⚙
+            </button>
+          )}
+          <button
+            onClick={toggleTheme}
+            className={styles.themeToggle}
+            title={
+              theme === "light" ? "Switch to dark mode" : "Switch to light mode"
+            }
+          >
+            {theme === "light" ? "🌙" : "☀️"}
+          </button>
+        </div>
       </div>
     </nav>
   );

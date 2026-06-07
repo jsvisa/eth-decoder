@@ -2508,6 +2508,12 @@ export default function ContractCaller() {
     setError(null);
   }, [chain, forkBlockNumber]);
 
+  useEffect(() => {
+    const handler = () => setShowSettings((v) => !v);
+    window.addEventListener("toggle-settings", handler);
+    return () => window.removeEventListener("toggle-settings", handler);
+  }, []);
+
   // Fetch token decimals and prices whenever a simulated result is set (including history loads)
   useEffect(() => {
     if (!result?.simulated) return;
@@ -3371,18 +3377,7 @@ export default function ContractCaller() {
   return (
     <main className={styles.main}>
       <div className={styles.container}>
-        <div className={styles.titleRow}>
-          <h1 className={styles.title}>Contract Caller</h1>
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className={`${styles.settingsToggle} ${isEtherscanConfigured() && isTenderlyConfigured() ? styles.settingsConfigured : ""}`}
-            type="button"
-          >
-            {isEtherscanConfigured() && isTenderlyConfigured()
-              ? "✓ API Keys Configured"
-              : `⚙ Settings ${isEtherscanConfigured() ? "(Etherscan ✓)" : ""} ${isTenderlyConfigured() ? "(Tenderly ✓)" : ""}`}
-          </button>
-        </div>
+        <h1 className={styles.title}>Contract Caller</h1>
 
         {/* Settings Panel */}
         <div className={styles.settingsSection}>
