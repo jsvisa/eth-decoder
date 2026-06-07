@@ -228,8 +228,8 @@ test.describe("Simulation result UI features", () => {
     // TO address gains USDC
     await expect(section.locator("text=+1,000").first()).toBeVisible();
 
-    // Receiver badge for the to-address row
-    await expect(section.locator("text=Receiver").first()).toBeVisible();
+    // Sender badge shown for the fromAddress rows
+    await expect(section.locator("text=Sender").first()).toBeVisible();
   });
 
   test("Balance Changes table shows correct Total Value in USD per address", async ({

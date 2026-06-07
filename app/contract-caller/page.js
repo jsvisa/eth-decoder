@@ -5835,6 +5835,13 @@ export default function ContractCaller() {
                                 const totalUsd = addrTotals[row.addr];
                                 const totalPos =
                                   totalUsd != null ? totalUsd >= 0 : pos;
+                                const isSender =
+                                  fromAddress &&
+                                  row.addr ===
+                                    fromAddress.toLowerCase();
+                                const isReceiver =
+                                  address &&
+                                  row.addr === address.toLowerCase();
                                 return (
                                   <tr key={i} className={styles.bdRow}>
                                     <td className={styles.bdTd}>
@@ -5856,11 +5863,13 @@ export default function ContractCaller() {
                                             ? row.addr
                                             : `${row.addr.slice(0, 10)}…${row.addr.slice(-8)}`}
                                         </span>
-                                        <span
-                                          className={`${styles.bdRole} ${pos ? styles.bdRoleReceiver : styles.bdRoleSender}`}
-                                        >
-                                          {pos ? "Receiver" : "Sender"}
-                                        </span>
+                                        {(isSender || isReceiver) && (
+                                          <span
+                                            className={`${styles.bdRole} ${isSender ? styles.bdRoleSender : styles.bdRoleReceiver}`}
+                                          >
+                                            {isSender ? "Sender" : "Receiver"}
+                                          </span>
+                                        )}
                                       </div>
                                     </td>
                                     <td className={styles.bdTd}>
