@@ -69,6 +69,9 @@ const CHAINS = [
 const STORAGE_KEY = "contract_caller_history";
 const ABI_CACHE_PREFIX = "abi-";
 const TOKEN_SYMBOL_CACHE_PREFIX = "token-symbol-";
+const TOKEN_DECIMALS_CACHE_PREFIX = "token-decimals-";
+
+const NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000";
 const TENDERLY_SETTINGS_KEY = "tenderly_settings";
 const API_KEYS_STORAGE_KEY = "api_keys_settings";
 const RPC_SETTINGS_KEY = "rpc_settings";
@@ -308,6 +311,30 @@ const setCachedTokenSymbol = (chain, address, symbol) => {
   }
 };
 
+const getTokenDecimalsCacheKey = (chain, address) =>
+  `${TOKEN_DECIMALS_CACHE_PREFIX}${chain}-${address.toLowerCase()}`;
+
+const getCachedTokenDecimals = (chain, address) => {
+  if (!address) return null;
+  try {
+    const val = localStorage.getItem(getTokenDecimalsCacheKey(chain, address));
+    return val !== null ? Number(val) : null;
+  } catch {
+    return null;
+  }
+};
+
+const setCachedTokenDecimals = (chain, address, decimals) => {
+  try {
+    localStorage.setItem(
+      getTokenDecimalsCacheKey(chain, address),
+      String(decimals),
+    );
+  } catch {
+    // Ignore cache errors
+  }
+};
+
 // ERC20 symbol() ABI for fetching token symbols
 const ERC20_SYMBOL_ABI = [
   {
@@ -318,6 +345,39 @@ const ERC20_SYMBOL_ABI = [
     stateMutability: "view",
   },
 ];
+
+// ERC20 decimals() ABI
+const ERC20_DECIMALS_ABI = [
+  {
+    type: "function",
+    name: "decimals",
+    inputs: [],
+    outputs: [{ type: "uint8" }],
+    stateMutability: "view",
+  },
+];
+
+// Format a raw token amount (BigInt) using its decimals, returning a human-readable string
+const formatTokenAmount = (rawValue, decimals) => {
+  try {
+    const val =
+      typeof rawValue === "bigint" ? rawValue : BigInt(String(rawValue));
+    const absVal = val < 0n ? -val : val;
+    if (decimals === 0) return absVal.toLocaleString();
+    const divisor = BigInt(10 ** decimals);
+    const whole = absVal / divisor;
+    const remainder = absVal % divisor;
+    if (remainder === 0n) return whole.toLocaleString();
+    const fracStr = remainder
+      .toString()
+      .padStart(decimals, "0")
+      .replace(/0+$/, "")
+      .slice(0, 6);
+    return `${whole.toLocaleString()}.${fracStr}`;
+  } catch {
+    return null;
+  }
+};
 
 // Get all cached contract addresses
 const getCachedAddresses = () => {
@@ -685,6 +745,8 @@ export default function ContractCaller() {
   const [showFullResponse, setShowFullResponse] = useState(false);
   const [cachedAddresses, setCachedAddresses] = useState([]);
   const [tokenSymbols, setTokenSymbols] = useState({}); // Map of address -> symbol for Transfer events
+  const [tokenDecimals, setTokenDecimals] = useState({}); // Map of address -> decimals
+  const [tokenPrices, setTokenPrices] = useState({}); // Map of address -> USD price
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const [addressFilter, setAddressFilter] = useState("");
   const [fromAddress, setFromAddress] = useState("");
@@ -1731,6 +1793,96 @@ export default function ContractCaller() {
     setTokenSymbols(newSymbols);
   };
 
+  // Fetch decimals and prices for all tokens involved in a simulation result
+  const fetchTokenDataForSimulation = async (
+    logs,
+    assetChanges,
+    balanceChanges,
+    chainNumericId,
+  ) => {
+    const tokenAddresses = new Set();
+
+    if (logs) {
+      for (const log of logs) {
+        if (log.name === "Transfer" && log.address) {
+          tokenAddresses.add(log.address.toLowerCase());
+        }
+      }
+    }
+    if (assetChanges) {
+      for (const change of assetChanges) {
+        if (change.token_info?.contract_address) {
+          tokenAddresses.add(change.token_info.contract_address.toLowerCase());
+        }
+      }
+    }
+
+    const newDecimals = { ...tokenDecimals };
+    const newPrices = { ...tokenPrices };
+
+    // Fetch decimals for ERC20s not already cached
+    const decimalFetches = Array.from(tokenAddresses)
+      .filter((addr) => {
+        const cached = getCachedTokenDecimals(chain, addr);
+        if (cached !== null) {
+          newDecimals[addr] = cached;
+          return false;
+        }
+        return newDecimals[addr] === undefined;
+      })
+      .map(async (addr) => {
+        try {
+          const response = await fetch("/api/call-contract", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chain,
+              address: addr,
+              functionName: "decimals",
+              args: [],
+              abi: ERC20_DECIMALS_ABI,
+              rpcUrl: rpcSettings[chain] || undefined,
+              chainId: chainNumericId,
+            }),
+          });
+          const data = await response.json();
+          if (response.ok && data.decoded && data.decoded.length > 0) {
+            const dec = Number(data.decoded[0].value);
+            newDecimals[addr] = dec;
+            setCachedTokenDecimals(chain, addr, dec);
+          }
+        } catch {
+          // Ignore individual fetch errors
+        }
+      });
+
+    // Fetch prices for all tokens including native
+    const allPriceAddresses = [...tokenAddresses];
+    if (balanceChanges && balanceChanges.length > 0) {
+      allPriceAddresses.push(NATIVE_TOKEN_ADDRESS);
+    }
+
+    const priceFetches = allPriceAddresses
+      .filter((addr) => newPrices[addr] === undefined)
+      .map(async (addr) => {
+        try {
+          const response = await fetch(
+            `/api/token-price?token=${addr}&chainId=${chainNumericId}`,
+          );
+          const data = await response.json();
+          if (data.price !== null && data.price !== undefined) {
+            newPrices[addr] = data.price;
+          }
+        } catch {
+          // Ignore individual fetch errors
+        }
+      });
+
+    await Promise.all([...decimalFetches, ...priceFetches]);
+    setTokenDecimals({ ...newDecimals });
+    setTokenPrices({ ...newPrices });
+  };
+
   const fetchAbi = async (forceRefresh = false) => {
     if (!address.trim()) {
       setError("Please enter a contract address");
@@ -2693,10 +2845,18 @@ export default function ContractCaller() {
       // Auto-collapse event logs when there are many of them
       setSimLogsExpanded(!data.logs || data.logs.length <= 10);
 
-      // Fetch token symbols for Transfer events (async, non-blocking)
+      // Fetch token symbols, decimals, and prices for simulation results (async, non-blocking)
+      const chainIdForSymbols = getChainId(chain);
       if (data.logs && data.logs.length > 0) {
-        const chainIdForSymbols = getChainId(chain);
         fetchTokenSymbolsForLogs(data.logs, chainIdForSymbols);
+      }
+      if (data.simulated && chainIdForSymbols) {
+        fetchTokenDataForSimulation(
+          data.logs,
+          data.assetChanges,
+          data.balanceChanges,
+          chainIdForSymbols,
+        );
       }
 
       saveToHistory({ chain, address, selectedFunction, args }, data, isWrite);
@@ -5284,6 +5444,11 @@ export default function ContractCaller() {
                           ? tokenSymbols[logAddress] ||
                             getCachedTokenSymbol(chain, logAddress)
                           : null;
+                      const logDecimals =
+                        log.name === "Transfer" && logAddress
+                          ? (tokenDecimals[logAddress] ??
+                            getCachedTokenDecimals(chain, logAddress))
+                          : null;
                       return (
                         <div key={index} className={styles.logItem}>
                           <div className={styles.logHeader}>
@@ -5306,7 +5471,20 @@ export default function ContractCaller() {
                           </div>
                           {log.inputs && log.inputs.length > 0 && (
                             <div className={styles.logInputs}>
-                              {log.inputs.map((input, i) => (
+                              {log.inputs.map((input, i) => {
+                                const isTransferValue =
+                                  log.name === "Transfer" &&
+                                  (input.name === "value" ||
+                                    input.name === "wad") &&
+                                  input.type === "uint256" &&
+                                  logDecimals !== null;
+                                const formattedAmt = isTransferValue
+                                  ? formatTokenAmount(
+                                      input.value,
+                                      logDecimals,
+                                    )
+                                  : null;
+                                return (
                                 <div key={i} className={styles.logInput}>
                                   <span className={styles.logInputName}>
                                     {input.name || `arg${i}`}
@@ -5323,9 +5501,16 @@ export default function ContractCaller() {
                                     {typeof input.value === "object"
                                       ? JSON.stringify(input.value)
                                       : String(input.value)}
+                                    {formattedAmt !== null && (
+                                      <span className={styles.tokenAmount}>
+                                        {" "}
+                                        ({formattedAmt} {symbol || ""})
+                                      </span>
+                                    )}
                                   </span>
                                 </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           )}
                           {(!log.inputs || log.inputs.length === 0) &&
@@ -5489,7 +5674,6 @@ export default function ContractCaller() {
                       ))}
                     </div>
                   )}
-
                 {/* State/Storage changes (simulation only) */}
                 {result.simulated &&
                   result.stateChanges &&

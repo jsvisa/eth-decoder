@@ -4415,3 +4415,10 @@
 .sessionBundleTxOutput {
   color: var(--text-secondary, #666);
 }
+
+/* Token amount formatted display in Transfer log values */
+.tokenAmount {
+  color: #9cdcfe;
+  font-size: 0.85em;
+  margin-left: 0.25rem;
+}
