@@ -2108,6 +2108,60 @@ export default function ContractCaller() {
     }
   };
 
+  const exportSettings = () => {
+    const data = {};
+    const exactKeys = [
+      TENDERLY_SETTINGS_KEY,
+      API_KEYS_STORAGE_KEY,
+      RPC_SETTINGS_KEY,
+      SIMULATION_SETTINGS_KEY,
+      CUSTOM_CHAINS_KEY,
+      "address_book",
+      STORAGE_KEY,
+      "evm_decoder_history",
+    ];
+    for (const key of exactKeys) {
+      const val = localStorage.getItem(key);
+      if (val != null) data[key] = val;
+    }
+    const prefixes = [
+      ABI_CACHE_PREFIX,
+      TOKEN_SYMBOL_CACHE_PREFIX,
+      TOKEN_DECIMALS_CACHE_PREFIX,
+    ];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && prefixes.some((p) => key.startsWith(p))) {
+        data[key] = localStorage.getItem(key);
+      }
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "evm-tools-settings.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importSettings = (file) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        for (const [key, value] of Object.entries(data)) {
+          if (typeof value === "string") localStorage.setItem(key, value);
+        }
+        window.location.reload();
+      } catch (err) {
+        alert("Failed to import settings: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const isTenderlyConfigured = () => {
     return (
       tenderlySettings.accessKey &&
@@ -3664,6 +3718,38 @@ export default function ContractCaller() {
                       })}
                   </div>
                 )}
+              </div>
+
+              {/* Sync Settings */}
+              <div className={styles.settingsGroup}>
+                <h4 className={styles.settingsTitle}>Sync Settings</h4>
+                <p className={styles.settingsDesc}>
+                  Settings and caches are stored per-origin (host). Use export
+                  / import to sync between{" "}
+                  <code>localhost</code>, <code>127.0.0.1</code>, and
+                  production.
+                </p>
+                <div className={styles.syncButtons}>
+                  <button
+                    className={styles.syncBtn}
+                    onClick={exportSettings}
+                    type="button"
+                  >
+                    Export
+                  </button>
+                  <label className={styles.syncBtn} style={{ cursor: "pointer" }}>
+                    Import
+                    <input
+                      type="file"
+                      accept=".json"
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        if (e.target.files?.[0])
+                          importSettings(e.target.files[0]);
+                      }}
+                    />
+                  </label>
+                </div>
               </div>
 
               <p className={styles.settingsNote}>

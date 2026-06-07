@@ -4596,3 +4596,29 @@
   color: #f87171;
   background-color: rgba(248, 113, 113, 0.12);
 }
+
+/* Sync Settings buttons */
+.syncButtons {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.syncBtn {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid var(--border-secondary, #555);
+  border-radius: 6px;
+  background-color: var(--bg-hover, #2d2d2d);
+  color: var(--text-primary, #e5e7eb);
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+  user-select: none;
+}
+
+.syncBtn:hover {
+  border-color: #818cf8;
+  background-color: rgba(129, 140, 248, 0.1);
+  color: #818cf8;
+}
