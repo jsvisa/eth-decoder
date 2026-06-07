@@ -748,6 +748,7 @@ export default function ContractCaller() {
   const [tokenDecimals, setTokenDecimals] = useState({}); // Map of address -> decimals
   const [tokenPrices, setTokenPrices] = useState({}); // Map of address -> USD price
   const [bdExpandedAddrs, setBdExpandedAddrs] = useState(new Set()); // addresses with full addr shown
+  const [bdExpandedTokens, setBdExpandedTokens] = useState(new Set()); // token addrs with full addr shown
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const [addressFilter, setAddressFilter] = useState("");
   const [fromAddress, setFromAddress] = useState("");
@@ -5863,12 +5864,44 @@ export default function ContractCaller() {
                                       </div>
                                     </td>
                                     <td className={styles.bdTd}>
-                                      <div className={styles.bdTokenCell}>
+                                      <div
+                                        className={styles.bdTokenCell}
+                                        onClick={() =>
+                                          row.tokenAddr !==
+                                            NATIVE_TOKEN_ADDRESS &&
+                                          setBdExpandedTokens((prev) => {
+                                            const next = new Set(prev);
+                                            next.has(row.tokenAddr)
+                                              ? next.delete(row.tokenAddr)
+                                              : next.add(row.tokenAddr);
+                                            return next;
+                                          })
+                                        }
+                                        style={
+                                          row.tokenAddr !== NATIVE_TOKEN_ADDRESS
+                                            ? { cursor: "pointer" }
+                                            : undefined
+                                        }
+                                        title={
+                                          row.tokenAddr !== NATIVE_TOKEN_ADDRESS
+                                            ? row.tokenAddr
+                                            : undefined
+                                        }
+                                      >
                                         <span className={styles.bdTokenIcon}>
                                           {row.symbol[0].toUpperCase()}
                                         </span>
                                         <span className={styles.bdTokenName}>
                                           {row.symbol}
+                                          {bdExpandedTokens.has(
+                                            row.tokenAddr,
+                                          ) && (
+                                            <span
+                                              className={styles.bdTokenAddr}
+                                            >
+                                              {row.tokenAddr}
+                                            </span>
+                                          )}
                                         </span>
                                       </div>
                                     </td>

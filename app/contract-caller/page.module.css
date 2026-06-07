@@ -4550,6 +4550,20 @@
 .bdTokenName {
   color: #e5e7eb;
   font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.bdTokenAddr {
+  color: #818cf8;
+  font-size: 0.75rem;
+  font-weight: 400;
+  word-break: break-all;
+}
+
+.bdTokenAddr:hover {
+  text-decoration: underline;
 }
 
 /* Amount columns */
