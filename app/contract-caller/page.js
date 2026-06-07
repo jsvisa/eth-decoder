@@ -5674,6 +5674,185 @@ export default function ContractCaller() {
                       ))}
                     </div>
                   )}
+
+                {/* Account Balance Changes with USD (simulation only) */}
+                {result.simulated &&
+                  (() => {
+                    // Aggregate per-account: native ETH from balanceChanges, ERC20 from Transfer logs
+                    const accountMap = {};
+
+                    if (result.balanceChanges) {
+                      for (const change of result.balanceChanges) {
+                        const addr = change.address?.toLowerCase();
+                        if (!addr || change.diff == null) continue;
+                        if (!accountMap[addr])
+                          accountMap[addr] = { native: null, tokens: {} };
+                        accountMap[addr].native = change.diff;
+                      }
+                    }
+
+                    if (result.logs) {
+                      for (const log of result.logs) {
+                        if (log.name !== "Transfer" || !log.inputs) continue;
+                        const tokenAddr = log.address?.toLowerCase();
+                        if (!tokenAddr) continue;
+                        const fromInput = log.inputs.find(
+                          (inp) => inp.name === "from" || inp.name === "src",
+                        );
+                        const toInput = log.inputs.find(
+                          (inp) => inp.name === "to" || inp.name === "dst",
+                        );
+                        const valueInput = log.inputs.find(
+                          (inp) =>
+                            inp.name === "value" ||
+                            inp.name === "amount" ||
+                            inp.name === "wad",
+                        );
+                        if (!valueInput) continue;
+                        let rawBig;
+                        try {
+                          rawBig = BigInt(String(valueInput.value));
+                        } catch {
+                          continue;
+                        }
+                        if (fromInput?.value) {
+                          const from = String(fromInput.value).toLowerCase();
+                          if (!accountMap[from])
+                            accountMap[from] = { native: null, tokens: {} };
+                          accountMap[from].tokens[tokenAddr] =
+                            (accountMap[from].tokens[tokenAddr] ?? 0n) -
+                            rawBig;
+                        }
+                        if (toInput?.value) {
+                          const to = String(toInput.value).toLowerCase();
+                          if (!accountMap[to])
+                            accountMap[to] = { native: null, tokens: {} };
+                          accountMap[to].tokens[tokenAddr] =
+                            (accountMap[to].tokens[tokenAddr] ?? 0n) + rawBig;
+                        }
+                      }
+                    }
+
+                    const entries = Object.entries(accountMap);
+                    if (entries.length === 0) return null;
+
+                    const nativePrice = tokenPrices[NATIVE_TOKEN_ADDRESS];
+
+                    return (
+                      <div className={styles.accountDiffSection}>
+                        <h3 className={styles.accountDiffTitle}>
+                          Account Balance Changes ({entries.length})
+                        </h3>
+                        {entries.map(([addr, data]) => {
+                          let totalUsd = 0;
+                          let hasPrice = false;
+
+                          const nativeDiff =
+                            data.native != null
+                              ? (() => {
+                                  try {
+                                    return BigInt(String(data.native));
+                                  } catch {
+                                    return null;
+                                  }
+                                })()
+                              : null;
+                          const nativeDiffFloat =
+                            nativeDiff !== null
+                              ? Number(nativeDiff) / 1e18
+                              : null;
+                          const nativeUsd =
+                            nativePrice != null && nativeDiffFloat !== null
+                              ? nativeDiffFloat * nativePrice
+                              : null;
+                          if (nativeUsd !== null) {
+                            totalUsd += nativeUsd;
+                            hasPrice = true;
+                          }
+
+                          const tokenEntries = Object.entries(data.tokens);
+
+                          return (
+                            <div key={addr} className={styles.accountDiffItem}>
+                              <div className={styles.accountDiffAddress}>
+                                {addr.slice(0, 10)}...{addr.slice(-8)}
+                              </div>
+                              {nativeDiff !== null && (
+                                <div
+                                  className={`${styles.accountDiffRow} ${nativeDiff >= 0n ? styles.accountDiffPositive : styles.accountDiffNegative}`}
+                                >
+                                  <span>
+                                    {nativeDiff >= 0n ? "+" : ""}
+                                    {nativeDiffFloat != null
+                                      ? nativeDiffFloat.toFixed(6)
+                                      : ""}{" "}
+                                    ETH
+                                  </span>
+                                  {nativeUsd !== null && (
+                                    <span className={styles.accountDiffUsd}>
+                                      (${nativeUsd.toFixed(2)})
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              {tokenEntries.map(([tokenAddr, rawDiff]) => {
+                                const decimals =
+                                  tokenDecimals[tokenAddr] ??
+                                  getCachedTokenDecimals(chain, tokenAddr) ??
+                                  18;
+                                const sym =
+                                  tokenSymbols[tokenAddr] ||
+                                  getCachedTokenSymbol(chain, tokenAddr);
+                                const price = tokenPrices[tokenAddr];
+                                const amountFloat =
+                                  Number(rawDiff) / 10 ** decimals;
+                                const usd =
+                                  price != null ? amountFloat * price : null;
+                                if (usd !== null) {
+                                  totalUsd += usd;
+                                  hasPrice = true;
+                                }
+                                const absFormatted = formatTokenAmount(
+                                  rawDiff < 0n ? -rawDiff : rawDiff,
+                                  decimals,
+                                );
+                                return (
+                                  <div
+                                    key={tokenAddr}
+                                    className={`${styles.accountDiffRow} ${rawDiff >= 0n ? styles.accountDiffPositive : styles.accountDiffNegative}`}
+                                  >
+                                    <span>
+                                      {rawDiff >= 0n ? "+" : "-"}
+                                      {absFormatted}{" "}
+                                      {sym ||
+                                        `${tokenAddr.slice(0, 6)}...`}
+                                    </span>
+                                    {usd !== null && (
+                                      <span className={styles.accountDiffUsd}>
+                                        (${Math.abs(usd).toFixed(2)})
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              {hasPrice && (
+                                <div
+                                  className={`${styles.accountDiffTotal} ${totalUsd >= 0 ? styles.accountDiffPositive : styles.accountDiffNegative}`}
+                                >
+                                  Net:{" "}
+                                  <strong>
+                                    {totalUsd >= 0 ? "+" : ""}$
+                                    {totalUsd.toFixed(2)}
+                                  </strong>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+
                 {/* State/Storage changes (simulation only) */}
                 {result.simulated &&
                   result.stateChanges &&

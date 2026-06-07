@@ -4422,3 +4422,60 @@
   font-size: 0.85em;
   margin-left: 0.25rem;
 }
+
+/* Account Balance Changes section */
+.accountDiffSection {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #333;
+}
+
+.accountDiffTitle {
+  color: #fbbf24;
+  font-size: 1rem;
+  margin: 0 0 1rem 0;
+  font-weight: 600;
+}
+
+.accountDiffItem {
+  background-color: #2d2d2d;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  border-left: 3px solid #fbbf24;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-size: 0.85rem;
+}
+
+.accountDiffAddress {
+  color: #a78bfa;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.accountDiffRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.accountDiffUsd {
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+
+.accountDiffPositive {
+  color: #4ade80;
+}
+
+.accountDiffNegative {
+  color: #f87171;
+}
+
+.accountDiffTotal {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #444;
+  font-size: 0.85rem;
+}
