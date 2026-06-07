@@ -747,6 +747,7 @@ export default function ContractCaller() {
   const [tokenSymbols, setTokenSymbols] = useState({}); // Map of address -> symbol for Transfer events
   const [tokenDecimals, setTokenDecimals] = useState({}); // Map of address -> decimals
   const [tokenPrices, setTokenPrices] = useState({}); // Map of address -> USD price
+  const [bdExpandedAddrs, setBdExpandedAddrs] = useState(new Set()); // addresses with full addr shown
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const [addressFilter, setAddressFilter] = useState("");
   const [fromAddress, setFromAddress] = useState("");
@@ -5820,7 +5821,6 @@ export default function ContractCaller() {
                               <tr>
                                 <th className={styles.bdTh}>Addresses</th>
                                 <th className={styles.bdTh}>Token</th>
-                                <th className={styles.bdTh}>TokenID</th>
                                 <th className={styles.bdTh}>Balance</th>
                                 <th className={styles.bdTh}>Value in USD</th>
                                 <th className={styles.bdTh}>
@@ -5838,9 +5838,22 @@ export default function ContractCaller() {
                                   <tr key={i} className={styles.bdRow}>
                                     <td className={styles.bdTd}>
                                       <div className={styles.bdAddrCell}>
-                                        <span className={styles.bdAddr}>
-                                          {row.addr.slice(0, 10)}…
-                                          {row.addr.slice(-8)}
+                                        <span
+                                          className={styles.bdAddr}
+                                          title={row.addr}
+                                          onClick={() =>
+                                            setBdExpandedAddrs((prev) => {
+                                              const next = new Set(prev);
+                                              next.has(row.addr)
+                                                ? next.delete(row.addr)
+                                                : next.add(row.addr);
+                                              return next;
+                                            })
+                                          }
+                                        >
+                                          {bdExpandedAddrs.has(row.addr)
+                                            ? row.addr
+                                            : `${row.addr.slice(0, 10)}…${row.addr.slice(-8)}`}
                                         </span>
                                         <span
                                           className={`${styles.bdRole} ${pos ? styles.bdRoleReceiver : styles.bdRoleSender}`}
@@ -5858,11 +5871,6 @@ export default function ContractCaller() {
                                           {row.symbol}
                                         </span>
                                       </div>
-                                    </td>
-                                    <td
-                                      className={`${styles.bdTd} ${styles.bdMuted}`}
-                                    >
-                                      –
                                     </td>
                                     <td
                                       className={`${styles.bdTd} ${pos ? styles.bdPos : styles.bdNeg}`}

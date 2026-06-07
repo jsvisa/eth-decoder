@@ -4497,6 +4497,12 @@
   color: #818cf8;
   font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.82rem;
+  cursor: pointer;
+  word-break: break-all;
+}
+
+.bdAddr:hover {
+  text-decoration: underline;
 }
 
 .bdRole {
