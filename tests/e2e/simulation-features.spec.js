@@ -158,14 +158,11 @@ async function mockTokenPrice(page) {
 
 async function loadHistoryResult(page) {
   await page.goto("/contract-caller");
-  const historyItem = page
-    .locator("[class*=historyItem]")
-    .filter({ hasText: "transfer" })
-    .first();
+  const historyItem = page.locator("[class*=historyItem]").first();
   await historyItem.waitFor({ state: "visible", timeout: 10000 });
   await historyItem.click();
-  // Wait for the Account Balance Changes section (confirms simulated result rendered)
-  await page.locator("text=Account Balance Changes").waitFor({ timeout: 5000 });
+  // Wait for the Balance Changes table section to appear
+  await page.locator("[class*=bdSection]").waitFor({ timeout: 5000 });
   // Allow async decimals/price fetches to complete
   await page.waitForTimeout(3000);
 }
@@ -191,7 +188,7 @@ test.describe("Simulation result UI features", () => {
     ).toBeVisible({ timeout: 5000 });
   });
 
-  test("Account Balance Changes section shows ETH diff with USD value", async ({
+  test("Balance Changes table shows ETH row with Sender badge and USD value", async ({
     page,
   }) => {
     await seedLocalStorage(page);
@@ -200,17 +197,21 @@ test.describe("Simulation result UI features", () => {
 
     await loadHistoryResult(page);
 
-    const section = page.locator("[class*=accountDiffSection]");
+    const section = page.locator("[class*=bdSection]");
     await expect(section).toBeVisible();
 
-    // -1 ETH change
-    await expect(section.locator("text=/-1\\.\\d+ ETH/").first()).toBeVisible();
+    // Table heading
+    await expect(section.locator("text=Balance Changes")).toBeVisible();
 
-    // $-3000.00 USD (ETH price × 1 ETH)
-    await expect(section.locator("text=$-3000.00").first()).toBeVisible();
+    // ETH row: amount -1, value $3,000.00
+    await expect(section.locator("text=-1").first()).toBeVisible();
+    await expect(section.locator("text=$3,000.00").first()).toBeVisible();
+
+    // Sender role badge shown for the from-address rows
+    await expect(section.locator("text=Sender").first()).toBeVisible();
   });
 
-  test("Account Balance Changes shows net USDC flow per address", async ({
+  test("Balance Changes table shows USDC token rows for both addresses", async ({
     page,
   }) => {
     await seedLocalStorage(page);
@@ -219,16 +220,19 @@ test.describe("Simulation result UI features", () => {
 
     await loadHistoryResult(page);
 
-    const section = page.locator("[class*=accountDiffSection]");
+    const section = page.locator("[class*=bdSection]");
 
-    // FROM address: -1,000 USDC
-    await expect(section.locator("text=/-1,000 USDC/").first()).toBeVisible();
+    // FROM address loses USDC
+    await expect(section.locator("text=-1,000").first()).toBeVisible();
 
-    // TO address: +1,000 USDC
-    await expect(section.locator("text=/\\+1,000 USDC/").first()).toBeVisible();
+    // TO address gains USDC
+    await expect(section.locator("text=+1,000").first()).toBeVisible();
+
+    // Receiver badge for the to-address row
+    await expect(section.locator("text=Receiver").first()).toBeVisible();
   });
 
-  test("Account Balance Changes shows Net USD total per account", async ({
+  test("Balance Changes table shows correct Total Value in USD per address", async ({
     page,
   }) => {
     await seedLocalStorage(page);
@@ -237,13 +241,13 @@ test.describe("Simulation result UI features", () => {
 
     await loadHistoryResult(page);
 
-    const section = page.locator("[class*=accountDiffSection]");
+    const section = page.locator("[class*=bdSection]");
 
-    // FROM account: -1 ETH ($-3000) + -1000 USDC ($-1000) = Net -$4000
-    await expect(section.locator("text=$-4000.00").first()).toBeVisible();
+    // FROM account: -1 ETH ($3,000) + -1,000 USDC ($1,000) = total – $4,000.00
+    await expect(section.locator("text=$4,000.00").first()).toBeVisible();
 
-    // TO account: +1000 USDC ($1000) = Net +$1000
-    await expect(section.locator("text=+$1000.00").first()).toBeVisible();
+    // TO account: +1,000 USDC ($1,000) = total + $1,000.00
+    await expect(section.locator("text=$1,000.00").first()).toBeVisible();
   });
 });
 

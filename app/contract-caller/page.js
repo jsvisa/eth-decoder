@@ -5677,10 +5677,10 @@ export default function ContractCaller() {
                     </div>
                   )}
 
-                {/* Account Balance Changes with USD (simulation only) */}
+                {/* Balance Changes table (simulation only) */}
                 {result.simulated &&
                   (() => {
-                    // Aggregate per-account: native ETH from balanceChanges, ERC20 from Transfer logs
+                    // Build flat rows: one per (address × token)
                     const accountMap = {};
 
                     if (result.balanceChanges) {
@@ -5735,122 +5735,166 @@ export default function ContractCaller() {
                       }
                     }
 
-                    const entries = Object.entries(accountMap);
-                    if (entries.length === 0) return null;
-
                     const nativePrice = tokenPrices[NATIVE_TOKEN_ADDRESS];
 
+                    // Flatten to one row per (address, token)
+                    const rows = [];
+                    for (const [addr, data] of Object.entries(accountMap)) {
+                      if (data.native != null) {
+                        let diff;
+                        try {
+                          diff = BigInt(String(data.native));
+                        } catch {
+                          diff = null;
+                        }
+                        if (diff !== null) {
+                          const usd =
+                            nativePrice != null
+                              ? (Number(diff) / 1e18) * nativePrice
+                              : null;
+                          rows.push({
+                            addr,
+                            symbol: "ETH",
+                            tokenAddr: NATIVE_TOKEN_ADDRESS,
+                            diff,
+                            absFormatted: formatTokenAmount(
+                              diff < 0n ? -diff : diff,
+                              18,
+                            ),
+                            usd,
+                          });
+                        }
+                      }
+                      for (const [tokenAddr, rawDiff] of Object.entries(
+                        data.tokens,
+                      )) {
+                        const decimals =
+                          tokenDecimals[tokenAddr] ??
+                          getCachedTokenDecimals(chain, tokenAddr) ??
+                          18;
+                        const sym =
+                          tokenSymbols[tokenAddr] ||
+                          getCachedTokenSymbol(chain, tokenAddr);
+                        const price = tokenPrices[tokenAddr];
+                        const usd =
+                          price != null
+                            ? (Number(rawDiff) / 10 ** decimals) * price
+                            : null;
+                        rows.push({
+                          addr,
+                          symbol: sym || `${tokenAddr.slice(0, 6)}…`,
+                          tokenAddr,
+                          diff: rawDiff,
+                          absFormatted: formatTokenAmount(
+                            rawDiff < 0n ? -rawDiff : rawDiff,
+                            decimals,
+                          ),
+                          usd,
+                        });
+                      }
+                    }
+
+                    if (rows.length === 0) return null;
+
+                    // Compute total USD per address
+                    const addrTotals = {};
+                    for (const row of rows) {
+                      if (row.usd != null) {
+                        addrTotals[row.addr] =
+                          (addrTotals[row.addr] ?? 0) + row.usd;
+                      }
+                    }
+
+                    const fmtUsd = (v) =>
+                      Math.abs(v).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      });
+
                     return (
-                      <div className={styles.accountDiffSection}>
-                        <h3 className={styles.accountDiffTitle}>
-                          Account Balance Changes ({entries.length})
-                        </h3>
-                        {entries.map(([addr, data]) => {
-                          let totalUsd = 0;
-                          let hasPrice = false;
-
-                          const nativeDiff =
-                            data.native != null
-                              ? (() => {
-                                  try {
-                                    return BigInt(String(data.native));
-                                  } catch {
-                                    return null;
-                                  }
-                                })()
-                              : null;
-                          const nativeDiffFloat =
-                            nativeDiff !== null
-                              ? Number(nativeDiff) / 1e18
-                              : null;
-                          const nativeUsd =
-                            nativePrice != null && nativeDiffFloat !== null
-                              ? nativeDiffFloat * nativePrice
-                              : null;
-                          if (nativeUsd !== null) {
-                            totalUsd += nativeUsd;
-                            hasPrice = true;
-                          }
-
-                          const tokenEntries = Object.entries(data.tokens);
-
-                          return (
-                            <div key={addr} className={styles.accountDiffItem}>
-                              <div className={styles.accountDiffAddress}>
-                                {addr.slice(0, 10)}...{addr.slice(-8)}
-                              </div>
-                              {nativeDiff !== null && (
-                                <div
-                                  className={`${styles.accountDiffRow} ${nativeDiff >= 0n ? styles.accountDiffPositive : styles.accountDiffNegative}`}
-                                >
-                                  <span>
-                                    {nativeDiff >= 0n ? "+" : ""}
-                                    {nativeDiffFloat != null
-                                      ? nativeDiffFloat.toFixed(6)
-                                      : ""}{" "}
-                                    ETH
-                                  </span>
-                                  {nativeUsd !== null && (
-                                    <span className={styles.accountDiffUsd}>
-                                      (${nativeUsd.toFixed(2)})
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                              {tokenEntries.map(([tokenAddr, rawDiff]) => {
-                                const decimals =
-                                  tokenDecimals[tokenAddr] ??
-                                  getCachedTokenDecimals(chain, tokenAddr) ??
-                                  18;
-                                const sym =
-                                  tokenSymbols[tokenAddr] ||
-                                  getCachedTokenSymbol(chain, tokenAddr);
-                                const price = tokenPrices[tokenAddr];
-                                const amountFloat =
-                                  Number(rawDiff) / 10 ** decimals;
-                                const usd =
-                                  price != null ? amountFloat * price : null;
-                                if (usd !== null) {
-                                  totalUsd += usd;
-                                  hasPrice = true;
-                                }
-                                const absFormatted = formatTokenAmount(
-                                  rawDiff < 0n ? -rawDiff : rawDiff,
-                                  decimals,
-                                );
+                      <div className={styles.bdSection}>
+                        <h3 className={styles.bdTitle}>Balance Changes</h3>
+                        <div className={styles.bdTableWrap}>
+                          <table className={styles.bdTable}>
+                            <thead>
+                              <tr>
+                                <th className={styles.bdTh}>Addresses</th>
+                                <th className={styles.bdTh}>Token</th>
+                                <th className={styles.bdTh}>TokenID</th>
+                                <th className={styles.bdTh}>Balance</th>
+                                <th className={styles.bdTh}>Value in USD</th>
+                                <th className={styles.bdTh}>
+                                  Total Value in USD
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rows.map((row, i) => {
+                                const pos = row.diff >= 0n;
+                                const totalUsd = addrTotals[row.addr];
+                                const totalPos =
+                                  totalUsd != null ? totalUsd >= 0 : pos;
                                 return (
-                                  <div
-                                    key={tokenAddr}
-                                    className={`${styles.accountDiffRow} ${rawDiff >= 0n ? styles.accountDiffPositive : styles.accountDiffNegative}`}
-                                  >
-                                    <span>
-                                      {rawDiff >= 0n ? "+" : "-"}
-                                      {absFormatted}{" "}
-                                      {sym ||
-                                        `${tokenAddr.slice(0, 6)}...`}
-                                    </span>
-                                    {usd !== null && (
-                                      <span className={styles.accountDiffUsd}>
-                                        (${Math.abs(usd).toFixed(2)})
-                                      </span>
-                                    )}
-                                  </div>
+                                  <tr key={i} className={styles.bdRow}>
+                                    <td className={styles.bdTd}>
+                                      <div className={styles.bdAddrCell}>
+                                        <span className={styles.bdAddr}>
+                                          {row.addr.slice(0, 10)}…
+                                          {row.addr.slice(-8)}
+                                        </span>
+                                        <span
+                                          className={`${styles.bdRole} ${pos ? styles.bdRoleReceiver : styles.bdRoleSender}`}
+                                        >
+                                          {pos ? "Receiver" : "Sender"}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className={styles.bdTd}>
+                                      <div className={styles.bdTokenCell}>
+                                        <span className={styles.bdTokenIcon}>
+                                          {row.symbol[0].toUpperCase()}
+                                        </span>
+                                        <span className={styles.bdTokenName}>
+                                          {row.symbol}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td
+                                      className={`${styles.bdTd} ${styles.bdMuted}`}
+                                    >
+                                      –
+                                    </td>
+                                    <td
+                                      className={`${styles.bdTd} ${pos ? styles.bdPos : styles.bdNeg}`}
+                                    >
+                                      {pos ? "+" : "-"}
+                                      {row.absFormatted}
+                                    </td>
+                                    <td
+                                      className={`${styles.bdTd} ${pos ? styles.bdPos : styles.bdNeg}`}
+                                    >
+                                      {row.usd != null
+                                        ? `$${fmtUsd(row.usd)}`
+                                        : "–"}
+                                    </td>
+                                    <td className={styles.bdTd}>
+                                      {totalUsd != null ? (
+                                        <span
+                                          className={`${styles.bdTotalBadge} ${totalPos ? styles.bdTotalPos : styles.bdTotalNeg}`}
+                                        >
+                                          {totalPos ? "+ " : "– "}$
+                                          {fmtUsd(totalUsd)}
+                                        </span>
+                                      ) : (
+                                        "–"
+                                      )}
+                                    </td>
+                                  </tr>
                                 );
                               })}
-                              {hasPrice && (
-                                <div
-                                  className={`${styles.accountDiffTotal} ${totalUsd >= 0 ? styles.accountDiffPositive : styles.accountDiffNegative}`}
-                                >
-                                  Net:{" "}
-                                  <strong>
-                                    {totalUsd >= 0 ? "+" : ""}$
-                                    {totalUsd.toFixed(2)}
-                                  </strong>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     );
                   })()}
