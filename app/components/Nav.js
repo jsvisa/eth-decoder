@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "../contexts/ThemeContext";
+import { useSettings } from "../contexts/SettingsContext";
 import styles from "./Nav.module.css";
 
 export default function Nav() {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
+  const { toggleSettings } = useSettings();
 
   return (
     <nav className={styles.nav}>
@@ -44,15 +46,24 @@ export default function Nav() {
             Contracts
           </Link>
         </div>
-        <button
-          onClick={toggleTheme}
-          className={styles.themeToggle}
-          title={
-            theme === "light" ? "Switch to dark mode" : "Switch to light mode"
-          }
-        >
-          {theme === "light" ? "🌙" : "☀️"}
-        </button>
+        <div className={styles.navRight}>
+          <button
+              className={styles.navSettings}
+              title="Settings"
+              onClick={toggleSettings}
+            >
+              ⚙
+            </button>
+          <button
+            onClick={toggleTheme}
+            className={styles.themeToggle}
+            title={
+              theme === "light" ? "Switch to dark mode" : "Switch to light mode"
+            }
+          >
+            {theme === "light" ? "🌙" : "☀️"}
+          </button>
+        </div>
       </div>
     </nav>
   );

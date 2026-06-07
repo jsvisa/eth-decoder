@@ -41,6 +41,29 @@
   background-color: rgba(255, 255, 255, 0.05);
 }
 
+.navRight {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.navSettings {
+  background: none;
+  border: none;
+  font-size: 1.15rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 6px;
+  color: #a0a0a0;
+  transition: background-color 0.2s, color 0.2s;
+  line-height: 1;
+}
+
+.navSettings:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
 .themeToggle {
   background: none;
   border: none;
