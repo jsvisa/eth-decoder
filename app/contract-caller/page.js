@@ -10,6 +10,7 @@ import {
 } from "viem";
 import yaml from "js-yaml";
 import styles from "./page.module.css";
+import { formatTokenAmount } from "../utils/tokenFormatting";
 import {
   getAddressBook,
   addToAddressBook,
@@ -69,6 +70,9 @@ const CHAINS = [
 const STORAGE_KEY = "contract_caller_history";
 const ABI_CACHE_PREFIX = "abi-";
 const TOKEN_SYMBOL_CACHE_PREFIX = "token-symbol-";
+const TOKEN_DECIMALS_CACHE_PREFIX = "token-decimals-";
+
+const NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000";
 const TENDERLY_SETTINGS_KEY = "tenderly_settings";
 const API_KEYS_STORAGE_KEY = "api_keys_settings";
 const RPC_SETTINGS_KEY = "rpc_settings";
@@ -308,6 +312,30 @@ const setCachedTokenSymbol = (chain, address, symbol) => {
   }
 };
 
+const getTokenDecimalsCacheKey = (chain, address) =>
+  `${TOKEN_DECIMALS_CACHE_PREFIX}${chain}-${address.toLowerCase()}`;
+
+const getCachedTokenDecimals = (chain, address) => {
+  if (!address) return null;
+  try {
+    const val = localStorage.getItem(getTokenDecimalsCacheKey(chain, address));
+    return val !== null ? Number(val) : null;
+  } catch {
+    return null;
+  }
+};
+
+const setCachedTokenDecimals = (chain, address, decimals) => {
+  try {
+    localStorage.setItem(
+      getTokenDecimalsCacheKey(chain, address),
+      String(decimals),
+    );
+  } catch {
+    // Ignore cache errors
+  }
+};
+
 // ERC20 symbol() ABI for fetching token symbols
 const ERC20_SYMBOL_ABI = [
   {
@@ -318,6 +346,18 @@ const ERC20_SYMBOL_ABI = [
     stateMutability: "view",
   },
 ];
+
+// ERC20 decimals() ABI
+const ERC20_DECIMALS_ABI = [
+  {
+    type: "function",
+    name: "decimals",
+    inputs: [],
+    outputs: [{ type: "uint8" }],
+    stateMutability: "view",
+  },
+];
+
 
 // Get all cached contract addresses
 const getCachedAddresses = () => {
@@ -685,6 +725,10 @@ export default function ContractCaller() {
   const [showFullResponse, setShowFullResponse] = useState(false);
   const [cachedAddresses, setCachedAddresses] = useState([]);
   const [tokenSymbols, setTokenSymbols] = useState({}); // Map of address -> symbol for Transfer events
+  const [tokenDecimals, setTokenDecimals] = useState({}); // Map of address -> decimals
+  const [tokenPrices, setTokenPrices] = useState({}); // Map of address -> USD price
+  const [bdExpandedAddrs, setBdExpandedAddrs] = useState(new Set()); // addresses with full addr shown
+  const [bdExpandedTokens, setBdExpandedTokens] = useState(new Set()); // token addrs with full addr shown
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const [addressFilter, setAddressFilter] = useState("");
   const [fromAddress, setFromAddress] = useState("");
@@ -1731,6 +1775,96 @@ export default function ContractCaller() {
     setTokenSymbols(newSymbols);
   };
 
+  // Fetch decimals and prices for all tokens involved in a simulation result
+  const fetchTokenDataForSimulation = async (
+    logs,
+    assetChanges,
+    balanceChanges,
+    chainNumericId,
+  ) => {
+    const tokenAddresses = new Set();
+
+    if (logs) {
+      for (const log of logs) {
+        if (log.name === "Transfer" && log.address) {
+          tokenAddresses.add(log.address.toLowerCase());
+        }
+      }
+    }
+    if (assetChanges) {
+      for (const change of assetChanges) {
+        if (change.token_info?.contract_address) {
+          tokenAddresses.add(change.token_info.contract_address.toLowerCase());
+        }
+      }
+    }
+
+    const newDecimals = { ...tokenDecimals };
+    const newPrices = { ...tokenPrices };
+
+    // Fetch decimals for ERC20s not already cached
+    const decimalFetches = Array.from(tokenAddresses)
+      .filter((addr) => {
+        const cached = getCachedTokenDecimals(chain, addr);
+        if (cached !== null) {
+          newDecimals[addr] = cached;
+          return false;
+        }
+        return newDecimals[addr] === undefined;
+      })
+      .map(async (addr) => {
+        try {
+          const response = await fetch("/api/call-contract", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chain,
+              address: addr,
+              functionName: "decimals",
+              args: [],
+              abi: ERC20_DECIMALS_ABI,
+              rpcUrl: rpcSettings[chain] || undefined,
+              chainId: chainNumericId,
+            }),
+          });
+          const data = await response.json();
+          if (response.ok && data.decoded && data.decoded.length > 0) {
+            const dec = Number(data.decoded[0].value);
+            newDecimals[addr] = dec;
+            setCachedTokenDecimals(chain, addr, dec);
+          }
+        } catch {
+          // Ignore individual fetch errors
+        }
+      });
+
+    // Fetch prices for all tokens including native
+    const allPriceAddresses = [...tokenAddresses];
+    if (balanceChanges && balanceChanges.length > 0) {
+      allPriceAddresses.push(NATIVE_TOKEN_ADDRESS);
+    }
+
+    const priceFetches = allPriceAddresses
+      .filter((addr) => newPrices[addr] === undefined)
+      .map(async (addr) => {
+        try {
+          const response = await fetch(
+            `/api/token-price?token=${addr}&chainId=${chainNumericId}`,
+          );
+          const data = await response.json();
+          if (data.price !== null && data.price !== undefined) {
+            newPrices[addr] = data.price;
+          }
+        } catch {
+          // Ignore individual fetch errors
+        }
+      });
+
+    await Promise.all([...decimalFetches, ...priceFetches]);
+    setTokenDecimals({ ...newDecimals });
+    setTokenPrices({ ...newPrices });
+  };
+
   const fetchAbi = async (forceRefresh = false) => {
     if (!address.trim()) {
       setError("Please enter a contract address");
@@ -2320,6 +2454,20 @@ export default function ContractCaller() {
     setError(null);
   }, [chain, forkBlockNumber]);
 
+  // Fetch token decimals and prices whenever a simulated result is set (including history loads)
+  useEffect(() => {
+    if (!result?.simulated) return;
+    const chainNumericId = getChainId(chain);
+    if (!chainNumericId) return;
+    fetchTokenSymbolsForLogs(result.logs, chainNumericId);
+    fetchTokenDataForSimulation(
+      result.logs,
+      result.assetChanges,
+      result.balanceChanges,
+      chainNumericId,
+    );
+  }, [result]);
+
   const handleCall = async () => {
     // Clear previous field errors
     setFieldErrors({});
@@ -2693,11 +2841,7 @@ export default function ContractCaller() {
       // Auto-collapse event logs when there are many of them
       setSimLogsExpanded(!data.logs || data.logs.length <= 10);
 
-      // Fetch token symbols for Transfer events (async, non-blocking)
-      if (data.logs && data.logs.length > 0) {
-        const chainIdForSymbols = getChainId(chain);
-        fetchTokenSymbolsForLogs(data.logs, chainIdForSymbols);
-      }
+      // Token symbols/decimals/prices are fetched by the useEffect that watches `result`
 
       saveToHistory({ chain, address, selectedFunction, args }, data, isWrite);
     } catch (err) {
@@ -5284,6 +5428,11 @@ export default function ContractCaller() {
                           ? tokenSymbols[logAddress] ||
                             getCachedTokenSymbol(chain, logAddress)
                           : null;
+                      const logDecimals =
+                        log.name === "Transfer" && logAddress
+                          ? (tokenDecimals[logAddress] ??
+                            getCachedTokenDecimals(chain, logAddress))
+                          : null;
                       return (
                         <div key={index} className={styles.logItem}>
                           <div className={styles.logHeader}>
@@ -5306,7 +5455,20 @@ export default function ContractCaller() {
                           </div>
                           {log.inputs && log.inputs.length > 0 && (
                             <div className={styles.logInputs}>
-                              {log.inputs.map((input, i) => (
+                              {log.inputs.map((input, i) => {
+                                const isTransferValue =
+                                  log.name === "Transfer" &&
+                                  (input.name === "value" ||
+                                    input.name === "wad") &&
+                                  input.type === "uint256" &&
+                                  logDecimals !== null;
+                                const formattedAmt = isTransferValue
+                                  ? formatTokenAmount(
+                                      input.value,
+                                      logDecimals,
+                                    )
+                                  : null;
+                                return (
                                 <div key={i} className={styles.logInput}>
                                   <span className={styles.logInputName}>
                                     {input.name || `arg${i}`}
@@ -5323,9 +5485,16 @@ export default function ContractCaller() {
                                     {typeof input.value === "object"
                                       ? JSON.stringify(input.value)
                                       : String(input.value)}
+                                    {formattedAmt !== null && (
+                                      <span className={styles.tokenAmount}>
+                                        {" "}
+                                        ({formattedAmt} {symbol || ""})
+                                      </span>
+                                    )}
                                   </span>
                                 </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           )}
                           {(!log.inputs || log.inputs.length === 0) &&
@@ -5489,6 +5658,276 @@ export default function ContractCaller() {
                       ))}
                     </div>
                   )}
+
+                {/* Balance Changes table (simulation only) */}
+                {result.simulated &&
+                  (() => {
+                    // Build flat rows: one per (address × token)
+                    const accountMap = {};
+
+                    if (result.balanceChanges) {
+                      for (const change of result.balanceChanges) {
+                        const addr = change.address?.toLowerCase();
+                        if (!addr || change.diff == null) continue;
+                        if (!accountMap[addr])
+                          accountMap[addr] = { native: null, tokens: {} };
+                        accountMap[addr].native = change.diff;
+                      }
+                    }
+
+                    if (result.logs) {
+                      for (const log of result.logs) {
+                        if (log.name !== "Transfer" || !log.inputs) continue;
+                        const tokenAddr = log.address?.toLowerCase();
+                        if (!tokenAddr) continue;
+                        const fromInput = log.inputs.find(
+                          (inp) => inp.name === "from" || inp.name === "src",
+                        );
+                        const toInput = log.inputs.find(
+                          (inp) => inp.name === "to" || inp.name === "dst",
+                        );
+                        const valueInput = log.inputs.find(
+                          (inp) =>
+                            inp.name === "value" ||
+                            inp.name === "amount" ||
+                            inp.name === "wad",
+                        );
+                        if (!valueInput) continue;
+                        let rawBig;
+                        try {
+                          rawBig = BigInt(String(valueInput.value));
+                        } catch {
+                          continue;
+                        }
+                        if (fromInput?.value) {
+                          const from = String(fromInput.value).toLowerCase();
+                          if (!accountMap[from])
+                            accountMap[from] = { native: null, tokens: {} };
+                          accountMap[from].tokens[tokenAddr] =
+                            (accountMap[from].tokens[tokenAddr] ?? 0n) -
+                            rawBig;
+                        }
+                        if (toInput?.value) {
+                          const to = String(toInput.value).toLowerCase();
+                          if (!accountMap[to])
+                            accountMap[to] = { native: null, tokens: {} };
+                          accountMap[to].tokens[tokenAddr] =
+                            (accountMap[to].tokens[tokenAddr] ?? 0n) + rawBig;
+                        }
+                      }
+                    }
+
+                    const nativePrice = tokenPrices[NATIVE_TOKEN_ADDRESS];
+
+                    // Flatten to one row per (address, token)
+                    const rows = [];
+                    for (const [addr, data] of Object.entries(accountMap)) {
+                      if (data.native != null) {
+                        let diff;
+                        try {
+                          diff = BigInt(String(data.native));
+                        } catch {
+                          diff = null;
+                        }
+                        if (diff !== null) {
+                          const usd =
+                            nativePrice != null
+                              ? (Number(diff) / 1e18) * nativePrice
+                              : null;
+                          rows.push({
+                            addr,
+                            symbol: "ETH",
+                            tokenAddr: NATIVE_TOKEN_ADDRESS,
+                            diff,
+                            absFormatted: formatTokenAmount(
+                              diff < 0n ? -diff : diff,
+                              18,
+                            ),
+                            usd,
+                          });
+                        }
+                      }
+                      for (const [tokenAddr, rawDiff] of Object.entries(
+                        data.tokens,
+                      )) {
+                        const decimals =
+                          tokenDecimals[tokenAddr] ??
+                          getCachedTokenDecimals(chain, tokenAddr) ??
+                          18;
+                        const sym =
+                          tokenSymbols[tokenAddr] ||
+                          getCachedTokenSymbol(chain, tokenAddr);
+                        const price = tokenPrices[tokenAddr];
+                        const usd =
+                          price != null
+                            ? (Number(rawDiff) / 10 ** decimals) * price
+                            : null;
+                        rows.push({
+                          addr,
+                          symbol: sym || `${tokenAddr.slice(0, 6)}…`,
+                          tokenAddr,
+                          diff: rawDiff,
+                          absFormatted: formatTokenAmount(
+                            rawDiff < 0n ? -rawDiff : rawDiff,
+                            decimals,
+                          ),
+                          usd,
+                        });
+                      }
+                    }
+
+                    if (rows.length === 0) return null;
+
+                    // Compute total USD per address
+                    const addrTotals = {};
+                    for (const row of rows) {
+                      if (row.usd != null) {
+                        addrTotals[row.addr] =
+                          (addrTotals[row.addr] ?? 0) + row.usd;
+                      }
+                    }
+
+                    const fmtUsd = (v) =>
+                      Math.abs(v).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      });
+
+                    return (
+                      <div className={styles.bdSection}>
+                        <h3 className={styles.bdTitle}>Balance Changes</h3>
+                        <div className={styles.bdTableWrap}>
+                          <table className={styles.bdTable}>
+                            <thead>
+                              <tr>
+                                <th className={styles.bdTh}>Addresses</th>
+                                <th className={styles.bdTh}>Token</th>
+                                <th className={styles.bdTh}>Balance</th>
+                                <th className={styles.bdTh}>Value in USD</th>
+                                <th className={styles.bdTh}>
+                                  Total Value in USD
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rows.map((row, i) => {
+                                const pos = row.diff >= 0n;
+                                const totalUsd = addrTotals[row.addr];
+                                const totalPos =
+                                  totalUsd != null ? totalUsd >= 0 : pos;
+                                const isSender =
+                                  fromAddress &&
+                                  row.addr ===
+                                    fromAddress.toLowerCase();
+                                const isReceiver =
+                                  address &&
+                                  row.addr === address.toLowerCase();
+                                return (
+                                  <tr key={i} className={styles.bdRow}>
+                                    <td className={styles.bdTd}>
+                                      <div className={styles.bdAddrCell}>
+                                        <span
+                                          className={styles.bdAddr}
+                                          title={row.addr}
+                                          onClick={() =>
+                                            setBdExpandedAddrs((prev) => {
+                                              const next = new Set(prev);
+                                              next.has(row.addr)
+                                                ? next.delete(row.addr)
+                                                : next.add(row.addr);
+                                              return next;
+                                            })
+                                          }
+                                        >
+                                          {bdExpandedAddrs.has(row.addr)
+                                            ? row.addr
+                                            : `${row.addr.slice(0, 10)}…${row.addr.slice(-8)}`}
+                                        </span>
+                                        {(isSender || isReceiver) && (
+                                          <span
+                                            className={`${styles.bdRole} ${isSender ? styles.bdRoleSender : styles.bdRoleReceiver}`}
+                                          >
+                                            {isSender ? "Sender" : "Receiver"}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className={styles.bdTd}>
+                                      <div
+                                        className={styles.bdTokenCell}
+                                        onClick={() =>
+                                          row.tokenAddr !==
+                                            NATIVE_TOKEN_ADDRESS &&
+                                          setBdExpandedTokens((prev) => {
+                                            const next = new Set(prev);
+                                            next.has(row.tokenAddr)
+                                              ? next.delete(row.tokenAddr)
+                                              : next.add(row.tokenAddr);
+                                            return next;
+                                          })
+                                        }
+                                        style={
+                                          row.tokenAddr !== NATIVE_TOKEN_ADDRESS
+                                            ? { cursor: "pointer" }
+                                            : undefined
+                                        }
+                                        title={
+                                          row.tokenAddr !== NATIVE_TOKEN_ADDRESS
+                                            ? row.tokenAddr
+                                            : undefined
+                                        }
+                                      >
+                                        <span className={styles.bdTokenIcon}>
+                                          {row.symbol[0].toUpperCase()}
+                                        </span>
+                                        <span className={styles.bdTokenName}>
+                                          {row.symbol}
+                                          {bdExpandedTokens.has(
+                                            row.tokenAddr,
+                                          ) && (
+                                            <span
+                                              className={styles.bdTokenAddr}
+                                            >
+                                              {row.tokenAddr}
+                                            </span>
+                                          )}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td
+                                      className={`${styles.bdTd} ${pos ? styles.bdPos : styles.bdNeg}`}
+                                    >
+                                      {pos ? "+" : "-"}
+                                      {row.absFormatted}
+                                    </td>
+                                    <td
+                                      className={`${styles.bdTd} ${pos ? styles.bdPos : styles.bdNeg}`}
+                                    >
+                                      {row.usd != null
+                                        ? `$${fmtUsd(row.usd)}`
+                                        : "–"}
+                                    </td>
+                                    <td className={styles.bdTd}>
+                                      {totalUsd != null ? (
+                                        <span
+                                          className={`${styles.bdTotalBadge} ${totalPos ? styles.bdTotalPos : styles.bdTotalNeg}`}
+                                        >
+                                          {totalPos ? "+ " : "– "}$
+                                          {fmtUsd(totalUsd)}
+                                        </span>
+                                      ) : (
+                                        "–"
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                 {/* State/Storage changes (simulation only) */}
                 {result.simulated &&

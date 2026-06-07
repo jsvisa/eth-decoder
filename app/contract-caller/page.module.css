@@ -4415,3 +4415,184 @@
 .sessionBundleTxOutput {
   color: var(--text-secondary, #666);
 }
+
+/* Token amount formatted display in Transfer log values */
+.tokenAmount {
+  color: #9cdcfe;
+  font-size: 0.85em;
+  margin-left: 0.25rem;
+}
+
+/* Balance Changes table section */
+.bdSection {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #333;
+}
+
+.bdTitle {
+  color: #fbbf24;
+  font-size: 1rem;
+  margin: 0 0 1rem 0;
+  font-weight: 600;
+}
+
+.bdTableWrap {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #3a3a3a;
+}
+
+.bdTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-size: 0.82rem;
+}
+
+.bdTh {
+  text-align: left;
+  padding: 0.6rem 1rem;
+  background-color: #232323;
+  color: #9ca3af;
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #3a3a3a;
+  white-space: nowrap;
+}
+
+.bdRow {
+  border-bottom: 1px solid #2d2d2d;
+}
+
+.bdRow:last-child {
+  border-bottom: none;
+}
+
+.bdRow:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.bdTd {
+  padding: 0.75rem 1rem;
+  vertical-align: middle;
+  color: #d1d5db;
+}
+
+.bdMuted {
+  color: #6b7280;
+}
+
+/* Address cell */
+.bdAddrCell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.bdAddr {
+  color: #818cf8;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-size: 0.82rem;
+  cursor: pointer;
+  word-break: break-all;
+}
+
+.bdAddr:hover {
+  text-decoration: underline;
+}
+
+.bdRole {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.bdRoleSender {
+  color: #f59e0b;
+  border-color: #f59e0b;
+  background-color: rgba(245, 158, 11, 0.08);
+}
+
+.bdRoleReceiver {
+  color: #10b981;
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.08);
+}
+
+/* Token cell */
+.bdTokenCell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bdTokenIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background-color: #4338ca;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.bdTokenName {
+  color: #e5e7eb;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.bdTokenAddr {
+  color: #818cf8;
+  font-size: 0.75rem;
+  font-weight: 400;
+  word-break: break-all;
+}
+
+.bdTokenAddr:hover {
+  text-decoration: underline;
+}
+
+/* Amount columns */
+.bdPos {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.bdNeg {
+  color: #f87171;
+  font-weight: 600;
+}
+
+/* Total badge */
+.bdTotalBadge {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 5px;
+  font-weight: 700;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.bdTotalPos {
+  color: #4ade80;
+  background-color: rgba(74, 222, 128, 0.12);
+}
+
+.bdTotalNeg {
+  color: #f87171;
+  background-color: rgba(248, 113, 113, 0.12);
+}
