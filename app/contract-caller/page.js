@@ -697,6 +697,9 @@ export default function ContractCaller() {
   const [fromAddress, setFromAddress] = useState("");
   const [rawCalldataMode, setRawCalldataMode] = useState(false);
   const [rawCalldata, setRawCalldata] = useState("");
+  const [pasteCalldataExpanded, setPasteCalldataExpanded] = useState(false);
+  const [pasteCalldataValue, setPasteCalldataValue] = useState("");
+  const [pasteCalldataError, setPasteCalldataError] = useState(null);
   const {
     tenderlySettings,
     apiKeys,
@@ -2921,6 +2924,72 @@ export default function ContractCaller() {
     setRawCalldataMode(!rawCalldataMode);
   };
 
+  const handleDecodeAndFill = () => {
+    const hex = pasteCalldataValue.trim();
+    if (!hex || !hex.startsWith("0x")) {
+      setPasteCalldataError("Enter hex calldata starting with 0x");
+      return;
+    }
+
+    // Try to match the first 4 bytes against a function in the loaded ABI
+    let matchedFunc = null;
+    if (hex.length >= 10) {
+      const selector = hex.slice(0, 10).toLowerCase();
+      matchedFunc =
+        parsedAbi?.find(
+          (item) =>
+            item.type === "function" &&
+            getFunctionSelector(item)?.toLowerCase() === selector,
+        ) ?? null;
+    }
+
+    if (matchedFunc) {
+      // Full calldata: selector matched — auto-select function and decode all args
+      try {
+        const { args: decoded } = decodeFunctionData({
+          abi: [matchedFunc],
+          data: hex,
+        });
+        const newArgs = matchedFunc.inputs.map((input, i) =>
+          viemDecodedToArgValue(decoded?.[i], input),
+        );
+        setSelectedFunction(getFunctionSig(matchedFunc));
+        setArgs(newArgs);
+        setPasteCalldataValue("");
+        setPasteCalldataError(null);
+      } catch {
+        setPasteCalldataError("Invalid calldata");
+      }
+    } else {
+      // Args-only: no selector match — require a function to already be selected
+      const func = getSelectedFunction();
+      if (!func) {
+        setPasteCalldataError(
+          hex.length >= 10
+            ? "No matching function found in ABI"
+            : "Select a function first",
+        );
+        return;
+      }
+      try {
+        const selector = getFunctionSelector(func);
+        const fullCalldata = selector + hex.slice(2);
+        const { args: decoded } = decodeFunctionData({
+          abi: [func],
+          data: fullCalldata,
+        });
+        const newArgs = func.inputs.map((input, i) =>
+          viemDecodedToArgValue(decoded?.[i], input),
+        );
+        setArgs(newArgs);
+        setPasteCalldataValue("");
+        setPasteCalldataError(null);
+      } catch {
+        setPasteCalldataError("Invalid calldata");
+      }
+    }
+  };
+
   const handleCopyCalldata = async () => {
     if (!selectedFunction || !parsedAbi) {
       setError("Please select a function first");
@@ -3709,6 +3778,50 @@ export default function ContractCaller() {
                       )}
                     </div>
                   </div>
+
+                  {/* Paste Calldata */}
+                  {parsedAbi && (
+                    <div className={styles.pasteCalldataSection}>
+                      <button
+                        type="button"
+                        className={styles.pasteCalldataToggle}
+                        onClick={() =>
+                          setPasteCalldataExpanded(!pasteCalldataExpanded)
+                        }
+                      >
+                        {pasteCalldataExpanded ? "▼" : "▶"} Paste calldata
+                      </button>
+                      {pasteCalldataExpanded && (
+                        <div className={styles.pasteCalldataBody}>
+                          <textarea
+                            className={`${styles.textarea} ${pasteCalldataError ? styles.inputError : ""}`}
+                            value={pasteCalldataValue}
+                            onChange={(e) => {
+                              setPasteCalldataValue(e.target.value);
+                              if (pasteCalldataError)
+                                setPasteCalldataError(null);
+                            }}
+                            placeholder="Full: 0x{selector}{args}  —  Args only: 0x{args} (function must be selected)"
+                            rows={3}
+                            disabled={loading}
+                          />
+                          {pasteCalldataError && (
+                            <span className={styles.pasteCalldataError}>
+                              {pasteCalldataError}
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            className={styles.pasteCalldataBtn}
+                            onClick={handleDecodeAndFill}
+                            disabled={loading || !pasteCalldataValue.trim()}
+                          >
+                            Decode &amp; fill
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Simulation Options - From Address, Fork Block, Cheatcodes in one row */}
                   {selectedFunction &&

@@ -4622,3 +4622,64 @@
   background-color: rgba(129, 140, 248, 0.1);
   color: #818cf8;
 }
+
+/* ── Paste calldata section ─────────────────────────────────────────────── */
+
+.pasteCalldataSection {
+  margin-bottom: 1rem;
+}
+
+.pasteCalldataToggle {
+  background: none;
+  border: none;
+  padding: 0.25rem 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.pasteCalldataToggle:hover {
+  color: var(--text-primary);
+}
+
+.pasteCalldataBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.pasteCalldataBody .textarea {
+  min-height: unset;
+  font-size: 0.82rem;
+}
+
+.pasteCalldataError {
+  font-size: 0.8rem;
+  color: #ef4444;
+}
+
+.pasteCalldataBtn {
+  align-self: flex-start;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: var(--bg-code);
+  border: 1px solid var(--border-secondary);
+  border-radius: 4px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.pasteCalldataBtn:hover:not(:disabled) {
+  border-color: var(--border-focus);
+}
+
+.pasteCalldataBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
