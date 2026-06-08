@@ -1,11 +1,8 @@
-import js from '@eslint/js';
-import globals from 'globals';
-import nextPlugin from '@next/eslint-plugin-next';
+import js from '@eslint/js'
+import globals from 'globals'
 
 export default [
   js.configs.recommended,
-  nextPlugin.flatConfig.recommended,
-  nextPlugin.flatConfig.coreWebVitals,
   {
     languageOptions: {
       globals: {
@@ -22,6 +19,8 @@ export default [
     },
   },
   {
+    // React components (PascalCase) used as JSX elements are not counted as
+    // variable references by ESLint flat config without a React plugin.
     files: ['app/**/*.js'],
     rules: {
       'no-unused-vars': [
@@ -48,6 +47,6 @@ export default [
     },
   },
   {
-    ignores: ['node_modules/', '.next/', 'coverage/', '.claude/', '.vercel/', '.worktrees/'],
+    ignores: ['node_modules/', '.next/', 'coverage/'],
   },
-];
+]
