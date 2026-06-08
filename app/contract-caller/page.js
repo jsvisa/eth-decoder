@@ -1531,6 +1531,8 @@ export default function ContractCaller() {
       setParsedAbi(null);
       setFunctions([]);
       setSelectedFunction("");
+      setPasteCalldataValue("");
+      setPasteCalldataError(null);
       return;
     }
 
@@ -1577,6 +1579,8 @@ export default function ContractCaller() {
       } else {
         setSelectedFunction("");
         setArgs([]);
+        setPasteCalldataValue("");
+        setPasteCalldataError(null);
       }
       setError(null);
     } catch (err) {
@@ -2930,6 +2934,10 @@ export default function ContractCaller() {
       setPasteCalldataError("Enter hex calldata starting with 0x");
       return;
     }
+    if (hex.length <= 2) {
+      setPasteCalldataError("Enter hex bytes after 0x");
+      return;
+    }
 
     // Try to match the first 4 bytes against a function in the loaded ABI
     let matchedFunc = null;
@@ -2939,7 +2947,7 @@ export default function ContractCaller() {
         parsedAbi?.find(
           (item) =>
             item.type === "function" &&
-            getFunctionSelector(item)?.toLowerCase() === selector,
+            getFunctionSelector(item) === selector,
         ) ?? null;
     }
 
