@@ -2961,8 +2961,13 @@ export default function ContractCaller() {
         const newArgs = matchedFunc.inputs.map((input, i) =>
           viemDecodedToArgValue(decoded?.[i], input),
         );
-        setSelectedFunction(getFunctionSig(matchedFunc));
-        setArgs(newArgs);
+        const sig = getFunctionSig(matchedFunc);
+        if (sig !== selectedFunction) {
+          pendingHistoryRef.current = { functionSig: sig, args: newArgs, timestamp: Date.now() };
+          setSelectedFunction(sig);
+        } else {
+          setArgs(newArgs);
+        }
         setPasteCalldataValue("");
         setPasteCalldataError(null);
       } catch {
