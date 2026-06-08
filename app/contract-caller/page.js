@@ -695,8 +695,6 @@ export default function ContractCaller() {
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const [addressFilter, setAddressFilter] = useState("");
   const [fromAddress, setFromAddress] = useState("");
-  const [rawCalldataMode, setRawCalldataMode] = useState(false);
-  const [rawCalldata, setRawCalldata] = useState("");
   const [pasteCalldataExpanded, setPasteCalldataExpanded] = useState(false);
   const [pasteCalldataValue, setPasteCalldataValue] = useState("");
   const [pasteCalldataError, setPasteCalldataError] = useState(null);
@@ -1631,9 +1629,32 @@ export default function ContractCaller() {
     } else {
       setArgs([]);
     }
-    setRawCalldata("");
-    setRawCalldataMode(false);
   }, [selectedFunction, parsedAbi, address]);
+
+  // Auto-encode calldata for the Paste Calldata section whenever function or args change
+  useEffect(() => {
+    if (!selectedFunction || !parsedAbi) {
+      setPasteCalldataValue("");
+      return;
+    }
+    const func = parsedAbi.find(
+      (item) => item.type === "function" && getFunctionSig(item) === selectedFunction,
+    );
+    if (!func) return;
+    try {
+      const parsedArgs = func.inputs.map((input, i) =>
+        normalizeArg(args[i] ?? getDefaultValue(input), input.type, input.components),
+      );
+      const encoded = encodeFunctionData({
+        abi: [func],
+        functionName: func.name,
+        args: parsedArgs,
+      });
+      setPasteCalldataValue(encoded);
+    } catch {
+      // args incomplete or invalid — leave current value
+    }
+  }, [selectedFunction, args, parsedAbi]);
 
   // Fetch token symbols for Transfer events
   const fetchTokenSymbolsForLogs = async (logs, chainId) => {
@@ -2300,7 +2321,7 @@ export default function ContractCaller() {
     }
 
     // Validate function arguments (addresses in all types including tuples)
-    if (!rawCalldataMode && selectedFunc && selectedFunc.inputs) {
+    if (selectedFunc && selectedFunc.inputs) {
       const argErrors = [];
       selectedFunc.inputs.forEach((input, index) => {
         const argValue = args[index];
@@ -2308,14 +2329,6 @@ export default function ContractCaller() {
       });
       if (argErrors.length > 0) {
         errors.argErrors = argErrors;
-      }
-    }
-
-    // Validate raw calldata format when in raw mode
-    if (rawCalldataMode) {
-      const hex = rawCalldata.trim();
-      if (!hex || !hex.startsWith("0x") || hex.length < 10) {
-        errors.rawCalldata = true;
       }
     }
 
@@ -2341,10 +2354,6 @@ export default function ContractCaller() {
       if (errors.warpTimestamp)
         errorMessages.push("Warp timestamp must be a valid positive integer");
       if (errors.argErrors) errorMessages.push(...errors.argErrors);
-      if (errors.rawCalldata)
-        errorMessages.push(
-          "Raw calldata must be a hex string starting with 0x (at least 4 bytes)",
-        );
       setError(errorMessages.join("; "));
       return;
     }
@@ -2417,7 +2426,6 @@ export default function ContractCaller() {
           onProgress: (pct) => setSimProgress(pct),
           abortSignal: abortController.signal,
           rpcBatchSize,
-          callData: rawCalldataMode ? rawCalldata.trim() : undefined,
         };
 
         if (sessionActive && sessionClientRef.current) {
@@ -2563,10 +2571,6 @@ export default function ContractCaller() {
           }
         }
 
-        // Pass raw calldata directly if in raw mode (skips server-side encoding)
-        if (rawCalldataMode) {
-          requestBody.callData = rawCalldata.trim();
-        }
 
         const response = await fetch(apiEndpoint, {
           method: "POST",
@@ -2882,124 +2886,44 @@ export default function ContractCaller() {
     return String(value);
   };
 
-  const handleRawModeToggle = () => {
-    const func = getSelectedFunction();
-    if (!func) return;
-
-    if (!rawCalldataMode) {
-      // Switching TO Raw: encode current args → calldata
-      try {
-        const parsedArgs = func.inputs.map((input, i) =>
-          normalizeArg(
-            args[i] ?? getDefaultValue(input),
-            input.type,
-            input.components,
-          ),
-        );
-        const encoded = encodeFunctionData({
-          abi: [func],
-          functionName: func.name,
-          args: parsedArgs,
-        });
-        setRawCalldata(encoded);
-      } catch {
-        // args incomplete/invalid — switch to raw with empty input
-        setRawCalldata("");
-      }
-    } else {
-      // Switching FROM Raw: decode calldata → args
-      const hex = rawCalldata.trim();
-      if (hex && hex.startsWith("0x") && hex.length >= 10) {
-        try {
-          const { args: decoded } = decodeFunctionData({
-            abi: [func],
-            data: hex,
-          });
-          const newArgs = func.inputs.map((input, i) =>
-            viemDecodedToArgValue(decoded?.[i], input),
-          );
-          setArgs(newArgs);
-        } catch {
-          // calldata doesn't match selected function — keep current args
-        }
-      }
-    }
-
-    setRawCalldataMode(!rawCalldataMode);
-  };
-
   const handleDecodeAndFill = () => {
     const hex = pasteCalldataValue.trim();
-    if (!hex || !hex.startsWith("0x")) {
-      setPasteCalldataError("Enter hex calldata starting with 0x");
-      return;
-    }
-    if (hex.length <= 2) {
-      setPasteCalldataError("Enter hex bytes after 0x");
+    if (!hex || !hex.startsWith("0x") || hex.length < 10) {
+      setPasteCalldataError("Calldata must start with 0x followed by a 4-byte selector");
       return;
     }
 
-    // Try to match the first 4 bytes against a function in the loaded ABI
-    let matchedFunc = null;
-    if (hex.length >= 10) {
-      const selector = hex.slice(0, 10).toLowerCase();
-      matchedFunc =
-        parsedAbi?.find(
-          (item) =>
-            item.type === "function" &&
-            getFunctionSelector(item) === selector,
-        ) ?? null;
+    const selector = hex.slice(0, 10).toLowerCase();
+    const matchedFunc =
+      parsedAbi?.find(
+        (item) =>
+          item.type === "function" &&
+          getFunctionSelector(item) === selector,
+      ) ?? null;
+
+    if (!matchedFunc) {
+      setPasteCalldataError("No matching function found in ABI");
+      return;
     }
 
-    if (matchedFunc) {
-      // Full calldata: selector matched — auto-select function and decode all args
-      try {
-        const { args: decoded } = decodeFunctionData({
-          abi: [matchedFunc],
-          data: hex,
-        });
-        const newArgs = matchedFunc.inputs.map((input, i) =>
-          viemDecodedToArgValue(decoded?.[i], input),
-        );
-        const sig = getFunctionSig(matchedFunc);
-        if (sig !== selectedFunction) {
-          pendingHistoryRef.current = { functionSig: sig, args: newArgs, timestamp: Date.now() };
-          setSelectedFunction(sig);
-        } else {
-          setArgs(newArgs);
-        }
-        setPasteCalldataValue("");
-        setPasteCalldataError(null);
-      } catch {
-        setPasteCalldataError("Invalid calldata");
-      }
-    } else {
-      // Args-only: no selector match — require a function to already be selected
-      const func = getSelectedFunction();
-      if (!func) {
-        setPasteCalldataError(
-          hex.length >= 10
-            ? "No matching function found in ABI"
-            : "Select a function first",
-        );
-        return;
-      }
-      try {
-        const selector = getFunctionSelector(func);
-        const fullCalldata = selector + hex.slice(2);
-        const { args: decoded } = decodeFunctionData({
-          abi: [func],
-          data: fullCalldata,
-        });
-        const newArgs = func.inputs.map((input, i) =>
-          viemDecodedToArgValue(decoded?.[i], input),
-        );
+    try {
+      const { args: decoded } = decodeFunctionData({
+        abi: [matchedFunc],
+        data: hex,
+      });
+      const newArgs = matchedFunc.inputs.map((input, i) =>
+        viemDecodedToArgValue(decoded?.[i], input),
+      );
+      const sig = getFunctionSig(matchedFunc);
+      if (sig !== selectedFunction) {
+        pendingHistoryRef.current = { functionSig: sig, args: newArgs, timestamp: Date.now() };
+        setSelectedFunction(sig);
+      } else {
         setArgs(newArgs);
-        setPasteCalldataValue("");
-        setPasteCalldataError(null);
-      } catch {
-        setPasteCalldataError("Invalid calldata");
       }
+      setPasteCalldataError(null);
+    } catch {
+      setPasteCalldataError("Invalid calldata");
     }
   };
 
@@ -3802,7 +3726,7 @@ export default function ContractCaller() {
                           setPasteCalldataExpanded(!pasteCalldataExpanded)
                         }
                       >
-                        {pasteCalldataExpanded ? "▼" : "▶"} Paste calldata
+                        {pasteCalldataExpanded ? "▼" : "▶"} Calldata
                       </button>
                       {pasteCalldataExpanded && (
                         <div className={styles.pasteCalldataBody}>
@@ -3814,7 +3738,7 @@ export default function ContractCaller() {
                               if (pasteCalldataError)
                                 setPasteCalldataError(null);
                             }}
-                            placeholder="Full: 0x{selector}{args}  —  Args only: 0x{args} (function must be selected)"
+                            placeholder="0x{4-byte selector}{encoded args}"
                             rows={3}
                             disabled={loading}
                           />
@@ -4279,15 +4203,6 @@ export default function ContractCaller() {
                       <div className={styles.argsSection}>
                         <div className={styles.argsSectionHeader}>
                           <label className={styles.label}>Arguments</label>
-                          <button
-                            type="button"
-                            className={`${styles.rawModeToggle} ${rawCalldataMode ? styles.rawModeActive : ""}`}
-                            onClick={handleRawModeToggle}
-                            disabled={loading}
-                            title="Toggle raw calldata input mode"
-                          >
-                            Raw
-                          </button>
                           {/* Block number for read-only functions */}
                           {isReadOnly(getSelectedFunction()) && (
                             <div className={styles.readBlockInline}>
@@ -4309,51 +4224,32 @@ export default function ContractCaller() {
                             </div>
                           )}
                         </div>
-                        {rawCalldataMode ? (
-                          <textarea
-                            className={`${styles.textarea} ${fieldErrors.rawCalldata ? styles.inputError : ""}`}
-                            value={rawCalldata}
-                            onChange={(e) => {
-                              setRawCalldata(e.target.value);
-                              if (fieldErrors.rawCalldata) {
-                                setFieldErrors((prev) => ({
-                                  ...prev,
-                                  rawCalldata: false,
-                                }));
-                              }
-                            }}
-                            placeholder="0x{4-byte selector}{encoded args}"
-                            disabled={loading}
-                            rows={4}
-                          />
-                        ) : (
-                          getSelectedFunctionInputs().map((input, index) => (
-                            <div key={index} className={styles.argField}>
-                              <label className={styles.argLabel}>
-                                {input.name || `arg${index}`} ({input.type})
-                              </label>
-                              <ArgInput
-                                input={input}
-                                value={args[index]}
-                                onChange={(value) => {
-                                  const newArgs = [...args];
-                                  newArgs[index] = value;
-                                  setArgs(newArgs);
-                                  if (fieldErrors[`arg_${index}`]) {
-                                    setFieldErrors((prev) => ({
-                                      ...prev,
-                                      [`arg_${index}`]: false,
-                                    }));
-                                  }
-                                }}
-                                addressBook={addressBook}
-                                disabled={loading}
-                                onBookmarkClick={handleOpenBookmarkModal}
-                                error={fieldErrors[`arg_${index}`]}
-                              />
-                            </div>
-                          ))
-                        )}
+                        {getSelectedFunctionInputs().map((input, index) => (
+                          <div key={index} className={styles.argField}>
+                            <label className={styles.argLabel}>
+                              {input.name || `arg${index}`} ({input.type})
+                            </label>
+                            <ArgInput
+                              input={input}
+                              value={args[index]}
+                              onChange={(value) => {
+                                const newArgs = [...args];
+                                newArgs[index] = value;
+                                setArgs(newArgs);
+                                if (fieldErrors[`arg_${index}`]) {
+                                  setFieldErrors((prev) => ({
+                                    ...prev,
+                                    [`arg_${index}`]: false,
+                                  }));
+                                }
+                              }}
+                              addressBook={addressBook}
+                              disabled={loading}
+                              onBookmarkClick={handleOpenBookmarkModal}
+                              error={fieldErrors[`arg_${index}`]}
+                            />
+                          </div>
+                        ))}
                       </div>
                     )}
 
