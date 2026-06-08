@@ -1,8 +1,11 @@
-import js from '@eslint/js'
-import globals from 'globals'
+import js from '@eslint/js';
+import globals from 'globals';
+import nextPlugin from '@next/eslint-plugin-next';
 
 export default [
   js.configs.recommended,
+  nextPlugin.configs.recommended,
+  nextPlugin.configs['core-web-vitals'],
   {
     languageOptions: {
       globals: {
@@ -47,6 +50,6 @@ export default [
     },
   },
   {
-    ignores: ['node_modules/', '.next/', 'coverage/'],
+    ignores: ['node_modules/', '.next/', 'coverage/', '.claude/', '.vercel/', '.worktrees/'],
   },
-]
+];
