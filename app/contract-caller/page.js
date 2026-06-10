@@ -682,6 +682,7 @@ export default function ContractCaller() {
   const [copied, setCopied] = useState(false);
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(true);
+  const [historySearch, setHistorySearch] = useState("");
   const [abiSource, setAbiSource] = useState(null); // 'cached', 'fetched', or null
   const [contractName, setContractName] = useState(null);
   const [abiSaved, setAbiSaved] = useState(false); // Feedback for ABI save action
@@ -5608,6 +5609,13 @@ export default function ContractCaller() {
                 {history.filter((item) => item.chain === chain).length})
               </h3>
               <div className={styles.historyActions}>
+                <input
+                  type="text"
+                  placeholder="Search…"
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                  className={styles.historySearch}
+                />
                 <button
                   onClick={() => setShowHistory(!showHistory)}
                   className={styles.historyToggle}
@@ -5629,6 +5637,7 @@ export default function ContractCaller() {
               <div className={styles.historyList}>
                 {history
                   .filter((item) => item.chain === chain)
+                  .filter((item) => !historySearch || item.functionName?.toLowerCase().includes(historySearch.toLowerCase()) || item.contractName?.toLowerCase().includes(historySearch.toLowerCase()))
                   .map((item) => {
                     if (item.type === "session") {
                       const abbrev = (v) => {
