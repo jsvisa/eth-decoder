@@ -129,8 +129,8 @@ describe("GET /api/decode-event — Sourcify fallback", () => {
     expect(body.msg).toBe("ok");
     expect(body.data.event).toBe("Transfer");
     expect(body.data.source).toBe("sourcify");
-    // serialized as strings, not BigInt
-    expect(body.data.args.arg2).toBe("1000000");
+    // serialized as a number (safe-range int), not BigInt
+    expect(body.data.args.arg2).toBe(1000000);
   });
 
   it("returns original backend response when Sourcify also has no match", async () => {

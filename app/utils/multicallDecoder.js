@@ -2,7 +2,7 @@ import { decodeFunctionData } from "viem";
 import { serializeValue } from "./decoder.js";
 
 // All known multicall ABI items, keyed by 4-byte selector
-const MULTICALL_ABIS = {
+export const MULTICALL_ABIS = {
   // multicall(bytes[])  — bytes_array, each element is full calldata to the same contract
   "0xac9650d8": {
     abi: {

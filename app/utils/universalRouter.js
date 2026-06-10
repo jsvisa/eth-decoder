@@ -21,7 +21,7 @@ const COMMAND_NAMES = {
 };
 
 // ABI params for each command (inputs have no selector — bare ABI encoding)
-const COMMAND_ABI_PARAMS = {
+export const COMMAND_ABI_PARAMS = {
   0x00: [
     { name: "recipient", type: "address" },
     { name: "amountIn", type: "uint256" },
@@ -85,7 +85,7 @@ const COMMAND_ABI_PARAMS = {
   ],
 };
 
-const UR_EXECUTE_NO_DEADLINE = {
+export const UR_EXECUTE_NO_DEADLINE = {
   name: "execute",
   type: "function",
   inputs: [
@@ -96,7 +96,7 @@ const UR_EXECUTE_NO_DEADLINE = {
   stateMutability: "payable",
 };
 
-const UR_EXECUTE_WITH_DEADLINE = {
+export const UR_EXECUTE_WITH_DEADLINE = {
   name: "execute",
   type: "function",
   inputs: [
