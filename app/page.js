@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import yaml from "js-yaml";
 import styles from "./page.module.css";
 import { decodeUniversalRouter } from "./utils/universalRouter.js";
@@ -50,6 +50,7 @@ async function decodeInnerCallsAsync(innerCalls, setResult) {
 }
 
 export default function Home() {
+  const modalContentRef = useRef(null);
   const [inputData, setInputData] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -572,6 +573,27 @@ export default function Home() {
     return () => window.removeEventListener("keydown", onKey);
   }, [editTarget]);
 
+  // Prevent wheel events inside the modal from scrolling the page.
+  // Textarea scroll is preserved only when it actually has content to scroll;
+  // at its boundary (or when empty) scroll is contained inside the modal.
+  useEffect(() => {
+    const el = modalContentRef.current;
+    if (!el || !editTarget) return;
+    const handler = (e) => {
+      const ta = e.target.closest("textarea");
+      if (ta) {
+        const canScroll =
+          (e.deltaY > 0 && ta.scrollTop < ta.scrollHeight - ta.clientHeight) ||
+          (e.deltaY < 0 && ta.scrollTop > 0);
+        if (!canScroll) e.preventDefault();
+      } else {
+        e.preventDefault();
+      }
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, [editTarget]);
+
   const handleCopyEncoded = async () => {
     try {
       await navigator.clipboard.writeText(encodedHex);
@@ -741,10 +763,13 @@ export default function Home() {
           <div
             className={styles.modalBackdrop}
             onClick={resetEncodeState}
+            onWheel={(e) => window.scrollBy({ top: e.deltaY, behavior: "instant" })}
           >
             <div
               className={styles.modalContent}
+              ref={modalContentRef}
               onClick={(e) => e.stopPropagation()}
+              onWheel={(e) => e.stopPropagation()}
             >
               <div className={styles.modalHeader}>
                 <span className={styles.modalTitle}>Edit & Encode</span>
