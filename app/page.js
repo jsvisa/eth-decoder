@@ -5,6 +5,15 @@ import yaml from "js-yaml";
 import styles from "./page.module.css";
 import { decodeUniversalRouter } from "./utils/universalRouter.js";
 import { decodeMulticall } from "./utils/multicallDecoder.js";
+import {
+  encodeFunction,
+  reencodeMulticallInner,
+  reencodeURInput,
+} from "./utils/txEncoder.js";
+import {
+  parseJsonWithBigNumbers,
+  stringifyForEditor,
+} from "./utils/jsonNumbers.js";
 
 const STORAGE_KEY = "evm_decoder_history";
 const MAX_HISTORY_ITEMS = 100;
@@ -52,6 +61,12 @@ export default function Home() {
   const [urlCopied, setUrlCopied] = useState(false);
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(true);
+  const [decodedInput, setDecodedInput] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
+  const [editText, setEditText] = useState("");
+  const [encodedHex, setEncodedHex] = useState(null);
+  const [encodeError, setEncodeError] = useState(null);
+  const [encodedCopied, setEncodedCopied] = useState(false);
 
   // Load history from localStorage on mount
   useEffect(() => {
@@ -107,6 +122,14 @@ export default function Home() {
     }
   };
 
+  const resetEncodeState = () => {
+    setEditTarget(null);
+    setEditText("");
+    setEncodedHex(null);
+    setEncodeError(null);
+    setEncodedCopied(false);
+  };
+
   // Load from history
   const loadFromHistory = (item) => {
     setInputData(item.input);
@@ -114,6 +137,8 @@ export default function Home() {
     setWithAbi(item.options.withAbi);
     setWithSign(item.options.withSign);
     setError(null);
+    setDecodedInput(item.input);
+    resetEncodeState();
   };
 
   // Clear history
@@ -151,8 +176,11 @@ export default function Home() {
       space,
     );
 
-    // Remove quotes around our number markers to keep them as unquoted numbers
-    return jsonStr.replace(/"__NUMBER__(-?\d+)__NUMBER__"/g, "$1");
+    // Remove quotes around our number markers to keep them as unquoted numbers,
+    // then unquote lossless big-integer strings (not keys) for display parity
+    return jsonStr
+      .replace(/"__NUMBER__(-?\d+)__NUMBER__"/g, "$1")
+      .replace(/"(-?\d{16,})"(?!\s*:)/g, "$1");
   };
 
   const syntaxHighlight = (json) => {
@@ -311,7 +339,8 @@ export default function Home() {
         throw new Error(`Error: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const text = await response.text();
+      const data = parseJsonWithBigNumbers(text);
 
       // Check if response has the expected structure
       let resultToDisplay;
@@ -349,6 +378,8 @@ export default function Home() {
       }
 
       setResult(resultToDisplay);
+      setDecodedInput(inputData.trim());
+      resetEncodeState();
       setIsYaml(false); // Reset to JSON format on new result
       setCopied(false); // Reset copied state
 
@@ -460,6 +491,85 @@ export default function Home() {
     return syntaxHighlight(result);
   };
 
+  const decodedSelector = decodedInput
+    ? (decodedInput.startsWith("0x") ? decodedInput : "0x" + decodedInput)
+        .slice(0, 10)
+        .toLowerCase()
+    : null;
+  const isURResult = decodedSelector ? UR_SELECTORS.has(decodedSelector) : false;
+
+  const editTargets = [];
+  if (result?.func && result?.args) {
+    editTargets.push({ id: "top", label: `top-level: ${result.func}` });
+  }
+  if (Array.isArray(result?.inner_calls)) {
+    result.inner_calls.forEach((call, i) => {
+      if (isURResult) {
+        if (call.args) {
+          editTargets.push({ id: `ur-${i}`, label: `inner #${i}: ${call.name}` });
+        }
+      } else if (call.decoded?.func && call.decoded?.args) {
+        editTargets.push({
+          id: `mc-${i}`,
+          label: `inner #${i}: ${call.decoded.func}`,
+        });
+      }
+    });
+  }
+
+  const openEditor = (targetId) => {
+    setEditTarget(targetId);
+    setEncodedHex(null);
+    setEncodeError(null);
+    setEncodedCopied(false);
+    let args;
+    if (targetId === "top") {
+      args = result.args;
+    } else {
+      const [kind, idxStr] = targetId.split("-");
+      const call = result.inner_calls[Number(idxStr)];
+      args = kind === "ur" ? call.args : call.decoded.args;
+    }
+    setEditText(stringifyForEditor(args));
+  };
+
+  const handleEncode = () => {
+    setEncodeError(null);
+    setEncodedHex(null);
+    try {
+      const args = parseJsonWithBigNumbers(editText);
+      let hex;
+      if (editTarget === "top") {
+        hex = encodeFunction(result.func, args);
+      } else {
+        const [kind, idxStr] = editTarget.split("-");
+        const idx = Number(idxStr);
+        if (kind === "ur") {
+          hex = reencodeURInput(decodedInput, idx, args);
+        } else {
+          const innerHex = encodeFunction(
+            result.inner_calls[idx].decoded.func,
+            args,
+          );
+          hex = reencodeMulticallInner(decodedInput, idx, innerHex);
+        }
+      }
+      setEncodedHex(hex);
+    } catch (err) {
+      setEncodeError(err.message);
+    }
+  };
+
+  const handleCopyEncoded = async () => {
+    try {
+      await navigator.clipboard.writeText(encodedHex);
+      setEncodedCopied(true);
+      setTimeout(() => setEncodedCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
   return (
     <main className={styles.main}>
       <div className={styles.container}>
@@ -525,6 +635,19 @@ export default function Home() {
             <div className={styles.resultHeader}>
               <h2>Result:</h2>
               <div className={styles.resultActions}>
+                {editTargets.length > 0 && (
+                  <button
+                    onClick={() =>
+                      editTarget
+                        ? resetEncodeState()
+                        : openEditor(editTargets[0].id)
+                    }
+                    className={styles.actionButton}
+                    type="button"
+                  >
+                    {editTarget ? "Close Editor" : "Edit & Encode"}
+                  </button>
+                )}
                 <button
                   onClick={() => setIsYaml(!isYaml)}
                   className={styles.actionButton}
@@ -545,6 +668,57 @@ export default function Home() {
               className={styles.json}
               dangerouslySetInnerHTML={{ __html: getDisplayContent() }}
             />
+            {editTarget && (
+              <div className={styles.encodePanel}>
+                <label className={styles.encodeLabel}>
+                  Edit target:
+                  <select
+                    value={editTarget}
+                    onChange={(e) => openEditor(e.target.value)}
+                    className={styles.encodeSelect}
+                  >
+                    {editTargets.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <textarea
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  className={styles.encodeTextarea}
+                  rows={10}
+                  spellCheck={false}
+                />
+                <div className={styles.buttonGroup}>
+                  <button
+                    type="button"
+                    onClick={handleEncode}
+                    className={styles.button}
+                  >
+                    Encode
+                  </button>
+                </div>
+                {encodeError && (
+                  <div className={styles.error}>
+                    <strong>Encode error:</strong> {encodeError}
+                  </div>
+                )}
+                {encodedHex && (
+                  <div className={styles.encodedResult}>
+                    <code className={styles.encodedHex}>{encodedHex}</code>
+                    <button
+                      type="button"
+                      onClick={handleCopyEncoded}
+                      className={styles.actionButton}
+                    >
+                      {encodedCopied ? "Copied!" : "Copy"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
