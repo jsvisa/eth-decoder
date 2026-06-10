@@ -775,7 +775,6 @@ export default function Home() {
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
                 className={styles.encodeTextarea}
-                rows={12}
                 spellCheck={false}
                 autoFocus
               />
