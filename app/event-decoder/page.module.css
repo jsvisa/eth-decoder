@@ -316,6 +316,21 @@
   gap: 0.5rem;
 }
 
+.historySearch {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  width: 9rem;
+}
+
+.historySearch:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+}
+
 .historyToggle,
 .historyClear {
   padding: 0.25rem 0.6rem;

@@ -17,6 +17,7 @@ export default function EventDecoder() {
   const [copied, setCopied] = useState(false);
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(true);
+  const [historySearch, setHistorySearch] = useState("");
 
   useEffect(() => {
     try {
@@ -307,6 +308,13 @@ export default function EventDecoder() {
             <div className={styles.historyHeader}>
               <h3>Recent Decodes ({history.length})</h3>
               <div className={styles.historyActions}>
+                <input
+                  type="text"
+                  placeholder="Search…"
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                  className={styles.historySearch}
+                />
                 <button
                   onClick={() => setShowHistory(!showHistory)}
                   className={styles.historyToggle}
@@ -330,7 +338,7 @@ export default function EventDecoder() {
             </div>
             {showHistory && (
               <div className={styles.historyList}>
-                {history.map((item) => (
+                {history.filter((item) => !historySearch || item.output?.event?.toLowerCase().includes(historySearch.toLowerCase())).map((item) => (
                   <div
                     key={item.id}
                     className={styles.historyItem}

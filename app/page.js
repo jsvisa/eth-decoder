@@ -62,6 +62,7 @@ export default function Home() {
   const [urlCopied, setUrlCopied] = useState(false);
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(true);
+  const [historySearch, setHistorySearch] = useState("");
   const [decodedInput, setDecodedInput] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
   const [editText, setEditText] = useState("");
@@ -706,6 +707,13 @@ export default function Home() {
             <div className={styles.historyHeader}>
               <h3>Recent Decodes ({history.length})</h3>
               <div className={styles.historyActions}>
+                <input
+                  type="text"
+                  placeholder="Search…"
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                  className={styles.historySearch}
+                />
                 <button
                   onClick={() => setShowHistory(!showHistory)}
                   className={styles.historyToggle}
@@ -725,7 +733,7 @@ export default function Home() {
 
             {showHistory && (
               <div className={styles.historyList}>
-                {history.map((item) => (
+                {history.filter((item) => !historySearch || item.output?.func?.toLowerCase().includes(historySearch.toLowerCase())).map((item) => (
                   <div
                     key={item.id}
                     className={styles.historyItem}
