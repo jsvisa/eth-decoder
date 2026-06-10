@@ -1,9 +1,14 @@
 import { describe, it, expect } from "vitest";
 import {
   decodeFunctionData,
+  encodeFunctionData,
   parseAbiItem,
 } from "viem";
-import { encodeFunction } from "../../app/utils/txEncoder.js";
+import { encodeFunction, reencodeMulticallInner } from "../../app/utils/txEncoder.js";
+import {
+  decodeMulticall,
+  MULTICALL_ABIS,
+} from "../../app/utils/multicallDecoder.js";
 
 const TRANSFER_DATA =
   "0xa9059cbb000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045000000000000000000000000000000000000000000000000002386f26fc10000";
@@ -90,5 +95,73 @@ describe("encodeFunction", () => {
     expect(() =>
       encodeFunction(TRANSFER_SIG, { to: "0x123", amount: "1" }),
     ).toThrow();
+  });
+});
+
+const transferCalldata = (to, amount) =>
+  encodeFunctionData({
+    abi: [parseAbiItem("function transfer(address,uint256)")],
+    args: [to, amount],
+  });
+
+describe("reencodeMulticallInner", () => {
+  const inner0 = TRANSFER_DATA;
+  const inner1 = transferCalldata(OTHER, 5n);
+  const bytesOuter = encodeFunctionData({
+    abi: [MULTICALL_ABIS["0xac9650d8"].abi],
+    args: [[inner0, inner1]],
+  });
+
+  it("round-trips an unchanged inner call byte-for-byte (bytes[])", () => {
+    expect(reencodeMulticallInner(bytesOuter, 1, inner1)).toBe(bytesOuter);
+  });
+
+  it("replaces only the edited inner call (bytes[])", () => {
+    const newInner = transferCalldata(
+      "0x3333333333333333333333333333333333333333",
+      7n,
+    );
+    const out = reencodeMulticallInner(bytesOuter, 1, newInner);
+    const dec = decodeMulticall(out);
+    expect(dec.inner_calls[0].data).toBe(inner0);
+    expect(dec.inner_calls[1].data).toBe(newInner);
+  });
+
+  it("replaces inner callData in an aggregate3 tuple array, preserving other fields", () => {
+    const agg3Outer = encodeFunctionData({
+      abi: [MULTICALL_ABIS["0x82ad56cb"].abi],
+      args: [[{ target: VITALIK, allowFailure: true, callData: inner0 }]],
+    });
+    const newInner = transferCalldata(OTHER, 7n);
+    const out = reencodeMulticallInner(agg3Outer, 0, newInner);
+    const dec = decodeMulticall(out);
+    expect(dec.inner_calls[0].data).toBe(newInner);
+    expect(dec.inner_calls[0].target.toLowerCase()).toBe(VITALIK);
+    expect(dec.inner_calls[0].allowFailure).toBe(true);
+  });
+
+  it("handles a big uint256 amount in the edited inner call", () => {
+    const big = 123456789012345678901234567890n;
+    const newInner = transferCalldata(OTHER, big);
+    const out = reencodeMulticallInner(bytesOuter, 0, newInner);
+    const dec = decodeMulticall(out);
+    expect(dec.inner_calls[0].data).toBe(newInner);
+    const innerDec = decodeFunctionData({
+      abi: [parseAbiItem("function transfer(address,uint256)")],
+      data: dec.inner_calls[0].data,
+    });
+    expect(innerDec.args[1]).toBe(big);
+  });
+
+  it("throws on an unknown selector", () => {
+    expect(() => reencodeMulticallInner(TRANSFER_DATA, 0, "0x")).toThrow(
+      /multicall/i,
+    );
+  });
+
+  it("throws on an out-of-range index", () => {
+    expect(() => reencodeMulticallInner(bytesOuter, 5, "0x")).toThrow(
+      /out of range/i,
+    );
   });
 });
