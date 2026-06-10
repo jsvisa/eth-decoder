@@ -8,6 +8,37 @@ import {
 } from "../../app/utils/decoder.js";
 
 // ---------------------------------------------------------------------------
+// serializeValue — number handling (safe-range BigInt → number)
+// ---------------------------------------------------------------------------
+
+describe("serializeValue number handling", () => {
+  it("emits safe-range BigInts as plain numbers", () => {
+    expect(serializeValue(10000000n)).toBe(10000000);
+    expect(serializeValue(-42n)).toBe(-42);
+    expect(serializeValue(0n)).toBe(0);
+    expect(serializeValue(BigInt(Number.MAX_SAFE_INTEGER))).toBe(
+      Number.MAX_SAFE_INTEGER,
+    );
+  });
+
+  it("keeps unsafe-range BigInts as lossless strings", () => {
+    expect(serializeValue(BigInt(Number.MAX_SAFE_INTEGER) + 1n)).toBe(
+      "9007199254740992",
+    );
+    expect(serializeValue(123456789012345678901234567890n)).toBe(
+      "123456789012345678901234567890",
+    );
+    expect(serializeValue(-(2n ** 255n))).toBe((-(2n ** 255n)).toString());
+  });
+
+  it("recurses through arrays and objects", () => {
+    expect(serializeValue({ a: [1n, 2n ** 200n] })).toEqual({
+      a: [1, (2n ** 200n).toString()],
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // isValidHexData
 // ---------------------------------------------------------------------------
 
@@ -34,16 +65,16 @@ describe("isValidHexData", () => {
 // ---------------------------------------------------------------------------
 
 describe("serializeValue", () => {
-  it("converts BigInt to a string", () => {
-    expect(serializeValue(123n)).toBe("123");
+  it("converts safe-range BigInt to a number", () => {
+    expect(serializeValue(123n)).toBe(123);
   });
 
   it("recursively converts BigInts inside arrays", () => {
-    expect(serializeValue([1n, [2n, 3n]])).toEqual(["1", ["2", "3"]]);
+    expect(serializeValue([1n, [2n, 3n]])).toEqual([1, [2, 3]]);
   });
 
   it("recursively converts BigInts inside objects", () => {
-    expect(serializeValue({ a: 5n, b: 0n })).toEqual({ a: "5", b: "0" });
+    expect(serializeValue({ a: 5n, b: 0n })).toEqual({ a: 5, b: 0 });
   });
 
   it("passes strings through unchanged", () => {
@@ -127,9 +158,9 @@ describe("decodeFunctionCalldata", () => {
     );
   });
 
-  it("serializes uint256 arguments as strings, not BigInt", () => {
+  it("serializes uint256 arguments as numbers (safe-range) or strings (unsafe-range)", () => {
     const result = decodeFunctionCalldata(TRANSFER_FUNC_ABI, TRANSFER_CALLDATA);
-    expect(result.args._value).toBe("1000000");
+    expect(result.args._value).toBe(1000000);
   });
 
   it("throws when the 4-byte selector does not match the ABI", () => {
@@ -175,13 +206,13 @@ describe("decodeEventLog", () => {
     expect(result.event).toBe("Transfer");
   });
 
-  it("serializes uint256 values as strings, not BigInt", () => {
+  it("serializes uint256 values as numbers (safe-range) or strings (unsafe-range)", () => {
     const result = decodeEventLog(
       TRANSFER_EVENT_ABI,
       [TRANSFER_TOPIC0, TRANSFER_TOPIC1, TRANSFER_TOPIC2],
       TRANSFER_DATA,
     );
-    expect(result.args.value).toBe("1000000");
+    expect(result.args.value).toBe(1000000);
   });
 
   it("decodes indexed address topics", () => {

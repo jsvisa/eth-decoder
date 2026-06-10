@@ -203,7 +203,7 @@ describe("reencodeURInput", () => {
     });
     const dec = decodeUniversalRouter(out);
     expect(dec.inner_calls[0].args.recipient.toLowerCase()).toBe(OTHER);
-    expect(dec.args.deadline).toBe("1700000000");
+    expect(dec.args.deadline).toBe(1700000000);
   });
 
   it("handles a big uint256 value losslessly", () => {

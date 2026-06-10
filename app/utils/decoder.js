@@ -11,12 +11,22 @@ export function isValidHexData(data) {
   return /^[0-9a-fA-F]+$/.test(hex);
 }
 
+const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
+
 /**
- * Recursively converts BigInt values to strings so the result is JSON-safe.
+ * Recursively converts BigInt values to numbers (safe range) or strings
+ * (unsafe range) so the result is JSON-safe and matches the decode backend's
+ * API contract where small integers are plain JSON numbers.
  * Equivalent to the Python server's serialize_value().
  */
 export function serializeValue(value) {
-  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "bigint") {
+    // Safe-range ints serialize as plain JSON numbers (matches the decode
+    // backend's contract); only values that would lose precision stay strings.
+    return value >= -MAX_SAFE && value <= MAX_SAFE
+      ? Number(value)
+      : value.toString();
+  }
   if (Array.isArray(value)) return value.map(serializeValue);
   if (value !== null && typeof value === "object") {
     return Object.fromEntries(
