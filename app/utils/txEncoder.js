@@ -99,7 +99,9 @@ export function reencodeURInput(outerData, index, newArgs) {
   const params = COMMAND_ABI_PARAMS[cmd];
   const args = newArgs ?? {};
 
-  if (typeof args.raw === "string" && !params) {
+  // raw always wins: the decoder emits {raw} when it couldn't decode a known
+  // command's input, and no COMMAND_ABI_PARAMS entry has a param named "raw".
+  if (typeof args.raw === "string") {
     inputs[index] = args.raw;
   } else if (params) {
     const values = params.map((p) =>

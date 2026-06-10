@@ -268,4 +268,14 @@ describe("reencodeURInput", () => {
       /Universal Router/i,
     );
   });
+
+  it("honors {raw} for a known-params command whose input failed to decode", () => {
+    // decoder falls back to {raw} when a TRANSFER input is malformed
+    const outer = encodeFunctionData({
+      abi: [UR_EXECUTE_WITH_DEADLINE],
+      args: ["0x05", ["0x1234"], 1700000000n],
+    });
+    const out = reencodeURInput(outer, 0, { raw: "0x1234" });
+    expect(out).toBe(outer);
+  });
 });
