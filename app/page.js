@@ -32,7 +32,7 @@ async function decodeInnerCallsAsync(innerCalls, setResult) {
           `/api/decode?${new URLSearchParams({ data: d })}`,
         );
         if (!resp.ok) return;
-        const json = await resp.json();
+        const json = parseJsonWithBigNumbers(await resp.text());
         const decoded =
           json?.msg === "ok" && json?.data?.[0] ? json.data[0] : null;
         if (!decoded) return;
@@ -139,6 +139,9 @@ export default function Home() {
     setError(null);
     setDecodedInput(item.input);
     resetEncodeState();
+    if (item.output?.inner_calls?.length > 0) {
+      decodeInnerCallsAsync(item.output.inner_calls, setResult);
+    }
   };
 
   // Clear history
