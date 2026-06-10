@@ -124,9 +124,9 @@ test.describe("Encode back", () => {
     await expect(select.locator("option")).toHaveCount(2, { timeout: 10000 });
     await select.selectOption({ index: 1 });
 
-    // lossless pre-fill: full 23-digit amount, quoted
+    // bare integer (no quotes) — lossless parse re-quotes it on encode
     await expect(page.locator("textarea")).toHaveValue(
-      new RegExp(`"${BIG}"`),
+      new RegExp(`:\\s*${BIG}`),
     );
 
     // unchanged re-encode reproduces the outer calldata byte-for-byte

@@ -15,18 +15,23 @@ export function parseJsonWithBigNumbers(text) {
 }
 
 export function stringifyForEditor(value) {
-  return JSON.stringify(
+  const json = JSON.stringify(
     value,
     (key, v) => {
-      if (typeof v === "bigint") return v.toString();
+      if (typeof v === "bigint") return `__BIG__${v.toString()}__BIG__`;
       if (typeof v === "number" && !Number.isSafeInteger(v) && Number.isFinite(v)) {
-        return v.toLocaleString("en-US", {
+        return `__BIG__${v.toLocaleString("en-US", {
           useGrouping: false,
           maximumFractionDigits: 0,
-        });
+        })}__BIG__`;
       }
       return v;
     },
     2,
   );
+  // Integers display bare; precision is safe because parseJsonWithBigNumbers
+  // re-quotes 16+ digit literals before JSON.parse on the way back in.
+  return json
+    .replace(/"__BIG__(-?\d+)__BIG__"/g, "$1")
+    .replace(/"(-?\d{16,})"(?!\s*:)/g, "$1");
 }

@@ -70,19 +70,42 @@ describe("parseJsonWithBigNumbers", () => {
 });
 
 describe("stringifyForEditor", () => {
-  it("renders BigInt values as quoted strings", () => {
+  it("renders BigInt values as bare integers", () => {
     expect(stringifyForEditor({ amount: 10000000000000000n })).toBe(
-      '{\n  "amount": "10000000000000000"\n}',
+      '{\n  "amount": 10000000000000000\n}',
     );
   });
 
-  it("keeps small numbers unquoted and nests objects/arrays", () => {
-    const out = stringifyForEditor({ a: 1, b: { c: [2n, "x"] } });
-    expect(JSON.parse(out)).toEqual({ a: 1, b: { c: ["2", "x"] } });
+  it("renders small BigInts bare and keeps non-numeric values intact", () => {
+    expect(stringifyForEditor({ a: 1, b: { c: [2n, "x"] } })).toBe(
+      '{\n  "a": 1,\n  "b": {\n    "c": [\n      2,\n      "x"\n    ]\n  }\n}',
+    );
   });
 
-  it("renders unsafe JS numbers as full-digit strings (no scientific notation)", () => {
+  it("renders unsafe JS numbers as bare full-digit integers (no scientific notation)", () => {
     const out = stringifyForEditor({ amount: 1e21 });
-    expect(out).toContain('"1000000000000000000000"');
+    expect(out).toContain('"amount": 1000000000000000000000');
+  });
+
+  it("renders 16+ digit integer strings bare (lossless parse output)", () => {
+    expect(
+      stringifyForEditor({ amount: "12345678901234567890123" }),
+    ).toBe('{\n  "amount": 12345678901234567890123\n}');
+  });
+
+  it("keeps short numeric strings quoted (string-typed args)", () => {
+    expect(stringifyForEditor({ id: "5" })).toBe('{\n  "id": "5"\n}');
+  });
+
+  it("keeps 16+ digit object keys quoted", () => {
+    expect(stringifyForEditor({ "1234567890123456789": 1 })).toBe(
+      '{\n  "1234567890123456789": 1\n}',
+    );
+  });
+
+  it("round-trips big values losslessly through parseJsonWithBigNumbers", () => {
+    const args = { to: "0xd8da6bf26964af9d7eed9e03e53415d37aa96045", amount: "12345678901234567890123" };
+    const reparsed = parseJsonWithBigNumbers(stringifyForEditor(args));
+    expect(reparsed).toEqual(args);
   });
 });
