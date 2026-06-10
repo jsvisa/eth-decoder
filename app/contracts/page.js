@@ -456,6 +456,7 @@ export default function Contracts() {
                     <td className={styles.tdChain}>
                       <div className={styles.chainCell}>
                         {contract.chainInfo?.icon && (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={contract.chainInfo.icon}
                             alt={contract.chainInfo.name}

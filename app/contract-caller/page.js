@@ -3074,6 +3074,7 @@ export default function ContractCaller() {
               <div className={styles.chainSelectRow}>
                 <div className={styles.chainSelectWithIcon}>
                   {allChains.find((c) => c.id === chain)?.icon && (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={allChains.find((c) => c.id === chain)?.icon}
                       alt=""
@@ -5913,6 +5914,7 @@ export default function ContractCaller() {
                       {customChains.map((c) => (
                         <div key={c.id} className={styles.addedChainItem}>
                           {c.icon && (
+                            // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={c.icon}
                               alt=""
@@ -5968,6 +5970,7 @@ export default function ContractCaller() {
                           }}
                         >
                           {chainData.icon && (
+                            // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={`https://icons.llamao.fi/icons/chains/rsz_${chainData.icon}.jpg`}
                               alt=""

@@ -302,6 +302,7 @@ export default function SettingsPanel() {
               <label className={styles.settingsLabel}>Chain</label>
               <div className={styles.chainSelectWithIcon}>
                 {allChains.find((c) => c.id === selectedRpcChain)?.icon && (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={allChains.find((c) => c.id === selectedRpcChain)?.icon} alt=""
                     className={styles.chainIconSmall} onError={(e) => { e.target.style.display = "none"; }} />
                 )}
@@ -344,6 +345,7 @@ export default function SettingsPanel() {
                 return (
                   <div key={chainId} className={styles.configuredRpcItem}>
                     {chainInfo?.icon && (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img src={chainInfo.icon} alt="" className={styles.chainIconTiny} />
                     )}
                     <span className={styles.configuredRpcChain}>{chainInfo?.name || chainId}</span>
