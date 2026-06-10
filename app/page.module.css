@@ -379,15 +379,57 @@
   letter-spacing: 1px;
 }
 
-.encodePanel {
-  margin-top: 1rem;
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
   padding: 1rem;
-  border: 2px solid var(--border-primary);
-  border-radius: 6px;
-  background-color: var(--bg-input);
+}
+
+.modalContent {
+  background: var(--bg-card);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.32);
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  padding: 1.5rem;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
+.modalTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.modalClose {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: var(--text-secondary, var(--text-primary));
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.modalClose:hover {
+  background: var(--bg-hover);
 }
 
 .encodeLabel {

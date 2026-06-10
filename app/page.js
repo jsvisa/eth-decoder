@@ -563,6 +563,15 @@ export default function Home() {
     }
   };
 
+  useEffect(() => {
+    if (!editTarget) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") resetEncodeState();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editTarget]);
+
   const handleCopyEncoded = async () => {
     try {
       await navigator.clipboard.writeText(encodedHex);
@@ -640,15 +649,11 @@ export default function Home() {
               <div className={styles.resultActions}>
                 {editTargets.length > 0 && (
                   <button
-                    onClick={() =>
-                      editTarget
-                        ? resetEncodeState()
-                        : openEditor(editTargets[0].id)
-                    }
+                    onClick={() => openEditor(editTargets[0].id)}
                     className={styles.actionButton}
                     type="button"
                   >
-                    {editTarget ? "Close Editor" : "Edit & Encode"}
+                    Edit & Encode
                   </button>
                 )}
                 <button
@@ -671,57 +676,6 @@ export default function Home() {
               className={styles.json}
               dangerouslySetInnerHTML={{ __html: getDisplayContent() }}
             />
-            {editTarget && (
-              <div className={styles.encodePanel}>
-                <label className={styles.encodeLabel}>
-                  Edit target:
-                  <select
-                    value={editTarget}
-                    onChange={(e) => openEditor(e.target.value)}
-                    className={styles.encodeSelect}
-                  >
-                    {editTargets.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <textarea
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  className={styles.encodeTextarea}
-                  rows={10}
-                  spellCheck={false}
-                />
-                <div className={styles.buttonGroup}>
-                  <button
-                    type="button"
-                    onClick={handleEncode}
-                    className={styles.button}
-                  >
-                    Encode
-                  </button>
-                </div>
-                {encodeError && (
-                  <div className={styles.error}>
-                    <strong>Encode error:</strong> {encodeError}
-                  </div>
-                )}
-                {encodedHex && (
-                  <div className={styles.encodedResult}>
-                    <code className={styles.encodedHex}>{encodedHex}</code>
-                    <button
-                      type="button"
-                      onClick={handleCopyEncoded}
-                      className={styles.actionButton}
-                    >
-                      {encodedCopied ? "Copied!" : "Copy"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         )}
 
@@ -783,6 +737,77 @@ export default function Home() {
           </div>
         )}
       </div>
+        {editTarget && (
+          <div
+            className={styles.modalBackdrop}
+            onClick={resetEncodeState}
+          >
+            <div
+              className={styles.modalContent}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className={styles.modalHeader}>
+                <span className={styles.modalTitle}>Edit & Encode</span>
+                <button
+                  type="button"
+                  onClick={resetEncodeState}
+                  className={styles.modalClose}
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+              <label className={styles.encodeLabel}>
+                Edit target:
+                <select
+                  value={editTarget}
+                  onChange={(e) => openEditor(e.target.value)}
+                  className={styles.encodeSelect}
+                >
+                  {editTargets.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <textarea
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                className={styles.encodeTextarea}
+                rows={12}
+                spellCheck={false}
+                autoFocus
+              />
+              <div className={styles.buttonGroup}>
+                <button
+                  type="button"
+                  onClick={handleEncode}
+                  className={styles.button}
+                >
+                  Encode
+                </button>
+              </div>
+              {encodeError && (
+                <div className={styles.error}>
+                  <strong>Encode error:</strong> {encodeError}
+                </div>
+              )}
+              {encodedHex && (
+                <div className={styles.encodedResult}>
+                  <code className={styles.encodedHex}>{encodedHex}</code>
+                  <button
+                    type="button"
+                    onClick={handleCopyEncoded}
+                    className={styles.actionButton}
+                  >
+                    {encodedCopied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
     </main>
   );
 }
