@@ -1,14 +1,21 @@
 import { describe, it, expect } from "vitest";
 import {
   decodeFunctionData,
+  encodeAbiParameters,
   encodeFunctionData,
   parseAbiItem,
 } from "viem";
-import { encodeFunction, reencodeMulticallInner } from "../../app/utils/txEncoder.js";
+import { encodeFunction, reencodeMulticallInner, reencodeURInput } from "../../app/utils/txEncoder.js";
 import {
   decodeMulticall,
   MULTICALL_ABIS,
 } from "../../app/utils/multicallDecoder.js";
+import {
+  decodeUniversalRouter,
+  COMMAND_ABI_PARAMS,
+  UR_EXECUTE_NO_DEADLINE,
+  UR_EXECUTE_WITH_DEADLINE,
+} from "../../app/utils/universalRouter.js";
 
 const TRANSFER_DATA =
   "0xa9059cbb000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045000000000000000000000000000000000000000000000000002386f26fc10000";
@@ -162,6 +169,103 @@ describe("reencodeMulticallInner", () => {
   it("throws on an out-of-range index", () => {
     expect(() => reencodeMulticallInner(bytesOuter, 5, "0x")).toThrow(
       /out of range/i,
+    );
+  });
+});
+
+describe("reencodeURInput", () => {
+  const TOKEN = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
+  // TRANSFER (0x05): token, recipient, value
+  const transferInput = encodeAbiParameters(COMMAND_ABI_PARAMS[0x05], [
+    TOKEN,
+    VITALIK,
+    1000n,
+  ]);
+  const outerWithDeadline = encodeFunctionData({
+    abi: [UR_EXECUTE_WITH_DEADLINE],
+    args: ["0x05", [transferInput], 1700000000n],
+  });
+
+  it("round-trips unchanged args byte-for-byte", () => {
+    const out = reencodeURInput(outerWithDeadline, 0, {
+      token: TOKEN,
+      recipient: VITALIK,
+      value: "1000",
+    });
+    expect(out).toBe(outerWithDeadline);
+  });
+
+  it("changes the recipient of a TRANSFER command, preserving deadline", () => {
+    const out = reencodeURInput(outerWithDeadline, 0, {
+      token: TOKEN,
+      recipient: OTHER,
+      value: "1000",
+    });
+    const dec = decodeUniversalRouter(out);
+    expect(dec.inner_calls[0].args.recipient.toLowerCase()).toBe(OTHER);
+    expect(dec.args.deadline).toBe("1700000000");
+  });
+
+  it("handles a big uint256 value losslessly", () => {
+    const big = "987654321098765432109876543210";
+    const out = reencodeURInput(outerWithDeadline, 0, {
+      token: TOKEN,
+      recipient: VITALIK,
+      value: big,
+    });
+    const dec = decodeUniversalRouter(out);
+    expect(dec.inner_calls[0].args.value).toBe(big);
+  });
+
+  it("ignores display-only keys (name, allow_revert, path_decoded)", () => {
+    const out = reencodeURInput(outerWithDeadline, 0, {
+      token: TOKEN,
+      recipient: VITALIK,
+      value: "1000",
+      name: "TRANSFER",
+      allow_revert: false,
+      path_decoded: ["0xabc", 3000],
+    });
+    expect(out).toBe(outerWithDeadline);
+  });
+
+  it("supports the no-deadline execute selector", () => {
+    const outer = encodeFunctionData({
+      abi: [UR_EXECUTE_NO_DEADLINE],
+      args: ["0x05", [transferInput]],
+    });
+    const out = reencodeURInput(outer, 0, {
+      token: TOKEN,
+      recipient: OTHER,
+      value: "1000",
+    });
+    const dec = decodeUniversalRouter(out);
+    expect(dec.inner_calls[0].args.recipient.toLowerCase()).toBe(OTHER);
+    expect(dec.args.deadline).toBeUndefined();
+  });
+
+  it("passes through {raw} for commands without known ABI params", () => {
+    // V4_SWAP (0x10) has no entry in COMMAND_ABI_PARAMS
+    const outer = encodeFunctionData({
+      abi: [UR_EXECUTE_WITH_DEADLINE],
+      args: ["0x10", ["0x1234"], 1700000000n],
+    });
+    const out = reencodeURInput(outer, 0, { raw: "0xdeadbeef" });
+    const dec = decodeUniversalRouter(out);
+    expect(dec.inner_calls[0].args.raw).toBe("0xdeadbeef");
+  });
+
+  it("throws for a command without ABI params when args are not {raw}", () => {
+    const outer = encodeFunctionData({
+      abi: [UR_EXECUTE_WITH_DEADLINE],
+      args: ["0x10", ["0x1234"], 1700000000n],
+    });
+    expect(() => reencodeURInput(outer, 0, { foo: 1 })).toThrow(/raw/);
+  });
+
+  it("throws for a non-UR selector", () => {
+    expect(() => reencodeURInput(TRANSFER_DATA, 0, {})).toThrow(
+      /Universal Router/i,
     );
   });
 });

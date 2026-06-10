@@ -1,10 +1,12 @@
 import {
   parseAbiItem,
+  encodeAbiParameters,
   encodeFunctionData,
   decodeFunctionData,
 } from "viem";
 import { normalizeArg } from "./normalizeArg.js";
 import { MULTICALL_ABIS } from "./multicallDecoder.js";
+import { COMMAND_ABI_PARAMS, UR_EXECUTE_NO_DEADLINE, UR_EXECUTE_WITH_DEADLINE } from "./universalRouter.js";
 
 // Convert object-shaped tuples (as produced by decoders) to positional arrays
 // so normalizeArg / viem can consume them. Matches by component name when
@@ -71,4 +73,47 @@ export function reencodeMulticallInner(outerData, index, newInnerHex) {
     functionName: config.abi.name,
     args: [calls],
   });
+}
+
+export function reencodeURInput(outerData, index, newArgs) {
+  const hex = outerData.startsWith("0x") ? outerData : "0x" + outerData;
+  const selector = hex.slice(0, 10).toLowerCase();
+  const abi =
+    selector === "0x3593564c"
+      ? [UR_EXECUTE_WITH_DEADLINE]
+      : selector === "0x24856bc3"
+        ? [UR_EXECUTE_NO_DEADLINE]
+        : null;
+  if (!abi) throw new Error(`Not a Universal Router selector: ${selector}`);
+
+  const decoded = decodeFunctionData({ abi, data: hex });
+  const [commands, inputsArr, deadline] = decoded.args;
+  const inputs = [...inputsArr];
+  if (index < 0 || index >= inputs.length) {
+    throw new Error(`Command index ${index} out of range (0-${inputs.length - 1})`);
+  }
+
+  const cmdHex = commands.replace(/^0x/i, "");
+  const cmdByte = parseInt(cmdHex.slice(index * 2, index * 2 + 2), 16);
+  const cmd = cmdByte & 0x3f;
+  const params = COMMAND_ABI_PARAMS[cmd];
+  const args = newArgs ?? {};
+
+  if (typeof args.raw === "string" && !params) {
+    inputs[index] = args.raw;
+  } else if (params) {
+    const values = params.map((p) =>
+      normalizeArg(toPositional(args[p.name], p), p.type, p.components),
+    );
+    inputs[index] = encodeAbiParameters(params, values);
+  } else {
+    throw new Error(
+      `No ABI params known for command 0x${cmd.toString(16).padStart(2, "0")}; ` +
+        `edit it as {"raw": "0x..."} instead`,
+    );
+  }
+
+  const outerArgs =
+    deadline !== undefined ? [commands, inputs, deadline] : [commands, inputs];
+  return encodeFunctionData({ abi, functionName: "execute", args: outerArgs });
 }
