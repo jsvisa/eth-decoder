@@ -1,16 +1,8 @@
 import {
   parseAbiItem,
   encodeFunctionData,
-  decodeFunctionData,
-  encodeAbiParameters,
 } from "viem";
 import { normalizeArg } from "./normalizeArg.js";
-import { MULTICALL_ABIS } from "./multicallDecoder.js";
-import {
-  COMMAND_ABI_PARAMS,
-  UR_EXECUTE_NO_DEADLINE,
-  UR_EXECUTE_WITH_DEADLINE,
-} from "./universalRouter.js";
 
 // Convert object-shaped tuples (as produced by decoders) to positional arrays
 // so normalizeArg / viem can consume them. Matches by component name when

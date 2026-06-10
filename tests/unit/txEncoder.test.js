@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   decodeFunctionData,
-  encodeFunctionData,
-  encodeAbiParameters,
   parseAbiItem,
 } from "viem";
 import { encodeFunction } from "../../app/utils/txEncoder.js";
