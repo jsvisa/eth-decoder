@@ -5059,7 +5059,25 @@ export default function ContractCaller() {
                                   "Unknown Token"}
                                 {change.token_info?.contract_address && (
                                   <span className={styles.assetTokenAddress}>
-                                    ({change.token_info.contract_address})
+                                    (
+                                    {(() => {
+                                      const url = getExplorerAddressUrl(
+                                        change.token_info.contract_address,
+                                      );
+                                      return url ? (
+                                        <a
+                                          href={url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className={styles.assetAddressLink}
+                                        >
+                                          {change.token_info.contract_address}
+                                        </a>
+                                      ) : (
+                                        change.token_info.contract_address
+                                      );
+                                    })()}
+                                    )
                                   </span>
                                 )}
                               </span>
@@ -5067,7 +5085,23 @@ export default function ContractCaller() {
                             <div className={styles.assetDetails}>
                               {change.from && (
                                 <span className={styles.assetFrom}>
-                                  {change.from}
+                                  {(() => {
+                                    const url = getExplorerAddressUrl(
+                                      change.from,
+                                    );
+                                    return url ? (
+                                      <a
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={styles.assetAddressLink}
+                                      >
+                                        {change.from}
+                                      </a>
+                                    ) : (
+                                      change.from
+                                    );
+                                  })()}
                                 </span>
                               )}
                               {change.from && change.to && (
@@ -5075,7 +5109,23 @@ export default function ContractCaller() {
                               )}
                               {change.to && (
                                 <span className={styles.assetTo}>
-                                  {change.to}
+                                  {(() => {
+                                    const url = getExplorerAddressUrl(
+                                      change.to,
+                                    );
+                                    return url ? (
+                                      <a
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={styles.assetAddressLink}
+                                      >
+                                        {change.to}
+                                      </a>
+                                    ) : (
+                                      change.to
+                                    );
+                                  })()}
                                 </span>
                               )}
                               <span className={styles.assetAmount}>

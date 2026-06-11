@@ -2026,6 +2026,15 @@
   margin-left: 0.25rem;
 }
 
+.assetAddressLink {
+  color: #4fc3f7;
+  text-decoration: none;
+}
+
+.assetAddressLink:hover {
+  text-decoration: underline;
+}
+
 .assetDetails {
   display: flex;
   flex-wrap: wrap;
