@@ -392,9 +392,9 @@ export default function SettingsPanel() {
               Tenderly Dashboard
             </a>
           </p>
-          <div className={styles.settingsFields}>
-            <div className={styles.settingsFieldInline}>
-              <label className={styles.settingsLabelInline}>Access Key</label>
+          <div className={styles.tenderlyRow}>
+            <div className={styles.tenderlyField}>
+              <label className={styles.tenderlyLabel}>Access Key</label>
               <input
                 type="password"
                 value={tenderlySettings.accessKey}
@@ -404,12 +404,12 @@ export default function SettingsPanel() {
                     accessKey: e.target.value,
                   })
                 }
-                placeholder="Tenderly access key..."
+                placeholder="Access key..."
                 className={styles.settingsInput}
               />
             </div>
-            <div className={styles.settingsFieldInline}>
-              <label className={styles.settingsLabelInline}>Account Slug</label>
+            <div className={styles.tenderlyField}>
+              <label className={styles.tenderlyLabel}>Account Slug</label>
               <input
                 type="text"
                 value={tenderlySettings.account}
@@ -419,12 +419,12 @@ export default function SettingsPanel() {
                     account: e.target.value,
                   })
                 }
-                placeholder="Account slug (from URL)"
+                placeholder="Account slug..."
                 className={styles.settingsInput}
               />
             </div>
-            <div className={styles.settingsFieldInline}>
-              <label className={styles.settingsLabelInline}>Project Slug</label>
+            <div className={styles.tenderlyField}>
+              <label className={styles.tenderlyLabel}>Project Slug</label>
               <input
                 type="text"
                 value={tenderlySettings.project}
@@ -434,25 +434,25 @@ export default function SettingsPanel() {
                     project: e.target.value,
                   })
                 }
-                placeholder="Project slug (from URL)"
+                placeholder="Project slug..."
                 className={styles.settingsInput}
               />
             </div>
+            <button
+              onClick={testTenderlyKey}
+              disabled={!isTenderlyConfigured() || testingTenderly}
+              className={`${styles.testButton} ${tenderlyTestResult === "success" ? styles.testSuccess : ""} ${tenderlyTestResult === "error" ? styles.testError : ""}`}
+              style={{ alignSelf: "flex-end" }}
+            >
+              {testingTenderly
+                ? "Testing..."
+                : tenderlyTestResult === "success"
+                  ? "✓ Valid"
+                  : tenderlyTestResult === "error"
+                    ? "✗ Invalid"
+                    : "Test"}
+            </button>
           </div>
-          <button
-            onClick={testTenderlyKey}
-            disabled={!isTenderlyConfigured() || testingTenderly}
-            className={`${styles.testButton} ${tenderlyTestResult === "success" ? styles.testSuccess : ""} ${tenderlyTestResult === "error" ? styles.testError : ""}`}
-            style={{ marginTop: "1rem" }}
-          >
-            {testingTenderly
-              ? "Testing..."
-              : tenderlyTestResult === "success"
-                ? "✓ Valid"
-                : tenderlyTestResult === "error"
-                  ? "✗ Invalid"
-                  : "Test Connection"}
-          </button>
         </div>
 
         {/* Custom RPC Endpoints */}
