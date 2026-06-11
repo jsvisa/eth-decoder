@@ -18,7 +18,7 @@ export function SettingsProvider({ children }) {
     account: "",
     project: "",
   });
-  const [apiKeys, setApiKeys] = useState({ etherscan: "" });
+  const [apiKeys, setApiKeys] = useState({ etherscan: "", routescan: "" });
   const [rpcSettings, setRpcSettings] = useState({
     ethereum: "",
     arbitrum: "",
@@ -104,6 +104,8 @@ export function SettingsProvider({ children }) {
 
   const isEtherscanConfigured = () => !!apiKeys.etherscan;
 
+  const isRoutescanConfigured = () => !!apiKeys.routescan;
+
   const getChainId = (chainId) => {
     if (BUILT_IN_CHAIN_IDS[chainId]) return BUILT_IN_CHAIN_IDS[chainId];
     const custom = customChains.find((c) => c.id === chainId);
@@ -131,6 +133,7 @@ export function SettingsProvider({ children }) {
         saveCustomChains,
         isTenderlyConfigured,
         isEtherscanConfigured,
+        isRoutescanConfigured,
         getChainId,
       }}
     >

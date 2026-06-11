@@ -1830,6 +1830,9 @@ export default function ContractCaller() {
       if (apiKeys.etherscan) {
         params.set("apiKey", apiKeys.etherscan);
       }
+      if (apiKeys.routescan) {
+        params.set("routescanApiKey", apiKeys.routescan);
+      }
       // Pass custom RPC if configured for this chain
       if (rpcSettings[chain]) {
         params.set("rpcUrl", rpcSettings[chain]);
@@ -2474,6 +2477,7 @@ export default function ContractCaller() {
               apiKeys.etherscan,
               rpcSettings[chain],
               chainIdForSimulation,
+              apiKeys.routescan,
             );
 
             // Merge new ABIs into cache

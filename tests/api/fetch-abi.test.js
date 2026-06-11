@@ -27,6 +27,7 @@ function mockFetch(responses) {
 
 beforeEach(() => {
   delete process.env.ETHERSCAN_API_KEY;
+  delete process.env.ROUTESCAN_API_KEY;
 });
 
 afterEach(() => {
@@ -53,12 +54,16 @@ describe("GET /api/fetch-abi", () => {
     expect(body.error).toMatch(/invalid address/i);
   });
 
-  it("returns 400 when no API key is provided and env var is not set", async () => {
-    vi.stubGlobal("fetch", vi.fn());
+  it("falls back to RouteScan without a key when Sourcify has no match", async () => {
+    // No apiKey → Etherscan is skipped; Sourcify fails; RouteScan (keyless) succeeds
+    mockFetch([
+      { status: "404" }, // Sourcify
+      etherscanErc20, // RouteScan (keyless)
+    ]);
     const res = await GET(makeRequest({ address: VALID_ADDRESS }));
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.error).toMatch(/api key/i);
+    expect(body.abi).toBeDefined();
   });
 
   it("returns ABI from Etherscan for a verified non-proxy contract", async () => {
@@ -116,11 +121,8 @@ describe("GET /api/fetch-abi", () => {
     const failFetch = vi
       .fn()
       .mockResolvedValueOnce({ ok: false, status: 500, statusText: "Error" }) // Etherscan
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        statusText: "Not Found",
-      }); // Sourcify check
+      .mockResolvedValueOnce({ ok: false, status: 404, statusText: "Not Found" }) // Sourcify check
+      .mockResolvedValueOnce({ ok: false, status: 404, statusText: "Not Found" }); // RouteScan
     vi.stubGlobal("fetch", failFetch);
 
     const res = await GET(

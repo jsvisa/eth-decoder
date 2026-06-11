@@ -32,6 +32,7 @@ export default function SettingsPanel() {
     customChains,
     isTenderlyConfigured,
     isEtherscanConfigured,
+    isRoutescanConfigured,
     getChainId,
   } = useSettings();
 
@@ -211,6 +212,27 @@ export default function SettingsPanel() {
             >
               {testingEtherscan ? "Testing..." : etherscanTestResult === "success" ? "✓ Valid" : etherscanTestResult === "error" ? "✗ Invalid" : "Test"}
             </button>
+          </div>
+        </div>
+
+        {/* RouteScan API Key */}
+        <div className={styles.settingsGroup}>
+          <h3 className={styles.settingsTitle}>
+            RouteScan API Key
+            {isRoutescanConfigured() && <span className={styles.settingsCheck}>✓</span>}
+          </h3>
+          <p className={styles.settingsDesc}>
+            Optional. Used as a fallback for chains not on Etherscan (e.g. Botanix). Works without a key but higher rate limits with one. Get yours from{" "}
+            <a href="https://routescan.io/documentation/api" target="_blank" rel="noopener noreferrer">RouteScan</a>
+          </p>
+          <div className={styles.settingsFieldWithTest}>
+            <input
+              type="password"
+              value={apiKeys.routescan || ""}
+              onChange={(e) => saveApiKeys({ ...apiKeys, routescan: e.target.value })}
+              placeholder="Enter your RouteScan API key..."
+              className={styles.settingsInput}
+            />
           </div>
         </div>
 

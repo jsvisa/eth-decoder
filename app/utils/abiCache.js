@@ -121,6 +121,9 @@ export const buildAbiCacheFromStorage = (chain) => {
  * @param {string} apiKey - Etherscan API key
  * @param {string} rpcUrl - Optional custom RPC URL
  * @param {number|string} chainId - Optional chain ID for custom chains
+ * @param {Object} opts
+ * @param {boolean} opts.detectProxy
+ * @param {string} opts.routescanApiKey - RouteScan API key (fallback)
  * @returns {Promise<Array|null>} The ABI array or null if fetch failed
  */
 export const fetchAndCacheAbi = async (
@@ -129,7 +132,7 @@ export const fetchAndCacheAbi = async (
   apiKey,
   rpcUrl,
   chainId,
-  { detectProxy = false } = {},
+  { detectProxy = false, routescanApiKey = "" } = {},
 ) => {
   try {
     // Check cache first
@@ -142,6 +145,9 @@ export const fetchAndCacheAbi = async (
     const params = new URLSearchParams({ address, chain });
     if (apiKey) {
       params.set("apiKey", apiKey);
+    }
+    if (routescanApiKey) {
+      params.set("routescanApiKey", routescanApiKey);
     }
     if (rpcUrl) {
       params.set("rpcUrl", rpcUrl);
@@ -185,6 +191,7 @@ export const fetchAndCacheAbi = async (
  * @param {string} apiKey - Etherscan API key
  * @param {string} rpcUrl - Optional custom RPC URL
  * @param {number|string} chainId - Optional chain ID for custom chains
+ * @param {string} routescanApiKey - RouteScan API key (fallback)
  * @returns {Promise<Map<string, Array>>} Map of lowercase address -> ABI array
  */
 export const fetchAbisForAddresses = async (
@@ -193,13 +200,14 @@ export const fetchAbisForAddresses = async (
   apiKey,
   rpcUrl,
   chainId,
+  routescanApiKey = "",
 ) => {
   const results = new Map();
 
   // Fetch all ABIs in parallel
   const fetchPromises = addresses.map(async (address) => {
     const normalizedAddress = address.toLowerCase();
-    const abi = await fetchAndCacheAbi(chain, address, apiKey, rpcUrl, chainId);
+    const abi = await fetchAndCacheAbi(chain, address, apiKey, rpcUrl, chainId, { routescanApiKey });
     if (abi) {
       results.set(normalizedAddress, abi);
     }

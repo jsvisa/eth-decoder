@@ -30,6 +30,7 @@ const RPC_URLS = {
 };
 
 const ETHERSCAN_V2_API = "https://api.etherscan.io/v2/api";
+const ROUTESCAN_API_BASE = "https://api.routescan.io/v2/network/mainnet/evm";
 
 // EIP-1967 implementation slot
 const EIP1967_IMPL_SLOT =
@@ -78,16 +79,55 @@ async function fetchContractInfoFromEtherscan(address, chainId, apiKey) {
   };
 }
 
+// Fetch ABI and contract name from RouteScan
+async function fetchContractInfoFromRouteScan(address, chainId, apiKey) {
+  const params = new URLSearchParams({
+    module: "contract",
+    action: "getsourcecode",
+    address: address,
+  });
+  if (apiKey) params.set("apikey", apiKey);
+
+  const url = `${ROUTESCAN_API_BASE}/${chainId}/etherscan/api?${params}`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = await response.json();
+
+  if (data.status !== "1" || !data.result || !data.result[0]) {
+    return null;
+  }
+
+  const result = data.result[0];
+  const abi =
+    result.ABI && result.ABI !== "Contract source code not verified"
+      ? JSON.parse(result.ABI)
+      : null;
+
+  return {
+    abi,
+    contractName: result.ContractName || null,
+    isProxy: result.Proxy === "1",
+    implementation: result.Implementation || null,
+    source: "routescan",
+  };
+}
+
 // Try to fetch contract info from multiple sources
-async function fetchContractInfo(address, chainId, apiKey) {
+async function fetchContractInfo(address, chainId, apiKey, routescanApiKey) {
   // Try Etherscan first
-  const etherscanInfo = await fetchContractInfoFromEtherscan(
-    address,
-    chainId,
-    apiKey,
-  );
-  if (etherscanInfo && etherscanInfo.abi) {
-    return etherscanInfo;
+  if (apiKey) {
+    const etherscanInfo = await fetchContractInfoFromEtherscan(
+      address,
+      chainId,
+      apiKey,
+    );
+    if (etherscanInfo && etherscanInfo.abi) {
+      return etherscanInfo;
+    }
   }
 
   // Fallback to Sourcify
@@ -96,8 +136,18 @@ async function fetchContractInfo(address, chainId, apiKey) {
     return sourcifyInfo;
   }
 
-  // Return Etherscan info even if no ABI (for contract name)
-  return etherscanInfo;
+  // Fallback to RouteScan
+  const routescanInfo = await fetchContractInfoFromRouteScan(
+    address,
+    chainId,
+    routescanApiKey,
+  );
+  if (routescanInfo && routescanInfo.abi) {
+    return routescanInfo;
+  }
+
+  // Return partial info even if no ABI (for contract name)
+  return routescanInfo || null;
 }
 
 // Get implementation address from proxy
@@ -315,22 +365,14 @@ export async function GET(request) {
       );
     }
 
-    // Get API key from query param (user-provided) or fall back to env var
+    // Get API keys from query params (user-provided) or fall back to env vars
     const apiKey =
       searchParams.get("apiKey") || process.env.ETHERSCAN_API_KEY || "";
-
-    if (!apiKey) {
-      return NextResponse.json(
-        {
-          error:
-            "Etherscan API key not configured. Please add your API key in Settings.",
-        },
-        { status: 400 },
-      );
-    }
+    const routescanApiKey =
+      searchParams.get("routescanApiKey") || process.env.ROUTESCAN_API_KEY || "";
 
     // Fetch the contract's ABI and name
-    const proxyInfo = await fetchContractInfo(address, chainId, apiKey);
+    const proxyInfo = await fetchContractInfo(address, chainId, apiKey, routescanApiKey);
 
     if (!proxyInfo || !proxyInfo.abi) {
       return NextResponse.json(
@@ -356,7 +398,7 @@ export async function GET(request) {
 
     if (implAddress) {
       // It's a proxy! Fetch implementation ABI and merge
-      const implInfo = await fetchContractInfo(implAddress, chainId, apiKey);
+      const implInfo = await fetchContractInfo(implAddress, chainId, apiKey, routescanApiKey);
 
       if (implInfo && implInfo.abi) {
         const mergedAbi = mergeAbis(proxyInfo.abi, implInfo.abi);

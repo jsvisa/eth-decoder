@@ -16,6 +16,7 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn());
   delete process.env.BACKEND_URL;
   delete process.env.ETHERSCAN_API_KEY;
+  delete process.env.ROUTESCAN_API_KEY;
 });
 
 afterEach(() => {
@@ -113,7 +114,10 @@ describe("GET /api/v1/fetch-abi", () => {
     expect(body.error).toMatch(/missing address/i);
   });
 
-  it("returns 400 when no API key is provided", async () => {
+  it("returns 400 when all sources fail to find the ABI", async () => {
+    global.fetch
+      .mockResolvedValueOnce({ ok: false, status: 404, statusText: "Not Found" }) // Sourcify
+      .mockResolvedValueOnce({ ok: false, status: 404, statusText: "Not Found" }); // RouteScan
     const res = await fetchAbiGET(
       makeRequest("/api/v1/fetch-abi", {
         address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
@@ -121,7 +125,7 @@ describe("GET /api/v1/fetch-abi", () => {
     );
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/api key/i);
+    expect(body.error).toMatch(/failed to fetch abi/i);
   });
 
   it("returns the ABI for a verified contract", async () => {
