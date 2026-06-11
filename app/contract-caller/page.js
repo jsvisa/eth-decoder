@@ -4961,28 +4961,26 @@ export default function ContractCaller() {
                                     )}
                                     <span className={styles.logInputValue}>
                                       {input.type === "address" &&
-                                      typeof input.value === "string" ? (
-                                        (() => {
-                                          const url = getExplorerAddressUrl(
-                                            input.value,
-                                          );
-                                          return url ? (
-                                            <a
-                                              href={url}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                            >
-                                              {input.value}
-                                            </a>
-                                          ) : (
-                                            input.value
-                                          );
-                                        })()
-                                      ) : typeof input.value === "object" ? (
-                                        JSON.stringify(input.value)
-                                      ) : (
-                                        String(input.value)
-                                      )}
+                                      typeof input.value === "string"
+                                        ? (() => {
+                                            const url = getExplorerAddressUrl(
+                                              input.value,
+                                            );
+                                            return url ? (
+                                              <a
+                                                href={url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                              >
+                                                {input.value}
+                                              </a>
+                                            ) : (
+                                              input.value
+                                            );
+                                          })()
+                                        : typeof input.value === "object"
+                                          ? JSON.stringify(input.value)
+                                          : String(input.value)}
                                       {formattedAmt !== null && (
                                         <span className={styles.tokenAmount}>
                                           {" "}
@@ -5348,8 +5346,9 @@ export default function ContractCaller() {
                                             : `${row.addr.slice(0, 10)}…${row.addr.slice(-8)}`}
                                         </span>
                                         {(() => {
-                                          const url =
-                                            getExplorerAddressUrl(row.addr);
+                                          const url = getExplorerAddressUrl(
+                                            row.addr,
+                                          );
                                           return url ? (
                                             <a
                                               href={url}
@@ -5543,28 +5542,26 @@ export default function ContractCaller() {
                             </div>
                             <div className={styles.decodedValue}>
                               {output.type === "address" &&
-                              typeof output.value === "string" ? (
-                                (() => {
-                                  const url = getExplorerAddressUrl(
-                                    output.value,
-                                  );
-                                  return url ? (
-                                    <a
-                                      href={url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                    >
-                                      {output.value}
-                                    </a>
-                                  ) : (
-                                    output.value
-                                  );
-                                })()
-                              ) : typeof output.value === "object" ? (
-                                JSON.stringify(output.value, null, 2)
-                              ) : (
-                                String(output.value)
-                              )}
+                              typeof output.value === "string"
+                                ? (() => {
+                                    const url = getExplorerAddressUrl(
+                                      output.value,
+                                    );
+                                    return url ? (
+                                      <a
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        {output.value}
+                                      </a>
+                                    ) : (
+                                      output.value
+                                    );
+                                  })()
+                                : typeof output.value === "object"
+                                  ? JSON.stringify(output.value, null, 2)
+                                  : String(output.value)}
                             </div>
                           </div>
                         ))}
