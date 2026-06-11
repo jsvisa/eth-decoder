@@ -813,6 +813,23 @@ export default function ContractCaller() {
     return allChains.find((c) => c.id === chainId) || null;
   };
 
+  const BUILT_IN_EXPLORER_URLS = {
+    ethereum: "https://etherscan.io",
+    arbitrum: "https://arbiscan.io",
+    base: "https://basescan.org",
+    polygon: "https://polygonscan.com",
+    bsc: "https://bscscan.com",
+  };
+
+  const getExplorerAddressUrl = (address) => {
+    const builtIn = BUILT_IN_EXPLORER_URLS[chain];
+    if (builtIn) return `${builtIn}/address/${address}`;
+    const chainInfo = getChainInfo(chain);
+    const explorer = chainInfo?.explorers?.[0];
+    if (explorer?.url) return `${explorer.url}/address/${address}`;
+    return null;
+  };
+
   // Clear stale pending history after 5 seconds
   useEffect(() => {
     if (pendingHistoryRef.current && pendingHistoryRef.current.timestamp) {
@@ -5413,9 +5430,29 @@ export default function ContractCaller() {
                               </span>
                             </div>
                             <div className={styles.decodedValue}>
-                              {typeof output.value === "object"
-                                ? JSON.stringify(output.value, null, 2)
-                                : String(output.value)}
+                              {output.type === "address" &&
+                              typeof output.value === "string" ? (
+                                (() => {
+                                  const url = getExplorerAddressUrl(
+                                    output.value,
+                                  );
+                                  return url ? (
+                                    <a
+                                      href={url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      {output.value}
+                                    </a>
+                                  ) : (
+                                    output.value
+                                  );
+                                })()
+                              ) : typeof output.value === "object" ? (
+                                JSON.stringify(output.value, null, 2)
+                              ) : (
+                                String(output.value)
+                              )}
                             </div>
                           </div>
                         ))}

@@ -1424,6 +1424,15 @@
   line-height: 1.5;
 }
 
+.decodedValue a {
+  color: #4fc3f7;
+  text-decoration: none;
+}
+
+.decodedValue a:hover {
+  text-decoration: underline;
+}
+
 /* Raw data styles */
 .rawSection {
   margin-bottom: 1.5rem;
