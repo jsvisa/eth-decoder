@@ -39,6 +39,8 @@ export default function SettingsPanel() {
   // UI-only state lives here (test results, etc.)
   const [testingEtherscan, setTestingEtherscan] = useState(false);
   const [etherscanTestResult, setEtherscanTestResult] = useState(null);
+  const [testingRoutescan, setTestingRoutescan] = useState(false);
+  const [routescanTestResult, setRoutescanTestResult] = useState(null);
   const [testingTenderly, setTestingTenderly] = useState(false);
   const [tenderlyTestResult, setTenderlyTestResult] = useState(null);
   const [testingRpc, setTestingRpc] = useState({});
@@ -68,6 +70,32 @@ export default function SettingsPanel() {
     } finally {
       setTestingEtherscan(false);
       setTimeout(() => setEtherscanTestResult(null), 3000);
+    }
+  };
+
+  const testRoutescanKey = async () => {
+    setTestingRoutescan(true);
+    setRoutescanTestResult(null);
+    try {
+      const params = new URLSearchParams({
+        module: "account",
+        action: "balance",
+        address: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+        tag: "latest",
+      });
+      if (apiKeys.routescan) params.set("apikey", apiKeys.routescan);
+      const res = await fetch(
+        `https://api.routescan.io/v2/network/mainnet/evm/1/etherscan/api?${params}`,
+      );
+      const data = await res.json();
+      setRoutescanTestResult(
+        data.status === "1" || data.message === "OK" ? "success" : "error",
+      );
+    } catch {
+      setRoutescanTestResult("error");
+    } finally {
+      setTestingRoutescan(false);
+      setTimeout(() => setRoutescanTestResult(null), 3000);
     }
   };
 
@@ -282,6 +310,19 @@ export default function SettingsPanel() {
               placeholder="Enter your RouteScan API key..."
               className={styles.settingsInput}
             />
+            <button
+              onClick={testRoutescanKey}
+              disabled={testingRoutescan}
+              className={`${styles.testButton} ${routescanTestResult === "success" ? styles.testSuccess : ""} ${routescanTestResult === "error" ? styles.testError : ""}`}
+            >
+              {testingRoutescan
+                ? "Testing..."
+                : routescanTestResult === "success"
+                  ? "✓ Valid"
+                  : routescanTestResult === "error"
+                    ? "✗ Invalid"
+                    : "Test"}
+            </button>
           </div>
         </div>
 
@@ -352,8 +393,8 @@ export default function SettingsPanel() {
             </a>
           </p>
           <div className={styles.settingsFields}>
-            <div className={styles.settingsField}>
-              <label className={styles.settingsLabel}>Access Key</label>
+            <div className={styles.settingsFieldInline}>
+              <label className={styles.settingsLabelInline}>Access Key</label>
               <input
                 type="password"
                 value={tenderlySettings.accessKey}
@@ -363,12 +404,12 @@ export default function SettingsPanel() {
                     accessKey: e.target.value,
                   })
                 }
-                placeholder="Enter your Tenderly access key..."
+                placeholder="Tenderly access key..."
                 className={styles.settingsInput}
               />
             </div>
-            <div className={styles.settingsField}>
-              <label className={styles.settingsLabel}>Account Slug</label>
+            <div className={styles.settingsFieldInline}>
+              <label className={styles.settingsLabelInline}>Account Slug</label>
               <input
                 type="text"
                 value={tenderlySettings.account}
@@ -378,12 +419,12 @@ export default function SettingsPanel() {
                     account: e.target.value,
                   })
                 }
-                placeholder="Your account slug (from URL)"
+                placeholder="Account slug (from URL)"
                 className={styles.settingsInput}
               />
             </div>
-            <div className={styles.settingsField}>
-              <label className={styles.settingsLabel}>Project Slug</label>
+            <div className={styles.settingsFieldInline}>
+              <label className={styles.settingsLabelInline}>Project Slug</label>
               <input
                 type="text"
                 value={tenderlySettings.project}
@@ -393,7 +434,7 @@ export default function SettingsPanel() {
                     project: e.target.value,
                   })
                 }
-                placeholder="Your project slug (from URL)"
+                placeholder="Project slug (from URL)"
                 className={styles.settingsInput}
               />
             </div>
