@@ -4954,9 +4954,29 @@ export default function ContractCaller() {
                                       </span>
                                     )}
                                     <span className={styles.logInputValue}>
-                                      {typeof input.value === "object"
-                                        ? JSON.stringify(input.value)
-                                        : String(input.value)}
+                                      {input.type === "address" &&
+                                      typeof input.value === "string" ? (
+                                        (() => {
+                                          const url = getExplorerAddressUrl(
+                                            input.value,
+                                          );
+                                          return url ? (
+                                            <a
+                                              href={url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                            >
+                                              {input.value}
+                                            </a>
+                                          ) : (
+                                            input.value
+                                          );
+                                        })()
+                                      ) : typeof input.value === "object" ? (
+                                        JSON.stringify(input.value)
+                                      ) : (
+                                        String(input.value)
+                                      )}
                                       {formattedAmt !== null && (
                                         <span className={styles.tokenAmount}>
                                           {" "}

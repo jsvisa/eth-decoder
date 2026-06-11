@@ -1634,6 +1634,15 @@
   text-decoration: underline;
 }
 
+.logInputValue a {
+  color: #4fc3f7;
+  text-decoration: none;
+}
+
+.logInputValue a:hover {
+  text-decoration: underline;
+}
+
 .logContractName {
   color: #dcdcaa;
   font-weight: 500;
