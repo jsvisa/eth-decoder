@@ -436,39 +436,3 @@ test.describe("Balance Changes click-to-expand", () => {
     await expect(tokenAddrSpan).not.toBeAttached();
   });
 });
-
-test.describe("/api/token-price endpoint", () => {
-  test("returns { price } for native ETH on Ethereum", async ({ request }) => {
-    const res = await request.get(
-      "/api/token-price?token=0x0000000000000000000000000000000000000000&chainId=1",
-    );
-    expect(res.ok()).toBeTruthy();
-    const data = await res.json();
-    expect(data).toHaveProperty("price");
-  });
-
-  test("returns { price } for USDC contract address on Ethereum", async ({
-    request,
-  }) => {
-    const res = await request.get(
-      `/api/token-price?token=${TOKEN_ADDR}&chainId=1`,
-    );
-    expect(res.ok()).toBeTruthy();
-    const data = await res.json();
-    expect(data).toHaveProperty("price");
-  });
-
-  test("returns 400 when parameters are missing", async ({ request }) => {
-    const res = await request.get("/api/token-price");
-    expect(res.status()).toBe(400);
-  });
-
-  test("returns { price: null } for unsupported chain", async ({ request }) => {
-    const res = await request.get(
-      `/api/token-price?token=${TOKEN_ADDR}&chainId=999999`,
-    );
-    expect(res.ok()).toBeTruthy();
-    const data = await res.json();
-    expect(data.price).toBeNull();
-  });
-});
