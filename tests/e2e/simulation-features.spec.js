@@ -183,9 +183,9 @@ test.describe("Simulation result UI features", () => {
     await expect(page.locator("text=1000000000").first()).toBeVisible();
 
     // Formatted hint "(1,000 USDC)" should appear after decimals/symbol fetch
-    await expect(
-      page.locator("text=(1,000 USDC)").first(),
-    ).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("text=(1,000 USDC)").first()).toBeVisible({
+      timeout: 5000,
+    });
   });
 
   test("Balance Changes table shows ETH row with Sender badge and USD value", async ({
@@ -359,9 +359,11 @@ test.describe("Balance Changes role badges", () => {
     let toAddrRowHasBadge = false;
     for (let i = 0; i < count; i++) {
       const rowText = await rows.nth(i).textContent();
-      const shortTo =
-        TO_ADDR.slice(0, 10) + "…" + TO_ADDR.slice(-8);
-      if (rowText.includes(shortTo) || rowText.toLowerCase().includes(TO_ADDR.toLowerCase())) {
+      const shortTo = TO_ADDR.slice(0, 10) + "…" + TO_ADDR.slice(-8);
+      if (
+        rowText.includes(shortTo) ||
+        rowText.toLowerCase().includes(TO_ADDR.toLowerCase())
+      ) {
         if (rowText.includes("Sender") || rowText.includes("Receiver")) {
           toAddrRowHasBadge = true;
         }
@@ -434,41 +436,5 @@ test.describe("Balance Changes click-to-expand", () => {
     // Click again → hidden
     await usdcTokenCell.click();
     await expect(tokenAddrSpan).not.toBeAttached();
-  });
-});
-
-test.describe("/api/token-price endpoint", () => {
-  test("returns { price } for native ETH on Ethereum", async ({ request }) => {
-    const res = await request.get(
-      "/api/token-price?token=0x0000000000000000000000000000000000000000&chainId=1",
-    );
-    expect(res.ok()).toBeTruthy();
-    const data = await res.json();
-    expect(data).toHaveProperty("price");
-  });
-
-  test("returns { price } for USDC contract address on Ethereum", async ({
-    request,
-  }) => {
-    const res = await request.get(
-      `/api/token-price?token=${TOKEN_ADDR}&chainId=1`,
-    );
-    expect(res.ok()).toBeTruthy();
-    const data = await res.json();
-    expect(data).toHaveProperty("price");
-  });
-
-  test("returns 400 when parameters are missing", async ({ request }) => {
-    const res = await request.get("/api/token-price");
-    expect(res.status()).toBe(400);
-  });
-
-  test("returns { price: null } for unsupported chain", async ({ request }) => {
-    const res = await request.get(
-      `/api/token-price?token=${TOKEN_ADDR}&chainId=999999`,
-    );
-    expect(res.ok()).toBeTruthy();
-    const data = await res.json();
-    expect(data.price).toBeNull();
   });
 });

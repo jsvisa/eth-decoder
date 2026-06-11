@@ -321,7 +321,6 @@ const ERC20_DECIMALS_ABI = [
   },
 ];
 
-
 // Get all cached contract addresses
 const getCachedAddresses = () => {
   const addresses = [];
@@ -1090,7 +1089,7 @@ export default function ContractCaller() {
         });
 
         if (apiKeys.etherscan) {
-          params.set("apiKey", apiKeys.etherscan);
+          params.set("etherscanApiKey", apiKeys.etherscan);
         }
 
         const chainIdForApi = getChainId(chain);
@@ -1639,12 +1638,17 @@ export default function ContractCaller() {
       return;
     }
     const func = parsedAbi.find(
-      (item) => item.type === "function" && getFunctionSig(item) === selectedFunction,
+      (item) =>
+        item.type === "function" && getFunctionSig(item) === selectedFunction,
     );
     if (!func) return;
     try {
       const parsedArgs = func.inputs.map((input, i) =>
-        normalizeArg(args[i] ?? getDefaultValue(input), input.type, input.components),
+        normalizeArg(
+          args[i] ?? getDefaultValue(input),
+          input.type,
+          input.components,
+        ),
       );
       const encoded = encodeFunctionData({
         abi: [func],
@@ -1828,7 +1832,10 @@ export default function ContractCaller() {
     try {
       const params = new URLSearchParams({ address, chain });
       if (apiKeys.etherscan) {
-        params.set("apiKey", apiKeys.etherscan);
+        params.set("etherscanApiKey", apiKeys.etherscan);
+      }
+      if (apiKeys.routescan) {
+        params.set("routescanApiKey", apiKeys.routescan);
       }
       // Pass custom RPC if configured for this chain
       if (rpcSettings[chain]) {
@@ -2012,7 +2019,6 @@ export default function ContractCaller() {
       console.error("Failed to clear history:", err);
     }
   };
-
 
   // Fetch chainlist data from chainlist.org
   const fetchChainlistData = async () => {
@@ -2474,6 +2480,7 @@ export default function ContractCaller() {
               apiKeys.etherscan,
               rpcSettings[chain],
               chainIdForSimulation,
+              apiKeys.routescan,
             );
 
             // Merge new ABIs into cache
@@ -2571,7 +2578,6 @@ export default function ContractCaller() {
             };
           }
         }
-
 
         const response = await fetch(apiEndpoint, {
           method: "POST",
@@ -2890,7 +2896,9 @@ export default function ContractCaller() {
   const handleDecodeAndFill = () => {
     const hex = pasteCalldataValue.trim();
     if (!hex || !hex.startsWith("0x") || hex.length < 10) {
-      setPasteCalldataError("Calldata must start with 0x followed by a 4-byte selector");
+      setPasteCalldataError(
+        "Calldata must start with 0x followed by a 4-byte selector",
+      );
       return;
     }
 
@@ -2898,8 +2906,7 @@ export default function ContractCaller() {
     const matchedFunc =
       parsedAbi?.find(
         (item) =>
-          item.type === "function" &&
-          getFunctionSelector(item) === selector,
+          item.type === "function" && getFunctionSelector(item) === selector,
       ) ?? null;
 
     if (!matchedFunc) {
@@ -2917,7 +2924,11 @@ export default function ContractCaller() {
       );
       const sig = getFunctionSig(matchedFunc);
       if (sig !== selectedFunction) {
-        pendingHistoryRef.current = { functionSig: sig, args: newArgs, timestamp: Date.now() };
+        pendingHistoryRef.current = {
+          functionSig: sig,
+          args: newArgs,
+          timestamp: Date.now(),
+        };
         setSelectedFunction(sig);
       } else {
         setArgs(newArgs);
@@ -4874,36 +4885,33 @@ export default function ContractCaller() {
                                   input.type === "uint256" &&
                                   logDecimals !== null;
                                 const formattedAmt = isTransferValue
-                                  ? formatTokenAmount(
-                                      input.value,
-                                      logDecimals,
-                                    )
+                                  ? formatTokenAmount(input.value, logDecimals)
                                   : null;
                                 return (
-                                <div key={i} className={styles.logInput}>
-                                  <span className={styles.logInputName}>
-                                    {input.name || `arg${i}`}
-                                  </span>
-                                  <span className={styles.logInputType}>
-                                    ({input.type})
-                                  </span>
-                                  {input.indexed && (
-                                    <span className={styles.logIndexed}>
-                                      indexed
+                                  <div key={i} className={styles.logInput}>
+                                    <span className={styles.logInputName}>
+                                      {input.name || `arg${i}`}
                                     </span>
-                                  )}
-                                  <span className={styles.logInputValue}>
-                                    {typeof input.value === "object"
-                                      ? JSON.stringify(input.value)
-                                      : String(input.value)}
-                                    {formattedAmt !== null && (
-                                      <span className={styles.tokenAmount}>
-                                        {" "}
-                                        ({formattedAmt} {symbol || ""})
+                                    <span className={styles.logInputType}>
+                                      ({input.type})
+                                    </span>
+                                    {input.indexed && (
+                                      <span className={styles.logIndexed}>
+                                        indexed
                                       </span>
                                     )}
-                                  </span>
-                                </div>
+                                    <span className={styles.logInputValue}>
+                                      {typeof input.value === "object"
+                                        ? JSON.stringify(input.value)
+                                        : String(input.value)}
+                                      {formattedAmt !== null && (
+                                        <span className={styles.tokenAmount}>
+                                          {" "}
+                                          ({formattedAmt} {symbol || ""})
+                                        </span>
+                                      )}
+                                    </span>
+                                  </div>
                                 );
                               })}
                             </div>
@@ -5115,8 +5123,7 @@ export default function ContractCaller() {
                           if (!accountMap[from])
                             accountMap[from] = { native: null, tokens: {} };
                           accountMap[from].tokens[tokenAddr] =
-                            (accountMap[from].tokens[tokenAddr] ?? 0n) -
-                            rawBig;
+                            (accountMap[from].tokens[tokenAddr] ?? 0n) - rawBig;
                         }
                         if (toInput?.value) {
                           const to = String(toInput.value).toLowerCase();
@@ -5228,11 +5235,9 @@ export default function ContractCaller() {
                                   totalUsd != null ? totalUsd >= 0 : pos;
                                 const isSender =
                                   fromAddress &&
-                                  row.addr ===
-                                    fromAddress.toLowerCase();
+                                  row.addr === fromAddress.toLowerCase();
                                 const isReceiver =
-                                  address &&
-                                  row.addr === address.toLowerCase();
+                                  address && row.addr === address.toLowerCase();
                                 return (
                                   <tr key={i} className={styles.bdRow}>
                                     <td className={styles.bdTd}>
@@ -5637,7 +5642,16 @@ export default function ContractCaller() {
               <div className={styles.historyList}>
                 {history
                   .filter((item) => item.chain === chain)
-                  .filter((item) => !historySearch || item.functionName?.toLowerCase().includes(historySearch.toLowerCase()) || item.contractName?.toLowerCase().includes(historySearch.toLowerCase()))
+                  .filter(
+                    (item) =>
+                      !historySearch ||
+                      item.functionName
+                        ?.toLowerCase()
+                        .includes(historySearch.toLowerCase()) ||
+                      item.contractName
+                        ?.toLowerCase()
+                        .includes(historySearch.toLowerCase()),
+                  )
                   .map((item) => {
                     if (item.type === "session") {
                       const abbrev = (v) => {

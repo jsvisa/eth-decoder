@@ -338,41 +338,49 @@ export default function EventDecoder() {
             </div>
             {showHistory && (
               <div className={styles.historyList}>
-                {history.filter((item) => !historySearch || item.output?.event?.toLowerCase().includes(historySearch.toLowerCase())).map((item) => (
-                  <div
-                    key={item.id}
-                    className={styles.historyItem}
-                    onClick={() => {
-                      setTopics(item.topics.length ? item.topics : [""]);
-                      setData(item.data === "0x" ? "" : item.data);
-                      setResult(item.output);
-                      setError(null);
-                    }}
-                  >
-                    <div className={styles.historyTop}>
-                      <div className={styles.historyInput}>
-                        {item.topics[0]?.slice(0, 10)}...
-                        {item.topics[0]?.slice(-6)}
-                        {item.topics.length > 1 && (
-                          <span className={styles.historyTopicCount}>
-                            {" "}
-                            +{item.topics.length - 1}
-                          </span>
+                {history
+                  .filter(
+                    (item) =>
+                      !historySearch ||
+                      item.output?.event
+                        ?.toLowerCase()
+                        .includes(historySearch.toLowerCase()),
+                  )
+                  .map((item) => (
+                    <div
+                      key={item.id}
+                      className={styles.historyItem}
+                      onClick={() => {
+                        setTopics(item.topics.length ? item.topics : [""]);
+                        setData(item.data === "0x" ? "" : item.data);
+                        setResult(item.output);
+                        setError(null);
+                      }}
+                    >
+                      <div className={styles.historyTop}>
+                        <div className={styles.historyInput}>
+                          {item.topics[0]?.slice(0, 10)}...
+                          {item.topics[0]?.slice(-6)}
+                          {item.topics.length > 1 && (
+                            <span className={styles.historyTopicCount}>
+                              {" "}
+                              +{item.topics.length - 1}
+                            </span>
+                          )}
+                        </div>
+                        {item.output?.event && (
+                          <div className={styles.historyFunc}>
+                            {item.output.event}
+                          </div>
                         )}
                       </div>
-                      {item.output?.event && (
-                        <div className={styles.historyFunc}>
-                          {item.output.event}
-                        </div>
-                      )}
+                      <div className={styles.historyMeta}>
+                        <span className={styles.historyTime}>
+                          {new Date(item.timestamp).toLocaleString()}
+                        </span>
+                      </div>
                     </div>
-                    <div className={styles.historyMeta}>
-                      <span className={styles.historyTime}>
-                        {new Date(item.timestamp).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             )}
           </div>

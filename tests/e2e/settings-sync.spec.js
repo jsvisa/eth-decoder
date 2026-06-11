@@ -24,21 +24,42 @@ async function openSettings(page) {
 
 /** Seed localStorage with representative data before the page loads. */
 async function seedStorage(page, extra = {}) {
-  await page.addInitScript((data) => {
-    for (const [k, v] of Object.entries(data)) localStorage.setItem(k, v);
-  }, {
-    tenderly_settings: JSON.stringify({ accessKey: "tk", account: "acc", project: "proj" }),
-    api_keys_settings: JSON.stringify({ etherscan: "ek123" }),
-    rpc_settings: JSON.stringify({ ethereum: "https://my-rpc.example.com" }),
-    simulation_settings: JSON.stringify({ useLocalSimulation: false }),
-    custom_chains: JSON.stringify([{ id: "mychain", chainId: 99999, name: "MyChain", rpcUrl: "https://rpc.mychain" }]),
-    address_book: JSON.stringify([{ address: "0xabc", name: "Alice", chain: "ethereum" }]),
-    "contract_caller_history": JSON.stringify([{ id: 1, chain: "ethereum", address: "0x123", functionName: "foo" }]),
-    "abi-ethereum-0xabcdef1234567890abcdef1234567890abcdef12": JSON.stringify({ abi: [], contractName: "MyContract" }),
-    "token-symbol-ethereum-0xabcdef1234567890abcdef1234567890abcdef12": "TKN",
-    "token-decimals-ethereum-0xabcdef1234567890abcdef1234567890abcdef12": "18",
-    ...extra,
-  });
+  await page.addInitScript(
+    (data) => {
+      for (const [k, v] of Object.entries(data)) localStorage.setItem(k, v);
+    },
+    {
+      tenderly_settings: JSON.stringify({
+        accessKey: "tk",
+        account: "acc",
+        project: "proj",
+      }),
+      api_keys_settings: JSON.stringify({ etherscan: "ek123" }),
+      rpc_settings: JSON.stringify({ ethereum: "https://my-rpc.example.com" }),
+      simulation_settings: JSON.stringify({ useLocalSimulation: false }),
+      custom_chains: JSON.stringify([
+        {
+          id: "mychain",
+          chainId: 99999,
+          name: "MyChain",
+          rpcUrl: "https://rpc.mychain",
+        },
+      ]),
+      address_book: JSON.stringify([
+        { address: "0xabc", name: "Alice", chain: "ethereum" },
+      ]),
+      contract_caller_history: JSON.stringify([
+        { id: 1, chain: "ethereum", address: "0x123", functionName: "foo" },
+      ]),
+      "abi-ethereum-0xabcdef1234567890abcdef1234567890abcdef12": JSON.stringify(
+        { abi: [], contractName: "MyContract" },
+      ),
+      "token-symbol-ethereum-0xabcdef1234567890abcdef1234567890abcdef12": "TKN",
+      "token-decimals-ethereum-0xabcdef1234567890abcdef1234567890abcdef12":
+        "18",
+      ...extra,
+    },
+  );
 }
 
 // ── Export tests ──────────────────────────────────────────────────────────────
@@ -107,8 +128,12 @@ test.describe("Export settings", () => {
     const filePath = await download.path();
     const json = JSON.parse(fs.readFileSync(filePath, "utf8"));
 
-    expect(Object.keys(json).some((k) => k.startsWith("token-symbol-"))).toBe(true);
-    expect(Object.keys(json).some((k) => k.startsWith("token-decimals-"))).toBe(true);
+    expect(Object.keys(json).some((k) => k.startsWith("token-symbol-"))).toBe(
+      true,
+    );
+    expect(Object.keys(json).some((k) => k.startsWith("token-decimals-"))).toBe(
+      true,
+    );
   });
 
   test("exported values match what was in localStorage", async ({ page }) => {
@@ -156,7 +181,11 @@ test.describe("Import settings", () => {
     await openSettingsClean(page);
 
     const payload = {
-      tenderly_settings: JSON.stringify({ accessKey: "imported-key", account: "imp-acc", project: "imp-proj" }),
+      tenderly_settings: JSON.stringify({
+        accessKey: "imported-key",
+        account: "imp-acc",
+        project: "imp-proj",
+      }),
       api_keys_settings: JSON.stringify({ etherscan: "imported-etherscan" }),
     };
     const tmpFile = writeTempJson(payload);
@@ -168,7 +197,10 @@ test.describe("Import settings", () => {
     await fileInput.setInputFiles(tmpFile);
     await page.waitForLoadState("load");
     // Wait for the page title to confirm the reload completed
-    await page.locator("text=Contract Caller").first().waitFor({ timeout: 10000 });
+    await page
+      .locator("text=Contract Caller")
+      .first()
+      .waitFor({ timeout: 10000 });
 
     // Verify localStorage was written with the imported values
     const stored = await page.evaluate(() =>
@@ -185,7 +217,10 @@ test.describe("Import settings", () => {
     await page.goto("/contract-caller");
     await page.evaluate(() => {
       localStorage.clear();
-      localStorage.setItem("address_book", JSON.stringify([{ address: "0xexisting", name: "Bob" }]));
+      localStorage.setItem(
+        "address_book",
+        JSON.stringify([{ address: "0xexisting", name: "Bob" }]),
+      );
     });
     await page.locator("[class*=navSettings]").click();
     await page.locator("text=Sync Settings").waitFor({ timeout: 5000 });
@@ -221,8 +256,8 @@ test.describe("Import settings", () => {
     // A file with a mix of valid strings and invalid types
     const payload = {
       api_keys_settings: JSON.stringify({ etherscan: "valid" }),
-      bad_key: 12345,       // number — should be skipped
-      another_bad: null,    // null — should be skipped
+      bad_key: 12345, // number — should be skipped
+      another_bad: null, // null — should be skipped
     };
     const tmpFile = writeTempJson(payload);
 

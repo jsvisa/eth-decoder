@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GET } from "../../app/api/fetch-abi/route.js";
 import etherscanErc20 from "./__fixtures__/etherscan-erc20.json";
-import etherscanUnverified from "./__fixtures__/etherscan-unverified.json";
 import etherscanProxy from "./__fixtures__/etherscan-proxy.json";
 import etherscanImpl from "./__fixtures__/etherscan-impl.json";
 import sourcifyV2 from "./__fixtures__/sourcify-v2.json";
@@ -27,6 +26,7 @@ function mockFetch(responses) {
 
 beforeEach(() => {
   delete process.env.ETHERSCAN_API_KEY;
+  delete process.env.ROUTESCAN_API_KEY;
 });
 
 afterEach(() => {
@@ -37,7 +37,7 @@ afterEach(() => {
 describe("GET /api/fetch-abi", () => {
   it("returns 400 when the address param is missing", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    const res = await GET(makeRequest({ apiKey: "test-key" }));
+    const res = await GET(makeRequest({ etherscanApiKey: "test-key" }));
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toMatch(/missing address/i);
@@ -46,26 +46,45 @@ describe("GET /api/fetch-abi", () => {
   it("returns 400 when the address is not a valid Ethereum address", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const res = await GET(
-      makeRequest({ address: "not-an-address", apiKey: "test-key" }),
+      makeRequest({ address: "not-an-address", etherscanApiKey: "test-key" }),
     );
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toMatch(/invalid address/i);
   });
 
-  it("returns 400 when no API key is provided and env var is not set", async () => {
-    vi.stubGlobal("fetch", vi.fn());
+  it("falls back to RouteScan without a key when Sourcify has no match", async () => {
+    // No apiKey → Etherscan is skipped; Sourcify fails; RouteScan (keyless) succeeds
+    mockFetch([
+      { status: "404" }, // Sourcify
+      etherscanErc20, // RouteScan (keyless)
+    ]);
     const res = await GET(makeRequest({ address: VALID_ADDRESS }));
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.error).toMatch(/api key/i);
+    expect(body.abi).toBeDefined();
   });
 
-  it("returns ABI from Etherscan for a verified non-proxy contract", async () => {
-    mockFetch([etherscanErc20]);
+  it("returns ABI from Sourcify when verified there", async () => {
+    mockFetch([sourcifyV2]);
 
     const res = await GET(
-      makeRequest({ address: VALID_ADDRESS, apiKey: "test-key" }),
+      makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
+    );
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.abi).toBeDefined();
+    expect(body.abi.length).toBeGreaterThan(0);
+    expect(body.abi.some((item) => item.name === "decimals")).toBe(true);
+  });
+
+  it("falls back to Etherscan when Sourcify has no match", async () => {
+    // {} → Sourcify: no abi field → null; etherscanErc20 → Etherscan: success
+    mockFetch([{}, etherscanErc20]);
+
+    const res = await GET(
+      makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
     );
     expect(res.status).toBe(200);
 
@@ -76,28 +95,12 @@ describe("GET /api/fetch-abi", () => {
     expect(body.contractName).toBe("ERC20");
   });
 
-  it("falls back to Sourcify when Etherscan returns an unverified ABI", async () => {
-    mockFetch([etherscanUnverified, sourcifyV2]);
-
-    const res = await GET(
-      makeRequest({ address: VALID_ADDRESS, apiKey: "test-key" }),
-    );
-    expect(res.status).toBe(200);
-
-    const body = await res.json();
-    expect(body.abi).toBeDefined();
-    expect(body.abi.length).toBeGreaterThan(0);
-    // ABI from sourcify-files.json fixture has the 'decimals' function
-    expect(body.abi.some((item) => item.name === "decimals")).toBe(true);
-  });
-
   it("detects a proxy via Etherscan and returns merged proxy + implementation ABI", async () => {
-    // Call 1: fetch proxy contract info → Proxy: "1" with Implementation address
-    // Call 2: fetch implementation contract info
-    mockFetch([etherscanProxy, etherscanImpl]);
+    // Sourcify miss for proxy, Etherscan proxy info, Sourcify miss for impl, Etherscan impl info
+    mockFetch([{}, etherscanProxy, {}, etherscanImpl]);
 
     const res = await GET(
-      makeRequest({ address: VALID_ADDRESS, apiKey: "test-key" }),
+      makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
     );
     expect(res.status).toBe(200);
 
@@ -115,16 +118,21 @@ describe("GET /api/fetch-abi", () => {
   it("returns 400 when both Etherscan and Sourcify fail", async () => {
     const failFetch = vi
       .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+      }) // Sourcify
       .mockResolvedValueOnce({ ok: false, status: 500, statusText: "Error" }) // Etherscan
       .mockResolvedValueOnce({
         ok: false,
         status: 404,
         statusText: "Not Found",
-      }); // Sourcify check
+      }); // RouteScan
     vi.stubGlobal("fetch", failFetch);
 
     const res = await GET(
-      makeRequest({ address: VALID_ADDRESS, apiKey: "test-key" }),
+      makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
     );
     expect(res.status).toBe(400);
     const body = await res.json();

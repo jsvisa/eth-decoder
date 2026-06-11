@@ -501,7 +501,9 @@ export default function Home() {
         .slice(0, 10)
         .toLowerCase()
     : null;
-  const isURResult = decodedSelector ? UR_SELECTORS.has(decodedSelector) : false;
+  const isURResult = decodedSelector
+    ? UR_SELECTORS.has(decodedSelector)
+    : false;
 
   const editTargets = [];
   if (result?.func && result?.args) {
@@ -511,7 +513,10 @@ export default function Home() {
     result.inner_calls.forEach((call, i) => {
       if (isURResult) {
         if (call.args) {
-          editTargets.push({ id: `ur-${i}`, label: `inner #${i}: ${call.name}` });
+          editTargets.push({
+            id: `ur-${i}`,
+            label: `inner #${i}: ${call.name}`,
+          });
         }
       } else if (call.decoded?.func && call.decoded?.args) {
         editTargets.push({
@@ -733,113 +738,123 @@ export default function Home() {
 
             {showHistory && (
               <div className={styles.historyList}>
-                {history.filter((item) => !historySearch || item.output?.func?.toLowerCase().includes(historySearch.toLowerCase())).map((item) => (
-                  <div
-                    key={item.id}
-                    className={styles.historyItem}
-                    onClick={() => loadFromHistory(item)}
-                  >
-                    <div className={styles.historyTop}>
-                      <div className={styles.historyInput}>
-                        {item.input.slice(0, 20)}...{item.input.slice(-10)}
-                      </div>
-                      {item.output && item.output.func && (
-                        <div className={styles.historyFunc}>
-                          {item.output.func}
+                {history
+                  .filter(
+                    (item) =>
+                      !historySearch ||
+                      item.output?.func
+                        ?.toLowerCase()
+                        .includes(historySearch.toLowerCase()),
+                  )
+                  .map((item) => (
+                    <div
+                      key={item.id}
+                      className={styles.historyItem}
+                      onClick={() => loadFromHistory(item)}
+                    >
+                      <div className={styles.historyTop}>
+                        <div className={styles.historyInput}>
+                          {item.input.slice(0, 20)}...{item.input.slice(-10)}
                         </div>
-                      )}
-                    </div>
-                    <div className={styles.historyMeta}>
-                      <span className={styles.historyTime}>
-                        {new Date(item.timestamp).toLocaleString()}
-                      </span>
-                      {(item.options.withAbi || item.options.withSign) && (
-                        <span className={styles.historyOptions}>
-                          {item.options.withAbi && "A"}
-                          {item.options.withSign && "S"}
+                        {item.output && item.output.func && (
+                          <div className={styles.historyFunc}>
+                            {item.output.func}
+                          </div>
+                        )}
+                      </div>
+                      <div className={styles.historyMeta}>
+                        <span className={styles.historyTime}>
+                          {new Date(item.timestamp).toLocaleString()}
                         </span>
-                      )}
+                        {(item.options.withAbi || item.options.withSign) && (
+                          <span className={styles.historyOptions}>
+                            {item.options.withAbi && "A"}
+                            {item.options.withSign && "S"}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             )}
           </div>
         )}
       </div>
-        {editTarget && (
+      {editTarget && (
+        <div
+          className={styles.modalBackdrop}
+          onClick={resetEncodeState}
+          onWheel={(e) =>
+            window.scrollBy({ top: e.deltaY, behavior: "instant" })
+          }
+        >
           <div
-            className={styles.modalBackdrop}
-            onClick={resetEncodeState}
-            onWheel={(e) => window.scrollBy({ top: e.deltaY, behavior: "instant" })}
+            className={styles.modalContent}
+            ref={modalContentRef}
+            onClick={(e) => e.stopPropagation()}
+            onWheel={(e) => e.stopPropagation()}
           >
-            <div
-              className={styles.modalContent}
-              ref={modalContentRef}
-              onClick={(e) => e.stopPropagation()}
-              onWheel={(e) => e.stopPropagation()}
-            >
-              <div className={styles.modalHeader}>
-                <span className={styles.modalTitle}>Edit & Encode</span>
-                <button
-                  type="button"
-                  onClick={resetEncodeState}
-                  className={styles.modalClose}
-                  aria-label="Close"
-                >
-                  ✕
-                </button>
-              </div>
-              <label className={styles.encodeLabel}>
-                Edit target:
-                <select
-                  value={editTarget}
-                  onChange={(e) => openEditor(e.target.value)}
-                  className={styles.encodeSelect}
-                >
-                  {editTargets.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <textarea
-                value={editText}
-                onChange={(e) => setEditText(e.target.value)}
-                className={styles.encodeTextarea}
-                spellCheck={false}
-                autoFocus
-              />
-              <div className={styles.buttonGroup}>
-                <button
-                  type="button"
-                  onClick={handleEncode}
-                  className={styles.button}
-                >
-                  Encode
-                </button>
-              </div>
-              {encodeError && (
-                <div className={styles.error}>
-                  <strong>Encode error:</strong> {encodeError}
-                </div>
-              )}
-              {encodedHex && (
-                <div className={styles.encodedResult}>
-                  <code className={styles.encodedHex}>{encodedHex}</code>
-                  <button
-                    type="button"
-                    onClick={handleCopyEncoded}
-                    className={styles.actionButton}
-                  >
-                    {encodedCopied ? "Copied!" : "Copy"}
-                  </button>
-                </div>
-              )}
+            <div className={styles.modalHeader}>
+              <span className={styles.modalTitle}>Edit & Encode</span>
+              <button
+                type="button"
+                onClick={resetEncodeState}
+                className={styles.modalClose}
+                aria-label="Close"
+              >
+                ✕
+              </button>
             </div>
+            <label className={styles.encodeLabel}>
+              Edit target:
+              <select
+                value={editTarget}
+                onChange={(e) => openEditor(e.target.value)}
+                className={styles.encodeSelect}
+              >
+                {editTargets.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <textarea
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              className={styles.encodeTextarea}
+              spellCheck={false}
+              autoFocus
+            />
+            <div className={styles.buttonGroup}>
+              <button
+                type="button"
+                onClick={handleEncode}
+                className={styles.button}
+              >
+                Encode
+              </button>
+            </div>
+            {encodeError && (
+              <div className={styles.error}>
+                <strong>Encode error:</strong> {encodeError}
+              </div>
+            )}
+            {encodedHex && (
+              <div className={styles.encodedResult}>
+                <code className={styles.encodedHex}>{encodedHex}</code>
+                <button
+                  type="button"
+                  onClick={handleCopyEncoded}
+                  className={styles.actionButton}
+                >
+                  {encodedCopied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+            )}
           </div>
-        )}
+        </div>
+      )}
     </main>
   );
 }

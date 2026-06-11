@@ -18,7 +18,7 @@ export function SettingsProvider({ children }) {
     account: "",
     project: "",
   });
-  const [apiKeys, setApiKeys] = useState({ etherscan: "" });
+  const [apiKeys, setApiKeys] = useState({ etherscan: "", routescan: "" });
   const [rpcSettings, setRpcSettings] = useState({
     ethereum: "",
     arbitrum: "",
@@ -87,7 +87,10 @@ export function SettingsProvider({ children }) {
     try {
       localStorage.setItem(
         SIMULATION_SETTINGS_KEY,
-        JSON.stringify({ useLocalSimulation: useLocal, rpcBatchSize: batchSize }),
+        JSON.stringify({
+          useLocalSimulation: useLocal,
+          rpcBatchSize: batchSize,
+        }),
       );
     } catch {}
   };
@@ -100,9 +103,15 @@ export function SettingsProvider({ children }) {
   };
 
   const isTenderlyConfigured = () =>
-    !!(tenderlySettings.accessKey && tenderlySettings.account && tenderlySettings.project);
+    !!(
+      tenderlySettings.accessKey &&
+      tenderlySettings.account &&
+      tenderlySettings.project
+    );
 
   const isEtherscanConfigured = () => !!apiKeys.etherscan;
+
+  const isRoutescanConfigured = () => !!apiKeys.routescan;
 
   const getChainId = (chainId) => {
     if (BUILT_IN_CHAIN_IDS[chainId]) return BUILT_IN_CHAIN_IDS[chainId];
@@ -131,6 +140,7 @@ export function SettingsProvider({ children }) {
         saveCustomChains,
         isTenderlyConfigured,
         isEtherscanConfigured,
+        isRoutescanConfigured,
         getChainId,
       }}
     >
