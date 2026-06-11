@@ -4556,6 +4556,18 @@
   text-decoration: underline;
 }
 
+.bdAddrExplorerLink {
+  color: #4fc3f7;
+  font-size: 0.75rem;
+  text-decoration: none;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.bdAddrExplorerLink:hover {
+  opacity: 1;
+}
+
 .bdRole {
   font-size: 0.7rem;
   font-weight: 600;

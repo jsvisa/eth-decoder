@@ -5347,6 +5347,26 @@ export default function ContractCaller() {
                                             ? row.addr
                                             : `${row.addr.slice(0, 10)}…${row.addr.slice(-8)}`}
                                         </span>
+                                        {(() => {
+                                          const url =
+                                            getExplorerAddressUrl(row.addr);
+                                          return url ? (
+                                            <a
+                                              href={url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className={
+                                                styles.bdAddrExplorerLink
+                                              }
+                                              title="View on explorer"
+                                              onClick={(e) =>
+                                                e.stopPropagation()
+                                              }
+                                            >
+                                              ↗
+                                            </a>
+                                          ) : null;
+                                        })()}
                                         {(isSender || isReceiver) && (
                                           <span
                                             className={`${styles.bdRole} ${isSender ? styles.bdRoleSender : styles.bdRoleReceiver}`}
