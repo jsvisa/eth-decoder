@@ -11,7 +11,13 @@ import {
 import yaml from "js-yaml";
 import styles from "./page.module.css";
 import { formatTokenAmount } from "../utils/tokenFormatting";
-import { buildTokenAccountMap } from "../utils/tokenTransfers";
+import {
+  buildTokenAccountMap,
+  TRANSFER_TOPIC,
+  ERC20_TRANSFER_TOPIC,
+  DEPOSIT_TOPIC,
+  WITHDRAWAL_TOPIC,
+} from "../utils/tokenTransfers";
 import {
   getAddressBook,
   addToAddressBook,
@@ -48,6 +54,12 @@ const TOKEN_SYMBOL_CACHE_PREFIX = "token-symbol-";
 const TOKEN_DECIMALS_CACHE_PREFIX = "token-decimals-";
 
 const NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000";
+const TOKEN_TRANSFER_TOPICS = new Set([
+  TRANSFER_TOPIC,
+  ERC20_TRANSFER_TOPIC,
+  DEPOSIT_TOPIC,
+  WITHDRAWAL_TOPIC,
+]);
 const CUSTOM_CHAINS_KEY = "custom_chains";
 const MAX_HISTORY_ITEMS = 50;
 
@@ -1666,12 +1678,15 @@ export default function ContractCaller() {
   const fetchTokenSymbolsForLogs = async (logs, chainId) => {
     if (!logs || logs.length === 0) return;
 
-    // Find unique addresses that emitted Transfer events
+    // Find unique token addresses from transfer-type events (by topic, not decoded name)
     const transferAddresses = new Set();
     for (const log of logs) {
-      if (log.name === "Transfer" && log.address) {
+      if (
+        log.address &&
+        log.topics?.[0] &&
+        TOKEN_TRANSFER_TOPICS.has(log.topics[0])
+      ) {
         const addr = log.address.toLowerCase();
-        // Only fetch if not already cached
         if (!getCachedTokenSymbol(chain, addr) && !tokenSymbols[addr]) {
           transferAddresses.add(addr);
         }
@@ -1723,7 +1738,11 @@ export default function ContractCaller() {
 
     if (logs) {
       for (const log of logs) {
-        if (log.name === "Transfer" && log.address) {
+        if (
+          log.address &&
+          log.topics?.[0] &&
+          TOKEN_TRANSFER_TOPICS.has(log.topics[0])
+        ) {
           tokenAddresses.add(log.address.toLowerCase());
         }
       }
