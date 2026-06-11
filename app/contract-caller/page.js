@@ -5094,39 +5094,57 @@ export default function ContractCaller() {
                       }
                     }
 
+                    const TRANSFER_TOPIC =
+                      "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+                    const ERC20_TRANSFER_TOPIC =
+                      "0xe59fdd36d0d223c0c7d996db7ad796880f45e1936cb0bb7ac102e7082e031487";
+                    const DEPOSIT_TOPIC =
+                      "0xe1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2402c5c5cc9109c";
+                    const WITHDRAWAL_TOPIC =
+                      "0x7fcf532c15f0a6db0bd6d0e038bea71d30d808c7d98cb3bf7268a95bf5081b65";
+                    const ZERO_ADDR = "0x" + "0".repeat(40);
+
                     if (result.logs) {
                       for (const log of result.logs) {
-                        if (log.name !== "Transfer" || !log.inputs) continue;
+                        const topics = log.topics ?? [];
+                        const topic0 = topics[0];
                         const tokenAddr = log.address?.toLowerCase();
                         if (!tokenAddr) continue;
-                        const fromInput = log.inputs.find(
-                          (inp) => inp.name === "from" || inp.name === "src",
-                        );
-                        const toInput = log.inputs.find(
-                          (inp) => inp.name === "to" || inp.name === "dst",
-                        );
-                        const valueInput = log.inputs.find(
-                          (inp) =>
-                            inp.name === "value" ||
-                            inp.name === "amount" ||
-                            inp.name === "wad",
-                        );
-                        if (!valueInput) continue;
+
                         let rawBig;
                         try {
-                          rawBig = BigInt(String(valueInput.value));
+                          rawBig = BigInt(log.data ?? "0x0");
                         } catch {
                           continue;
                         }
-                        if (fromInput?.value) {
-                          const from = String(fromInput.value).toLowerCase();
+
+                        let from, to;
+                        if (
+                          topic0 === TRANSFER_TOPIC ||
+                          topic0 === ERC20_TRANSFER_TOPIC
+                        ) {
+                          if (topics.length < 3) continue;
+                          from = ("0x" + topics[1].slice(-40)).toLowerCase();
+                          to = ("0x" + topics[2].slice(-40)).toLowerCase();
+                        } else if (topic0 === DEPOSIT_TOPIC) {
+                          if (topics.length < 2) continue;
+                          from = ZERO_ADDR;
+                          to = ("0x" + topics[1].slice(-40)).toLowerCase();
+                        } else if (topic0 === WITHDRAWAL_TOPIC) {
+                          if (topics.length < 2) continue;
+                          from = ("0x" + topics[1].slice(-40)).toLowerCase();
+                          to = ZERO_ADDR;
+                        } else {
+                          continue;
+                        }
+
+                        if (from) {
                           if (!accountMap[from])
                             accountMap[from] = { native: null, tokens: {} };
                           accountMap[from].tokens[tokenAddr] =
                             (accountMap[from].tokens[tokenAddr] ?? 0n) - rawBig;
                         }
-                        if (toInput?.value) {
-                          const to = String(toInput.value).toLowerCase();
+                        if (to) {
                           if (!accountMap[to])
                             accountMap[to] = { native: null, tokens: {} };
                           accountMap[to].tokens[tokenAddr] =
