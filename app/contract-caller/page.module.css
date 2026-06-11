@@ -1424,6 +1424,15 @@
   line-height: 1.5;
 }
 
+.decodedValue a {
+  color: #4fc3f7;
+  text-decoration: none;
+}
+
+.decodedValue a:hover {
+  text-decoration: underline;
+}
+
 /* Raw data styles */
 .rawSection {
   margin-bottom: 1.5rem;
@@ -1614,6 +1623,24 @@
   color: #808080;
   font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.8rem;
+}
+
+.logAddressLink {
+  color: #4fc3f7;
+  text-decoration: none;
+}
+
+.logAddressLink:hover {
+  text-decoration: underline;
+}
+
+.logInputValue a {
+  color: #4fc3f7;
+  text-decoration: none;
+}
+
+.logInputValue a:hover {
+  text-decoration: underline;
 }
 
 .logContractName {
@@ -1997,6 +2024,15 @@
   font-weight: 400;
   font-size: 0.8rem;
   margin-left: 0.25rem;
+}
+
+.assetAddressLink {
+  color: #4fc3f7;
+  text-decoration: none;
+}
+
+.assetAddressLink:hover {
+  text-decoration: underline;
 }
 
 .assetDetails {
@@ -4518,6 +4554,18 @@
 
 .bdAddr:hover {
   text-decoration: underline;
+}
+
+.bdAddrExplorerLink {
+  color: #4fc3f7;
+  font-size: 0.75rem;
+  text-decoration: none;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.bdAddrExplorerLink:hover {
+  opacity: 1;
 }
 
 .bdRole {

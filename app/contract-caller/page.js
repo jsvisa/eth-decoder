@@ -266,8 +266,10 @@ const getContractNameFromCache = (chain, address) => {
 };
 
 // Token symbol cache functions
-const getTokenSymbolCacheKey = (chain, address) =>
-  `${TOKEN_SYMBOL_CACHE_PREFIX}${chain}-${address.toLowerCase()}`;
+const getTokenSymbolCacheKey = (chain, address) => {
+  if (!address) return null;
+  return `${TOKEN_SYMBOL_CACHE_PREFIX}${chain}-${address.toLowerCase()}`;
+};
 
 const getCachedTokenSymbol = (chain, address) => {
   if (!address) return null;
@@ -280,6 +282,7 @@ const getCachedTokenSymbol = (chain, address) => {
 };
 
 const setCachedTokenSymbol = (chain, address, symbol) => {
+  if (!address) return;
   try {
     const key = getTokenSymbolCacheKey(chain, address);
     localStorage.setItem(key, symbol);
@@ -288,8 +291,10 @@ const setCachedTokenSymbol = (chain, address, symbol) => {
   }
 };
 
-const getTokenDecimalsCacheKey = (chain, address) =>
-  `${TOKEN_DECIMALS_CACHE_PREFIX}${chain}-${address.toLowerCase()}`;
+const getTokenDecimalsCacheKey = (chain, address) => {
+  if (!address) return null;
+  return `${TOKEN_DECIMALS_CACHE_PREFIX}${chain}-${address.toLowerCase()}`;
+};
 
 const getCachedTokenDecimals = (chain, address) => {
   if (!address) return null;
@@ -302,6 +307,7 @@ const getCachedTokenDecimals = (chain, address) => {
 };
 
 const setCachedTokenDecimals = (chain, address, decimals) => {
+  if (!address) return;
   try {
     localStorage.setItem(
       getTokenDecimalsCacheKey(chain, address),
@@ -811,6 +817,23 @@ export default function ContractCaller() {
   // Get chain info by ID
   const getChainInfo = (chainId) => {
     return allChains.find((c) => c.id === chainId) || null;
+  };
+
+  const BUILT_IN_EXPLORER_URLS = {
+    ethereum: "https://etherscan.io",
+    arbitrum: "https://arbiscan.io",
+    base: "https://basescan.org",
+    polygon: "https://polygonscan.com",
+    bsc: "https://bscscan.com",
+  };
+
+  const getExplorerAddressUrl = (address) => {
+    const builtIn = BUILT_IN_EXPLORER_URLS[chain];
+    if (builtIn) return `${builtIn}/address/${address}`;
+    const chainInfo = getChainInfo(chain);
+    const explorer = chainInfo?.explorers?.[0];
+    if (explorer?.url) return `${explorer.url}/address/${address}`;
+    return null;
   };
 
   // Clear stale pending history after 5 seconds
@@ -4866,7 +4889,7 @@ export default function ContractCaller() {
                       );
                       const logAddress = log.address?.toLowerCase();
                       const symbol =
-                        log.name === "Transfer"
+                        log.name === "Transfer" && logAddress
                           ? tokenSymbols[logAddress] ||
                             getCachedTokenSymbol(chain, logAddress)
                           : null;
@@ -4892,7 +4915,23 @@ export default function ContractCaller() {
                                   {contractName}
                                 </span>
                               )}
-                              {log.address}
+                              {(() => {
+                                const url = log.address
+                                  ? getExplorerAddressUrl(log.address)
+                                  : null;
+                                return url ? (
+                                  <a
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={styles.logAddressLink}
+                                  >
+                                    {log.address}
+                                  </a>
+                                ) : (
+                                  log.address
+                                );
+                              })()}
                             </span>
                           </div>
                           {log.inputs && log.inputs.length > 0 && (
@@ -4921,9 +4960,27 @@ export default function ContractCaller() {
                                       </span>
                                     )}
                                     <span className={styles.logInputValue}>
-                                      {typeof input.value === "object"
-                                        ? JSON.stringify(input.value)
-                                        : String(input.value)}
+                                      {input.type === "address" &&
+                                      typeof input.value === "string"
+                                        ? (() => {
+                                            const url = getExplorerAddressUrl(
+                                              input.value,
+                                            );
+                                            return url ? (
+                                              <a
+                                                href={url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                              >
+                                                {input.value}
+                                              </a>
+                                            ) : (
+                                              input.value
+                                            );
+                                          })()
+                                        : typeof input.value === "object"
+                                          ? JSON.stringify(input.value)
+                                          : String(input.value)}
                                       {formattedAmt !== null && (
                                         <span className={styles.tokenAmount}>
                                           {" "}
@@ -5006,7 +5063,25 @@ export default function ContractCaller() {
                                   "Unknown Token"}
                                 {change.token_info?.contract_address && (
                                   <span className={styles.assetTokenAddress}>
-                                    ({change.token_info.contract_address})
+                                    (
+                                    {(() => {
+                                      const url = getExplorerAddressUrl(
+                                        change.token_info.contract_address,
+                                      );
+                                      return url ? (
+                                        <a
+                                          href={url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className={styles.assetAddressLink}
+                                        >
+                                          {change.token_info.contract_address}
+                                        </a>
+                                      ) : (
+                                        change.token_info.contract_address
+                                      );
+                                    })()}
+                                    )
                                   </span>
                                 )}
                               </span>
@@ -5014,7 +5089,23 @@ export default function ContractCaller() {
                             <div className={styles.assetDetails}>
                               {change.from && (
                                 <span className={styles.assetFrom}>
-                                  {change.from}
+                                  {(() => {
+                                    const url = getExplorerAddressUrl(
+                                      change.from,
+                                    );
+                                    return url ? (
+                                      <a
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={styles.assetAddressLink}
+                                      >
+                                        {change.from}
+                                      </a>
+                                    ) : (
+                                      change.from
+                                    );
+                                  })()}
                                 </span>
                               )}
                               {change.from && change.to && (
@@ -5022,7 +5113,23 @@ export default function ContractCaller() {
                               )}
                               {change.to && (
                                 <span className={styles.assetTo}>
-                                  {change.to}
+                                  {(() => {
+                                    const url = getExplorerAddressUrl(
+                                      change.to,
+                                    );
+                                    return url ? (
+                                      <a
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={styles.assetAddressLink}
+                                      >
+                                        {change.to}
+                                      </a>
+                                    ) : (
+                                      change.to
+                                    );
+                                  })()}
                                 </span>
                               )}
                               <span className={styles.assetAmount}>
@@ -5238,6 +5345,27 @@ export default function ContractCaller() {
                                             ? row.addr
                                             : `${row.addr.slice(0, 10)}…${row.addr.slice(-8)}`}
                                         </span>
+                                        {(() => {
+                                          const url = getExplorerAddressUrl(
+                                            row.addr,
+                                          );
+                                          return url ? (
+                                            <a
+                                              href={url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className={
+                                                styles.bdAddrExplorerLink
+                                              }
+                                              title="View on explorer"
+                                              onClick={(e) =>
+                                                e.stopPropagation()
+                                              }
+                                            >
+                                              ↗
+                                            </a>
+                                          ) : null;
+                                        })()}
                                         {(isSender || isReceiver) && (
                                           <span
                                             className={`${styles.bdRole} ${isSender ? styles.bdRoleSender : styles.bdRoleReceiver}`}
@@ -5413,9 +5541,27 @@ export default function ContractCaller() {
                               </span>
                             </div>
                             <div className={styles.decodedValue}>
-                              {typeof output.value === "object"
-                                ? JSON.stringify(output.value, null, 2)
-                                : String(output.value)}
+                              {output.type === "address" &&
+                              typeof output.value === "string"
+                                ? (() => {
+                                    const url = getExplorerAddressUrl(
+                                      output.value,
+                                    );
+                                    return url ? (
+                                      <a
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        {output.value}
+                                      </a>
+                                    ) : (
+                                      output.value
+                                    );
+                                  })()
+                                : typeof output.value === "object"
+                                  ? JSON.stringify(output.value, null, 2)
+                                  : String(output.value)}
                             </div>
                           </div>
                         ))}

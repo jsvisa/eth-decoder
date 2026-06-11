@@ -221,18 +221,32 @@ export async function decodeLogsViaServer(logs) {
         log.decoded = true;
         // Use ABI inputs for proper type and indexed flags when available,
         // falling back to plain name/value pairs if not.
+        const serializeArg = (v) => {
+          if (v === null || v === undefined) return "";
+          if (typeof v === "bigint") return v.toString();
+          if (typeof v === "object") {
+            try {
+              return JSON.stringify(v, (_, val) =>
+                typeof val === "bigint" ? val.toString() : val,
+              );
+            } catch {
+              return String(v);
+            }
+          }
+          return String(v);
+        };
         if (abiInputs?.length > 0) {
           log.inputs = abiInputs.map((inp) => ({
             name: inp.name || "",
             type: inp.type || "unknown",
-            value: String(args?.[inp.name] ?? ""),
+            value: serializeArg(args?.[inp.name] ?? ""),
             indexed: inp.indexed || false,
           }));
         } else {
           log.inputs = Object.entries(args || {}).map(([name, value]) => ({
             name,
             type: "unknown",
-            value: String(value),
+            value: serializeArg(value),
             indexed: false,
           }));
         }
