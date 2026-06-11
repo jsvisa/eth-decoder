@@ -118,7 +118,13 @@ async function fetchContractInfoFromRouteScan(address, chainId, apiKey) {
 
 // Try to fetch contract info from multiple sources
 async function fetchContractInfo(address, chainId, apiKey, routescanApiKey) {
-  // Try Etherscan first
+  // Try Sourcify first
+  const sourcifyInfo = await fetchContractInfoFromSourcify(address, chainId);
+  if (sourcifyInfo && sourcifyInfo.abi) {
+    return sourcifyInfo;
+  }
+
+  // Fallback to Etherscan
   if (apiKey) {
     const etherscanInfo = await fetchContractInfoFromEtherscan(
       address,
@@ -128,12 +134,6 @@ async function fetchContractInfo(address, chainId, apiKey, routescanApiKey) {
     if (etherscanInfo && etherscanInfo.abi) {
       return etherscanInfo;
     }
-  }
-
-  // Fallback to Sourcify
-  const sourcifyInfo = await fetchContractInfoFromSourcify(address, chainId);
-  if (sourcifyInfo && sourcifyInfo.abi) {
-    return sourcifyInfo;
   }
 
   // Fallback to RouteScan
