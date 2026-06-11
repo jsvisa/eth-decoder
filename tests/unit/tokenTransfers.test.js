@@ -85,8 +85,14 @@ describe("parseTokenTransferLog", () => {
       data: "0x0000000000000000000000000000000000000000000000000000000000000001",
       name: "Transfer",
       inputs: [
-        { name: "fromAddress", value: "0x1111111111111111111111111111111111111111" },
-        { name: "toAddress", value: "0x2222222222222222222222222222222222222222" },
+        {
+          name: "fromAddress",
+          value: "0x1111111111111111111111111111111111111111",
+        },
+        {
+          name: "toAddress",
+          value: "0x2222222222222222222222222222222222222222",
+        },
         { name: "value", value: "999" },
       ],
     };
@@ -99,7 +105,9 @@ describe("parseTokenTransferLog", () => {
   it("returns null for an unrelated log topic", () => {
     const log = {
       address: TOKEN,
-      topics: ["0x91b01baeee3a24b590d112613814d86801005c7ef9353e7fc1eaeaf33ccf83b0"],
+      topics: [
+        "0x91b01baeee3a24b590d112613814d86801005c7ef9353e7fc1eaeaf33ccf83b0",
+      ],
       data: "0x",
     };
     expect(parseTokenTransferLog(log)).toBeNull();
