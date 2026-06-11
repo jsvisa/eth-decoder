@@ -12,6 +12,13 @@ import yaml from "js-yaml";
 import styles from "./page.module.css";
 import { formatTokenAmount } from "../utils/tokenFormatting";
 import {
+  buildTokenAccountMap,
+  TRANSFER_TOPIC,
+  ERC20_TRANSFER_TOPIC,
+  DEPOSIT_TOPIC,
+  WITHDRAWAL_TOPIC,
+} from "../utils/tokenTransfers";
+import {
   getAddressBook,
   addToAddressBook,
   removeFromAddressBook,
@@ -47,6 +54,12 @@ const TOKEN_SYMBOL_CACHE_PREFIX = "token-symbol-";
 const TOKEN_DECIMALS_CACHE_PREFIX = "token-decimals-";
 
 const NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000";
+const TOKEN_TRANSFER_TOPICS = new Set([
+  TRANSFER_TOPIC,
+  ERC20_TRANSFER_TOPIC,
+  DEPOSIT_TOPIC,
+  WITHDRAWAL_TOPIC,
+]);
 const CUSTOM_CHAINS_KEY = "custom_chains";
 const MAX_HISTORY_ITEMS = 50;
 
@@ -1665,12 +1678,15 @@ export default function ContractCaller() {
   const fetchTokenSymbolsForLogs = async (logs, chainId) => {
     if (!logs || logs.length === 0) return;
 
-    // Find unique addresses that emitted Transfer events
+    // Find unique token addresses from transfer-type events (by topic, not decoded name)
     const transferAddresses = new Set();
     for (const log of logs) {
-      if (log.name === "Transfer" && log.address) {
+      if (
+        log.address &&
+        log.topics?.[0] &&
+        TOKEN_TRANSFER_TOPICS.has(log.topics[0])
+      ) {
         const addr = log.address.toLowerCase();
-        // Only fetch if not already cached
         if (!getCachedTokenSymbol(chain, addr) && !tokenSymbols[addr]) {
           transferAddresses.add(addr);
         }
@@ -1722,7 +1738,11 @@ export default function ContractCaller() {
 
     if (logs) {
       for (const log of logs) {
-        if (log.name === "Transfer" && log.address) {
+        if (
+          log.address &&
+          log.topics?.[0] &&
+          TOKEN_TRANSFER_TOPICS.has(log.topics[0])
+        ) {
           tokenAddresses.add(log.address.toLowerCase());
         }
       }
@@ -5082,7 +5102,7 @@ export default function ContractCaller() {
                 {result.simulated &&
                   (() => {
                     // Build flat rows: one per (address × token)
-                    const accountMap = {};
+                    const accountMap = buildTokenAccountMap(result.logs);
 
                     if (result.balanceChanges) {
                       for (const change of result.balanceChanges) {
@@ -5091,47 +5111,6 @@ export default function ContractCaller() {
                         if (!accountMap[addr])
                           accountMap[addr] = { native: null, tokens: {} };
                         accountMap[addr].native = change.diff;
-                      }
-                    }
-
-                    if (result.logs) {
-                      for (const log of result.logs) {
-                        if (log.name !== "Transfer" || !log.inputs) continue;
-                        const tokenAddr = log.address?.toLowerCase();
-                        if (!tokenAddr) continue;
-                        const fromInput = log.inputs.find(
-                          (inp) => inp.name === "from" || inp.name === "src",
-                        );
-                        const toInput = log.inputs.find(
-                          (inp) => inp.name === "to" || inp.name === "dst",
-                        );
-                        const valueInput = log.inputs.find(
-                          (inp) =>
-                            inp.name === "value" ||
-                            inp.name === "amount" ||
-                            inp.name === "wad",
-                        );
-                        if (!valueInput) continue;
-                        let rawBig;
-                        try {
-                          rawBig = BigInt(String(valueInput.value));
-                        } catch {
-                          continue;
-                        }
-                        if (fromInput?.value) {
-                          const from = String(fromInput.value).toLowerCase();
-                          if (!accountMap[from])
-                            accountMap[from] = { native: null, tokens: {} };
-                          accountMap[from].tokens[tokenAddr] =
-                            (accountMap[from].tokens[tokenAddr] ?? 0n) - rawBig;
-                        }
-                        if (toInput?.value) {
-                          const to = String(toInput.value).toLowerCase();
-                          if (!accountMap[to])
-                            accountMap[to] = { native: null, tokens: {} };
-                          accountMap[to].tokens[tokenAddr] =
-                            (accountMap[to].tokens[tokenAddr] ?? 0n) + rawBig;
-                        }
                       }
                     }
 
