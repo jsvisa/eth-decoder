@@ -1625,6 +1625,15 @@
   font-size: 0.8rem;
 }
 
+.logAddressLink {
+  color: #4fc3f7;
+  text-decoration: none;
+}
+
+.logAddressLink:hover {
+  text-decoration: underline;
+}
+
 .logContractName {
   color: #dcdcaa;
   font-weight: 500;

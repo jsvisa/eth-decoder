@@ -4909,7 +4909,23 @@ export default function ContractCaller() {
                                   {contractName}
                                 </span>
                               )}
-                              {log.address}
+                              {(() => {
+                                const url = log.address
+                                  ? getExplorerAddressUrl(log.address)
+                                  : null;
+                                return url ? (
+                                  <a
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={styles.logAddressLink}
+                                  >
+                                    {log.address}
+                                  </a>
+                                ) : (
+                                  log.address
+                                );
+                              })()}
                             </span>
                           </div>
                           {log.inputs && log.inputs.length > 0 && (
