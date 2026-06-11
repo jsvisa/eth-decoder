@@ -266,8 +266,10 @@ const getContractNameFromCache = (chain, address) => {
 };
 
 // Token symbol cache functions
-const getTokenSymbolCacheKey = (chain, address) =>
-  `${TOKEN_SYMBOL_CACHE_PREFIX}${chain}-${address.toLowerCase()}`;
+const getTokenSymbolCacheKey = (chain, address) => {
+  if (!address) return null;
+  return `${TOKEN_SYMBOL_CACHE_PREFIX}${chain}-${address.toLowerCase()}`;
+};
 
 const getCachedTokenSymbol = (chain, address) => {
   if (!address) return null;
@@ -280,6 +282,7 @@ const getCachedTokenSymbol = (chain, address) => {
 };
 
 const setCachedTokenSymbol = (chain, address, symbol) => {
+  if (!address) return;
   try {
     const key = getTokenSymbolCacheKey(chain, address);
     localStorage.setItem(key, symbol);
@@ -288,8 +291,10 @@ const setCachedTokenSymbol = (chain, address, symbol) => {
   }
 };
 
-const getTokenDecimalsCacheKey = (chain, address) =>
-  `${TOKEN_DECIMALS_CACHE_PREFIX}${chain}-${address.toLowerCase()}`;
+const getTokenDecimalsCacheKey = (chain, address) => {
+  if (!address) return null;
+  return `${TOKEN_DECIMALS_CACHE_PREFIX}${chain}-${address.toLowerCase()}`;
+};
 
 const getCachedTokenDecimals = (chain, address) => {
   if (!address) return null;
@@ -302,6 +307,7 @@ const getCachedTokenDecimals = (chain, address) => {
 };
 
 const setCachedTokenDecimals = (chain, address, decimals) => {
+  if (!address) return;
   try {
     localStorage.setItem(
       getTokenDecimalsCacheKey(chain, address),
@@ -4883,7 +4889,7 @@ export default function ContractCaller() {
                       );
                       const logAddress = log.address?.toLowerCase();
                       const symbol =
-                        log.name === "Transfer"
+                        log.name === "Transfer" && logAddress
                           ? tokenSymbols[logAddress] ||
                             getCachedTokenSymbol(chain, logAddress)
                           : null;
