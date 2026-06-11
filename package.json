@@ -4,10 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "node scripts/patch-tevm-node.js && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "postinstall": "node scripts/patch-tevm-node.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -21,6 +20,9 @@
     "react-dom": "^19.2.7",
     "tevm": "^1.0.0-next.149",
     "viem": "^2.44.2"
+  },
+  "overrides": {
+    "@tevm/node": "1.0.0-next.148"
   },
   "devDependencies": {
     "@next/eslint-plugin-next": "^16.2.7",
