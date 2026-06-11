@@ -207,7 +207,14 @@ export const fetchAbisForAddresses = async (
   // Fetch all ABIs in parallel
   const fetchPromises = addresses.map(async (address) => {
     const normalizedAddress = address.toLowerCase();
-    const abi = await fetchAndCacheAbi(chain, address, apiKey, rpcUrl, chainId, { routescanApiKey });
+    const abi = await fetchAndCacheAbi(
+      chain,
+      address,
+      apiKey,
+      rpcUrl,
+      chainId,
+      { routescanApiKey },
+    );
     if (abi) {
       results.set(normalizedAddress, abi);
     }

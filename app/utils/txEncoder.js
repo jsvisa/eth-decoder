@@ -6,7 +6,11 @@ import {
 } from "viem";
 import { normalizeArg } from "./normalizeArg.js";
 import { MULTICALL_ABIS } from "./multicallDecoder.js";
-import { COMMAND_ABI_PARAMS, UR_EXECUTE_NO_DEADLINE, UR_EXECUTE_WITH_DEADLINE } from "./universalRouter.js";
+import {
+  COMMAND_ABI_PARAMS,
+  UR_EXECUTE_NO_DEADLINE,
+  UR_EXECUTE_WITH_DEADLINE,
+} from "./universalRouter.js";
 
 // Convert object-shaped tuples (as produced by decoders) to positional arrays
 // so normalizeArg / viem can consume them. Matches by component name when
@@ -25,7 +29,10 @@ function toPositional(value, param) {
   ) {
     const positional = Object.values(value);
     return param.components.map((c, i) =>
-      toPositional(c.name && c.name in value ? value[c.name] : positional[i], c),
+      toPositional(
+        c.name && c.name in value ? value[c.name] : positional[i],
+        c,
+      ),
     );
   }
   return value;
@@ -34,7 +41,8 @@ function toPositional(value, param) {
 function orderedArgs(inputs, args) {
   const obj = args ?? {};
   const keys = Object.keys(obj);
-  const useNames = inputs.length > 0 && inputs.every((inp) => inp.name && inp.name in obj);
+  const useNames =
+    inputs.length > 0 && inputs.every((inp) => inp.name && inp.name in obj);
   return inputs.map((inp, i) => {
     const raw = useNames ? obj[inp.name] : obj[keys[i]];
     return normalizeArg(toPositional(raw, inp), inp.type, inp.components);
@@ -59,7 +67,9 @@ export function reencodeMulticallInner(outerData, index, newInnerHex) {
   const decoded = decodeFunctionData({ abi: [config.abi], data: hex });
   const calls = [...decoded.args[0]];
   if (index < 0 || index >= calls.length) {
-    throw new Error(`Inner call index ${index} out of range (0-${calls.length - 1})`);
+    throw new Error(
+      `Inner call index ${index} out of range (0-${calls.length - 1})`,
+    );
   }
 
   if (config.isBytesArray) {
@@ -90,7 +100,9 @@ export function reencodeURInput(outerData, index, newArgs) {
   const [commands, inputsArr, deadline] = decoded.args;
   const inputs = [...inputsArr];
   if (index < 0 || index >= inputs.length) {
-    throw new Error(`Command index ${index} out of range (0-${inputs.length - 1})`);
+    throw new Error(
+      `Command index ${index} out of range (0-${inputs.length - 1})`,
+    );
   }
 
   const cmdHex = commands.replace(/^0x/i, "");

@@ -5,7 +5,11 @@ import {
   encodeFunctionData,
   parseAbiItem,
 } from "viem";
-import { encodeFunction, reencodeMulticallInner, reencodeURInput } from "../../app/utils/txEncoder.js";
+import {
+  encodeFunction,
+  reencodeMulticallInner,
+  reencodeURInput,
+} from "../../app/utils/txEncoder.js";
 import {
   decodeMulticall,
   MULTICALL_ABIS,

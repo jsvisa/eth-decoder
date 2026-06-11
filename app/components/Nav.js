@@ -48,12 +48,12 @@ export default function Nav() {
         </div>
         <div className={styles.navRight}>
           <button
-              className={styles.navSettings}
-              title="Settings"
-              onClick={toggleSettings}
-            >
-              ⚙
-            </button>
+            className={styles.navSettings}
+            title="Settings"
+            onClick={toggleSettings}
+          >
+            ⚙
+          </button>
           <button
             onClick={toggleTheme}
             className={styles.themeToggle}

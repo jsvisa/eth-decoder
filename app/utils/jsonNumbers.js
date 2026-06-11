@@ -19,7 +19,11 @@ export function stringifyForEditor(value) {
     value,
     (key, v) => {
       if (typeof v === "bigint") return `__BIG__${v.toString()}__BIG__`;
-      if (typeof v === "number" && !Number.isSafeInteger(v) && Number.isFinite(v)) {
+      if (
+        typeof v === "number" &&
+        !Number.isSafeInteger(v) &&
+        Number.isFinite(v)
+      ) {
         return `__BIG__${v.toLocaleString("en-US", {
           useGrouping: false,
           maximumFractionDigits: 0,

@@ -117,7 +117,12 @@ async function fetchContractInfoFromRouteScan(address, chainId, apiKey) {
 }
 
 // Try to fetch contract info from multiple sources
-async function fetchContractInfo(address, chainId, apiKey, routescanApiKey) {
+async function fetchContractInfo(
+  address,
+  chainId,
+  etherscanApiKey,
+  routescanApiKey,
+) {
   // Try Sourcify first
   const sourcifyInfo = await fetchContractInfoFromSourcify(address, chainId);
   if (sourcifyInfo && sourcifyInfo.abi) {
@@ -125,11 +130,11 @@ async function fetchContractInfo(address, chainId, apiKey, routescanApiKey) {
   }
 
   // Fallback to Etherscan
-  if (apiKey) {
+  if (etherscanApiKey) {
     const etherscanInfo = await fetchContractInfoFromEtherscan(
       address,
       chainId,
-      apiKey,
+      etherscanApiKey,
     );
     if (etherscanInfo && etherscanInfo.abi) {
       return etherscanInfo;
@@ -366,13 +371,22 @@ export async function GET(request) {
     }
 
     // Get API keys from query params (user-provided) or fall back to env vars
-    const apiKey =
-      searchParams.get("etherscanApiKey") || process.env.ETHERSCAN_API_KEY || "";
+    const etherscanApiKey =
+      searchParams.get("etherscanApiKey") ||
+      process.env.ETHERSCAN_API_KEY ||
+      "";
     const routescanApiKey =
-      searchParams.get("routescanApiKey") || process.env.ROUTESCAN_API_KEY || "";
+      searchParams.get("routescanApiKey") ||
+      process.env.ROUTESCAN_API_KEY ||
+      "";
 
     // Fetch the contract's ABI and name
-    const proxyInfo = await fetchContractInfo(address, chainId, apiKey, routescanApiKey);
+    const proxyInfo = await fetchContractInfo(
+      address,
+      chainId,
+      etherscanApiKey,
+      routescanApiKey,
+    );
 
     if (!proxyInfo || !proxyInfo.abi) {
       return NextResponse.json(
@@ -398,7 +412,12 @@ export async function GET(request) {
 
     if (implAddress) {
       // It's a proxy! Fetch implementation ABI and merge
-      const implInfo = await fetchContractInfo(implAddress, chainId, apiKey, routescanApiKey);
+      const implInfo = await fetchContractInfo(
+        implAddress,
+        chainId,
+        etherscanApiKey,
+        routescanApiKey,
+      );
 
       if (implInfo && implInfo.abi) {
         const mergedAbi = mergeAbis(proxyInfo.abi, implInfo.abi);

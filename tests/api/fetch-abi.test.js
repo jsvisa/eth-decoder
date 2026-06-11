@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GET } from "../../app/api/fetch-abi/route.js";
 import etherscanErc20 from "./__fixtures__/etherscan-erc20.json";
-import etherscanUnverified from "./__fixtures__/etherscan-unverified.json";
 import etherscanProxy from "./__fixtures__/etherscan-proxy.json";
 import etherscanImpl from "./__fixtures__/etherscan-impl.json";
 import sourcifyV2 from "./__fixtures__/sourcify-v2.json";
@@ -119,9 +118,17 @@ describe("GET /api/fetch-abi", () => {
   it("returns 400 when both Etherscan and Sourcify fail", async () => {
     const failFetch = vi
       .fn()
-      .mockResolvedValueOnce({ ok: false, status: 404, statusText: "Not Found" }) // Sourcify
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+      }) // Sourcify
       .mockResolvedValueOnce({ ok: false, status: 500, statusText: "Error" }) // Etherscan
-      .mockResolvedValueOnce({ ok: false, status: 404, statusText: "Not Found" }); // RouteScan
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+      }); // RouteScan
     vi.stubGlobal("fetch", failFetch);
 
     const res = await GET(

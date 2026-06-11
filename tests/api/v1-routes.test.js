@@ -116,8 +116,16 @@ describe("GET /api/v1/fetch-abi", () => {
 
   it("returns 400 when all sources fail to find the ABI", async () => {
     global.fetch
-      .mockResolvedValueOnce({ ok: false, status: 404, statusText: "Not Found" }) // Sourcify
-      .mockResolvedValueOnce({ ok: false, status: 404, statusText: "Not Found" }); // RouteScan
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+      }) // Sourcify
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+      }); // RouteScan
     const res = await fetchAbiGET(
       makeRequest("/api/v1/fetch-abi", {
         address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",

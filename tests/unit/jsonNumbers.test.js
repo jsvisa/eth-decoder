@@ -88,9 +88,9 @@ describe("stringifyForEditor", () => {
   });
 
   it("renders 16+ digit integer strings bare (lossless parse output)", () => {
-    expect(
-      stringifyForEditor({ amount: "12345678901234567890123" }),
-    ).toBe('{\n  "amount": 12345678901234567890123\n}');
+    expect(stringifyForEditor({ amount: "12345678901234567890123" })).toBe(
+      '{\n  "amount": 12345678901234567890123\n}',
+    );
   });
 
   it("keeps short numeric strings quoted (string-typed args)", () => {
@@ -104,7 +104,10 @@ describe("stringifyForEditor", () => {
   });
 
   it("round-trips big values losslessly through parseJsonWithBigNumbers", () => {
-    const args = { to: "0xd8da6bf26964af9d7eed9e03e53415d37aa96045", amount: "12345678901234567890123" };
+    const args = {
+      to: "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
+      amount: "12345678901234567890123",
+    };
     const reparsed = parseJsonWithBigNumbers(stringifyForEditor(args));
     expect(reparsed).toEqual(args);
   });

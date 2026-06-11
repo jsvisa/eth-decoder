@@ -87,7 +87,10 @@ export function SettingsProvider({ children }) {
     try {
       localStorage.setItem(
         SIMULATION_SETTINGS_KEY,
-        JSON.stringify({ useLocalSimulation: useLocal, rpcBatchSize: batchSize }),
+        JSON.stringify({
+          useLocalSimulation: useLocal,
+          rpcBatchSize: batchSize,
+        }),
       );
     } catch {}
   };
@@ -100,7 +103,11 @@ export function SettingsProvider({ children }) {
   };
 
   const isTenderlyConfigured = () =>
-    !!(tenderlySettings.accessKey && tenderlySettings.account && tenderlySettings.project);
+    !!(
+      tenderlySettings.accessKey &&
+      tenderlySettings.account &&
+      tenderlySettings.project
+    );
 
   const isEtherscanConfigured = () => !!apiKeys.etherscan;
 
