@@ -1090,7 +1090,7 @@ export default function ContractCaller() {
         });
 
         if (apiKeys.etherscan) {
-          params.set("apiKey", apiKeys.etherscan);
+          params.set("etherscanApiKey", apiKeys.etherscan);
         }
 
         const chainIdForApi = getChainId(chain);
@@ -1828,7 +1828,7 @@ export default function ContractCaller() {
     try {
       const params = new URLSearchParams({ address, chain });
       if (apiKeys.etherscan) {
-        params.set("apiKey", apiKeys.etherscan);
+        params.set("etherscanApiKey", apiKeys.etherscan);
       }
       if (apiKeys.routescan) {
         params.set("routescanApiKey", apiKeys.routescan);

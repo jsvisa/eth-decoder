@@ -38,7 +38,7 @@ afterEach(() => {
 describe("GET /api/fetch-abi", () => {
   it("returns 400 when the address param is missing", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    const res = await GET(makeRequest({ apiKey: "test-key" }));
+    const res = await GET(makeRequest({ etherscanApiKey: "test-key" }));
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toMatch(/missing address/i);
@@ -47,7 +47,7 @@ describe("GET /api/fetch-abi", () => {
   it("returns 400 when the address is not a valid Ethereum address", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const res = await GET(
-      makeRequest({ address: "not-an-address", apiKey: "test-key" }),
+      makeRequest({ address: "not-an-address", etherscanApiKey: "test-key" }),
     );
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -70,7 +70,7 @@ describe("GET /api/fetch-abi", () => {
     mockFetch([sourcifyV2]);
 
     const res = await GET(
-      makeRequest({ address: VALID_ADDRESS, apiKey: "test-key" }),
+      makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
     );
     expect(res.status).toBe(200);
 
@@ -85,7 +85,7 @@ describe("GET /api/fetch-abi", () => {
     mockFetch([{}, etherscanErc20]);
 
     const res = await GET(
-      makeRequest({ address: VALID_ADDRESS, apiKey: "test-key" }),
+      makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
     );
     expect(res.status).toBe(200);
 
@@ -101,7 +101,7 @@ describe("GET /api/fetch-abi", () => {
     mockFetch([{}, etherscanProxy, {}, etherscanImpl]);
 
     const res = await GET(
-      makeRequest({ address: VALID_ADDRESS, apiKey: "test-key" }),
+      makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
     );
     expect(res.status).toBe(200);
 
@@ -125,7 +125,7 @@ describe("GET /api/fetch-abi", () => {
     vi.stubGlobal("fetch", failFetch);
 
     const res = await GET(
-      makeRequest({ address: VALID_ADDRESS, apiKey: "test-key" }),
+      makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
     );
     expect(res.status).toBe(400);
     const body = await res.json();

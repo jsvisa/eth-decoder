@@ -144,7 +144,7 @@ export const fetchAndCacheAbi = async (
     // Build API params
     const params = new URLSearchParams({ address, chain });
     if (apiKey) {
-      params.set("apiKey", apiKey);
+      params.set("etherscanApiKey", apiKey);
     }
     if (routescanApiKey) {
       params.set("routescanApiKey", routescanApiKey);

@@ -367,7 +367,7 @@ export async function GET(request) {
 
     // Get API keys from query params (user-provided) or fall back to env vars
     const apiKey =
-      searchParams.get("apiKey") || process.env.ETHERSCAN_API_KEY || "";
+      searchParams.get("etherscanApiKey") || process.env.ETHERSCAN_API_KEY || "";
     const routescanApiKey =
       searchParams.get("routescanApiKey") || process.env.ROUTESCAN_API_KEY || "";
 

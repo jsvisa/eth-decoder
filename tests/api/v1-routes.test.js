@@ -107,7 +107,7 @@ describe("GET /api/v1/decode-event", () => {
 describe("GET /api/v1/fetch-abi", () => {
   it("returns 400 when address param is missing", async () => {
     const res = await fetchAbiGET(
-      makeRequest("/api/v1/fetch-abi", { apiKey: "test" }),
+      makeRequest("/api/v1/fetch-abi", { etherscanApiKey: "test" }),
     );
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -136,7 +136,7 @@ describe("GET /api/v1/fetch-abi", () => {
     const res = await fetchAbiGET(
       makeRequest("/api/v1/fetch-abi", {
         address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-        apiKey: "test-key",
+        etherscanApiKey: "test-key",
       }),
     );
     expect(res.status).toBe(200);

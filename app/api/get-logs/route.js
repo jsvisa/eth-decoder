@@ -20,7 +20,7 @@ export async function GET(request) {
   const toBlock = searchParams.get("toBlock") || "latest";
   const page = searchParams.get("page") || "1";
   const offset = searchParams.get("offset") || "1000";
-  const apiKey = searchParams.get("apiKey") || process.env.ETHERSCAN_API_KEY;
+  const apiKey = searchParams.get("etherscanApiKey") || process.env.ETHERSCAN_API_KEY;
   const customChainId = searchParams.get("chainId");
 
   if (!address || !isValidEthAddress(address)) {
