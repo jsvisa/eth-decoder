@@ -39,3 +39,7 @@ test-results/*
 
 # AI planning artifacts
 docs/superpowers/
+.superpowers/*
+.playwright-mcp/*
+.claude/*
+.claire/*
