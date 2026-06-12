@@ -14,7 +14,7 @@ const TOKEN_ADDR = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"; // USDC on Ethe
 const FROM_ADDR = "0xb826224b742ead5cf91ea432340e3763fac09cdd";
 const TO_ADDR = "0xdeadbeef00000000000000000000000000000001";
 
-// ── Mock data ────────────────────────────────────────────────────────────────
+// ── Mock data ──────────────────────────────────────────────────────────
 
 // Simulated Transfer of 1 000 USDC (raw = 1_000_000_000 with 6 decimals)
 const MOCK_SIMULATE_OUTPUT = {
@@ -50,6 +50,20 @@ const MOCK_SIMULATE_OUTPUT = {
       after: "9000000000000000000", //  9 ETH
       diff: "-1000000000000000000", // -1 ETH
     },
+    // USDC balance change for FROM_ADDR (loses 1,000 USDC)
+    {
+      address: TOKEN_ADDR,
+      before: "1000000000", // 1,000 USDC (with 6 decimals)
+      after: "0",
+      diff: "-1000000000",
+    },
+    // USDC balance change for TO_ADDR (gains 1,000 USDC)
+    {
+      address: TO_ADDR,
+      before: "0",
+      after: "1000000000", // 1,000 USDC (with 6 decimals)
+      diff: "1000000000",
+    },
   ],
   stateChanges: [],
   callTrace: null,
@@ -84,7 +98,7 @@ const MOCK_HISTORY_ITEM = {
   timestamp: new Date().toISOString(),
 };
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────
 
 /** Pre-seed localStorage so the page loads with a pre-existing history entry */
 async function seedLocalStorage(page) {
@@ -163,11 +177,11 @@ async function loadHistoryResult(page) {
   await historyItem.click();
   // Wait for the Balance Changes table section to appear
   await page.locator("[class*=bdSection]").waitFor({ timeout: 5000 });
-  // Allow async decimals/price fetches to complete
-  await page.waitForTimeout(3000);
+  // Allow async decimals/price/symbol fetches to complete
+  await page.waitForTimeout(5000);
 }
 
-// ── Tests ────────────────────────────────────────────────────────────────────
+// ── Tests ────────────────────────────────────────────────────────────
 
 test.describe("Simulation result UI features", () => {
   test("Transfer log shows formatted USDC amount next to raw value", async ({
@@ -251,7 +265,7 @@ test.describe("Simulation result UI features", () => {
   });
 });
 
-// ── Role badge tests ─────────────────────────────────────────────────────────
+// ── Role badge tests ────────────────────────────────────────────────────
 
 test.describe("Balance Changes role badges", () => {
   // Seed a simulation where TOKEN_ADDR (the contract = `address` state) also
@@ -373,7 +387,7 @@ test.describe("Balance Changes role badges", () => {
   });
 });
 
-// ── Click-to-expand tests ─────────────────────────────────────────────────────
+// ── Click-to-expand tests ─────────────────────────────────────────────────
 
 test.describe("Balance Changes click-to-expand", () => {
   test("clicking address toggles between truncated and full display", async ({
