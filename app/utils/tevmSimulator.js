@@ -1,4 +1,5 @@
 import { createMemoryClient, http } from "tevm";
+import { createCommon, createMockKzg } from "tevm/common";
 import {
   encodeFunctionData,
   decodeFunctionData,
@@ -11,6 +12,7 @@ import {
   toFunctionSelector,
 } from "viem";
 import { isValidEthAddress } from "./validation";
+import { CHAIN_META, FORK_RPC_URLS } from "./chains";
 
 // Create an http transport with or without JSON-RPC batching.
 // batchSize=1 → http(url) with NO batch option — guarantees single {…} request
@@ -21,6 +23,85 @@ function makeHttp(url, batchSize = 1) {
   return batchSize > 1
     ? http(url, { batch: { batchSize, wait: 0 } })
     : http(url);
+}
+
+function isBlobTransaction(tx) {
+  if (!tx || typeof tx !== "object" || Array.isArray(tx)) return false;
+  return tx.type === "0x3" || tx.type === "0x03" || tx.type === 3;
+}
+
+export function sanitizeForkRpcResult(method, result) {
+  if (
+    (method !== "eth_getBlockByNumber" && method !== "eth_getBlockByHash") ||
+    !result ||
+    !Array.isArray(result.transactions)
+  ) {
+    return result;
+  }
+
+  return {
+    ...result,
+    transactions: result.transactions.filter((tx) => !isBlobTransaction(tx)),
+  };
+}
+
+export function ensureTevmNodeCompat(client) {
+  const tevmNode = client?.transport?.tevm;
+  if (!tevmNode || typeof tevmNode !== "object") return client;
+
+  const state = {
+    nextBlockTimestamp: undefined,
+    nextBlockGasLimit: undefined,
+    nextBlockBaseFeePerGas: undefined,
+    nextBlockPrevRandao: undefined,
+    blockTimestampInterval: undefined,
+  };
+
+  if (typeof tevmNode.getNextBlockTimestamp !== "function") {
+    tevmNode.getNextBlockTimestamp = () => state.nextBlockTimestamp;
+  }
+  if (typeof tevmNode.setNextBlockTimestamp !== "function") {
+    tevmNode.setNextBlockTimestamp = (value) => {
+      state.nextBlockTimestamp = value;
+    };
+  }
+  if (typeof tevmNode.getNextBlockGasLimit !== "function") {
+    tevmNode.getNextBlockGasLimit = () => state.nextBlockGasLimit;
+  }
+  if (typeof tevmNode.setNextBlockGasLimit !== "function") {
+    tevmNode.setNextBlockGasLimit = (value) => {
+      state.nextBlockGasLimit = value;
+    };
+  }
+  if (typeof tevmNode.getNextBlockBaseFeePerGas !== "function") {
+    tevmNode.getNextBlockBaseFeePerGas = () => state.nextBlockBaseFeePerGas;
+  }
+  if (typeof tevmNode.setNextBlockBaseFeePerGas !== "function") {
+    tevmNode.setNextBlockBaseFeePerGas = (value) => {
+      state.nextBlockBaseFeePerGas = value;
+    };
+  }
+  if (typeof tevmNode.getNextBlockPrevRandao !== "function") {
+    tevmNode.getNextBlockPrevRandao = () => state.nextBlockPrevRandao;
+  }
+  if (typeof tevmNode.setNextBlockPrevRandao !== "function") {
+    tevmNode.setNextBlockPrevRandao = (value) => {
+      state.nextBlockPrevRandao = value;
+    };
+  }
+  if (typeof tevmNode.getBlockTimestampInterval !== "function") {
+    tevmNode.getBlockTimestampInterval = () => state.blockTimestampInterval;
+  }
+  if (typeof tevmNode.setBlockTimestampInterval !== "function") {
+    tevmNode.setBlockTimestampInterval = (value) => {
+      state.blockTimestampInterval = value;
+    };
+  }
+  if (typeof tevmNode.emitExExEvent !== "function") {
+    tevmNode.emitExExEvent = async () => {};
+  }
+
+  return client;
 }
 
 // Wraps an HTTP transport to avoid eth_getProof, which is unsupported by many
@@ -53,29 +134,12 @@ function createProofFreeTransport(rpcUrl, batchSize = 1) {
             storageProof: [],
           };
         }
-        return base.request({ method, params });
+        const result = await base.request({ method, params });
+        return sanitizeForkRpcResult(method, result);
       },
     };
   };
 }
-
-// Chain configurations for forking (built-in chains)
-const BUILT_IN_CHAIN_CONFIGS = {
-  ethereum: { chainId: 1, name: "Ethereum" },
-  arbitrum: { chainId: 42161, name: "Arbitrum" },
-  base: { chainId: 8453, name: "Base" },
-  polygon: { chainId: 137, name: "Polygon" },
-  bsc: { chainId: 56, name: "BSC" },
-};
-
-// Default public RPCs (fallback)
-const DEFAULT_RPCS = {
-  ethereum: "https://ethereum-rpc.publicnode.com",
-  arbitrum: "https://arbitrum-one-rpc.publicnode.com",
-  base: "https://base-rpc.publicnode.com",
-  polygon: "https://polygon-bor-rpc.publicnode.com",
-  bsc: "https://bsc-rpc.publicnode.com",
-};
 
 // Helper to parse an argument value based on ABI type
 const parseArgValue = (arg, input) => {
@@ -532,7 +596,7 @@ export async function createTevmClient(
   batchSize = 1,
 ) {
   // Get chain config from built-in or use custom chain ID
-  let chainConfig = BUILT_IN_CHAIN_CONFIGS[chain];
+  let chainConfig = CHAIN_META[chain];
 
   // Handle custom chains
   if (!chainConfig && customChainId) {
@@ -545,7 +609,7 @@ export async function createTevmClient(
     );
   }
 
-  const forkUrl = rpcUrl || DEFAULT_RPCS[chain];
+  const forkUrl = rpcUrl || FORK_RPC_URLS[chain];
   if (!forkUrl) {
     throw new Error(`No RPC URL configured for ${chain}`);
   }
@@ -562,13 +626,23 @@ export async function createTevmClient(
     }
   }
 
-  // Create fork client with the specified block tag
+  // Create fork client with the specified block tag.
+  // customCrypto.kzg is required for chains that have EIP-4844 (blob txs) enabled;
+  // createMockKzg provides a no-op implementation that satisfies the interface.
+  const common = createCommon({
+    id: chainConfig.chainId,
+    name: chainConfig.name || chain,
+    customCrypto: { kzg: createMockKzg() },
+  });
+
   const client = createMemoryClient({
+    common,
     fork: {
       transport: createProofFreeTransport(forkUrl, batchSize),
       blockTag,
     },
   });
+  ensureTevmNodeCompat(client);
 
   await client.tevmReady();
 
@@ -852,7 +926,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
 
     await prefetchAccountsFromAccessList({
       client,
-      forkRpcUrl: rpcUrl || DEFAULT_RPCS[chain] || "",
+      forkRpcUrl: rpcUrl || FORK_RPC_URLS[chain] || "",
       callParams: {
         to: address,
         from: sender,
@@ -1033,18 +1107,11 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       value: valueInWei,
       createAccessList: true,
       throwOnFail: false, // return errors in result instead of throwing, so rawData is accessible
-      // Commit state changes into tevm's in-memory layer on success (session mode writes).
-      // Without this, tevmCall is a dry-run and subsequent calls still see pre-call state.
-      createTransaction: persistState ? "on-success" : undefined,
+      addToBlockchain: persistState ? "on-success" : undefined,
       onBeforeMessage,
       onAfterMessage,
       onStep,
     });
-
-    // Mine the pending transaction so the state diff is visible to subsequent calls.
-    if (persistState) {
-      await client.tevmMine({ blockCount: 1 });
-    }
 
     // Check for errors
     const success = !callResult.errors || callResult.errors.length === 0;
