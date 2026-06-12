@@ -22,7 +22,7 @@ A web application for decoding EVM transaction input data and interacting with s
 
 - **Multi-chain support**: Ethereum, Arbitrum, Base, Polygon, BSC
 - **ABI Management**:
-  - Auto-fetch ABI from block explorers (Etherscan, etc.)
+  - Auto-fetch ABI via Sourcify → Etherscan → Routescan fallback chain
   - Automatic proxy contract detection and implementation ABI fetching
   - ABI caching in localStorage for faster subsequent loads
   - Contract address autocomplete from cached ABIs
@@ -92,6 +92,11 @@ The app requires API keys for full functionality:
 - Get your free API key from [Etherscan](https://etherscan.io/myapikey)
 - Works across all supported chains (Etherscan, Arbiscan, Basescan, etc.)
 
+### Routescan API Key
+
+- Optional fallback for ABI fetching when Etherscan doesn't cover a chain
+- Get your API key from [Routescan](https://routescan.io/api-key)
+
 ### Tenderly API Settings
 
 - Required for simulating write functions
@@ -147,7 +152,7 @@ GET /api/v1/decode-event?sign=0xddf252ad...&topics=0xddf252ad...,0x000...&data=0
 
 ### `GET /api/v1/fetch-abi`
 
-Fetch the verified ABI for a contract from Etherscan or Sourcify. Automatically detects proxy contracts and merges the implementation ABI.
+Fetch the verified ABI for a contract. Tries Sourcify first, then Etherscan, then Routescan. Automatically detects proxy contracts and merges the implementation ABI.
 
 | Parameter     | Required | Description                                                            |
 | ------------- | -------- | ---------------------------------------------------------------------- |
@@ -225,13 +230,37 @@ vercel --prod
 ### Contract Caller
 
 1. User enters contract address and selects chain
-2. ABI is fetched from block explorer or loaded from cache
+2. ABI is fetched via the resolution sequence below, or loaded from localStorage cache
 3. User selects function and enters arguments
 4. For read functions: Direct RPC call via `/api/call-contract`
 5. For write functions: Simulation via Tenderly API through `/api/simulate`
 6. Results displayed with decoded outputs, logs, and call traces
 
 This architecture keeps the backend endpoints secure and hidden from the client-side code.
+
+### ABI Resolution Order
+
+#### Main contract ABI (`/api/fetch-abi`)
+
+Used when loading a contract in the Contract Caller. Tries each source in order and stops at the first hit:
+
+1. **Sourcify** — fully decentralised, no API key required
+2. **Etherscan** (V2 API, covers all supported chains) — requires an Etherscan API key
+3. **Routescan** — fallback for chains not well-covered by Etherscan
+
+For proxy contracts (EIP-1967, beacon, OZ legacy), the proxy's implementation address is resolved via `eth_getStorageAt` and its ABI is merged on top.
+
+The result is cached in `localStorage` under `abi-{chain}-{address}`.
+
+#### Simulation result logs & call traces
+
+After a simulation runs, logs and call-trace frames are decoded in three passes:
+
+| Pass | Source                                                     | Trigger                                                                                 |
+| ---- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 1    | **Cached ABIs** (`localStorage`)                           | Always — uses whatever ABIs are already in cache                                        |
+| 2    | **Sourcify → Etherscan → Routescan**                       | For any `undecodedAddresses` returned by the simulation backend that are not yet cached |
+| 3    | **Decode server API** (`/api/decode-event`, topic0 lookup) | Fallback for logs still undecoded after passes 1 & 2 (e.g. unverified contracts)        |
 
 ## Tech Stack
 
