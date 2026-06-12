@@ -264,7 +264,7 @@ After a simulation runs, logs and call-trace frames are decoded in three passes:
 
 ## Tech Stack
 
-- **Framework**: Next.js 15 (App Router)
+- **Framework**: Next.js 16 (App Router)
 - **Runtime**: React 19
 - **Blockchain**: viem (for ABI encoding/decoding)
 - **Deployment**: Vercel
