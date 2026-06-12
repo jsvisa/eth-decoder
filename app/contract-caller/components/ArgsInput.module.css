@@ -1,0 +1,207 @@
+/* ETH value field container */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  width: 100%;
+}
+
+.label {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.payableBadge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #7c3aed;
+  background-color: #ede9fe;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  margin-left: 0.5rem;
+}
+
+/* ETH Value with unit toggle */
+.ethValueWrapper {
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+}
+
+.ethValueInput {
+  flex: 1;
+  padding: 0.875rem 1rem;
+  font-size: 1rem;
+  border: 2px solid var(--border-primary);
+  border-radius: 6px 0 0 6px;
+  border-right: none;
+  transition: border-color 0.3s;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.ethValueInput:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.ethValueInput:disabled {
+  background-color: var(--bg-hover);
+  cursor: not-allowed;
+}
+
+.ethValueUnitToggle {
+  display: flex;
+  border: 2px solid var(--border-primary);
+  border-radius: 0 6px 6px 0;
+  overflow: hidden;
+}
+
+.ethValueUnitBtn {
+  padding: 0.875rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background-color: var(--bg-hover);
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ethValueUnitBtn:first-child {
+  border-right: 1px solid var(--border-primary);
+}
+
+.ethValueUnitBtn:hover {
+  background-color: var(--bg-secondary);
+}
+
+.ethValueUnitBtn.active {
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  color: white;
+}
+
+/* Arguments section */
+.argsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  background-color: var(--bg-code);
+  border-radius: 8px;
+  border: 1px solid var(--border-secondary);
+}
+
+.argsSectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.readBlockInline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.08) 0%,
+    rgba(16, 185, 129, 0.08) 100%
+  );
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 6px;
+}
+
+.readBlockStandalone {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.08) 0%,
+    rgba(16, 185, 129, 0.08) 100%
+  );
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 6px;
+}
+
+.readBlockLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #059669;
+  white-space: nowrap;
+}
+
+.readBlockInput {
+  width: 120px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.readBlockInput:focus {
+  outline: none;
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.readBlockInput::placeholder {
+  color: #6ee7b7;
+}
+
+.argField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.argLabel {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+.input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  font-size: 1rem;
+  border: 2px solid var(--border-primary);
+  border-radius: 6px;
+  transition: border-color 0.3s;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.input:disabled {
+  background-color: var(--bg-hover);
+  cursor: not-allowed;
+}
+
+/* Error state */
+.inputError {
+  border-color: #ef4444 !important;
+  background-color: rgba(239, 68, 68, 0.05) !important;
+}
+
+.inputError:focus {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+.inputError::placeholder {
+  color: #f87171 !important;
+}

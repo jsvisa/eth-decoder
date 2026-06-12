@@ -1,0 +1,300 @@
+.simOptionsSection {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.08) 0%,
+    rgba(168, 85, 247, 0.08) 50%,
+    rgba(236, 72, 153, 0.08) 100%
+  );
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.1);
+}
+
+.simOptionsHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.simOptionsLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #8b5cf6;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.simOptionsToggle {
+  background: none;
+  border: none;
+  color: #a855f7;
+  cursor: pointer;
+  padding: 0.2rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+
+.simOptionsToggle:hover {
+  color: #c084fc;
+  transform: scale(1.2);
+}
+
+.simOptionsInline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  flex-wrap: nowrap;
+}
+
+.simOptionInput {
+  flex: 1;
+  min-width: 150px;
+  max-width: 300px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.simOptionInput:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+}
+
+.simOptionInput::placeholder {
+  color: #a78bfa;
+}
+
+.simOptionInputSmall {
+  width: 140px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid rgba(236, 72, 153, 0.3);
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.simOptionInputSmall:focus {
+  outline: none;
+  border-color: #ec4899;
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.15);
+}
+
+.simOptionInputSmall::placeholder {
+  color: #f472b6;
+}
+
+.inputError {
+  border-color: #ef4444 !important;
+  background-color: rgba(239, 68, 68, 0.05) !important;
+}
+
+.inputError:focus {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+.inputError::placeholder {
+  color: #f87171 !important;
+}
+
+.cheatcodesInline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.cheatcodeInlineItem {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6366f1;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.cheatcodeInlineItem input[type='checkbox'] {
+  width: 0.85rem;
+  height: 0.85rem;
+  cursor: pointer;
+  accent-color: #8b5cf6;
+}
+
+.cheatcodeInlineItem:hover {
+  background: rgba(99, 102, 241, 0.15);
+  color: #4f46e5;
+}
+
+.simOptionsExpanded {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(139, 92, 246, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cheatcodeExpandedRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 6px;
+}
+
+.cheatcodeLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  min-width: 70px;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.cheatcodeExpandedRow:nth-child(1) .cheatcodeLabel {
+  color: #059669;
+  background: rgba(5, 150, 105, 0.1);
+}
+
+.cheatcodeExpandedRow:nth-child(2) .cheatcodeLabel {
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.1);
+}
+
+.cheatcodeExpandedRow:nth-child(3) .cheatcodeLabel {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+/* From address wrapper in simulation options */
+.simOptionFromAddress {
+  flex: 1;
+  min-width: 200px;
+}
+
+.simOptionFromAddress input {
+  border: 1px solid rgba(139, 92, 246, 0.3) !important;
+  border-radius: 6px !important;
+}
+
+.simOptionFromAddress input:focus {
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15) !important;
+}
+
+.simOptionFromAddress input::placeholder {
+  color: #a78bfa !important;
+}
+
+/* State override buttons */
+.addOverrideBtn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 4px;
+  color: #8b5cf6;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.addOverrideBtn:hover {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: #8b5cf6;
+}
+
+.removeOverrideBtn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 4px;
+  color: #ef4444;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.removeOverrideBtn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+}
+
+.overridesLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #6366f1;
+  margin-bottom: 0.25rem;
+}
+
+/* Address arg input wrapper */
+.addressArgWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+}
+
+.input::placeholder {
+  color: #a78bfa;
+}
+
+.addressBookToggleButton {
+  position: absolute;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #a78bfa;
+  font-size: 1rem;
+  padding: 0;
+  line-height: 1;
+}
+
+.addressBookToggleButton:hover {
+  color: #8b5cf6;
+}
+
+.bookmarked {
+  color: #f59e0b;
+}

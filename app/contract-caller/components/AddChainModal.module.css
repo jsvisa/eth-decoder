@@ -1,0 +1,283 @@
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.chainModal {
+  background: var(--bg-card);
+  padding: 1.5rem;
+  border-radius: 12px;
+  max-width: 550px;
+  width: 90%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.chainModal .modalBody {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modalTitle {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.25rem;
+  color: #333;
+}
+
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modalField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.modalLabel {
+  font-weight: 500;
+  color: #555;
+  font-size: 0.875rem;
+}
+
+.modalInput {
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  transition: border-color 0.2s;
+}
+
+.modalInput:focus {
+  outline: none;
+  border-color: #0070f3;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.modalCancelButton {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #666;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modalCancelButton:hover {
+  background-color: #e8e8e8;
+}
+
+/* Added chains section */
+.addedChainsSection {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.addedChainsHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.addedChainsHeader:hover {
+  opacity: 0.8;
+}
+
+.addedChainsHeader .modalLabel {
+  margin: 0;
+}
+
+.collapseIcon {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  width: 1rem;
+}
+
+.addedChainsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.addedChainItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--bg-hover);
+  border-radius: 6px;
+}
+
+.addedChainName {
+  flex: 1;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.addedChainId {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.removeChainButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.removeChainButton:hover {
+  color: #dc2626;
+  background-color: #fef2f2;
+}
+
+/* Chain icons */
+.chainIconSmall {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.chainIconTiny {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* Chainlist results */
+.chainlistSection {
+  margin-top: 0.5rem;
+}
+
+.chainlistResults {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 350px;
+  overflow-y: auto;
+  margin-top: 0.5rem;
+}
+
+.chainlistItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  background-color: var(--bg-hover);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.chainlistItem:hover:not(.chainlistItemAdded) {
+  background-color: var(--bg-secondary);
+}
+
+.chainlistItemAdded {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.chainlistItemInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.chainlistItemName {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chainlistItemMeta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.chainlistItemAdded span {
+  font-size: 0.8rem;
+  color: var(--accent-green);
+}
+
+.addChainItemButton {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--accent-blue);
+  background-color: var(--accent-blue-light);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.addChainItemButton:hover {
+  background-color: var(--accent-blue);
+  color: white;
+}
+
+.chainlistEmpty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.chainlistError {
+  padding: 1rem;
+  text-align: center;
+  color: #dc2626;
+  font-size: 0.9rem;
+  background-color: #fef2f2;
+  border-radius: 6px;
+}
+
+.loadingText {
+  font-weight: 400;
+  color: var(--text-muted);
+}

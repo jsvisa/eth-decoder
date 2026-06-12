@@ -1,0 +1,207 @@
+/* Scoped styles for ContractAddressInput */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  width: 100%;
+}
+
+.label {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.addressLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.bookmarkName {
+  font-size: 0.85rem;
+  color: #f59e0b;
+  font-weight: 600;
+  background-color: #fef3c7;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+}
+
+.contractName {
+  font-size: 0.85rem;
+  color: #0070f3;
+  font-weight: 600;
+  background-color: #e8f4ff;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+}
+
+.addressRow {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.addressInputWrapper {
+  flex: 1;
+  position: relative;
+}
+
+.input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  font-size: 1rem;
+  border: 2px solid var(--border-primary, #ddd);
+  border-radius: 6px;
+  transition: border-color 0.3s;
+  background-color: var(--bg-input, white);
+  color: var(--text-primary, #333);
+  box-sizing: border-box;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--border-focus, #0070f3);
+}
+
+.input:disabled {
+  background-color: var(--bg-hover, #f5f5f5);
+  cursor: not-allowed;
+}
+
+.inputError {
+  border-color: #ef4444 !important;
+  background-color: rgba(239, 68, 68, 0.05) !important;
+}
+
+.inputError:focus {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+.inputError::placeholder {
+  color: #f87171 !important;
+}
+
+.addressSuggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.addressSuggestionItem {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.addressSuggestionItem:last-child {
+  border-bottom: none;
+}
+
+.addressSuggestionItem:hover {
+  background-color: #f8f9fa;
+}
+
+.suggestionName {
+  font-weight: 500;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.suggestionAddress {
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.bookmarkButton {
+  padding: 0.875rem 1rem;
+  font-size: 1.25rem;
+  color: #999;
+  background-color: white;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1;
+}
+
+.bookmarkButton:hover:not(:disabled) {
+  color: #f59e0b;
+  border-color: #f59e0b;
+}
+
+.bookmarkButton:disabled {
+  color: #ccc;
+  border-color: #eee;
+  cursor: not-allowed;
+}
+
+.bookmarkButton.bookmarked {
+  color: #f59e0b;
+  border-color: #f59e0b;
+  background-color: #fffbeb;
+}
+
+.bookmarkStar {
+  color: #f59e0b;
+  margin-right: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.detectProxyLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: #666;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fetchButton {
+  padding: 0.875rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0070f3;
+  background-color: white;
+  border: 2px solid #0070f3;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.fetchButton:hover:not(:disabled) {
+  background-color: #0070f3;
+  color: white;
+}
+
+.fetchButton:disabled {
+  background-color: #f5f5f5;
+  border-color: #ccc;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.fieldErrorMsg {
+  font-size: 0.85rem;
+  color: #ef4444;
+}

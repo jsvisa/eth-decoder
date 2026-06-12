@@ -1,0 +1,495 @@
+"use client";
+
+import React from "react";
+import styles from "./SimulationOptions.module.css";
+
+/**
+ * SimulationOptions — write-mode panel for fork-block, from-address,
+ * cheatcodes (local sim) and balance/storage/timestamp overrides (Tenderly).
+ *
+ * Pure presentational: no useState/useEffect beyond what's needed for
+ * the inline AddressArgInput dropdown.
+ *
+ * Props:
+ *   useLocalSimulation       {boolean}
+ *   forkBlockNumber          {string}
+ *   onForkBlockChange        {(s: string) => void}
+ *   fromAddress              {string}
+ *   onFromAddressChange      {(s: string) => void}
+ *   cheatcodes               {Cheatcodes}
+ *   onCheatcodesChange       {(c: Cheatcodes) => void}
+ *   balanceOverrides         {BalanceOverride[]}
+ *   onBalanceOverridesChange {(arr) => void}
+ *   storageOverrides         {StorageOverride[]}
+ *   onStorageOverridesChange {(arr) => void}
+ *   timestampOverride        {string}
+ *   onTimestampOverrideChange {(s: string) => void}
+ *   expanded                 {boolean}
+ *   onToggleExpanded         {() => void}
+ *   fieldErrors              {Record<string,string>}
+ *   onOpenBookmarkModal      {(addr: string) => void}
+ *   disabled                 {boolean}
+ *   addressBook              {Array}
+ */
+
+function AddressArgInput({
+  value,
+  onChange,
+  addressBook = [],
+  disabled,
+  placeholder,
+  onBookmarkClick,
+  error,
+}) {
+  const isValidAddress = value && /^0x[0-9a-fA-F]{40}$/.test(value);
+  const isBookmarked =
+    isValidAddress &&
+    addressBook.some(
+      (item) => item.address.toLowerCase() === value.toLowerCase(),
+    );
+
+  const handleStarClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isValidAddress || !onBookmarkClick) return;
+    onBookmarkClick(value);
+  };
+
+  return React.createElement(
+    "div",
+    { className: styles.addressArgWrapper },
+    React.createElement("input", {
+      type: "text",
+      value: value,
+      onChange: (e) => onChange(e.target.value),
+      placeholder: placeholder,
+      className: `${styles.input} ${error ? styles.inputError : ""}`,
+      disabled: disabled,
+    }),
+    isValidAddress &&
+      onBookmarkClick &&
+      React.createElement(
+        "button",
+        {
+          type: "button",
+          className: `${styles.addressBookToggleButton} ${isBookmarked ? styles.bookmarked : ""}`,
+          onClick: handleStarClick,
+          title: isBookmarked ? "Edit bookmark" : "Add to address book",
+        },
+        isBookmarked ? "★" : "☆",
+      ),
+  );
+}
+
+export default function SimulationOptions({
+  useLocalSimulation,
+  forkBlockNumber,
+  onForkBlockChange,
+  fromAddress,
+  onFromAddressChange,
+  cheatcodes,
+  onCheatcodesChange,
+  balanceOverrides,
+  onBalanceOverridesChange,
+  storageOverrides,
+  onStorageOverridesChange,
+  timestampOverride,
+  onTimestampOverrideChange,
+  expanded,
+  onToggleExpanded,
+  fieldErrors = {},
+  onOpenBookmarkModal,
+  disabled,
+  addressBook = [],
+}) {
+  const hasCheatcodesExpanded =
+    expanded &&
+    (cheatcodes.deal.enabled ||
+      cheatcodes.prank.enabled ||
+      cheatcodes.warp.enabled);
+
+  // -- Inline section (always visible) --
+  const inlineItems = [];
+
+  // Fork block input
+  inlineItems.push(
+    React.createElement("input", {
+      key: "forkBlock",
+      type: "text",
+      value: forkBlockNumber,
+      onChange: (e) => onForkBlockChange(e.target.value),
+      placeholder: "Block # (latest)",
+      className: `${styles.simOptionInputSmall} ${fieldErrors.forkBlockNumber ? styles.inputError : ""}`,
+      disabled: disabled,
+    }),
+  );
+
+  // From address
+  inlineItems.push(
+    React.createElement(
+      "div",
+      {
+        key: "fromAddress",
+        className: styles.simOptionFromAddress,
+        title: "Sender address to impersonate (prank) - simulates msg.sender",
+      },
+      React.createElement(AddressArgInput, {
+        value: fromAddress,
+        onChange: onFromAddressChange,
+        addressBook: addressBook,
+        disabled: disabled,
+        placeholder: "From (prank)",
+        onBookmarkClick: onOpenBookmarkModal,
+        error: fieldErrors.fromAddress,
+      }),
+    ),
+  );
+
+  if (useLocalSimulation) {
+    // Cheatcode checkboxes
+    inlineItems.push(
+      React.createElement(
+        "div",
+        { key: "cheatcodesInline", className: styles.cheatcodesInline },
+        React.createElement(
+          "label",
+          {
+            className: styles.cheatcodeInlineItem,
+            title: "vm.deal - Set ETH balance",
+          },
+          React.createElement("input", {
+            type: "checkbox",
+            checked: cheatcodes.deal.enabled,
+            onChange: (e) =>
+              onCheatcodesChange({
+                ...cheatcodes,
+                deal: { ...cheatcodes.deal, enabled: e.target.checked },
+              }),
+          }),
+          React.createElement("span", null, "deal"),
+        ),
+        React.createElement(
+          "label",
+          {
+            className: styles.cheatcodeInlineItem,
+            title: "vm.prank - Impersonate address",
+          },
+          React.createElement("input", {
+            type: "checkbox",
+            checked: cheatcodes.prank.enabled,
+            onChange: (e) =>
+              onCheatcodesChange({
+                ...cheatcodes,
+                prank: { ...cheatcodes.prank, enabled: e.target.checked },
+              }),
+          }),
+          React.createElement("span", null, "prank"),
+        ),
+        React.createElement(
+          "label",
+          {
+            className: styles.cheatcodeInlineItem,
+            title: "vm.warp - Set timestamp",
+          },
+          React.createElement("input", {
+            type: "checkbox",
+            checked: cheatcodes.warp.enabled,
+            onChange: (e) =>
+              onCheatcodesChange({
+                ...cheatcodes,
+                warp: { ...cheatcodes.warp, enabled: e.target.checked },
+              }),
+          }),
+          React.createElement("span", null, "warp"),
+        ),
+      ),
+    );
+  } else {
+    // Tenderly override controls
+    inlineItems.push(
+      React.createElement(
+        "button",
+        {
+          key: "addBalance",
+          type: "button",
+          className: styles.addOverrideBtn,
+          onClick: () =>
+            onBalanceOverridesChange([
+              ...balanceOverrides,
+              { address: "", balance: "" },
+            ]),
+          title: "Add balance override",
+        },
+        "+ Balance",
+      ),
+      React.createElement(
+        "button",
+        {
+          key: "addStorage",
+          type: "button",
+          className: styles.addOverrideBtn,
+          onClick: () =>
+            onStorageOverridesChange([
+              ...storageOverrides,
+              { address: "", slot: "", value: "" },
+            ]),
+          title: "Add storage override",
+        },
+        "+ Storage",
+      ),
+      React.createElement("input", {
+        key: "timestamp",
+        type: "text",
+        value: timestampOverride,
+        onChange: (e) => onTimestampOverrideChange(e.target.value),
+        placeholder: "Timestamp (unix)",
+        className: styles.simOptionInputSmall,
+        disabled: disabled,
+        title: "Override block timestamp",
+      }),
+    );
+  }
+
+  // -- Expanded cheatcode rows (local sim) --
+  const expandedCheatcodes =
+    hasCheatcodesExpanded &&
+    React.createElement(
+      "div",
+      { className: styles.simOptionsExpanded },
+      cheatcodes.deal.enabled &&
+        React.createElement(
+          "div",
+          { className: styles.cheatcodeExpandedRow },
+          React.createElement(
+            "span",
+            { className: styles.cheatcodeLabel },
+            "vm.deal:",
+          ),
+          React.createElement("input", {
+            type: "text",
+            value: cheatcodes.deal.address,
+            onChange: (e) =>
+              onCheatcodesChange({
+                ...cheatcodes,
+                deal: { ...cheatcodes.deal, address: e.target.value },
+              }),
+            placeholder: "Address",
+            className: `${styles.simOptionInput} ${fieldErrors.dealAddress ? styles.inputError : ""}`,
+          }),
+          React.createElement("input", {
+            type: "text",
+            value: cheatcodes.deal.amount,
+            onChange: (e) =>
+              onCheatcodesChange({
+                ...cheatcodes,
+                deal: { ...cheatcodes.deal, amount: e.target.value },
+              }),
+            placeholder: "ETH Amount",
+            className: `${styles.simOptionInputSmall} ${fieldErrors.dealAmount ? styles.inputError : ""}`,
+          }),
+        ),
+      cheatcodes.prank.enabled &&
+        React.createElement(
+          "div",
+          { className: styles.cheatcodeExpandedRow },
+          React.createElement(
+            "span",
+            { className: styles.cheatcodeLabel },
+            "vm.prank:",
+          ),
+          React.createElement("input", {
+            type: "text",
+            value: cheatcodes.prank.address,
+            onChange: (e) =>
+              onCheatcodesChange({
+                ...cheatcodes,
+                prank: { ...cheatcodes.prank, address: e.target.value },
+              }),
+            placeholder: "Impersonate Address",
+            className: `${styles.simOptionInput} ${fieldErrors.prankAddress ? styles.inputError : ""}`,
+          }),
+        ),
+      cheatcodes.warp.enabled &&
+        React.createElement(
+          "div",
+          { className: styles.cheatcodeExpandedRow },
+          React.createElement(
+            "span",
+            { className: styles.cheatcodeLabel },
+            "vm.warp:",
+          ),
+          React.createElement("input", {
+            type: "text",
+            value: cheatcodes.warp.timestamp,
+            onChange: (e) =>
+              onCheatcodesChange({
+                ...cheatcodes,
+                warp: { ...cheatcodes.warp, timestamp: e.target.value },
+              }),
+            placeholder: "Unix Timestamp",
+            className: `${styles.simOptionInputSmall} ${fieldErrors.warpTimestamp ? styles.inputError : ""}`,
+          }),
+        ),
+    );
+
+  // -- Balance overrides (Tenderly) --
+  const balanceOverrideSection =
+    !useLocalSimulation &&
+    balanceOverrides.length > 0 &&
+    React.createElement(
+      "div",
+      { className: styles.simOptionsExpanded },
+      React.createElement(
+        "div",
+        { className: styles.overridesLabel },
+        "Balance Overrides:",
+      ),
+      ...balanceOverrides.map((override, index) =>
+        React.createElement(
+          "div",
+          { key: index, className: styles.cheatcodeExpandedRow },
+          React.createElement("input", {
+            type: "text",
+            value: override.address,
+            onChange: (e) => {
+              const next = balanceOverrides.map((o, i) =>
+                i === index ? { ...o, address: e.target.value } : o,
+              );
+              onBalanceOverridesChange(next);
+            },
+            placeholder: "Address (0x...)",
+            className: styles.simOptionInput,
+          }),
+          React.createElement("input", {
+            type: "text",
+            value: override.balance,
+            onChange: (e) => {
+              const next = balanceOverrides.map((o, i) =>
+                i === index ? { ...o, balance: e.target.value } : o,
+              );
+              onBalanceOverridesChange(next);
+            },
+            placeholder: "ETH Balance",
+            className: styles.simOptionInputSmall,
+          }),
+          React.createElement(
+            "button",
+            {
+              type: "button",
+              className: styles.removeOverrideBtn,
+              onClick: () =>
+                onBalanceOverridesChange(
+                  balanceOverrides.filter((_, i) => i !== index),
+                ),
+              title: "Remove override",
+            },
+            "×",
+          ),
+        ),
+      ),
+    );
+
+  // -- Storage overrides (Tenderly) --
+  const storageOverrideSection =
+    !useLocalSimulation &&
+    storageOverrides.length > 0 &&
+    React.createElement(
+      "div",
+      { className: styles.simOptionsExpanded },
+      React.createElement(
+        "div",
+        { className: styles.overridesLabel },
+        "Storage Overrides:",
+      ),
+      ...storageOverrides.map((override, index) =>
+        React.createElement(
+          "div",
+          { key: index, className: styles.cheatcodeExpandedRow },
+          React.createElement("input", {
+            type: "text",
+            value: override.address,
+            onChange: (e) => {
+              const next = storageOverrides.map((o, i) =>
+                i === index ? { ...o, address: e.target.value } : o,
+              );
+              onStorageOverridesChange(next);
+            },
+            placeholder: "Contract (0x...)",
+            className: styles.simOptionInput,
+          }),
+          React.createElement("input", {
+            type: "text",
+            value: override.slot,
+            onChange: (e) => {
+              const next = storageOverrides.map((o, i) =>
+                i === index ? { ...o, slot: e.target.value } : o,
+              );
+              onStorageOverridesChange(next);
+            },
+            placeholder: "Slot (0x...)",
+            className: styles.simOptionInputSmall,
+          }),
+          React.createElement("input", {
+            type: "text",
+            value: override.value,
+            onChange: (e) => {
+              const next = storageOverrides.map((o, i) =>
+                i === index ? { ...o, value: e.target.value } : o,
+              );
+              onStorageOverridesChange(next);
+            },
+            placeholder: "Value (0x...)",
+            className: styles.simOptionInputSmall,
+          }),
+          React.createElement(
+            "button",
+            {
+              type: "button",
+              className: styles.removeOverrideBtn,
+              onClick: () =>
+                onStorageOverridesChange(
+                  storageOverrides.filter((_, i) => i !== index),
+                ),
+              title: "Remove override",
+            },
+            "×",
+          ),
+        ),
+      ),
+    );
+
+  return React.createElement(
+    "div",
+    { className: styles.simOptionsSection },
+    // Header row
+    React.createElement(
+      "div",
+      { className: styles.simOptionsHeader },
+      React.createElement(
+        "span",
+        { className: styles.simOptionsLabel },
+        "Simulation Options",
+      ),
+      React.createElement(
+        "button",
+        {
+          onClick: onToggleExpanded,
+          className: styles.simOptionsToggle,
+          type: "button",
+        },
+        expanded ? "▼" : "▶",
+      ),
+      React.createElement(
+        "div",
+        { className: styles.simOptionsInline },
+        ...inlineItems,
+      ),
+    ),
+    // Expanded cheatcodes
+    expandedCheatcodes,
+    // Balance overrides
+    balanceOverrideSection,
+    // Storage overrides
+    storageOverrideSection,
+  );
+}
