@@ -208,192 +208,194 @@ export default function ContractCallerPage() {
             />
           </div>
 
-        <AbiPanel
-          abi={abi.abi}
-          onAbiChange={abi.setAbi}
-          parsedAbi={abi.parsedAbi}
-          abiSource={abi.abiSource}
-          abiSaved={abi.abiSaved}
-          onSaveAbi={abi.saveAbiToCache}
-          onRefetchAbi={() => abi.fetchAbi({ forceRefresh: true })}
-          loading={exec.loading}
-        />
+          <AbiPanel
+            abi={abi.abi}
+            onAbiChange={abi.setAbi}
+            parsedAbi={abi.parsedAbi}
+            abiSource={abi.abiSource}
+            abiSaved={abi.abiSaved}
+            onSaveAbi={abi.saveAbiToCache}
+            onRefetchAbi={() => abi.fetchAbi({ forceRefresh: true })}
+            loading={exec.loading}
+          />
 
-        <FunctionEventsTabs
-          activeTab={events.activeTab}
-          onTabChange={events.setActiveTab}
-          functionsCount={abi.functions.length}
-          eventsCount={
-            (abi.parsedAbi || []).filter((x) => x.type === "event").length
-          }
-          functionsContent={
-            <>
-              <FunctionSelector
-                functions={abi.functions}
-                selectedFunction={fn.selectedFunction}
-                onSelectFunction={fn.setSelectedFunction}
-                disabled={exec.loading}
-              />
-              <CalldataSection
-                expanded={fn.pasteCalldataExpanded}
-                onToggle={() => fn.setPasteCalldataExpanded((v) => !v)}
-                value={fn.pasteCalldataValue}
-                onValueChange={fn.setPasteCalldataValue}
-                error={fn.pasteCalldataError}
-                onDecodeAndFill={fn.handleDecodeAndFill}
-                disabled={exec.loading}
-              />
-              <SimulationOptions
-                useLocalSimulation={useLocalSimulation}
-                forkBlockNumber={simOpts.forkBlockNumber}
-                onForkBlockChange={simOpts.setForkBlockNumber}
-                fromAddress={simOpts.fromAddress}
-                onFromAddressChange={simOpts.setFromAddress}
-                cheatcodes={simOpts.cheatcodes}
-                onCheatcodesChange={simOpts.setCheatcodes}
-                balanceOverrides={simOpts.balanceOverrides}
-                onBalanceOverridesChange={simOpts.setBalanceOverrides}
-                storageOverrides={simOpts.storageOverrides}
-                onStorageOverridesChange={simOpts.setStorageOverrides}
-                timestampOverride={simOpts.timestampOverride}
-                onTimestampOverrideChange={simOpts.setTimestampOverride}
-                expanded={simOpts.simOptionsExpanded}
-                onToggleExpanded={() =>
-                  simOpts.setSimOptionsExpanded((v) => !v)
+          <FunctionEventsTabs
+            activeTab={events.activeTab}
+            onTabChange={events.setActiveTab}
+            functionsCount={abi.functions.length}
+            eventsCount={
+              (abi.parsedAbi || []).filter((x) => x.type === "event").length
+            }
+            functionsContent={
+              <>
+                <FunctionSelector
+                  functions={abi.functions}
+                  selectedFunction={fn.selectedFunction}
+                  onSelectFunction={fn.setSelectedFunction}
+                  disabled={exec.loading}
+                />
+                <CalldataSection
+                  expanded={fn.pasteCalldataExpanded}
+                  onToggle={() => fn.setPasteCalldataExpanded((v) => !v)}
+                  value={fn.pasteCalldataValue}
+                  onValueChange={fn.setPasteCalldataValue}
+                  error={fn.pasteCalldataError}
+                  onDecodeAndFill={fn.handleDecodeAndFill}
+                  disabled={exec.loading}
+                />
+                <SimulationOptions
+                  useLocalSimulation={useLocalSimulation}
+                  forkBlockNumber={simOpts.forkBlockNumber}
+                  onForkBlockChange={simOpts.setForkBlockNumber}
+                  fromAddress={simOpts.fromAddress}
+                  onFromAddressChange={simOpts.setFromAddress}
+                  cheatcodes={simOpts.cheatcodes}
+                  onCheatcodesChange={simOpts.setCheatcodes}
+                  balanceOverrides={simOpts.balanceOverrides}
+                  onBalanceOverridesChange={simOpts.setBalanceOverrides}
+                  storageOverrides={simOpts.storageOverrides}
+                  onStorageOverridesChange={simOpts.setStorageOverrides}
+                  timestampOverride={simOpts.timestampOverride}
+                  onTimestampOverrideChange={simOpts.setTimestampOverride}
+                  expanded={simOpts.simOptionsExpanded}
+                  onToggleExpanded={() =>
+                    simOpts.setSimOptionsExpanded((v) => !v)
+                  }
+                  fieldErrors={fn.fieldErrors}
+                  onOpenBookmarkModal={bookmark.openBookmarkModal}
+                  addressBook={bookmark.addressBook}
+                  disabled={exec.loading}
+                />
+                <ArgsInput
+                  fn={selectedFn}
+                  args={fn.args}
+                  onArgsChange={fn.setArgs}
+                  fieldErrors={fn.fieldErrors}
+                  addressBook={bookmark.addressBook}
+                  onOpenBookmarkModal={bookmark.openBookmarkModal}
+                  readBlockNumber={fn.readBlockNumber}
+                  onReadBlockNumberChange={fn.setReadBlockNumber}
+                  ethValue={fn.ethValue}
+                  onEthValueChange={fn.setEthValue}
+                  ethValueUnit={fn.ethValueUnit}
+                  onEthValueUnitChange={fn.setEthValueUnit}
+                  disabled={exec.loading}
+                />
+              </>
+            }
+            eventsContent={
+              <EventsTab
+                events={(abi.parsedAbi || []).filter((x) => x.type === "event")}
+                selectedEvents={events.selectedEvents}
+                onToggleEvent={events.toggleEventSelection}
+                onSelectAll={events.selectAllEvents}
+                onClearSelection={events.clearEventSelection}
+                eventFilter={events.eventFilter}
+                onEventFilterChange={events.setEventFilter}
+                eventListCollapsed={events.eventListCollapsed}
+                onToggleEventList={() =>
+                  events.setEventListCollapsed((v) => !v)
                 }
-                fieldErrors={fn.fieldErrors}
-                onOpenBookmarkModal={bookmark.openBookmarkModal}
-                addressBook={bookmark.addressBook}
-                disabled={exec.loading}
+                logsFromBlock={events.logsFromBlock}
+                logsToBlock={events.logsToBlock}
+                onLogsFromBlockChange={events.setLogsFromBlock}
+                onLogsToBlockChange={events.setLogsToBlock}
+                logsPage={events.logsPage}
+                logsOffset={events.logsOffset}
+                onLogsPageChange={events.setLogsPage}
+                onLogsOffsetChange={events.setLogsOffset}
+                onFetchLogs={events.fetchLogs}
+                fetchingLogs={events.fetchingLogs}
+                logsError={events.logsError}
+                logsFetched={events.logsFetched}
+                eventLogs={events.eventLogs}
+                logsFilter={events.logsFilter}
+                onLogsFilterChange={events.setLogsFilter}
+                onDownloadCsv={events.downloadLogsAsCsv}
+                latestBlock={events.latestBlockCache}
               />
-              <ArgsInput
-                fn={selectedFn}
-                args={fn.args}
-                onArgsChange={fn.setArgs}
-                fieldErrors={fn.fieldErrors}
-                addressBook={bookmark.addressBook}
-                onOpenBookmarkModal={bookmark.openBookmarkModal}
-                readBlockNumber={fn.readBlockNumber}
-                onReadBlockNumberChange={fn.setReadBlockNumber}
-                ethValue={fn.ethValue}
-                onEthValueChange={fn.setEthValue}
-                ethValueUnit={fn.ethValueUnit}
-                onEthValueUnitChange={fn.setEthValueUnit}
-                disabled={exec.loading}
-              />
-            </>
+            }
+          />
+
+          <CallActionBar
+            selectedFunction={fn.selectedFunction}
+            isWrite={isWrite}
+            loading={exec.loading}
+            useLocalSimulation={useLocalSimulation}
+            simProgress={exec.simProgress}
+            sessionActive={session.sessionActive}
+            sessionBlock={session.sessionBlock}
+            sessionStarting={session.sessionStarting}
+            calldataCopied={fn.calldataCopied}
+            urlCopied={exec.urlCopied}
+            activeTab={events.activeTab}
+            onCall={exec.handleCall}
+            onCancel={exec.handleCancel}
+            onCopyCalldata={fn.handleCopyCalldata}
+            onShareUrl={exec.handleShareUrl}
+            onStartSession={session.handleStartSession}
+            onResetSession={session.handleResetSession}
+          />
+
+          <SessionHistoryStrip
+            active={session.sessionActive}
+            items={session.sessionHistory}
+            expandedIds={history.expandedHistoryIds}
+            onToggleExpanded={history.toggleHistoryExpanded}
+          />
+
+          <ResultPanel
+            result={exec.result}
+            error={exec.error}
+            chain={chain}
+            address={address}
+            fromAddress={simOpts.fromAddress}
+            tokenSymbols={tokens.tokenSymbols}
+            tokenDecimals={tokens.tokenDecimals}
+            tokenPrices={tokens.tokenPrices}
+          />
+
+          <HistorySidebar
+            history={history.history}
+            chain={chain}
+            show={history.showHistory}
+            onShowChange={history.setShowHistory}
+            search={history.historySearch}
+            onSearchChange={history.setHistorySearch}
+            onLoad={history.loadFromHistory}
+            onClear={history.clearHistory}
+          />
+        </div>
+
+        <BookmarkModal
+          open={bookmark.showBookmarkModal}
+          address={bookmark.bookmarkAddress}
+          label={bookmark.bookmarkLabel}
+          notes={bookmark.bookmarkNotes}
+          onLabelChange={bookmark.setBookmarkLabel}
+          onNotesChange={bookmark.setBookmarkNotes}
+          onSave={bookmark.saveBookmark}
+          onRemove={bookmark.removeBookmark}
+          onClose={bookmark.closeBookmarkModal}
+        />
+
+        <AddChainModal
+          open={addChain.showAddChainModal}
+          onClose={addChain.closeAddChainModal}
+          search={addChain.chainlistSearch}
+          onSearchChange={addChain.setChainlistSearch}
+          customChains={customChains}
+          addedCollapsed={addChain.addedChainsCollapsed}
+          onToggleAddedCollapsed={() =>
+            addChain.setAddedChainsCollapsed((v) => !v)
           }
-          eventsContent={
-            <EventsTab
-              events={(abi.parsedAbi || []).filter((x) => x.type === "event")}
-              selectedEvents={events.selectedEvents}
-              onToggleEvent={events.toggleEventSelection}
-              onSelectAll={events.selectAllEvents}
-              onClearSelection={events.clearEventSelection}
-              eventFilter={events.eventFilter}
-              onEventFilterChange={events.setEventFilter}
-              eventListCollapsed={events.eventListCollapsed}
-              onToggleEventList={() => events.setEventListCollapsed((v) => !v)}
-              logsFromBlock={events.logsFromBlock}
-              logsToBlock={events.logsToBlock}
-              onLogsFromBlockChange={events.setLogsFromBlock}
-              onLogsToBlockChange={events.setLogsToBlock}
-              logsPage={events.logsPage}
-              logsOffset={events.logsOffset}
-              onLogsPageChange={events.setLogsPage}
-              onLogsOffsetChange={events.setLogsOffset}
-              onFetchLogs={events.fetchLogs}
-              fetchingLogs={events.fetchingLogs}
-              logsError={events.logsError}
-              logsFetched={events.logsFetched}
-              eventLogs={events.eventLogs}
-              logsFilter={events.logsFilter}
-              onLogsFilterChange={events.setLogsFilter}
-              onDownloadCsv={events.downloadLogsAsCsv}
-              latestBlock={events.latestBlockCache}
-            />
-          }
+          chainlistData={addChain.chainlistData}
+          loading={addChain.chainlistLoading}
+          error={addChain.chainlistError}
+          onAddChain={addChain.addCustomChain}
+          onRemoveChain={addChain.removeCustomChain}
+          isChainAdded={addChain.isChainAdded}
         />
-
-        <CallActionBar
-          selectedFunction={fn.selectedFunction}
-          isWrite={isWrite}
-          loading={exec.loading}
-          useLocalSimulation={useLocalSimulation}
-          simProgress={exec.simProgress}
-          sessionActive={session.sessionActive}
-          sessionBlock={session.sessionBlock}
-          sessionStarting={session.sessionStarting}
-          calldataCopied={fn.calldataCopied}
-          urlCopied={exec.urlCopied}
-          activeTab={events.activeTab}
-          onCall={exec.handleCall}
-          onCancel={exec.handleCancel}
-          onCopyCalldata={fn.handleCopyCalldata}
-          onShareUrl={exec.handleShareUrl}
-          onStartSession={session.handleStartSession}
-          onResetSession={session.handleResetSession}
-        />
-
-        <SessionHistoryStrip
-          active={session.sessionActive}
-          items={session.sessionHistory}
-          expandedIds={history.expandedHistoryIds}
-          onToggleExpanded={history.toggleHistoryExpanded}
-        />
-
-        <ResultPanel
-          result={exec.result}
-          error={exec.error}
-          chain={chain}
-          address={address}
-          fromAddress={simOpts.fromAddress}
-          tokenSymbols={tokens.tokenSymbols}
-          tokenDecimals={tokens.tokenDecimals}
-          tokenPrices={tokens.tokenPrices}
-        />
-
-        <HistorySidebar
-          history={history.history}
-          chain={chain}
-          show={history.showHistory}
-          onShowChange={history.setShowHistory}
-          search={history.historySearch}
-          onSearchChange={history.setHistorySearch}
-          onLoad={history.loadFromHistory}
-          onClear={history.clearHistory}
-        />
-      </div>
-
-      <BookmarkModal
-        open={bookmark.showBookmarkModal}
-        address={bookmark.bookmarkAddress}
-        label={bookmark.bookmarkLabel}
-        notes={bookmark.bookmarkNotes}
-        onLabelChange={bookmark.setBookmarkLabel}
-        onNotesChange={bookmark.setBookmarkNotes}
-        onSave={bookmark.saveBookmark}
-        onRemove={bookmark.removeBookmark}
-        onClose={bookmark.closeBookmarkModal}
-      />
-
-      <AddChainModal
-        open={addChain.showAddChainModal}
-        onClose={addChain.closeAddChainModal}
-        search={addChain.chainlistSearch}
-        onSearchChange={addChain.setChainlistSearch}
-        customChains={customChains}
-        addedCollapsed={addChain.addedChainsCollapsed}
-        onToggleAddedCollapsed={() =>
-          addChain.setAddedChainsCollapsed((v) => !v)
-        }
-        chainlistData={addChain.chainlistData}
-        loading={addChain.chainlistLoading}
-        error={addChain.chainlistError}
-        onAddChain={addChain.addCustomChain}
-        onRemoveChain={addChain.removeCustomChain}
-        isChainAdded={addChain.isChainAdded}
-      />
       </div>
     </main>
   );
