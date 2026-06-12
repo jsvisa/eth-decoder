@@ -98,7 +98,19 @@ export function useFunctionSelection({
 
   // --- Effect: reset / restore args when selected function or parsedAbi changes (lines 1627-1668) ---
   useEffect(() => {
-    if (!selectedFunction || !parsedAbi) {
+    if (!parsedAbi) {
+      if (!pendingHistoryRef.current) {
+        if (selectedFunction) {
+          setSelectedFunction("");
+        }
+        setArgs([]);
+        setPasteCalldataValue("");
+        setPasteCalldataError(null);
+      }
+      return;
+    }
+
+    if (!selectedFunction) {
       if (!pendingHistoryRef.current) {
         setArgs([]);
       }
@@ -113,9 +125,23 @@ export function useFunctionSelection({
     if (pendingHistoryRef.current !== null) {
       const pending = pendingHistoryRef.current;
       const pendingArgs = pending.args || [];
+      const pendingFunc =
+        func ||
+        parsedAbi.find(
+          (item) =>
+            item.type === "function" &&
+            (getFunctionSig(item) === pending.functionSig ||
+              item.name === pending.functionSig),
+        );
 
-      if (pending.functionSig === selectedFunction && func) {
-        const expectedInputs = func.inputs?.length || 0;
+      if (pendingFunc) {
+        const resolvedSig = getFunctionSig(pendingFunc);
+        if (selectedFunction !== resolvedSig) {
+          setSelectedFunction(resolvedSig);
+          return;
+        }
+
+        const expectedInputs = pendingFunc.inputs?.length || 0;
         if (pendingArgs.length === expectedInputs) {
           pendingHistoryRef.current = null;
           setArgs(pendingArgs);
@@ -127,7 +153,13 @@ export function useFunctionSelection({
     }
 
     // Normal function switch: reset args to defaults
-    if (func && func.inputs) {
+    if (!func) {
+      setSelectedFunction("");
+      setArgs([]);
+      return;
+    }
+
+    if (func.inputs) {
       setArgs(func.inputs.map((input) => getDefaultValue(input)));
     } else {
       setArgs([]);

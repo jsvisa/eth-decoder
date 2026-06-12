@@ -32,6 +32,7 @@ function makeParams(overrides = {}) {
     setResult: vi.fn(),
     setError: vi.fn(),
     setEthValue: vi.fn(),
+    applyPendingArgs: vi.fn(),
     ...overrides,
   };
 }
@@ -79,6 +80,29 @@ describe("initial state", () => {
 
     const { result } = renderHook(() => useHistory(makeParams()));
     expect(result.current.history).toEqual(stored);
+  });
+
+  it("hydrates share-link function args into selection state on mount", () => {
+    const applyPendingArgs = vi.fn();
+    window.history.replaceState(
+      null,
+      "",
+      "/contract-caller?chain=ethereum&address=0xabc&function=transfer(address,uint256)&args=%5B%220xdead%22%2C%22100%22%5D",
+    );
+
+    renderHook(() =>
+      useHistory(
+        makeParams({
+          applyPendingArgs,
+        }),
+      ),
+    );
+
+    expect(applyPendingArgs).toHaveBeenCalledWith({
+      functionSig: "transfer(address,uint256)",
+      args: ["0xdead", "100"],
+      timestamp: expect.any(Number),
+    });
   });
 });
 
@@ -194,7 +218,8 @@ describe("loadFromHistory", () => {
   });
 
   it("sets pendingHistoryRef when switching to a different contract", () => {
-    const params = makeParams();
+    const applyPendingArgs = vi.fn();
+    const params = makeParams({ applyPendingArgs });
     const { result } = renderHook(() => useHistory(params));
 
     const item = {
@@ -216,6 +241,11 @@ describe("loadFromHistory", () => {
       "balanceOf(address)",
     );
     expect(result.current.pendingHistoryRef.current.args).toEqual(["0x1234"]);
+    expect(applyPendingArgs).toHaveBeenCalledWith({
+      functionSig: "balanceOf(address)",
+      args: ["0x1234"],
+      timestamp: expect.any(Number),
+    });
   });
 });
 

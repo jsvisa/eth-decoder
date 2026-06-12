@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { useSettings } from "../contexts/SettingsContext";
 import { CHAINS } from "../utils/chains";
+import { isValidEthAddress } from "../utils/validation";
 
 import { useAbi } from "./hooks/useAbi";
 import { useFunctionSelection } from "./hooks/useFunctionSelection";
@@ -33,6 +34,116 @@ import AddChainModal from "./components/AddChainModal";
 
 import styles from "./page.module.css";
 
+const getFunctionSig = (func) => {
+  const types = func.inputs?.map((input) => input.type).join(",") || "";
+  return `${func.name}(${types})`;
+};
+
+const validateAddressesInArg = (
+  argValue,
+  input,
+  errors,
+  argIndex,
+  argErrors,
+  path = "",
+) => {
+  const type = input.type;
+
+  if (type === "address") {
+    if (!argValue || !isValidEthAddress(argValue)) {
+      errors[`arg_${argIndex}`] = true;
+      const fieldName = path || input.name || `Argument ${argIndex + 1}`;
+      argErrors.push(`${fieldName} must be a valid Ethereum address`);
+      return false;
+    }
+    return true;
+  }
+
+  if (type === "address[]") {
+    if (!argValue) return true;
+    try {
+      const addresses =
+        typeof argValue === "string" ? JSON.parse(argValue) : argValue;
+      if (Array.isArray(addresses)) {
+        let valid = true;
+        addresses.forEach((addressValue, index) => {
+          if (!isValidEthAddress(addressValue)) {
+            errors[`arg_${argIndex}`] = true;
+            const fieldName = path || input.name || `Argument ${argIndex + 1}`;
+            argErrors.push(
+              `${fieldName}[${index}] must be a valid Ethereum address`,
+            );
+            valid = false;
+          }
+        });
+        return valid;
+      }
+    } catch {
+      return true;
+    }
+    return true;
+  }
+
+  if (type === "tuple" && input.components) {
+    if (!argValue) return true;
+    const tupleValue = Array.isArray(argValue) ? argValue : [];
+    let valid = true;
+    input.components.forEach((component, index) => {
+      const componentPath = path
+        ? `${path}.${component.name || index}`
+        : `${input.name || `Argument ${argIndex + 1}`}.${component.name || index}`;
+      if (
+        !validateAddressesInArg(
+          tupleValue[index],
+          component,
+          errors,
+          argIndex,
+          argErrors,
+          componentPath,
+        )
+      ) {
+        valid = false;
+      }
+    });
+    return valid;
+  }
+
+  if (type === "tuple[]" && input.components) {
+    if (!argValue) return true;
+    try {
+      const tupleArray =
+        typeof argValue === "string" ? JSON.parse(argValue) : argValue;
+      if (Array.isArray(tupleArray)) {
+        let valid = true;
+        tupleArray.forEach((tuple, index) => {
+          const tuplePath = path
+            ? `${path}[${index}]`
+            : `${input.name || `Argument ${argIndex + 1}`}[${index}]`;
+          const tupleInput = { ...input, type: "tuple" };
+          if (
+            !validateAddressesInArg(
+              tuple,
+              tupleInput,
+              errors,
+              argIndex,
+              argErrors,
+              tuplePath,
+            )
+          ) {
+            valid = false;
+          }
+        });
+        return valid;
+      }
+    } catch {
+      return true;
+    }
+    return true;
+  }
+
+  return true;
+};
+
 export default function ContractCallerPage() {
   // --- Settings ---
   const {
@@ -44,6 +155,7 @@ export default function ContractCallerPage() {
     isTenderlyConfigured,
     getChainId,
     customChains,
+    setShowSettings,
   } = useSettings();
 
   // --- Top-level shared state ---
@@ -57,11 +169,50 @@ export default function ContractCallerPage() {
   const setErrorRef = useRef(null);
   const saveToHistoryRef = useRef(null);
 
+  const resetFunctionState = () => {
+    fn.setSelectedFunction("");
+    fn.setArgs([]);
+    fn.setPasteCalldataValue("");
+    fn.setPasteCalldataError(null);
+  };
+
+  const handleAbiParsed = (parsed, allFunctions) => {
+    if (!parsed) {
+      resetFunctionState();
+      setErrorRef.current?.(null);
+      return;
+    }
+
+    const hasSelectedFunction =
+      fn.selectedFunction &&
+      allFunctions.some((func) => getFunctionSig(func) === fn.selectedFunction);
+
+    if (!hasSelectedFunction && !fn.selectedFunction) {
+      resetFunctionState();
+    }
+
+    setErrorRef.current?.(null);
+  };
+
+  const handleAbiError = (message) => {
+    resetFunctionState();
+    setErrorRef.current?.(message);
+  };
+
   // --- Hooks (dependency order: simOpts → abi → fn → session → exec → history) ---
 
   const simOpts = useSimulationOptions();
 
-  const abi = useAbi({ chain, address, apiKeys, rpcSettings, getChainId });
+  const abi = useAbi({
+    chain,
+    address,
+    apiKeys,
+    rpcSettings,
+    getChainId,
+    onAbiParsed: handleAbiParsed,
+    onAbiError: handleAbiError,
+    onSetError: (...args) => setErrorRef.current?.(...args),
+  });
 
   const fn = useFunctionSelection({
     parsedAbi: abi.parsedAbi,
@@ -107,12 +258,12 @@ export default function ContractCallerPage() {
     storageOverrides: simOpts.storageOverrides,
     timestampOverride: simOpts.timestampOverride,
     setFieldErrors: fn.setFieldErrors,
-    setShowSettings: () => {},
+    setShowSettings,
     getChainId,
-    setCachedAddresses: () => {},
-    getCachedAddresses: () => [],
+    setCachedAddresses: abi.setCachedAddressesState,
+    getCachedAddresses: abi.getCachedAddresses,
     saveToHistory: (...args) => saveToHistoryRef.current?.(...args),
-    validateAddressesInArg: () => true,
+    validateAddressesInArg,
   });
 
   // Wire the deferred callback refs now that exec is available
@@ -128,9 +279,7 @@ export default function ContractCallerPage() {
     getSelectedFunction: () =>
       abi.parsedAbi?.find(
         (item) =>
-          item.type === "function" &&
-          `${item.name}(${(item.inputs || []).map((i) => i.type).join(",")})` ===
-            fn.selectedFunction,
+          item.type === "function" && getFunctionSig(item) === fn.selectedFunction,
       ) || null,
     setChain,
     setAddress,
@@ -140,6 +289,7 @@ export default function ContractCallerPage() {
     setResult: exec.setResult,
     setError: exec.setError,
     setEthValue: fn.setEthValue,
+    applyPendingArgs: fn.applyPendingArgs,
   });
 
   // Wire remaining deferred refs
@@ -154,7 +304,7 @@ export default function ContractCallerPage() {
     parsedAbi: abi.parsedAbi,
     apiKeys,
     getChainId,
-    onMissingApiKey: () => {},
+    onMissingApiKey: () => setShowSettings(true),
   });
 
   const bookmark = useBookmarkModal({
@@ -166,9 +316,7 @@ export default function ContractCallerPage() {
   // Derive isWrite from selected function
   const selectedFn = abi.parsedAbi?.find(
     (item) =>
-      item.type === "function" &&
-      `${item.name}(${(item.inputs || []).map((i) => i.type).join(",")})` ===
-        fn.selectedFunction,
+      item.type === "function" && getFunctionSig(item) === fn.selectedFunction,
   );
   const isWrite =
     selectedFn?.stateMutability !== "view" &&

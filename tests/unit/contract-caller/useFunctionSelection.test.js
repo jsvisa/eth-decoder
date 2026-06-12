@@ -142,6 +142,33 @@ describe("useFunctionSelection — function selection and arg reset", () => {
     // transfer(address,uint256) selector is 0xa9059cbb
     expect(result.current.pasteCalldataValue.slice(0, 10)).toBe("0xa9059cbb");
   });
+
+  it("clears stale selected function state when parsed ABI disappears", () => {
+    const { result, rerender } = renderHook(
+      ({ parsedAbi, functions }) =>
+        useFunctionSelection({
+          parsedAbi,
+          functions,
+          address: "0x1234567890123456789012345678901234567890",
+        }),
+      {
+        initialProps: {
+          parsedAbi: TRANSFER_ABI,
+          functions: TRANSFER_ABI,
+        },
+      },
+    );
+
+    act(() => {
+      result.current.setSelectedFunction("transfer(address,uint256)");
+    });
+
+    rerender({ parsedAbi: null, functions: [] });
+
+    expect(result.current.selectedFunction).toBe("");
+    expect(result.current.args).toEqual([]);
+    expect(result.current.pasteCalldataValue).toBe("");
+  });
 });
 
 describe("useFunctionSelection — handleDecodeAndFill", () => {
@@ -249,6 +276,29 @@ describe("useFunctionSelection — applyPendingArgs", () => {
     expect(result.current.args).toEqual([
       "0x0000000000000000000000000000000000000003",
       "42",
+    ]);
+  });
+
+  it("resolves legacy function-name pending selections to canonical signatures", () => {
+    const { result } = renderHook(() =>
+      useFunctionSelection({
+        parsedAbi: TRANSFER_ABI,
+        functions: TRANSFER_ABI,
+        address: "0xabc",
+      }),
+    );
+
+    act(() => {
+      result.current.applyPendingArgs({
+        functionSig: "transfer",
+        args: ["0x0000000000000000000000000000000000000004", "7"],
+      });
+    });
+
+    expect(result.current.selectedFunction).toBe("transfer(address,uint256)");
+    expect(result.current.args).toEqual([
+      "0x0000000000000000000000000000000000000004",
+      "7",
     ]);
   });
 });

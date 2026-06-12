@@ -165,6 +165,10 @@ export function useAbi({
   const [abiFilter, setAbiFilter] = useState("");
   const [abiCopiedItem, setAbiCopiedItem] = useState(null);
 
+  useEffect(() => {
+    setCachedAddresses(getCachedAddresses());
+  }, []);
+
   // -------------------------------------------------------------------------
   // Effect 1: Auto-load cached ABI when address or chain changes (lines 1533–1560)
   // -------------------------------------------------------------------------
@@ -380,6 +384,8 @@ export function useAbi({
     setAbiFilter,
     abiCopiedItem,
     setAbiCopiedItem,
+    getCachedAddresses,
+    setCachedAddressesState: setCachedAddresses,
     fetchAbi,
     saveAbiToCache,
   };

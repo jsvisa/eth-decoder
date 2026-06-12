@@ -26,6 +26,7 @@ const MAX_HISTORY_ITEMS = 50;
  * @param {Function} params.setResult         – setter for result panel
  * @param {Function} params.setError          – setter for error state
  * @param {Function} params.setEthValue       – setter for ETH value input
+ * @param {Function} params.applyPendingArgs  – queue pending function/args in selection state
  */
 export function useHistory({
   chain,
@@ -43,6 +44,7 @@ export function useHistory({
   setResult,
   setError,
   setEthValue,
+  applyPendingArgs,
 }) {
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(true);
@@ -138,11 +140,15 @@ export function useHistory({
           }
         }
 
-        pendingHistoryRef.current = {
+        const pendingSelection = {
           functionSig: urlFunction,
           args: parsedArgs,
           timestamp: Date.now(),
         };
+        pendingHistoryRef.current = pendingSelection;
+        if (typeof applyPendingArgs === "function") {
+          applyPendingArgs(pendingSelection);
+        }
       }
 
       if (urlFrom) {
@@ -303,11 +309,15 @@ export function useHistory({
         return;
       }
 
-      pendingHistoryRef.current = {
+      const pendingSelection = {
         functionSig: itemSig,
         args: historyArgs,
         timestamp: Date.now(),
       };
+      pendingHistoryRef.current = pendingSelection;
+      if (typeof applyPendingArgs === "function") {
+        applyPendingArgs(pendingSelection);
+      }
 
       setChain(item.chain);
       setAddress(item.address);
@@ -326,6 +336,7 @@ export function useHistory({
       setError,
       setAddress,
       setSelectedFunction,
+      applyPendingArgs,
     ],
   );
 
