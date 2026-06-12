@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSettings } from "../contexts/SettingsContext";
 import { CHAINS } from "../utils/chains";
 import { isValidEthAddress } from "../utils/validation";
@@ -298,6 +298,19 @@ export default function ContractCallerPage() {
   saveToHistoryRef.current = history.saveToHistory;
 
   const tokens = useTokenMetadata(chain, rpcSettings);
+
+  useEffect(() => {
+    if (!exec.result?.simulated) return;
+
+    const chainId = getChainId(chain);
+    tokens.fetchTokenSymbolsForLogs(exec.result.logs, chainId);
+    tokens.fetchTokenDataForSimulation(
+      exec.result.logs,
+      exec.result.assetChanges,
+      exec.result.balanceChanges,
+      chainId,
+    );
+  }, [exec.result, chain, getChainId]);
 
   const events = useEventLogs({
     chain,

@@ -13,6 +13,16 @@ import { test, expect } from "@playwright/test";
 const TOKEN_ADDR = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"; // USDC on Ethereum
 const FROM_ADDR = "0xb826224b742ead5cf91ea432340e3763fac09cdd";
 const TO_ADDR = "0xdeadbeef00000000000000000000000000000001";
+const TRANSFER_TOPIC =
+  "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+
+function padTopicAddress(address) {
+  return `0x${address.slice(2).padStart(64, "0")}`;
+}
+
+function encodeUint256(value) {
+  return `0x${BigInt(value).toString(16).padStart(64, "0")}`;
+}
 
 // ── Mock data ──────────────────────────────────────────────────────────
 
@@ -28,8 +38,12 @@ const MOCK_SIMULATE_OUTPUT = {
       address: TOKEN_ADDR,
       name: "Transfer",
       decoded: true,
-      topics: [],
-      data: "0x",
+      topics: [
+        TRANSFER_TOPIC,
+        padTopicAddress(FROM_ADDR),
+        padTopicAddress(TO_ADDR),
+      ],
+      data: encodeUint256("1000000000"),
       inputs: [
         { name: "from", type: "address", value: FROM_ADDR, indexed: true },
         { name: "to", type: "address", value: TO_ADDR, indexed: true },
