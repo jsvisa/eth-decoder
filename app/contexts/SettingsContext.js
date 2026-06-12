@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect } from "react";
-import { BUILT_IN_CHAIN_IDS } from "../utils/chains";
+import { CHAINS, BUILT_IN_CHAIN_IDS } from "../utils/chains";
 
 const TENDERLY_SETTINGS_KEY = "tenderly_settings";
 const API_KEYS_STORAGE_KEY = "api_keys_settings";
@@ -19,13 +19,9 @@ export function SettingsProvider({ children }) {
     project: "",
   });
   const [apiKeys, setApiKeys] = useState({ etherscan: "", routescan: "" });
-  const [rpcSettings, setRpcSettings] = useState({
-    ethereum: "",
-    arbitrum: "",
-    base: "",
-    polygon: "",
-    bsc: "",
-  });
+  const [rpcSettings, setRpcSettings] = useState(() =>
+    CHAINS.reduce((acc, c) => ({ ...acc, [c.id]: "" }), {}),
+  );
   const [useLocalSimulation, setUseLocalSimulation] = useState(true);
   const [rpcBatchSize, setRpcBatchSize] = useState(1);
   const [customChains, setCustomChains] = useState([]);
