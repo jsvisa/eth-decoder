@@ -176,30 +176,37 @@ export default function ContractCallerPage() {
 
   // --- Layout ---
   return (
-    <div className={styles.page}>
-      <div className={styles.main}>
-        <NetworkSelector
-          chain={chain}
-          onChainChange={setChain}
-          allChains={allChains}
-          onOpenAddChain={addChain.openAddChainModal}
-          disabled={exec.loading}
-        />
+    <main className={styles.main}>
+      <div className={styles.container}>
+        <h1 className={styles.title}>Contract Caller</h1>
+        <div className={styles.form}>
+          <div className={styles.row}>
+            <div className={styles.networkField}>
+              <label className={styles.label}>Network</label>
+              <NetworkSelector
+                chain={chain}
+                onChainChange={setChain}
+                allChains={allChains}
+                onOpenAddChain={addChain.openAddChainModal}
+                disabled={exec.loading}
+              />
+            </div>
 
-        <ContractAddressInput
-          address={address}
-          onAddressChange={setAddress}
-          addressBook={bookmark.addressBook}
-          cachedAddresses={abi.cachedAddresses}
-          contractName={abi.contractName}
-          detectProxy={abi.detectProxy}
-          onDetectProxyChange={abi.setDetectProxy}
-          onFetchAbi={abi.fetchAbi}
-          fetchingAbi={abi.fetchingAbi}
-          fieldError={fn.fieldErrors.address}
-          onOpenBookmarkModal={bookmark.openBookmarkModal}
-          disabled={exec.loading}
-        />
+            <ContractAddressInput
+              address={address}
+              onAddressChange={setAddress}
+              addressBook={bookmark.addressBook}
+              cachedAddresses={abi.cachedAddresses}
+              contractName={abi.contractName}
+              detectProxy={abi.detectProxy}
+              onDetectProxyChange={abi.setDetectProxy}
+              onFetchAbi={abi.fetchAbi}
+              fetchingAbi={abi.fetchingAbi}
+              fieldError={fn.fieldErrors.address}
+              onOpenBookmarkModal={bookmark.openBookmarkModal}
+              disabled={exec.loading}
+            />
+          </div>
 
         <AbiPanel
           abi={abi.abi}
@@ -345,18 +352,18 @@ export default function ContractCallerPage() {
           tokenDecimals={tokens.tokenDecimals}
           tokenPrices={tokens.tokenPrices}
         />
-      </div>
 
-      <HistorySidebar
-        history={history.history}
-        chain={chain}
-        show={history.showHistory}
-        onShowChange={history.setShowHistory}
-        search={history.historySearch}
-        onSearchChange={history.setHistorySearch}
-        onLoad={history.loadFromHistory}
-        onClear={history.clearHistory}
-      />
+        <HistorySidebar
+          history={history.history}
+          chain={chain}
+          show={history.showHistory}
+          onShowChange={history.setShowHistory}
+          search={history.historySearch}
+          onSearchChange={history.setHistorySearch}
+          onLoad={history.loadFromHistory}
+          onClear={history.clearHistory}
+        />
+      </div>
 
       <BookmarkModal
         open={bookmark.showBookmarkModal}
@@ -387,6 +394,7 @@ export default function ContractCallerPage() {
         onRemoveChain={addChain.removeCustomChain}
         isChainAdded={addChain.isChainAdded}
       />
-    </div>
+      </div>
+    </main>
   );
 }
