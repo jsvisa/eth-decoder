@@ -186,7 +186,6 @@ describe("useTevmSession — chain/forkBlockNumber change effect", () => {
     });
 
     const setError = vi.fn();
-    let chain = "ethereum";
     const { result, rerender } = renderHook(
       ({ chain }) => useTevmSession({ ...DEFAULT_PARAMS, chain, setError }),
       { initialProps: { chain: "ethereum" } },

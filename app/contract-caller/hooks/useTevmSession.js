@@ -41,7 +41,7 @@ export function useTevmSession({
     setSessionBlock(null);
     setSessionHistory([]);
     if (setError) setError(null);
-  }, [chain, forkBlockNumber]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chain, forkBlockNumber]);
 
   // ── handleStartSession (lines 2219-2242) ─────────────────────────────────────
   const handleStartSession = useCallback(async () => {

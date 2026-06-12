@@ -161,7 +161,7 @@ export function useHistory({
         }
       }, 200);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Effect 4 (lines 1507-1531): sync URL with current chain + address ────
   useEffect(() => {

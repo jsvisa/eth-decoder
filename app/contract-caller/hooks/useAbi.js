@@ -235,7 +235,7 @@ export function useAbi({
       setFunctions([]);
       if (onAbiError) onAbiError("Invalid ABI JSON format");
     }
-  }, [abi]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [abi]);
 
   // -------------------------------------------------------------------------
   // Callback: fetchAbi (lines 1847–1934)

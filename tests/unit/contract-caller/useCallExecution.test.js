@@ -20,19 +20,6 @@ vi.mock("../../../app/utils/abiCache.js", () => ({
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-const TRANSFER_ABI = [
-  {
-    type: "function",
-    name: "transfer",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "to", type: "address" },
-      { name: "amount", type: "uint256" },
-    ],
-    outputs: [{ name: "", type: "bool" }],
-  },
-];
-
 const BALANCE_OF_ABI = [
   {
     type: "function",

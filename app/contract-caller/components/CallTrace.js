@@ -3,20 +3,6 @@
 import React, { useState } from "react";
 import styles from "./CallTrace.module.css";
 
-const BUILT_IN_EXPLORER_URLS = {
-  ethereum: "https://etherscan.io",
-  arbitrum: "https://arbiscan.io",
-  base: "https://basescan.org",
-  polygon: "https://polygonscan.com",
-  bsc: "https://bscscan.com",
-};
-
-function getExplorerAddressUrl(chain, address) {
-  if (!address) return null;
-  const base = BUILT_IN_EXPLORER_URLS[chain];
-  if (base) return `${base}/address/${address}`;
-  return null;
-}
 
 function formatValue(value) {
   if (value === null || value === undefined) return "null";
@@ -243,7 +229,7 @@ function CallTraceNode({ trace, depth, chain, hideTooltip, onCopy }) {
  *   tokenSymbols  {Record<string,string>} - for pretty token names
  *   chain         {string}               - for explorer links
  */
-export default function CallTrace({ trace, tokenSymbols = {}, chain }) {
+export default function CallTrace({ trace, tokenSymbols: _tokenSymbols = {}, chain }) {
   const [hideTooltip, setHideTooltip] = useState(false);
 
   const handleCopy = async (content) => {

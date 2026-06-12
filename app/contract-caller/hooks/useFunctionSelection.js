@@ -76,7 +76,7 @@ const viemDecodedToArgValue = (value, input) => {
  */
 export function useFunctionSelection({
   parsedAbi = null,
-  functions = [],
+  functions: _functions = [],
   address = "",
 } = {}) {
   const [selectedFunction, setSelectedFunction] = useState("");

@@ -104,7 +104,7 @@ describe("useTokenMetadata — fetchTokenDataForSimulation happy path", () => {
   it("fetches decimals and price for a log token address", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn((url, opts) => {
+      vi.fn((url, _opts) => {
         if (typeof url === "string" && url.startsWith("/api/token-price")) {
           return Promise.resolve({
             ok: true,

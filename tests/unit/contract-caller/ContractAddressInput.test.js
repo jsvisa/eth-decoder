@@ -2,7 +2,7 @@
  * Tests for ContractAddressInput presentational component.
  * Uses react-dom/client + act() (no @testing-library/react JSX transform needed).
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import ContractAddressInput from "../../../app/contract-caller/components/ContractAddressInput.js";
