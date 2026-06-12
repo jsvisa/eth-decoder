@@ -1,4 +1,5 @@
 import { createMemoryClient, http } from "tevm";
+import { createCommon, createMockKzg } from "tevm/common";
 import {
   encodeFunctionData,
   decodeFunctionData,
@@ -545,8 +546,17 @@ export async function createTevmClient(
     }
   }
 
-  // Create fork client with the specified block tag
+  // Create fork client with the specified block tag.
+  // customCrypto.kzg is required for chains that have EIP-4844 (blob txs) enabled;
+  // createMockKzg provides a no-op implementation that satisfies the interface.
+  const common = createCommon({
+    id: chainConfig.chainId,
+    name: chainConfig.name || chain,
+    customCrypto: { kzg: createMockKzg() },
+  });
+
   const client = createMemoryClient({
+    common,
     fork: {
       transport: createProofFreeTransport(forkUrl, batchSize),
       blockTag,
