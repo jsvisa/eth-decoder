@@ -279,7 +279,8 @@ export default function ContractCallerPage() {
     getSelectedFunction: () =>
       abi.parsedAbi?.find(
         (item) =>
-          item.type === "function" && getFunctionSig(item) === fn.selectedFunction,
+          item.type === "function" &&
+          getFunctionSig(item) === fn.selectedFunction,
       ) || null,
     setChain,
     setAddress,

@@ -240,11 +240,10 @@ vi.mock("../../../app/contract-caller/hooks/useTokenMetadata.js", () => ({
   useTokenMetadata: () => tokenMetadataState,
 }));
 
-vi.mock("../../../app/contract-caller/components/NetworkSelector.js", () =>
-  ({
-    default: () => React.createElement("div", { "data-testid": "network-selector" }),
-  }),
-);
+vi.mock("../../../app/contract-caller/components/NetworkSelector.js", () => ({
+  default: () =>
+    React.createElement("div", { "data-testid": "network-selector" }),
+}));
 vi.mock(
   "../../../app/contract-caller/components/ContractAddressInput.js",
   () => ({
@@ -252,11 +251,9 @@ vi.mock(
       React.createElement("div", { "data-testid": "contract-address-input" }),
   }),
 );
-vi.mock("../../../app/contract-caller/components/AbiPanel.js", () =>
-  ({
-    default: () => React.createElement("div", { "data-testid": "abi-panel" }),
-  }),
-);
+vi.mock("../../../app/contract-caller/components/AbiPanel.js", () => ({
+  default: () => React.createElement("div", { "data-testid": "abi-panel" }),
+}));
 vi.mock(
   "../../../app/contract-caller/components/FunctionEventsTabs.js",
   () => ({
@@ -264,48 +261,31 @@ vi.mock(
       React.createElement("div", { "data-testid": "function-events-tabs" }),
   }),
 );
-vi.mock(
-  "../../../app/contract-caller/components/FunctionSelector.js",
-  () => ({
-    default: () =>
-      React.createElement("div", { "data-testid": "function-selector" }),
-  }),
-);
-vi.mock(
-  "../../../app/contract-caller/components/CalldataSection.js",
-  () => ({
-    default: () =>
-      React.createElement("div", { "data-testid": "calldata-section" }),
-  }),
-);
-vi.mock(
-  "../../../app/contract-caller/components/SimulationOptions.js",
-  () => ({
-    default: () =>
-      React.createElement("div", { "data-testid": "simulation-options" }),
-  }),
-);
-vi.mock("../../../app/contract-caller/components/ArgsInput.js", () =>
-  ({
-    default: () => React.createElement("div", { "data-testid": "args-input" }),
-  }),
-);
-vi.mock("../../../app/contract-caller/components/EventsTab.js", () =>
-  ({
-    default: () => React.createElement("div", { "data-testid": "events-tab" }),
-  }),
-);
-vi.mock("../../../app/contract-caller/components/CallActionBar.js", () =>
-  ({
-    default: () =>
-      React.createElement("div", { "data-testid": "call-action-bar" }),
-  }),
-);
-vi.mock("../../../app/contract-caller/components/ResultPanel.js", () =>
-  ({
-    default: () => React.createElement("div", { "data-testid": "result-panel" }),
-  }),
-);
+vi.mock("../../../app/contract-caller/components/FunctionSelector.js", () => ({
+  default: () =>
+    React.createElement("div", { "data-testid": "function-selector" }),
+}));
+vi.mock("../../../app/contract-caller/components/CalldataSection.js", () => ({
+  default: () =>
+    React.createElement("div", { "data-testid": "calldata-section" }),
+}));
+vi.mock("../../../app/contract-caller/components/SimulationOptions.js", () => ({
+  default: () =>
+    React.createElement("div", { "data-testid": "simulation-options" }),
+}));
+vi.mock("../../../app/contract-caller/components/ArgsInput.js", () => ({
+  default: () => React.createElement("div", { "data-testid": "args-input" }),
+}));
+vi.mock("../../../app/contract-caller/components/EventsTab.js", () => ({
+  default: () => React.createElement("div", { "data-testid": "events-tab" }),
+}));
+vi.mock("../../../app/contract-caller/components/CallActionBar.js", () => ({
+  default: () =>
+    React.createElement("div", { "data-testid": "call-action-bar" }),
+}));
+vi.mock("../../../app/contract-caller/components/ResultPanel.js", () => ({
+  default: () => React.createElement("div", { "data-testid": "result-panel" }),
+}));
 vi.mock(
   "../../../app/contract-caller/components/SessionHistoryStrip.js",
   () => ({
@@ -313,25 +293,18 @@ vi.mock(
       React.createElement("div", { "data-testid": "session-history-strip" }),
   }),
 );
-vi.mock(
-  "../../../app/contract-caller/components/HistorySidebar.js",
-  () => ({
-    default: () =>
-      React.createElement("div", { "data-testid": "history-sidebar" }),
-  }),
-);
-vi.mock("../../../app/contract-caller/components/BookmarkModal.js", () =>
-  ({
-    default: () =>
-      React.createElement("div", { "data-testid": "bookmark-modal" }),
-  }),
-);
-vi.mock("../../../app/contract-caller/components/AddChainModal.js", () =>
-  ({
-    default: () =>
-      React.createElement("div", { "data-testid": "add-chain-modal" }),
-  }),
-);
+vi.mock("../../../app/contract-caller/components/HistorySidebar.js", () => ({
+  default: () =>
+    React.createElement("div", { "data-testid": "history-sidebar" }),
+}));
+vi.mock("../../../app/contract-caller/components/BookmarkModal.js", () => ({
+  default: () =>
+    React.createElement("div", { "data-testid": "bookmark-modal" }),
+}));
+vi.mock("../../../app/contract-caller/components/AddChainModal.js", () => ({
+  default: () =>
+    React.createElement("div", { "data-testid": "add-chain-modal" }),
+}));
 
 import ContractCallerPage from "../../../app/contract-caller/page.js";
 
@@ -372,7 +345,9 @@ describe("ContractCallerPage wiring", () => {
   it("passes live integration callbacks instead of stubs", () => {
     const { unmount } = renderPage();
 
-    expect(callExecutionArgs.setShowSettings).toBe(settingsState.setShowSettings);
+    expect(callExecutionArgs.setShowSettings).toBe(
+      settingsState.setShowSettings,
+    );
     expect(callExecutionArgs.setCachedAddresses).toBe(
       abiHookState.setCachedAddressesState,
     );
@@ -395,9 +370,7 @@ describe("ContractCallerPage wiring", () => {
       ),
     ).toBe(false);
     expect(errors.arg_0).toBe(true);
-    expect(argErrors).toEqual([
-      "recipient must be a valid Ethereum address",
-    ]);
+    expect(argErrors).toEqual(["recipient must be a valid Ethereum address"]);
 
     eventLogsArgs.onMissingApiKey();
     expect(settingsState.setShowSettings).toHaveBeenCalledWith(true);
@@ -411,7 +384,9 @@ describe("ContractCallerPage wiring", () => {
     abiHookArgs.onAbiParsed(null, []);
     expect(functionSelectionState.setSelectedFunction).toHaveBeenCalledWith("");
     expect(functionSelectionState.setArgs).toHaveBeenCalledWith([]);
-    expect(functionSelectionState.setPasteCalldataValue).toHaveBeenCalledWith("");
+    expect(functionSelectionState.setPasteCalldataValue).toHaveBeenCalledWith(
+      "",
+    );
     expect(functionSelectionState.setPasteCalldataError).toHaveBeenCalledWith(
       null,
     );
@@ -423,7 +398,9 @@ describe("ContractCallerPage wiring", () => {
     );
 
     abiHookArgs.onSetError("Fetch failed");
-    expect(callExecutionState.setError).toHaveBeenLastCalledWith("Fetch failed");
+    expect(callExecutionState.setError).toHaveBeenLastCalledWith(
+      "Fetch failed",
+    );
 
     unmount();
   });
