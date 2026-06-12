@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import styles from "./CallTrace.module.css";
 
-
 function formatValue(value) {
   if (value === null || value === undefined) return "null";
   if (typeof value === "object") {
@@ -229,7 +228,11 @@ function CallTraceNode({ trace, depth, chain, hideTooltip, onCopy }) {
  *   tokenSymbols  {Record<string,string>} - for pretty token names
  *   chain         {string}               - for explorer links
  */
-export default function CallTrace({ trace, tokenSymbols: _tokenSymbols = {}, chain }) {
+export default function CallTrace({
+  trace,
+  tokenSymbols: _tokenSymbols = {},
+  chain,
+}) {
   const [hideTooltip, setHideTooltip] = useState(false);
 
   const handleCopy = async (content) => {
