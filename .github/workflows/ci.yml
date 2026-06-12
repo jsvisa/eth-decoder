@@ -81,7 +81,7 @@ jobs:
         run: npm ci
 
       - name: Install abi_server
-        run: pip install -e "."
+        run: python -m pip install -e "."
         working-directory: abi_server
 
       - name: Create SQLite DB from CSV
