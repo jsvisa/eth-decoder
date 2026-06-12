@@ -49,7 +49,7 @@ All state is React `useState` + `localStorage`. No external state library. Keys:
 
 ## Key Patterns (Footguns)
 
-- **Chain configs are duplicated** across `fetch-abi/route.js`, `call-contract/route.js`, `simulate/route.js`, `tevmSimulator.js`, `contract-caller/page.js`, `contracts/page.js`. Each has its own `CHAINS` / `RPC_URLS` / `CHAIN_IDS` mapping — update all of them when adding a chain.
+- **Chain configs are consolidated** in `app/utils/chains.js` — exports `CHAINS`, `BUILT_IN_CHAIN_IDS`, `DEFAULT_RPC_URLS`, `VIEM_CHAINS`, `getChainConfig()`, and more. Always import from here; don't redeclare locally.
 - **Proxy detection** in `fetch-abi/route.js` checks EIP-1967 implementation slot, beacon slot, and OZ legacy slot via `getStorageAt`.
 - **All pages are client components** (`'use client'`). Only the layout and API routes are server components.
 - **`contract-caller/page.js` is monolithic** (~6000 lines) — ABI display, function selection, argument input, read/write execution, result display, event log rendering, call trace, and history are all in one file. Don't try to split it without explicit instruction.
