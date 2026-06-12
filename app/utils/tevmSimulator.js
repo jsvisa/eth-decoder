@@ -11,6 +11,7 @@ import {
   toFunctionSelector,
 } from "viem";
 import { isValidEthAddress } from "./validation";
+import { CHAIN_META, FORK_RPC_URLS } from "./chains";
 
 // Create an http transport with or without JSON-RPC batching.
 // batchSize=1 → http(url) with NO batch option — guarantees single {…} request
@@ -58,24 +59,6 @@ function createProofFreeTransport(rpcUrl, batchSize = 1) {
     };
   };
 }
-
-// Chain configurations for forking (built-in chains)
-const BUILT_IN_CHAIN_CONFIGS = {
-  ethereum: { chainId: 1, name: "Ethereum" },
-  arbitrum: { chainId: 42161, name: "Arbitrum" },
-  base: { chainId: 8453, name: "Base" },
-  polygon: { chainId: 137, name: "Polygon" },
-  bsc: { chainId: 56, name: "BSC" },
-};
-
-// Default public RPCs (fallback)
-const DEFAULT_RPCS = {
-  ethereum: "https://ethereum-rpc.publicnode.com",
-  arbitrum: "https://arbitrum-one-rpc.publicnode.com",
-  base: "https://base-rpc.publicnode.com",
-  polygon: "https://polygon-bor-rpc.publicnode.com",
-  bsc: "https://bsc-rpc.publicnode.com",
-};
 
 // Helper to parse an argument value based on ABI type
 const parseArgValue = (arg, input) => {
@@ -532,7 +515,7 @@ export async function createTevmClient(
   batchSize = 1,
 ) {
   // Get chain config from built-in or use custom chain ID
-  let chainConfig = BUILT_IN_CHAIN_CONFIGS[chain];
+  let chainConfig = CHAIN_META[chain];
 
   // Handle custom chains
   if (!chainConfig && customChainId) {
@@ -545,7 +528,7 @@ export async function createTevmClient(
     );
   }
 
-  const forkUrl = rpcUrl || DEFAULT_RPCS[chain];
+  const forkUrl = rpcUrl || FORK_RPC_URLS[chain];
   if (!forkUrl) {
     throw new Error(`No RPC URL configured for ${chain}`);
   }
@@ -852,7 +835,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
 
     await prefetchAccountsFromAccessList({
       client,
-      forkRpcUrl: rpcUrl || DEFAULT_RPCS[chain] || "",
+      forkRpcUrl: rpcUrl || FORK_RPC_URLS[chain] || "",
       callParams: {
         to: address,
         from: sender,

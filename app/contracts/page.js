@@ -7,37 +7,9 @@ import {
   exportContractsToCSV,
   importContractsFromCSV,
 } from "../utils/contractsCache";
+import { CHAIN_META } from "../utils/chains";
 
 const CUSTOM_CHAINS_KEY = "custom_chains";
-
-// Built-in chains for display
-const BUILT_IN_CHAINS = {
-  ethereum: {
-    name: "Ethereum",
-    chainId: 1,
-    icon: "https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg",
-  },
-  arbitrum: {
-    name: "Arbitrum",
-    chainId: 42161,
-    icon: "https://icons.llamao.fi/icons/chains/rsz_arbitrum.jpg",
-  },
-  base: {
-    name: "Base",
-    chainId: 8453,
-    icon: "https://icons.llamao.fi/icons/chains/rsz_base.jpg",
-  },
-  polygon: {
-    name: "Polygon",
-    chainId: 137,
-    icon: "https://icons.llamao.fi/icons/chains/rsz_polygon.jpg",
-  },
-  bsc: {
-    name: "BSC",
-    chainId: 56,
-    icon: "https://icons.llamao.fi/icons/chains/rsz_binance.jpg",
-  },
-};
 
 // Load custom chains from localStorage
 const loadCustomChains = () => {
@@ -95,7 +67,7 @@ const getCachedContracts = (customChains) => {
         const cached = JSON.parse(localStorage.getItem(key));
 
         // Get chain info
-        let chainInfo = BUILT_IN_CHAINS[chain];
+        let chainInfo = CHAIN_META[chain];
         if (!chainInfo && chain.startsWith("chain-")) {
           // Look up custom chain
           const customChain = customChains.find((c) => c.id === chain);

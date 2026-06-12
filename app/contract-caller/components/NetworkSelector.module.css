@@ -1,0 +1,66 @@
+.chainSelectRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chainSelectWithIcon {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chainSelectWithIcon .select {
+  flex: 1;
+}
+
+.chainIconSmall {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.select {
+  padding: 0.875rem 1rem;
+  font-size: 1rem;
+  border: 2px solid var(--border-primary);
+  border-radius: 6px;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.addChainButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background-color: var(--bg-hover);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.addChainButton:hover {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-secondary);
+  color: var(--text-primary);
+}
+
+.addChainButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

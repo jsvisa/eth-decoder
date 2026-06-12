@@ -1,15 +1,8 @@
 import { NextResponse } from "next/server";
 import { isValidEthAddress } from "../../utils/validation";
+import { BUILT_IN_CHAIN_IDS } from "../../utils/chains";
 
 const ETHERSCAN_V2_API = "https://api.etherscan.io/v2/api";
-
-const BUILT_IN_CHAIN_IDS = {
-  ethereum: 1,
-  arbitrum: 42161,
-  base: 8453,
-  polygon: 137,
-  bsc: 56,
-};
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
