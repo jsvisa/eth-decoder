@@ -2,8 +2,8 @@ import { test, expect } from "@playwright/test";
 
 // transfer(address,uint256) — well-known ERC-20 selector
 const TRANSFER_SELECTOR = "0xa9059cbb";
-// Unlikely to exist in any DB
-const UNKNOWN_SELECTOR = "0x00000000";
+// keccak256("__nonExistentTestSelector_ethDecoder_CI__()")[0:4] — guaranteed not in any signature DB
+const UNKNOWN_SELECTOR = "0x00a8afe6";
 
 test.describe("GET /api/v1/query", () => {
   test("returns 400 when sign param is missing", async ({ request }) => {
