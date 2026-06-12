@@ -2,15 +2,7 @@ import { NextResponse } from "next/server";
 import { encodeFunctionData } from "viem";
 import { isValidEthAddress } from "../../utils/validation";
 import { normalizeArg, ArgValidationError } from "../../utils/normalizeArg";
-
-// Tenderly network IDs for simulation API
-const TENDERLY_NETWORK_IDS = {
-  ethereum: "1",
-  arbitrum: "42161",
-  base: "8453",
-  polygon: "137",
-  bsc: "56",
-};
+import { BUILT_IN_CHAIN_IDS } from "../../utils/chains";
 
 export async function POST(request) {
   try {
@@ -48,13 +40,15 @@ export async function POST(request) {
       );
     }
 
-    const networkId = TENDERLY_NETWORK_IDS[chain];
-    if (!networkId) {
+    const chainId = BUILT_IN_CHAIN_IDS[chain];
+    if (!chainId) {
       return NextResponse.json(
         { error: `Unsupported chain: ${chain}` },
         { status: 400 },
       );
     }
+    // Tenderly simulation API expects network_id as a string
+    const networkId = String(chainId);
 
     // Check for Tenderly credentials (from request body)
     if (!tenderlyAccessKey || !tenderlyAccount || !tenderlyProject) {

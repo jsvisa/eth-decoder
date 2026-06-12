@@ -1,33 +1,12 @@
 import { NextResponse } from "next/server";
 import { createPublicClient, http, defineChain } from "viem";
-import { mainnet, arbitrum, base, polygon, bsc } from "viem/chains";
 import { isValidEthAddress } from "../../utils/validation";
 import { fetchContractInfoFromSourcify } from "../../utils/sourcify";
-
-// Etherscan V2 API uses chain IDs (built-in chains)
-const BUILT_IN_CHAIN_IDS = {
-  ethereum: 1,
-  arbitrum: 42161,
-  base: 8453,
-  polygon: 137,
-  bsc: 56,
-};
-
-const CHAINS = {
-  ethereum: mainnet,
-  arbitrum: arbitrum,
-  base: base,
-  polygon: polygon,
-  bsc: bsc,
-};
-
-const RPC_URLS = {
-  ethereum: "https://eth.llamarpc.com",
-  arbitrum: "https://arb1.arbitrum.io/rpc",
-  base: "https://mainnet.base.org",
-  polygon: "https://polygon-rpc.com",
-  bsc: "https://bsc-dataseed.binance.org",
-};
+import {
+  BUILT_IN_CHAIN_IDS,
+  VIEM_CHAINS,
+  DEFAULT_RPC_URLS,
+} from "../../utils/chains";
 
 const ETHERSCAN_V2_API = "https://api.etherscan.io/v2/api";
 const ROUTESCAN_API_BASE = "https://api.routescan.io/v2/network/mainnet/evm";
@@ -343,8 +322,8 @@ export async function GET(request) {
 
     // Determine chain ID and config
     let chainId = BUILT_IN_CHAIN_IDS[chain];
-    let chainConfig = CHAINS[chain];
-    let rpcUrl = customRpcUrl || RPC_URLS[chain];
+    let chainConfig = VIEM_CHAINS[chain];
+    let rpcUrl = customRpcUrl || DEFAULT_RPC_URLS[chain];
 
     // Handle custom chains (chain IDs starting with "chain-")
     if (!chainId && customChainIdParam && customRpcUrl) {

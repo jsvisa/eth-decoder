@@ -6,25 +6,9 @@ import {
   encodeFunctionData,
   defineChain,
 } from "viem";
-import { mainnet, arbitrum, base, polygon, bsc } from "viem/chains";
 import { isValidEthAddress } from "../../utils/validation";
 import { normalizeArg, ArgValidationError } from "../../utils/normalizeArg";
-
-const CHAINS = {
-  ethereum: mainnet,
-  arbitrum: arbitrum,
-  base: base,
-  polygon: polygon,
-  bsc: bsc,
-};
-
-const RPC_URLS = {
-  ethereum: "https://eth.llamarpc.com",
-  arbitrum: "https://arb1.arbitrum.io/rpc",
-  base: "https://mainnet.base.org",
-  polygon: "https://polygon-rpc.com",
-  bsc: "https://bsc-dataseed.binance.org",
-};
+import { VIEM_CHAINS, DEFAULT_RPC_URLS } from "../../utils/chains";
 
 export async function POST(request) {
   try {
@@ -67,8 +51,8 @@ export async function POST(request) {
     }
 
     // Get chain config - either from built-in chains or create a custom one
-    let chainConfig = CHAINS[chain];
-    let rpcUrl = customRpcUrl || RPC_URLS[chain];
+    let chainConfig = VIEM_CHAINS[chain];
+    let rpcUrl = customRpcUrl || DEFAULT_RPC_URLS[chain];
 
     // Handle custom chains (chain IDs starting with "chain-")
     if (!chainConfig && customChainId && customRpcUrl) {
