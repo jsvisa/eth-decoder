@@ -1,0 +1,89 @@
+.pasteCalldataSection {
+  margin-bottom: 1rem;
+}
+
+.pasteCalldataToggle {
+  background: none;
+  border: none;
+  padding: 0.25rem 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.pasteCalldataToggle:hover {
+  color: var(--text-primary);
+}
+
+.pasteCalldataBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.textarea {
+  padding: 1rem;
+  font-size: 0.82rem;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  border: 2px solid var(--border-primary);
+  border-radius: 6px;
+  resize: vertical;
+  transition: border-color 0.3s;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.textarea:disabled {
+  background-color: var(--bg-hover);
+  cursor: not-allowed;
+}
+
+.inputError {
+  border-color: #ef4444 !important;
+  background-color: rgba(239, 68, 68, 0.05) !important;
+}
+
+.inputError:focus {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+.inputError::placeholder {
+  color: #f87171 !important;
+}
+
+.pasteCalldataError {
+  font-size: 0.8rem;
+  color: #ef4444;
+}
+
+.pasteCalldataBtn {
+  align-self: flex-start;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: var(--bg-code);
+  border: 1px solid var(--border-secondary);
+  border-radius: 4px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.pasteCalldataBtn:hover:not(:disabled) {
+  border-color: var(--border-focus);
+}
+
+.pasteCalldataBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

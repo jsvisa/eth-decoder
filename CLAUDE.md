@@ -52,4 +52,6 @@ All state is React `useState` + `localStorage`. No external state library. Keys:
 - **Chain configs are consolidated** in `app/utils/chains.js` — exports `CHAINS`, `BUILT_IN_CHAIN_IDS`, `DEFAULT_RPC_URLS`, `VIEM_CHAINS`, `getChainConfig()`, and more. Always import from here; don't redeclare locally.
 - **Proxy detection** in `fetch-abi/route.js` checks EIP-1967 implementation slot, beacon slot, and OZ legacy slot via `getStorageAt`.
 - **All pages are client components** (`'use client'`). Only the layout and API routes are server components.
-- **`contract-caller/page.js` is monolithic** (~6000 lines) — ABI display, function selection, argument input, read/write execution, result display, event log rendering, call trace, and history are all in one file. Don't try to split it without explicit instruction.
+- **`contract-caller/page.js` is a thin orchestrator** (~400 lines) that composes hooks and components. Logic lives in `hooks/`, presentational rendering in `components/`. Don't inline state or effects into `page.js`.
+- **`contract-caller` layout** uses `main > div.container` (card, max-width 1200px) with `h1 "Contract Caller"` and a `div.form` flex column. First row is `div.row` with `div.networkField` (Network label + selector) and `ContractAddressInput` side by side. Match this pattern for new top-level sections.
+- **`ResultPanel`** (`components/ResultPanel.js`, ~1200 lines) handles all simulation result rendering. Don't split without explicit instruction.
