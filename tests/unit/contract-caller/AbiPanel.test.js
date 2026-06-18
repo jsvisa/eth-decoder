@@ -70,9 +70,18 @@ describe("AbiPanel", () => {
     expect(container.textContent).toContain("ABI (JSON)");
     const buttons = container.querySelectorAll("button");
     const collapseBtn = Array.from(buttons).find((b) =>
-      b.textContent.includes("Collapse"),
+      b.textContent.includes("Expand"),
     );
     expect(collapseBtn).toBeTruthy();
+
+    cleanup();
+  });
+
+  it("keeps ABI content collapsed by default", () => {
+    const { container, cleanup } = renderComponent(defaultProps);
+
+    expect(container.querySelector('[class*="abiContent"]')).toBeNull();
+    expect(container.textContent).not.toContain("transfer(address to");
 
     cleanup();
   });
@@ -115,8 +124,15 @@ describe("AbiPanel", () => {
     cleanup();
   });
 
-  it("renders List and Raw view toggle buttons", () => {
+  it("renders List and Raw view toggle buttons after expanding", () => {
     const { container, cleanup } = renderComponent(defaultProps);
+
+    const expandBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent.includes("Expand"),
+    );
+    act(() => {
+      expandBtn.click();
+    });
 
     const buttons = Array.from(container.querySelectorAll("button"));
     const listBtn = buttons.find((b) => b.textContent === "List");
@@ -127,8 +143,15 @@ describe("AbiPanel", () => {
     cleanup();
   });
 
-  it("renders function and event entries in list view", () => {
+  it("renders function and event entries in list view after expanding", () => {
     const { container, cleanup } = renderComponent(defaultProps);
+
+    const expandBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent.includes("Expand"),
+    );
+    act(() => {
+      expandBtn.click();
+    });
 
     // Both functions should appear
     expect(container.textContent).toContain("transfer");
@@ -141,6 +164,13 @@ describe("AbiPanel", () => {
 
   it("switches to raw view and shows textarea", () => {
     const { container, cleanup } = renderComponent(defaultProps);
+
+    const expandBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent.includes("Expand"),
+    );
+    act(() => {
+      expandBtn.click();
+    });
 
     // Initially list view — no textarea visible
     let textarea = container.querySelector("textarea");
@@ -169,6 +199,13 @@ describe("AbiPanel", () => {
       onAbiChange,
     });
 
+    const expandBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent.includes("Expand"),
+    );
+    act(() => {
+      expandBtn.click();
+    });
+
     const textarea = container.querySelector("textarea");
     expect(textarea).toBeTruthy();
 
@@ -192,28 +229,33 @@ describe("AbiPanel", () => {
     cleanup();
   });
 
-  it("collapses content when collapse button is clicked", () => {
+  it("expands content when expand button is clicked", () => {
     const { container, cleanup } = renderComponent(defaultProps);
 
-    // Content visible initially
-    expect(container.querySelector('[class*="abiContent"]')).toBeTruthy();
+    expect(container.querySelector('[class*="abiContent"]')).toBeNull();
 
-    const collapseBtn = Array.from(container.querySelectorAll("button")).find(
-      (b) => b.textContent.includes("Collapse"),
+    const expandBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent.includes("Expand"),
     );
     act(() => {
-      collapseBtn.click();
+      expandBtn.click();
     });
 
-    // After collapse, content should be gone
-    expect(container.querySelector('[class*="abiContent"]')).toBeNull();
-    expect(container.textContent).toContain("Expand");
+    expect(container.querySelector('[class*="abiContent"]')).toBeTruthy();
+    expect(container.textContent).toContain("Collapse");
 
     cleanup();
   });
 
   it("shows empty state when search filter has no matches", () => {
     const { container, cleanup } = renderComponent(defaultProps);
+
+    const expandBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent.includes("Expand"),
+    );
+    act(() => {
+      expandBtn.click();
+    });
 
     const searchInput = container.querySelector('input[type="text"]');
     expect(searchInput).toBeTruthy();

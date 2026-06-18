@@ -159,7 +159,7 @@ export default function AbiPanel({
   onRefetchAbi,
   loading,
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [viewMode, setViewMode] = useState("list");
   const [filter, setFilter] = useState("");
   const [copiedItem, setCopiedItem] = useState(null);
