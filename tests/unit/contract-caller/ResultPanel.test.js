@@ -216,12 +216,27 @@ describe("ResultPanel", () => {
     const functionLabels = Array.from(
       container.querySelectorAll(".traceFuncName"),
     ).map((node) => node.textContent);
+    const tooltipContents = Array.from(
+      container.querySelectorAll(".traceTooltipContent"),
+    ).map((node) => node.textContent);
+    const copyButtons = Array.from(container.querySelectorAll("button")).filter(
+      (button) => button.textContent === "Copy",
+    );
 
     expect(contractLabels[0]).toBe(
       "0xf8b2c637....withdrawWei(uint256,uint256,uint256,uint256,uint8)",
     );
     expect(contractLabels[1]).toBe("0xf8b2c637....withdrawWei");
     expect(functionLabels).toEqual([]);
+    expect(tooltipContents).toEqual(
+      expect.arrayContaining([
+        "0xf8b2c63711111111111111111111111111111111",
+        "0xabcdef01",
+        "0xf8b2c63722222222222222222222222222222222",
+        "0xabcdef02",
+      ]),
+    );
+    expect(copyButtons).toHaveLength(4);
 
     cleanup();
   });

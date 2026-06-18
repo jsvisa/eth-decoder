@@ -27,8 +27,7 @@ function getFunctionTypeSuffix(functionName, baseName) {
 function getTraceLabelParts(contractName, functionName, depth) {
   const baseName = getFunctionBaseName(functionName);
   const contractIncludesFunction =
-    baseName &&
-    (contractName.endsWith(`.${baseName}`) || contractName.endsWith(baseName));
+    baseName && contractName.endsWith(`.${baseName}`);
 
   if (contractIncludesFunction) {
     return {
@@ -50,26 +49,30 @@ function getTraceLabelParts(contractName, functionName, depth) {
  * Tooltip rendered inside a wrapper element.
  * The tooltip is shown via CSS :hover on the parent `tooltipWrapper` span.
  */
-function Tooltip({ content, onCopy }) {
+function Tooltip({ content, items, onCopy }) {
+  const tooltipItems = items || (content ? [content] : []);
   return React.createElement(
     "span",
     { className: styles.traceTooltip },
-    React.createElement(
-      "span",
-      { className: styles.traceTooltipContent },
-      content,
-    ),
-    React.createElement(
-      "button",
-      {
-        className: styles.traceTooltipCopy,
-        onClick: (e) => {
-          e.stopPropagation();
-          onCopy(content);
+    ...tooltipItems.flatMap((item, index) => [
+      React.createElement(
+        "span",
+        { key: `content-${index}`, className: styles.traceTooltipContent },
+        item,
+      ),
+      React.createElement(
+        "button",
+        {
+          key: `copy-${index}`,
+          className: styles.traceTooltipCopy,
+          onClick: (e) => {
+            e.stopPropagation();
+            onCopy(item);
+          },
         },
-      },
-      "Copy",
-    ),
+        "Copy",
+      ),
+    ]),
   );
 }
 
@@ -106,6 +109,10 @@ function CallTraceNode({ trace, depth, chain, hideTooltip, onCopy }) {
   const callClass = [styles.traceCall, trace.error ? styles.traceCallError : ""]
     .filter(Boolean)
     .join(" ");
+  const contractTooltipItems = [contractAddress];
+  if (!functionLabel && trace.input) {
+    contractTooltipItems.push(trace.input);
+  }
 
   return React.createElement(
     "div",
@@ -139,7 +146,7 @@ function CallTraceNode({ trace, depth, chain, hideTooltip, onCopy }) {
             !hideTooltip &&
               contractAddress &&
               React.createElement(Tooltip, {
-                content: contractAddress,
+                items: contractTooltipItems,
                 onCopy,
               }),
           ),

@@ -103,8 +103,7 @@ function getFunctionTypeSuffix(functionName, baseName) {
 function getTraceLabelParts(contractName, functionName, depth) {
   const baseName = getFunctionBaseName(functionName);
   const contractIncludesFunction =
-    baseName &&
-    (contractName.endsWith(`.${baseName}`) || contractName.endsWith(baseName));
+    baseName && contractName.endsWith(`.${baseName}`);
 
   if (contractIncludesFunction) {
     return {
@@ -153,6 +152,27 @@ function syntaxHighlight(obj, cssClasses) {
   );
 }
 
+function TraceTooltip({ items, onCopy }) {
+  return (
+    <span className={styles.traceTooltip}>
+      {items.map((item, index) => (
+        <span key={`item-${index}`}>
+          <span className={styles.traceTooltipContent}>{item}</span>
+          <button
+            className={styles.traceTooltipCopy}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCopy(item);
+            }}
+          >
+            Copy
+          </button>
+        </span>
+      ))}
+    </span>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // CallTrace sub-component
 // ---------------------------------------------------------------------------
@@ -196,6 +216,10 @@ function CallTraceNode({ trace, depth, chain }) {
           : formatValue(p.value);
       })
       .join(", ") || "";
+  const contractTooltipItems = [contractAddress];
+  if (!functionLabel && trace.input) {
+    contractTooltipItems.push(trace.input);
+  }
 
   const copyToClipboard = async (content) => {
     try {
@@ -217,20 +241,10 @@ function CallTraceNode({ trace, depth, chain }) {
           <span className={styles.traceContractWrapper}>
             <span className={styles.traceContract}>{contractLabel}</span>
             {!hideTooltip && (
-              <span className={styles.traceTooltip}>
-                <span className={styles.traceTooltipContent}>
-                  {contractAddress}
-                </span>
-                <button
-                  className={styles.traceTooltipCopy}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    copyToClipboard(contractAddress);
-                  }}
-                >
-                  Copy
-                </button>
-              </span>
+              <TraceTooltip
+                items={contractTooltipItems}
+                onCopy={copyToClipboard}
+              />
             )}
           </span>
           {functionLabel && <span className={styles.traceDot}>.</span>}
