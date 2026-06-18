@@ -4,13 +4,20 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
-  push:
-    branches: [main]
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
 
 jobs:
   deploy:
     name: Deploy (production)
     runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.pull_request.merged == true &&
+        contains(github.event.pull_request.labels.*.name, 'deploy')
+      )
     environment:
       name: production
       url: ${{ steps.deploy.outputs.url }}
