@@ -10,14 +10,16 @@ export default function Nav() {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
   const { toggleSettings } = useSettings();
+  const isContractCallerActive =
+    pathname === "/" || pathname === "/contract-caller";
 
   return (
     <nav className={styles.nav}>
       <div className={styles.container}>
         <div className={styles.links}>
           <Link
-            href="/"
-            className={`${styles.link} ${pathname === "/" ? styles.active : ""}`}
+            href="/tx-decoder"
+            className={`${styles.link} ${pathname === "/tx-decoder" ? styles.active : ""}`}
           >
             Tx Decoder
           </Link>
@@ -28,8 +30,8 @@ export default function Nav() {
             Event Decoder
           </Link>
           <Link
-            href="/contract-caller"
-            className={`${styles.link} ${pathname === "/contract-caller" ? styles.active : ""}`}
+            href="/"
+            className={`${styles.link} ${isContractCallerActive ? styles.active : ""}`}
           >
             Contract Caller
           </Link>

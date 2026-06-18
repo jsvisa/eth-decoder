@@ -1,18 +1,32 @@
 import { test, expect } from "@playwright/test";
 
+const DECODER_PATH = "/tx-decoder";
+
 test.describe("Decoder page", () => {
   test("loads and shows the decode input form", async ({ page }) => {
-    await page.goto("/");
+    await page.goto(DECODER_PATH);
     await expect(
       page.getByPlaceholder("Enter hex data to decode (e.g., 0x1234abcd...)"),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "Decode" })).toBeVisible();
   });
 
+  test("redirects legacy shared URLs to the tx decoder route", async ({
+    page,
+  }) => {
+    await page.goto("/?data=0x12345678&with_abi=true");
+    await expect(page).toHaveURL(
+      /\/tx-decoder\?data=0x12345678&with_abi=true$/,
+    );
+    await expect(
+      page.getByPlaceholder("Enter hex data to decode (e.g., 0x1234abcd...)"),
+    ).toBeVisible();
+  });
+
   test("shows a result or error after submitting hex data", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto(DECODER_PATH);
     const input = page.getByPlaceholder(
       "Enter hex data to decode (e.g., 0x1234abcd...)",
     );
@@ -31,7 +45,7 @@ test.describe("Decoder page", () => {
   test("shows a validation error when submitting whitespace-only input", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto(DECODER_PATH);
     const input = page.getByPlaceholder(
       "Enter hex data to decode (e.g., 0x1234abcd...)",
     );
@@ -59,7 +73,7 @@ test.describe("Encode back", () => {
     await page.route("**/api/decode**", (route) =>
       route.fulfill({ contentType: "application/json", body: DECODE_RESPONSE }),
     );
-    await page.goto("/");
+    await page.goto(DECODER_PATH);
     await page
       .getByPlaceholder("Enter hex data to decode (e.g., 0x1234abcd...)")
       .fill(TRANSFER_DATA);
@@ -82,7 +96,7 @@ test.describe("Encode back", () => {
     await page.route("**/api/decode**", (route) =>
       route.fulfill({ contentType: "application/json", body: DECODE_RESPONSE }),
     );
-    await page.goto("/");
+    await page.goto(DECODER_PATH);
     await page
       .getByPlaceholder("Enter hex data to decode (e.g., 0x1234abcd...)")
       .fill(TRANSFER_DATA);
@@ -112,7 +126,7 @@ test.describe("Encode back", () => {
       return route.fulfill({ contentType: "application/json", body });
     });
 
-    await page.goto("/");
+    await page.goto(DECODER_PATH);
     await page
       .getByPlaceholder("Enter hex data to decode (e.g., 0x1234abcd...)")
       .fill(MULTICALL_DATA);
