@@ -179,6 +179,59 @@ describe("SessionHistoryStrip", () => {
     cleanup();
   });
 
+  it("renders a metrics chip when an entry has metrics", () => {
+    const items = [
+      {
+        id: 1,
+        address: "0xa",
+        contractName: "C",
+        functionName: "f",
+        type: "read",
+        success: true,
+        inputs: [],
+        outputs: [],
+        timestamp: 1,
+        metrics: {
+          totalMs: 1240,
+          phases: { prefetchMs: 540, executionMs: 700, lazyLoadMs: 290 },
+          rpc: {
+            totalLogicalCalls: 47,
+            totalHttpCalls: 6,
+            batchSize: 1,
+            duplicates: 0,
+            byMethod: {},
+          },
+          touched: { addresses: 12, slots: 28 },
+        },
+      },
+      {
+        id: 2,
+        address: "0xb",
+        contractName: "C",
+        functionName: "g",
+        type: "read",
+        success: true,
+        inputs: [],
+        outputs: [],
+        timestamp: 2,
+        metrics: null,
+      },
+    ];
+    const { container, cleanup } = renderComponent({
+      active: true,
+      items,
+      expandedIds: new Set(),
+      onToggleExpanded: () => {},
+    });
+    const text = container.textContent;
+    expect(text.includes("47rpc")).toBeTruthy();
+    expect(text.includes("1240ms")).toBeTruthy();
+    // Only one chip should be present (one for the entry with metrics, none for the null one)
+    const matches = text.match(/47rpc/g) || [];
+    expect(matches.length).toBe(1);
+    cleanup();
+  });
+
   it("abbreviates long address inputs in function signature", () => {
     const { container, cleanup } = renderComponent({
       active: true,
