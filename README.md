@@ -50,7 +50,7 @@ A web application for decoding EVM transaction input data and interacting with s
 You can share decode results by using URL parameters:
 
 ```
-https://your-domain.vercel.app/?data=0x1234abcd...&with_abi=true&with_sign=true
+https://your-domain.vercel.app/tx-decoder?data=0x1234abcd...&with_abi=true&with_sign=true
 ```
 
 Parameters:
@@ -295,9 +295,12 @@ decoder/
 │   ├── contract-caller/
 │   │   ├── page.js                # Contract Caller page
 │   │   └── page.module.css        # Contract Caller styles
+│   ├── tx-decoder/
+│   │   ├── page.js                # Transaction decoder page
+│   │   └── page.module.css        # Transaction decoder styles
 │   ├── layout.js                  # Root layout
-│   ├── page.js                    # Main decoder page
-│   ├── page.module.css            # Decoder page styles
+│   ├── page.js                    # Home page (Contract Caller)
+│   ├── page.module.css            # Home page wrapper styles
 │   └── globals.css                # Global styles
 ├── .env.local                     # Local environment variables (not committed)
 ├── .env.example                   # Example environment variables

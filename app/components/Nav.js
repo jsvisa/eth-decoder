@@ -10,6 +10,8 @@ export default function Nav() {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
   const { toggleSettings } = useSettings();
+  const isContractCallerActive =
+    pathname === "/" || pathname === "/contract-caller";
 
   return (
     <nav className={styles.nav}>
@@ -29,7 +31,7 @@ export default function Nav() {
           </Link>
           <Link
             href="/"
-            className={`${styles.link} ${pathname === "/" ? styles.active : ""}`}
+            className={`${styles.link} ${isContractCallerActive ? styles.active : ""}`}
           >
             Contract Caller
           </Link>

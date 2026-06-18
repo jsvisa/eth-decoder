@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export function middleware(request) {
+export function proxy(request) {
   const { searchParams } = request.nextUrl;
   if (searchParams.has("data")) {
     const dest = new URL("/tx-decoder", request.nextUrl.origin);
