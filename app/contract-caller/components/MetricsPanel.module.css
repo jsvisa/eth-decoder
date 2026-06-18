@@ -1,0 +1,83 @@
+.panel {
+  margin-top: 16px;
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 6px;
+  background: var(--surface, #161616);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.title {
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+.subtitle {
+  flex: 1;
+  margin-left: 12px;
+  opacity: 0.7;
+}
+.chevron {
+  flex: 0 0 auto;
+  opacity: 0.6;
+}
+
+.body {
+  padding: 4px 12px 12px;
+}
+
+.section {
+  padding: 6px 0;
+  border-top: 1px solid var(--border-subtle, #222);
+}
+.section:first-child {
+  border-top: 0;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.indent {
+  padding-left: 12px;
+  opacity: 0.85;
+}
+.warn {
+  color: var(--warn, #c8860b);
+}
+
+.methodTable {
+  width: 100%;
+  margin-top: 6px;
+  border-collapse: collapse;
+}
+.methodTable th,
+.methodTable td {
+  text-align: left;
+  padding: 2px 8px 2px 0;
+  font-weight: normal;
+}
+.methodTable th {
+  opacity: 0.6;
+}
+.methodTable td:nth-child(2),
+.methodTable td:nth-child(3),
+.methodTable td:nth-child(4),
+.methodTable th:nth-child(2),
+.methodTable th:nth-child(3),
+.methodTable th:nth-child(4) {
+  text-align: right;
+}
