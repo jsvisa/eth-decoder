@@ -24,13 +24,11 @@ export function createMetricsCollector({ batchSize = 1 } = {}) {
   let startedAt = 0;
   let endedAt = 0;
   let logicalCalls = 0;
-  let httpCalls = 0;
   let duplicates = 0;
   const byMethod = Object.create(null);
   const seenParamKeys = new Set();
   const touchedAddresses = new Set();
   const touchedSlots = new Set();
-  const phases = { prefetchMs: 0, executionMs: 0, lazyLoadMs: 0 };
   const phaseMarks = {};
   const callLog = [];
 
@@ -83,7 +81,6 @@ export function createMetricsCollector({ batchSize = 1 } = {}) {
               try {
                 recordCall(method, params, dt);
                 callLog.push({ method, startedAt: t0, durationMs: dt });
-                httpCalls += 1;
               } catch (_) {
                 // metrics recording must never crash the caller
               }
@@ -93,7 +90,6 @@ export function createMetricsCollector({ batchSize = 1 } = {}) {
               try {
                 recordCall(method, params, dt);
                 callLog.push({ method, startedAt: t0, durationMs: dt });
-                httpCalls += 1;
               } catch (_) {
                 // metrics recording must never crash the caller
               }
