@@ -89,6 +89,39 @@ function buildExplorerAddressUrl(chain, address) {
   return null;
 }
 
+function getFunctionBaseName(functionName) {
+  return functionName?.split("(")[0] || "";
+}
+
+function getFunctionTypeSuffix(functionName, baseName) {
+  if (!functionName || !baseName || !functionName.startsWith(`${baseName}(`)) {
+    return "";
+  }
+  return functionName.slice(baseName.length);
+}
+
+function getTraceLabelParts(contractName, functionName, depth) {
+  const baseName = getFunctionBaseName(functionName);
+  const contractIncludesFunction =
+    baseName &&
+    (contractName.endsWith(`.${baseName}`) || contractName.endsWith(baseName));
+
+  if (contractIncludesFunction) {
+    return {
+      contractLabel:
+        depth === 0
+          ? `${contractName}${getFunctionTypeSuffix(functionName, baseName)}`
+          : contractName,
+      functionLabel: "",
+    };
+  }
+
+  return {
+    contractLabel: contractName,
+    functionLabel: functionName,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Syntax-highlight a plain object to HTML (coloured JSON spans)
 // ---------------------------------------------------------------------------
@@ -134,6 +167,11 @@ function CallTraceNode({ trace, depth, chain }) {
     trace.toName || (trace.to ? `${trace.to.slice(0, 10)}...` : "?");
   const contractAddress = trace.to || "";
   const funcName = trace.functionName || trace.input?.slice(0, 10) || "()";
+  const { contractLabel, functionLabel } = getTraceLabelParts(
+    contractName,
+    funcName,
+    depth,
+  );
 
   const formatValue = (value) => {
     if (value === null || value === undefined) return "null";
@@ -177,7 +215,7 @@ function CallTraceNode({ trace, depth, chain }) {
         <span className={styles.traceType}>{trace.type}</span>
         <span className={styles.traceSignature}>
           <span className={styles.traceContractWrapper}>
-            <span className={styles.traceContract}>{contractName}</span>
+            <span className={styles.traceContract}>{contractLabel}</span>
             {!hideTooltip && (
               <span className={styles.traceTooltip}>
                 <span className={styles.traceTooltipContent}>
@@ -195,26 +233,28 @@ function CallTraceNode({ trace, depth, chain }) {
               </span>
             )}
           </span>
-          <span className={styles.traceDot}>.</span>
-          <span className={styles.traceFuncWrapper}>
-            <span className={styles.traceFuncName}>{funcName}</span>
-            {trace.input && !hideTooltip && (
-              <span className={styles.traceTooltip}>
-                <span className={styles.traceTooltipContent}>
-                  {trace.input}
+          {functionLabel && <span className={styles.traceDot}>.</span>}
+          {functionLabel && (
+            <span className={styles.traceFuncWrapper}>
+              <span className={styles.traceFuncName}>{functionLabel}</span>
+              {trace.input && !hideTooltip && (
+                <span className={styles.traceTooltip}>
+                  <span className={styles.traceTooltipContent}>
+                    {trace.input}
+                  </span>
+                  <button
+                    className={styles.traceTooltipCopy}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      copyToClipboard(trace.input);
+                    }}
+                  >
+                    Copy
+                  </button>
                 </span>
-                <button
-                  className={styles.traceTooltipCopy}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    copyToClipboard(trace.input);
-                  }}
-                >
-                  Copy
-                </button>
-              </span>
-            )}
-          </span>
+              )}
+            </span>
+          )}
           <span className={styles.traceParams}>({inputParams})</span>
           {outputParams && (
             <>
