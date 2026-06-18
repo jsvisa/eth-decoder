@@ -3,17 +3,17 @@
 import { useState, useEffect, useRef } from "react";
 import yaml from "js-yaml";
 import styles from "./page.module.css";
-import { decodeUniversalRouter } from "./utils/universalRouter.js";
-import { decodeMulticall } from "./utils/multicallDecoder.js";
+import { decodeUniversalRouter } from "../utils/universalRouter.js";
+import { decodeMulticall } from "../utils/multicallDecoder.js";
 import {
   encodeFunction,
   reencodeMulticallInner,
   reencodeURInput,
-} from "./utils/txEncoder.js";
+} from "../utils/txEncoder.js";
 import {
   parseJsonWithBigNumbers,
   stringifyForEditor,
-} from "./utils/jsonNumbers.js";
+} from "../utils/jsonNumbers.js";
 
 const STORAGE_KEY = "evm_decoder_history";
 const MAX_HISTORY_ITEMS = 100;
