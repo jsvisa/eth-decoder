@@ -4,6 +4,7 @@ import { SettingsProvider } from "./contexts/SettingsContext";
 import Nav from "./components/Nav";
 import SettingsPanel from "./components/SettingsPanel";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata = {
   title: "EVM Tools",
@@ -22,6 +23,7 @@ export default function RootLayout({ children }) {
           </SettingsProvider>
         </ThemeProvider>
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
