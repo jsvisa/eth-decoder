@@ -96,6 +96,7 @@ export default function CallActionBar({
   const callButtonClass = isWrite
     ? `${styles.button} ${styles.simulateButton}`
     : styles.button;
+  const showCancel = simProgress !== null || (loading && isWrite);
 
   return React.createElement(
     React.Fragment,
@@ -126,8 +127,7 @@ export default function CallActionBar({
           callButtonLabel,
         ),
 
-        // Cancel button — only visible while local sim is running
-        simProgress !== null &&
+        showCancel &&
           React.createElement(
             "button",
             {

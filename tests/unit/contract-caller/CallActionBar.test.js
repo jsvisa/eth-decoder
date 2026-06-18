@@ -187,6 +187,16 @@ describe("CallActionBar", () => {
     cleanup();
   });
 
+  it("shows Cancel button while a write simulation is loading without progress", () => {
+    const { container, cleanup } = renderComponent(
+      makeProps({ isWrite: true, loading: true, simProgress: null }),
+    );
+    const btns = Array.from(container.querySelectorAll("button"));
+    const cancelBtn = btns.find((b) => /cancel/i.test(b.textContent));
+    expect(cancelBtn).toBeTruthy();
+    cleanup();
+  });
+
   it("calls onCancel when Cancel is clicked", () => {
     const props = makeProps({ simProgress: 50 });
     const { container, cleanup } = renderComponent(props);
