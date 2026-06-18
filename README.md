@@ -35,14 +35,15 @@ A web application for decoding EVM transaction input data and interacting with s
   - ETH value input for payable functions
 - **Read Functions**: Direct RPC calls to read contract state
 - **Write Functions (Simulation)**:
-  - Tenderly integration for transaction simulation
+  - **Local simulation (tevm)** — default backend for fast, in-browser transaction simulation
   - Decoded event logs with parameter names and types
   - Call trace tree visualization with nested contract calls
   - Asset/balance changes display
   - State changes (storage diff) display
   - Gas usage estimation
+  - Tenderly integration (legacy) — available for advanced simulation scenarios
 - **History**: Recent calls saved with function name, args, and decoded output
-- **API Key Validation**: Test buttons to verify Etherscan and Tenderly API keys
+- **API Key Validation**: Test buttons to verify Etherscan API keys
 
 ## URL Parameters
 
