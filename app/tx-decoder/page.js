@@ -49,7 +49,7 @@ async function decodeInnerCallsAsync(innerCalls, setResult) {
   );
 }
 
-export default function Home() {
+export default function TxDecoderPage() {
   const modalContentRef = useRef(null);
   const [inputData, setInputData] = useState("");
   const [result, setResult] = useState(null);
