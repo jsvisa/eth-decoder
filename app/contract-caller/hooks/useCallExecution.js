@@ -352,6 +352,7 @@ export function useCallExecution({
                 inputs: data.callTrace?.decodedInputs || [],
                 outputs: data.decoded || [],
                 timestamp: ts,
+                metrics: data.metrics ?? null,
               },
             ]);
           }

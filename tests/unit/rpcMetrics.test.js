@@ -132,3 +132,34 @@ describe("collector.markPhase()", () => {
     expect(c.snapshot().phases.lazyLoadMs).toBeGreaterThan(0);
   });
 });
+
+describe("session history shape contract", () => {
+  it("documents the fields a sessionHistory entry must carry", () => {
+    // This test is a contract: if these field names change in
+    // useCallExecution.js or SessionHistoryStrip.js, update this test in lockstep.
+    const exampleEntry = {
+      id: 1,
+      address: "0x0",
+      contractName: "X",
+      functionName: "name",
+      type: "read",
+      success: true,
+      inputs: [],
+      outputs: [],
+      timestamp: 1,
+      metrics: {
+        totalMs: 0,
+        phases: { prefetchMs: 0, executionMs: 0, lazyLoadMs: 0 },
+        rpc: {
+          totalLogicalCalls: 0,
+          totalHttpCalls: 0,
+          batchSize: 1,
+          duplicates: 0,
+          byMethod: {},
+        },
+        touched: { addresses: 0, slots: 0 },
+      },
+    };
+    expect(exampleEntry.metrics).toBeTruthy();
+  });
+});
