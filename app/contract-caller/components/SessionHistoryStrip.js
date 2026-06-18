@@ -48,6 +48,21 @@ export default function SessionHistoryStrip({
                   {item.contractName} · {item.functionName}(
                   {item.inputs.map((i) => abbrev(i.value)).join(", ")})
                 </span>
+                {item.metrics && (
+                  <span
+                    className={styles.sessionHistoryMetricsChip}
+                    title={
+                      `Total ${Math.round(item.metrics.totalMs)}ms · ` +
+                      `${item.metrics.rpc.totalLogicalCalls} rpc calls · ` +
+                      `prefetch ${Math.round(item.metrics.phases.prefetchMs)}ms · ` +
+                      `exec ${Math.round(item.metrics.phases.executionMs)}ms`
+                    }
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {item.metrics.rpc.totalLogicalCalls}rpc ·{" "}
+                    {Math.round(item.metrics.totalMs)}ms
+                  </span>
+                )}
                 <span className={styles.sessionHistoryChevron}>
                   {expanded ? "▲" : "▼"}
                 </span>

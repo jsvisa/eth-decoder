@@ -135,3 +135,14 @@
   color: var(--text-secondary, #aaa);
   flex-shrink: 0;
 }
+
+.sessionHistoryMetricsChip {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--surface-2, #1f1f1f);
+  opacity: 0.8;
+  white-space: nowrap;
+}

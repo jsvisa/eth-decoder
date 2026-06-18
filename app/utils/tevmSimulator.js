@@ -13,6 +13,7 @@ import {
 } from "viem";
 import { isValidEthAddress } from "./validation";
 import { CHAIN_META, FORK_RPC_URLS } from "./chains";
+import { createMetricsCollector } from "./rpcMetrics";
 
 // Create an http transport with or without JSON-RPC batching.
 // batchSize=1 → http(url) with NO batch option — guarantees single {…} request
@@ -109,10 +110,15 @@ export function ensureTevmNodeCompat(client) {
 // eth_getCode only — nonce is omitted because it is irrelevant for CALL
 // simulation (only matters for CREATE address derivation, which is rare).
 // Storage slots are unaffected since tevm already uses eth_getStorageAt.
-function createProofFreeTransport(rpcUrl, batchSize = 1) {
-  const baseHttp = makeHttp(rpcUrl, batchSize);
+function createProofFreeTransport(rpcUrl, batchSize = 1, collector = null) {
+  const baseHttpFactory = makeHttp(rpcUrl, batchSize);
+  // If a collector is provided, every request the EVM/tevm makes through this
+  // transport is recorded. The wrap is invisible to callers.
+  const wrappedFactory = collector
+    ? collector.wrap(baseHttpFactory)
+    : baseHttpFactory;
   return (config) => {
-    const base = baseHttp(config);
+    const base = wrappedFactory(config);
     return {
       ...base,
       request: async ({ method, params }) => {
@@ -594,6 +600,7 @@ export async function createTevmClient(
   blockNumber = "latest",
   customChainId = null,
   batchSize = 1,
+  collector = null,
 ) {
   // Get chain config from built-in or use custom chain ID
   let chainConfig = CHAIN_META[chain];
@@ -638,7 +645,7 @@ export async function createTevmClient(
   const client = createMemoryClient({
     common,
     fork: {
-      transport: createProofFreeTransport(forkUrl, batchSize),
+      transport: createProofFreeTransport(forkUrl, batchSize, collector),
       blockTag,
     },
   });
@@ -714,8 +721,11 @@ async function prefetchAccountsFromAccessList({
   callParams,
   blockTag,
   batchSize = 1,
+  collector = null,
 }) {
-  const transport = makeHttp(forkRpcUrl, batchSize)({});
+  const baseFactory = makeHttp(forkRpcUrl, batchSize);
+  const factory = collector ? collector.wrap(baseFactory) : baseFactory;
+  const transport = factory({});
   const tag =
     blockTag === "latest" ? "latest" : `0x${BigInt(blockTag).toString(16)}`;
 
@@ -841,6 +851,13 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     throw new Error("Invalid address format");
   }
 
+  const collector = createMetricsCollector({ batchSize: rpcBatchSize });
+  collector.start();
+  const finalize = (payload) => {
+    collector.end();
+    return { ...payload, metrics: collector.snapshot() };
+  };
+
   try {
     // Find the function in ABI — supports both plain name and full signature (e.g. "transfer(address,uint256)")
     const functionAbi = abi.find((item) => {
@@ -924,6 +941,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
         ? "latest"
         : String(pinnedBlock).trim();
 
+    collector.markPhase("prefetch", "start");
     await prefetchAccountsFromAccessList({
       client,
       forkRpcUrl: rpcUrl || FORK_RPC_URLS[chain] || "",
@@ -935,7 +953,9 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       },
       blockTag: resolvedBlockTag,
       batchSize: rpcBatchSize,
+      collector,
     });
+    collector.markPhase("prefetch", "end");
 
     // ── callTracer implementation (forge/anvil/geth style) ──────────────────
     // Uses three hooks mirroring go-ethereum's callTracer / revm's Inspector:
@@ -982,6 +1002,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       if (message.depth === 0) {
         callTraceRoot = node;
         rootGasLimit = message.gasLimit ?? 0n;
+        collector.markPhase("execution", "start");
       } else if (type !== "STATICCALL") {
         // Attach to parent — STATICCALLs are excluded from the visible tree to
         // keep the trace readable, but are still pushed on the stack below so
@@ -1020,6 +1041,9 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
               : (abiCache.get(node.to?.toLowerCase()) ?? abi);
           node.errorReason = decodeRevertData(revertHex, nodeAbi);
         }
+      }
+      if (node === callTraceRoot) {
+        collector.markPhase("execution", "end");
       }
       next?.();
     };
@@ -1216,7 +1240,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       ? callResult.accessList
       : [];
 
-    return {
+    return finalize({
       success,
       simulated: true,
       localSimulation: true,
@@ -1243,7 +1267,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
             return reason ? `Revert: ${reason}` : "Transaction reverted";
           })(),
       undecodedAddresses: Array.from(undecodedAddresses),
-    };
+    });
   } catch (error) {
     console.error("Tevm simulation error:", error);
 
@@ -1265,7 +1289,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       errorMessage = "Transaction reverted";
     }
 
-    return {
+    return finalize({
       success: false,
       simulated: true,
       localSimulation: true,
@@ -1279,7 +1303,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       stateChanges: [],
       error: errorMessage,
       undecodedAddresses: [],
-    };
+    });
   }
 }
 

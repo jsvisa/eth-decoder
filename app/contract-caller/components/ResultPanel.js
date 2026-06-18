@@ -6,6 +6,7 @@ import { formatTokenAmount } from "../../utils/tokenFormatting";
 import { buildTokenAccountMap } from "../../utils/tokenTransfers";
 import { CHAINS } from "../../utils/chains";
 import styles from "./ResultPanel.module.css";
+import MetricsPanel from "./MetricsPanel";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1237,6 +1238,11 @@ export default function ResultPanel({
                 </div>
               )}
             </>
+          )}
+
+          {/* Simulation metrics panel — collapsible, always rendered for simulated runs that include metrics */}
+          {result.simulated && result.metrics && (
+            <MetricsPanel metrics={result.metrics} />
           )}
         </div>
       )}
