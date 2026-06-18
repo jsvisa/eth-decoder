@@ -173,6 +173,74 @@ describe("ResultPanel", () => {
     cleanup();
   });
 
+  it("renders call trace labels without duplicated function signatures", () => {
+    const traceResult = {
+      simulated: true,
+      success: true,
+      logs: [],
+      callTrace: {
+        type: "CALL",
+        to: "0xf8b2c63711111111111111111111111111111111",
+        toName: "0xf8b2c637....withdrawWei",
+        functionName: "withdrawWei(uint256,uint256,uint256,uint256,uint8)",
+        input: "0xabcdef01",
+        decodedInputs: [{ name: "_isolationModeMarketId", value: "0" }],
+        decodedOutputs: [],
+        calls: [
+          {
+            type: "CALL",
+            to: "0xf8b2c63722222222222222222222222222222222",
+            toName: "0xf8b2c637....withdrawWei",
+            functionName: "withdrawWei(uint256,uint256,uint256,uint256,uint8)",
+            input: "0xabcdef02",
+            decodedInputs: [{ name: "_isolationModeMarketId", value: "0" }],
+            decodedOutputs: [],
+            calls: [],
+            logs: [],
+          },
+        ],
+        logs: [],
+      },
+    };
+
+    const { container, cleanup } = renderComponent(
+      React.createElement(ResultPanel, {
+        ...defaultProps,
+        result: traceResult,
+      }),
+    );
+
+    const contractLabels = Array.from(
+      container.querySelectorAll(".traceContract"),
+    ).map((node) => node.textContent);
+    const functionLabels = Array.from(
+      container.querySelectorAll(".traceFuncName"),
+    ).map((node) => node.textContent);
+    const tooltipContents = Array.from(
+      container.querySelectorAll(".traceTooltipContent"),
+    ).map((node) => node.textContent);
+    const copyButtons = Array.from(container.querySelectorAll("button")).filter(
+      (button) => button.textContent === "Copy",
+    );
+
+    expect(contractLabels[0]).toBe(
+      "0xf8b2c637....withdrawWei(uint256,uint256,uint256,uint256,uint8)",
+    );
+    expect(contractLabels[1]).toBe("0xf8b2c637....withdrawWei");
+    expect(functionLabels).toEqual([]);
+    expect(tooltipContents).toEqual(
+      expect.arrayContaining([
+        "0xf8b2c63711111111111111111111111111111111",
+        "0xabcdef01",
+        "0xf8b2c63722222222222222222222222222222222",
+        "0xabcdef02",
+      ]),
+    );
+    expect(copyButtons).toHaveLength(4);
+
+    cleanup();
+  });
+
   it("collapses content when Collapse button is clicked", () => {
     const { container, cleanup } = renderComponent(
       React.createElement(ResultPanel, { ...defaultProps, result: readResult }),

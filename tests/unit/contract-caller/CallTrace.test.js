@@ -197,6 +197,110 @@ describe("CallTrace – nested calls and logs", () => {
   });
 });
 
+describe("CallTrace – signature labels", () => {
+  it("renders root labels with the canonical signature and child labels with the function name", () => {
+    const trace = {
+      type: "CALL",
+      to: "0xf8b2c63711111111111111111111111111111111",
+      toName: "0xf8b2c637....withdrawWei",
+      functionName: "withdrawWei(uint256,uint256,uint256,uint256,uint8)",
+      input: "0xabcdef01",
+      decodedInputs: [
+        { name: "_isolationModeMarketId", value: "0" },
+        { name: "_amountWei", value: "10" },
+      ],
+      decodedOutputs: [],
+      logs: [],
+      calls: [
+        {
+          type: "CALL",
+          to: "0xf8b2c63722222222222222222222222222222222",
+          toName: "0xf8b2c637....withdrawWei",
+          functionName: "withdrawWei(uint256,uint256,uint256,uint256,uint8)",
+          input: "0xabcdef02",
+          decodedInputs: [{ name: "_isolationModeMarketId", value: "0" }],
+          decodedOutputs: [],
+          logs: [],
+          calls: [],
+        },
+      ],
+    };
+
+    const { container, cleanup } = renderComponent({
+      trace,
+      tokenSymbols: {},
+      chain: "ethereum",
+    });
+
+    const contractLabels = Array.from(
+      container.querySelectorAll('[class*="traceContract_"]'),
+    ).map((node) => node.textContent);
+    const functionLabels = Array.from(
+      container.querySelectorAll('[class*="traceFuncName"]'),
+    ).map((node) => node.textContent);
+    const params = Array.from(
+      container.querySelectorAll('[class*="traceParams"]'),
+    ).map((node) => node.textContent);
+    const tooltipContents = Array.from(
+      container.querySelectorAll('[class*="traceTooltipContent"]'),
+    ).map((node) => node.textContent);
+    const copyButtons = Array.from(container.querySelectorAll("button")).filter(
+      (button) => button.textContent === "Copy",
+    );
+
+    expect(contractLabels[0]).toBe(
+      "0xf8b2c637....withdrawWei(uint256,uint256,uint256,uint256,uint8)",
+    );
+    expect(contractLabels[1]).toBe("0xf8b2c637....withdrawWei");
+    expect(functionLabels).toEqual([]);
+    expect(params[0]).toContain("_isolationModeMarketId=0");
+    expect(params[1]).toContain("_isolationModeMarketId=0");
+    expect(tooltipContents).toEqual(
+      expect.arrayContaining([
+        "0xf8b2c63711111111111111111111111111111111",
+        "0xabcdef01",
+        "0xf8b2c63722222222222222222222222222222222",
+        "0xabcdef02",
+      ]),
+    );
+    expect(copyButtons).toHaveLength(4);
+
+    cleanup();
+  });
+
+  it("keeps a separate function label when the contract name only suffix-matches the function name", () => {
+    const trace = {
+      type: "CALL",
+      to: "0x1111111111111111111111111111111111111111",
+      toName: "NotwithdrawWei",
+      functionName: "withdrawWei(uint256)",
+      input: "0xabcdef01",
+      decodedInputs: [{ name: "amount", value: "10" }],
+      decodedOutputs: [],
+      logs: [],
+      calls: [],
+    };
+
+    const { container, cleanup } = renderComponent({
+      trace,
+      tokenSymbols: {},
+      chain: "ethereum",
+    });
+
+    const contractLabels = Array.from(
+      container.querySelectorAll('[class*="traceContract_"]'),
+    ).map((node) => node.textContent);
+    const functionLabels = Array.from(
+      container.querySelectorAll('[class*="traceFuncName"]'),
+    ).map((node) => node.textContent);
+
+    expect(contractLabels).toEqual(["NotwithdrawWei"]);
+    expect(functionLabels).toEqual(["withdrawWei(uint256)"]);
+
+    cleanup();
+  });
+});
+
 describe("CallTrace – STATICCALL filtering", () => {
   it("does not render STATICCALL nodes", () => {
     const staticTrace = {
