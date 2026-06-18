@@ -113,7 +113,6 @@ export function useCallExecution({
   const [hideTooltip, setHideTooltip] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
 
-  // internal abort controller ref
   const simAbortRef = useRef(null);
 
   // ── helpers ────────────────────────────────────────────────────────────────
@@ -304,6 +303,7 @@ export function useCallExecution({
         initialAbiCache.set(address.toLowerCase(), parsedAbi);
 
         const abortController = new AbortController();
+        simAbortRef.current?.abort();
         simAbortRef.current = abortController;
         setSimProgress(0);
 
@@ -455,10 +455,15 @@ export function useCallExecution({
           }
         }
 
+        const abortController = new AbortController();
+        simAbortRef.current?.abort();
+        simAbortRef.current = abortController;
+
         const response = await fetch(apiEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestBody),
+          signal: abortController.signal,
         });
 
         data = await response.json();
@@ -485,7 +490,7 @@ export function useCallExecution({
         );
       }
     } catch (err) {
-      if (err.message === "Simulation cancelled") {
+      if (err.name === "AbortError" || err.message === "Simulation cancelled") {
         setError(null);
       } else {
         setError(err.message);
