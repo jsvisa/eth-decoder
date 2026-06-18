@@ -16,8 +16,8 @@ export default function Nav() {
       <div className={styles.container}>
         <div className={styles.links}>
           <Link
-            href="/"
-            className={`${styles.link} ${pathname === "/" ? styles.active : ""}`}
+            href="/tx-decoder"
+            className={`${styles.link} ${pathname === "/tx-decoder" ? styles.active : ""}`}
           >
             Tx Decoder
           </Link>
@@ -28,8 +28,8 @@ export default function Nav() {
             Event Decoder
           </Link>
           <Link
-            href="/contract-caller"
-            className={`${styles.link} ${pathname === "/contract-caller" ? styles.active : ""}`}
+            href="/"
+            className={`${styles.link} ${pathname === "/" ? styles.active : ""}`}
           >
             Contract Caller
           </Link>
