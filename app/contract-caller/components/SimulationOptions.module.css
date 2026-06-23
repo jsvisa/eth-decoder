@@ -61,7 +61,7 @@
   font-size: 0.85rem;
   border: 1px solid rgba(139, 92, 246, 0.3);
   border-radius: 6px;
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: var(--bg-input);
   color: var(--text-primary);
   transition: all 0.2s;
 }
@@ -82,7 +82,7 @@
   font-size: 0.85rem;
   border: 1px solid rgba(236, 72, 153, 0.3);
   border-radius: 6px;
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: var(--bg-input);
   color: var(--text-primary);
   transition: all 0.2s;
 }
@@ -266,7 +266,7 @@
   font-size: 0.85rem;
   border: 1px solid rgba(139, 92, 246, 0.3);
   border-radius: 6px;
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: var(--bg-input);
   color: var(--text-primary);
   transition: all 0.2s;
 }
