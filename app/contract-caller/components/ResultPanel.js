@@ -896,22 +896,25 @@ export default function ResultPanel({
                           nativePrice != null
                             ? (Number(diff) / 1e18) * nativePrice
                             : null;
-                        rows.push({
-                          addr,
-                          symbol: "ETH",
-                          tokenAddr: NATIVE_TOKEN_ADDRESS,
-                          diff,
-                          absFormatted: formatTokenAmount(
-                            diff < 0n ? -diff : diff,
-                            18,
-                          ),
-                          usd,
-                        });
+                        if (diff !== 0n) {
+                          rows.push({
+                            addr,
+                            symbol: "ETH",
+                            tokenAddr: NATIVE_TOKEN_ADDRESS,
+                            diff,
+                            absFormatted: formatTokenAmount(
+                              diff < 0n ? -diff : diff,
+                              18,
+                            ),
+                            usd,
+                          });
+                        }
                       }
                     }
                     for (const [tokenAddr, rawDiff] of Object.entries(
                       data.tokens,
                     )) {
+                      if (rawDiff === 0n) continue;
                       const decimals =
                         tokenDecimals[tokenAddr] ??
                         getCachedTokenDecimals(chain, tokenAddr) ??
@@ -954,6 +957,16 @@ export default function ResultPanel({
                       maximumFractionDigits: 2,
                     });
 
+                  const rowGroups = [];
+                  for (const row of rows) {
+                    const currentGroup = rowGroups[rowGroups.length - 1];
+                    if (currentGroup?.addr === row.addr) {
+                      currentGroup.rows.push(row);
+                    } else {
+                      rowGroups.push({ addr: row.addr, rows: [row] });
+                    }
+                  }
+
                   return (
                     <div className={styles.bdSection}>
                       <h3 className={styles.bdTitle}>Balance Changes</h3>
@@ -971,133 +984,154 @@ export default function ResultPanel({
                             </tr>
                           </thead>
                           <tbody>
-                            {rows.map((row, i) => {
-                              const pos = row.diff >= 0n;
-                              const totalUsd = addrTotals[row.addr];
-                              const totalPos =
-                                totalUsd != null ? totalUsd >= 0 : pos;
-                              const isSender =
-                                fromAddress &&
-                                row.addr === fromAddress.toLowerCase();
-                              const isReceiver =
-                                address && row.addr === address.toLowerCase();
-                              return (
-                                <tr key={i} className={styles.bdRow}>
-                                  <td className={styles.bdTd}>
-                                    <div className={styles.bdAddrCell}>
-                                      <span
-                                        className={styles.bdAddr}
-                                        title={row.addr}
+                            {rowGroups.map((group) =>
+                              group.rows.map((row, rowIndex) => {
+                                const pos = row.diff >= 0n;
+                                const totalUsd = addrTotals[row.addr];
+                                const totalPos =
+                                  totalUsd != null ? totalUsd >= 0 : pos;
+                                const isSender =
+                                  fromAddress &&
+                                  group.addr === fromAddress.toLowerCase();
+                                const isReceiver =
+                                  address &&
+                                  group.addr === address.toLowerCase();
+                                const isFirstGroupRow = rowIndex === 0;
+                                return (
+                                  <tr
+                                    key={`${row.addr}-${row.tokenAddr}`}
+                                    className={styles.bdRow}
+                                  >
+                                    {isFirstGroupRow && (
+                                      <td
+                                        className={styles.bdTd}
+                                        rowSpan={group.rows.length}
+                                      >
+                                        <div className={styles.bdAddrCell}>
+                                          <span
+                                            className={styles.bdAddr}
+                                            title={group.addr}
+                                            onClick={() =>
+                                              setBdExpandedAddrs((prev) => {
+                                                const next = new Set(prev);
+                                                next.has(group.addr)
+                                                  ? next.delete(group.addr)
+                                                  : next.add(group.addr);
+                                                return next;
+                                              })
+                                            }
+                                          >
+                                            {bdExpandedAddrs.has(group.addr)
+                                              ? group.addr
+                                              : `${group.addr.slice(0, 10)}…${group.addr.slice(-8)}`}
+                                          </span>
+                                          {(() => {
+                                            const url = getExplorerAddressUrl(
+                                              group.addr,
+                                            );
+                                            return url ? (
+                                              <a
+                                                href={url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className={
+                                                  styles.bdAddrExplorerLink
+                                                }
+                                                title="View on explorer"
+                                                onClick={(e) =>
+                                                  e.stopPropagation()
+                                                }
+                                              >
+                                                ↗
+                                              </a>
+                                            ) : null;
+                                          })()}
+                                          {(isSender || isReceiver) && (
+                                            <span
+                                              className={`${styles.bdRole} ${isSender ? styles.bdRoleSender : styles.bdRoleReceiver}`}
+                                            >
+                                              {isSender ? "Sender" : "Receiver"}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </td>
+                                    )}
+                                    <td className={styles.bdTd}>
+                                      <div
+                                        className={styles.bdTokenCell}
                                         onClick={() =>
-                                          setBdExpandedAddrs((prev) => {
+                                          row.tokenAddr !==
+                                            NATIVE_TOKEN_ADDRESS &&
+                                          setBdExpandedTokens((prev) => {
                                             const next = new Set(prev);
-                                            next.has(row.addr)
-                                              ? next.delete(row.addr)
-                                              : next.add(row.addr);
+                                            next.has(row.tokenAddr)
+                                              ? next.delete(row.tokenAddr)
+                                              : next.add(row.tokenAddr);
                                             return next;
                                           })
                                         }
+                                        style={
+                                          row.tokenAddr !== NATIVE_TOKEN_ADDRESS
+                                            ? { cursor: "pointer" }
+                                            : undefined
+                                        }
+                                        title={
+                                          row.tokenAddr !== NATIVE_TOKEN_ADDRESS
+                                            ? row.tokenAddr
+                                            : undefined
+                                        }
                                       >
-                                        {bdExpandedAddrs.has(row.addr)
-                                          ? row.addr
-                                          : `${row.addr.slice(0, 10)}…${row.addr.slice(-8)}`}
-                                      </span>
-                                      {(() => {
-                                        const url = getExplorerAddressUrl(
-                                          row.addr,
-                                        );
-                                        return url ? (
-                                          <a
-                                            href={url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className={
-                                              styles.bdAddrExplorerLink
-                                            }
-                                            title="View on explorer"
-                                            onClick={(e) => e.stopPropagation()}
-                                          >
-                                            ↗
-                                          </a>
-                                        ) : null;
-                                      })()}
-                                      {(isSender || isReceiver) && (
-                                        <span
-                                          className={`${styles.bdRole} ${isSender ? styles.bdRoleSender : styles.bdRoleReceiver}`}
-                                        >
-                                          {isSender ? "Sender" : "Receiver"}
+                                        <span className={styles.bdTokenIcon}>
+                                          {row.symbol[0].toUpperCase()}
                                         </span>
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className={styles.bdTd}>
-                                    <div
-                                      className={styles.bdTokenCell}
-                                      onClick={() =>
-                                        row.tokenAddr !==
-                                          NATIVE_TOKEN_ADDRESS &&
-                                        setBdExpandedTokens((prev) => {
-                                          const next = new Set(prev);
-                                          next.has(row.tokenAddr)
-                                            ? next.delete(row.tokenAddr)
-                                            : next.add(row.tokenAddr);
-                                          return next;
-                                        })
-                                      }
-                                      style={
-                                        row.tokenAddr !== NATIVE_TOKEN_ADDRESS
-                                          ? { cursor: "pointer" }
-                                          : undefined
-                                      }
-                                      title={
-                                        row.tokenAddr !== NATIVE_TOKEN_ADDRESS
-                                          ? row.tokenAddr
-                                          : undefined
-                                      }
+                                        <span className={styles.bdTokenName}>
+                                          {row.symbol}
+                                          {bdExpandedTokens.has(
+                                            row.tokenAddr,
+                                          ) && (
+                                            <span
+                                              className={styles.bdTokenAddr}
+                                            >
+                                              {row.tokenAddr}
+                                            </span>
+                                          )}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td
+                                      className={`${styles.bdTd} ${pos ? styles.bdPos : styles.bdNeg}`}
                                     >
-                                      <span className={styles.bdTokenIcon}>
-                                        {row.symbol[0].toUpperCase()}
-                                      </span>
-                                      <span className={styles.bdTokenName}>
-                                        {row.symbol}
-                                        {bdExpandedTokens.has(
-                                          row.tokenAddr,
-                                        ) && (
-                                          <span className={styles.bdTokenAddr}>
-                                            {row.tokenAddr}
-                                          </span>
-                                        )}
-                                      </span>
-                                    </div>
-                                  </td>
-                                  <td
-                                    className={`${styles.bdTd} ${pos ? styles.bdPos : styles.bdNeg}`}
-                                  >
-                                    {pos ? "+" : "-"}
-                                    {row.absFormatted}
-                                  </td>
-                                  <td
-                                    className={`${styles.bdTd} ${pos ? styles.bdPos : styles.bdNeg}`}
-                                  >
-                                    {row.usd != null
-                                      ? `$${fmtUsd(row.usd)}`
-                                      : "–"}
-                                  </td>
-                                  <td className={styles.bdTd}>
-                                    {totalUsd != null ? (
-                                      <span
-                                        className={`${styles.bdTotalBadge} ${totalPos ? styles.bdTotalPos : styles.bdTotalNeg}`}
+                                      {pos ? "+" : "-"}
+                                      {row.absFormatted}
+                                    </td>
+                                    <td
+                                      className={`${styles.bdTd} ${pos ? styles.bdPos : styles.bdNeg}`}
+                                    >
+                                      {row.usd != null
+                                        ? `$${fmtUsd(row.usd)}`
+                                        : "–"}
+                                    </td>
+                                    {isFirstGroupRow && (
+                                      <td
+                                        className={styles.bdTd}
+                                        rowSpan={group.rows.length}
                                       >
-                                        {totalPos ? "+ " : "– "}$
-                                        {fmtUsd(totalUsd)}
-                                      </span>
-                                    ) : (
-                                      "–"
+                                        {totalUsd != null ? (
+                                          <span
+                                            className={`${styles.bdTotalBadge} ${totalPos ? styles.bdTotalPos : styles.bdTotalNeg}`}
+                                          >
+                                            {totalPos ? "+ " : "– "}$
+                                            {fmtUsd(totalUsd)}
+                                          </span>
+                                        ) : (
+                                          "–"
+                                        )}
+                                      </td>
                                     )}
-                                  </td>
-                                </tr>
-                              );
-                            })}
+                                  </tr>
+                                );
+                              }),
+                            )}
                           </tbody>
                         </table>
                       </div>
