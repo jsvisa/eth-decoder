@@ -368,7 +368,7 @@ export default function ResultPanel({
   const [isYaml, setIsYaml] = useState(false);
   const [copied, setCopied] = useState(false);
   const [simLogsExpanded, setSimLogsExpanded] = useState(true);
-  const [simLogNameFilter, setSimLogNameFilter] = useState("");
+  const [selectedSimLogNames, setSelectedSimLogNames] = useState([]);
   const [bdExpandedAddrs, setBdExpandedAddrs] = useState(new Set());
   const [bdExpandedTokens, setBdExpandedTokens] = useState(new Set());
 
@@ -537,8 +537,8 @@ export default function ResultPanel({
                 logs={result.simulated ? result.logs : []}
                 expanded={simLogsExpanded}
                 onToggleExpanded={() => setSimLogsExpanded((value) => !value)}
-                eventNameFilter={simLogNameFilter}
-                onEventNameFilterChange={setSimLogNameFilter}
+                selectedEventNames={selectedSimLogNames}
+                onSelectedEventNamesChange={setSelectedSimLogNames}
                 getExplorerAddressUrl={getExplorerAddressUrl}
                 getContractName={getLogContractName}
                 getTokenSymbol={getLogTokenSymbol}

@@ -218,7 +218,7 @@ describe("ResultPanel", () => {
     cleanup();
   });
 
-  it("filters simulation event logs by selected event name", () => {
+  it("filters simulation event logs by one selected event name", () => {
     const { container, cleanup } = renderComponent(
       React.createElement(ResultPanel, {
         ...defaultProps,
@@ -226,14 +226,13 @@ describe("ResultPanel", () => {
       }),
     );
 
-    const eventFilter = container.querySelector(
-      'select[aria-label="Filter simulation event logs by event name"]',
+    const approvalFilter = container.querySelector(
+      'input[aria-label="Show Approval event logs"]',
     );
-    expect(eventFilter).toBeTruthy();
+    expect(approvalFilter).toBeTruthy();
 
     act(() => {
-      eventFilter.value = "Approval";
-      eventFilter.dispatchEvent(new Event("change", { bubbles: true }));
+      approvalFilter.click();
     });
 
     const renderedLogs = Array.from(container.querySelectorAll(".logItem")).map(
@@ -241,6 +240,79 @@ describe("ResultPanel", () => {
     );
     expect(renderedLogs).toEqual([expect.stringContaining("Approval")]);
     expect(container.textContent).toContain("1 of 3");
+
+    cleanup();
+  });
+
+  it("filters simulation event logs by multiple selected event names", () => {
+    const { container, cleanup } = renderComponent(
+      React.createElement(ResultPanel, {
+        ...defaultProps,
+        result: multiLogResult,
+      }),
+    );
+
+    const transferFilter = container.querySelector(
+      'input[aria-label="Show Transfer event logs"]',
+    );
+    const depositFilter = container.querySelector(
+      'input[aria-label="Show Deposit event logs"]',
+    );
+    expect(transferFilter).toBeTruthy();
+    expect(depositFilter).toBeTruthy();
+
+    act(() => {
+      transferFilter.click();
+      depositFilter.click();
+    });
+
+    const renderedLogs = Array.from(container.querySelectorAll(".logItem")).map(
+      (node) => node.textContent,
+    );
+    expect(renderedLogs).toEqual([
+      expect.stringContaining("Transfer"),
+      expect.stringContaining("Deposit"),
+    ]);
+    expect(container.textContent).toContain("2 of 3");
+
+    cleanup();
+  });
+
+  it("shows all simulation event logs when All events is selected", () => {
+    const { container, cleanup } = renderComponent(
+      React.createElement(ResultPanel, {
+        ...defaultProps,
+        result: multiLogResult,
+      }),
+    );
+
+    const approvalFilter = container.querySelector(
+      'input[aria-label="Show Approval event logs"]',
+    );
+    const allEventsFilter = container.querySelector(
+      'input[aria-label="Show all event logs"]',
+    );
+    expect(approvalFilter).toBeTruthy();
+    expect(allEventsFilter).toBeTruthy();
+
+    act(() => {
+      approvalFilter.click();
+    });
+    expect(container.querySelectorAll(".logItem")).toHaveLength(1);
+
+    act(() => {
+      allEventsFilter.click();
+    });
+
+    const renderedLogs = Array.from(container.querySelectorAll(".logItem")).map(
+      (node) => node.textContent,
+    );
+    expect(renderedLogs).toEqual([
+      expect.stringContaining("Transfer"),
+      expect.stringContaining("Approval"),
+      expect.stringContaining("Deposit"),
+    ]);
+    expect(container.textContent).toContain("Event Logs (3)");
 
     cleanup();
   });

@@ -8,8 +8,8 @@ export default function SimulatedEventLogs({
   logs,
   expanded,
   onToggleExpanded,
-  eventNameFilter,
-  onEventNameFilterChange,
+  selectedEventNames,
+  onSelectedEventNamesChange,
   getExplorerAddressUrl,
   getContractName,
   getTokenSymbol,
@@ -20,40 +20,84 @@ export default function SimulatedEventLogs({
   const eventNames = Array.from(
     new Set(logs.map((log) => log.name || "Unknown Event")),
   );
-  const activeEventNameFilter = eventNames.includes(eventNameFilter)
-    ? eventNameFilter
-    : "";
+  const activeEventNames = Array.isArray(selectedEventNames)
+    ? selectedEventNames.filter(
+        (eventName, index) =>
+          eventNames.includes(eventName) &&
+          selectedEventNames.indexOf(eventName) === index,
+      )
+    : [];
+  const activeEventNameSet = new Set(activeEventNames);
+  const allEventsSelected = activeEventNames.length === 0;
   const filteredLogs = logs
     .map((log, index) => ({ log, index }))
     .filter(
       ({ log }) =>
-        !activeEventNameFilter ||
-        (log.name || "Unknown Event") === activeEventNameFilter,
+        allEventsSelected ||
+        activeEventNameSet.has(log.name || "Unknown Event"),
     );
   const visibleLogs = expanded ? filteredLogs : [];
+  const filterLabel = allEventsSelected
+    ? "All events"
+    : activeEventNames.length === 1
+      ? activeEventNames[0]
+      : `${activeEventNames.length} events`;
+
+  const toggleEventName = (eventName) => {
+    const nextEventNames = new Set(activeEventNames);
+    if (nextEventNames.has(eventName)) {
+      nextEventNames.delete(eventName);
+    } else {
+      nextEventNames.add(eventName);
+    }
+    onSelectedEventNamesChange(
+      eventNames.filter((name) => nextEventNames.has(name)),
+    );
+  };
 
   return (
     <div className={styles.logsSection}>
       <h3 className={styles.logsTitle}>
         <span>
           Event Logs{" "}
-          {activeEventNameFilter
+          {!allEventsSelected
             ? `(${filteredLogs.length} of ${logs.length})`
             : `(${logs.length})`}
         </span>
-        <select
-          aria-label="Filter simulation event logs by event name"
-          className={styles.logsEventFilter}
-          value={activeEventNameFilter}
-          onChange={(event) => onEventNameFilterChange(event.target.value)}
-        >
-          <option value="">All events</option>
-          {eventNames.map((eventName) => (
-            <option key={eventName} value={eventName}>
-              {eventName}
-            </option>
-          ))}
-        </select>
+        <span className={styles.logsEventFilterMenu}>
+          <button
+            type="button"
+            className={styles.logsEventFilter}
+            aria-haspopup="true"
+          >
+            {filterLabel}
+          </button>
+          <span
+            className={styles.logsEventFilterDropdown}
+            aria-label="Filter simulation event logs by event name"
+          >
+            <label className={styles.logsEventFilterOption}>
+              <input
+                type="checkbox"
+                aria-label="Show all event logs"
+                checked={allEventsSelected}
+                onChange={() => onSelectedEventNamesChange([])}
+              />
+              <span>All events</span>
+            </label>
+            {eventNames.map((eventName) => (
+              <label key={eventName} className={styles.logsEventFilterOption}>
+                <input
+                  type="checkbox"
+                  aria-label={`Show ${eventName} event logs`}
+                  checked={activeEventNameSet.has(eventName)}
+                  onChange={() => toggleEventName(eventName)}
+                />
+                <span>{eventName}</span>
+              </label>
+            ))}
+          </span>
+        </span>
         <button
           className={styles.logsToggleBtn}
           onClick={onToggleExpanded}
