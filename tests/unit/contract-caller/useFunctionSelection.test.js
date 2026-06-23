@@ -35,6 +35,36 @@ const TRANSFER_ABI = [
   },
 ];
 
+const ADDRESS_ARRAY_ABI = [
+  {
+    type: "function",
+    name: "setOwners",
+    inputs: [{ name: "owners", type: "address[]" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+];
+
+const TUPLE_ARRAY_ABI = [
+  {
+    type: "function",
+    name: "executeRoute",
+    inputs: [
+      {
+        name: "route",
+        type: "tuple[]",
+        components: [
+          { name: "target", type: "address" },
+          { name: "value", type: "uint256" },
+          { name: "data", type: "bytes" },
+        ],
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+];
+
 describe("useFunctionSelection — initial state", () => {
   it("starts with empty / default values", () => {
     const { result } = renderHook(() =>
@@ -141,6 +171,68 @@ describe("useFunctionSelection — function selection and arg reset", () => {
     expect(result.current.pasteCalldataValue).toMatch(/^0x[0-9a-f]+$/i);
     // transfer(address,uint256) selector is 0xa9059cbb
     expect(result.current.pasteCalldataValue.slice(0, 10)).toBe("0xa9059cbb");
+  });
+
+  it("encodes comma-separated address array calldata", async () => {
+    const { result } = renderHook(() =>
+      useFunctionSelection({
+        parsedAbi: ADDRESS_ARRAY_ABI,
+        functions: ADDRESS_ARRAY_ABI,
+        address: "0x1234567890123456789012345678901234567890",
+      }),
+    );
+
+    act(() => {
+      result.current.setSelectedFunction("setOwners(address[])");
+    });
+
+    act(() => {
+      result.current.setArgs([
+        "0x0000000000000000000000000000000000000001,0x0000000000000000000000000000000000000002",
+      ]);
+    });
+
+    await act(async () => {});
+
+    await act(async () => {
+      await result.current.handleCopyCalldata();
+    });
+
+    expect(result.current.pasteCalldataValue).toMatch(/^0x[0-9a-f]+$/i);
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      result.current.pasteCalldataValue,
+    );
+  });
+
+  it("copies calldata when args contain structured tuple arrays", async () => {
+    const { result } = renderHook(() =>
+      useFunctionSelection({
+        parsedAbi: TUPLE_ARRAY_ABI,
+        functions: TUPLE_ARRAY_ABI,
+        address: "0x1234567890123456789012345678901234567890",
+      }),
+    );
+
+    act(() => {
+      result.current.setSelectedFunction("executeRoute(tuple[])");
+    });
+
+    act(() => {
+      result.current.setArgs([
+        [["0x0000000000000000000000000000000000000001", "25", "0xabcdef"]],
+      ]);
+    });
+
+    await act(async () => {});
+
+    await act(async () => {
+      await result.current.handleCopyCalldata();
+    });
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      result.current.pasteCalldataValue,
+    );
+    expect(result.current.pasteCalldataValue).toMatch(/^0x[0-9a-f]+$/i);
   });
 
   it("clears stale selected function state when parsed ABI disappears", () => {

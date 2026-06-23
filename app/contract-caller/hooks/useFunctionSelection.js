@@ -1,70 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { encodeFunctionData, decodeFunctionData } from "viem";
 import {
-  encodeFunctionData,
-  decodeFunctionData,
-  toFunctionSelector,
-} from "viem";
-import { normalizeArg } from "../../utils/normalizeArg";
-
-// Canonical signature for a function ABI item, e.g. "transfer(address,uint256)"
-const getFunctionSig = (func) => {
-  const types = func.inputs?.map((i) => i.type).join(",") || "";
-  return `${func.name}(${types})`;
-};
-
-// Get function selector (4-byte selector string)
-const getFunctionSelector = (func) => {
-  if (!func) return null;
-  try {
-    return toFunctionSelector(func);
-  } catch {
-    return null;
-  }
-};
-
-// Helper to get a sensible default arg value for an ABI input
-const getDefaultValue = (input) => {
-  if (!input) return "";
-  const type = input.type;
-  if (type === "tuple" && input.components) {
-    return input.components.map((comp) => getDefaultValue(comp));
-  }
-  if (type.endsWith("[]")) {
-    return [];
-  }
-  return "";
-};
-
-// Convert a viem-decoded value back into the string/array form used by arg inputs
-const viemDecodedToArgValue = (value, input) => {
-  if (value === undefined || value === null) return getDefaultValue(input);
-  const type = input.type;
-
-  const arrayMatch = type.match(/^(.+)\[(\d*)\]$/);
-  if (arrayMatch) {
-    const baseType = arrayMatch[1];
-    const baseInput =
-      baseType === "tuple"
-        ? { type: "tuple", components: input.components }
-        : { type: baseType };
-    return Array.isArray(value)
-      ? value.map((v) => viemDecodedToArgValue(v, baseInput))
-      : [];
-  }
-
-  if (type === "tuple" && input.components) {
-    return input.components.map((comp, i) => {
-      const compValue = Array.isArray(value) ? value[i] : value[comp.name];
-      return viemDecodedToArgValue(compValue, comp);
-    });
-  }
-
-  if (typeof value === "bigint") return value.toString();
-  if (typeof value === "boolean") return value.toString();
-  return String(value);
-};
+  getDefaultArgValue,
+  getFunctionSelector,
+  getFunctionSig,
+  normalizeInputValue,
+  viemDecodedToArgValue,
+} from "../utils/functionArgs";
 
 /**
  * Manages the currently-selected function and all associated arg/calldata state.
@@ -160,7 +104,7 @@ export function useFunctionSelection({
     }
 
     if (func.inputs) {
-      setArgs(func.inputs.map((input) => getDefaultValue(input)));
+      setArgs(func.inputs.map((input) => getDefaultArgValue(input)));
     } else {
       setArgs([]);
     }
@@ -179,11 +123,7 @@ export function useFunctionSelection({
     if (!func) return;
     try {
       const parsedArgs = func.inputs.map((input, i) =>
-        normalizeArg(
-          args[i] ?? getDefaultValue(input),
-          input.type,
-          input.components,
-        ),
+        normalizeInputValue(args[i], input),
       );
       const encoded = encodeFunctionData({
         abi: [func],
@@ -254,39 +194,13 @@ export function useFunctionSelection({
     if (!func) return;
 
     try {
-      const parsedArgs = func.inputs.map((input, index) => {
-        const value = args[index] || "";
-
-        if (input.type.includes("[]")) {
-          try {
-            return JSON.parse(value);
-          } catch {
-            return value.split(",").map((v) => v.trim());
-          }
-        }
-
-        if (input.type === "tuple" || input.type.startsWith("tuple")) {
-          try {
-            return JSON.parse(value);
-          } catch {
-            return value;
-          }
-        }
-
-        if (input.type === "bool") {
-          return value.toLowerCase() === "true" || value === "1";
-        }
-
-        if (input.type.startsWith("uint") || input.type.startsWith("int")) {
-          return value;
-        }
-
-        return value;
-      });
+      const parsedArgs = func.inputs.map((input, index) =>
+        normalizeInputValue(args[index], input),
+      );
 
       const calldata = encodeFunctionData({
-        abi: parsedAbi,
-        functionName: selectedFunction,
+        abi: [func],
+        functionName: func.name,
         args: parsedArgs,
       });
 
