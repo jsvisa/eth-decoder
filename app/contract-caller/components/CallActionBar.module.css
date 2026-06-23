@@ -2,6 +2,7 @@
   display: flex;
   gap: 1rem;
   width: 100%;
+  min-width: 0;
 }
 
 .buttonGroup .button {
@@ -202,4 +203,23 @@
 
 .sessionResetBtn:hover {
   background: rgba(239, 68, 68, 0.1);
+}
+
+@media (max-width: 620px) {
+  .buttonGroup {
+    flex-direction: column;
+  }
+
+  .button,
+  .calldataButton,
+  .shareButton {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    font-size: 1rem;
+  }
+
+  .sessionBanner {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
 }

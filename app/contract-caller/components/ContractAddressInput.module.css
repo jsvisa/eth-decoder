@@ -19,6 +19,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .bookmarkName {
@@ -37,16 +38,22 @@
   background-color: #e8f4ff;
   padding: 0.25rem 0.75rem;
   border-radius: 4px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .addressRow {
   display: flex;
   gap: 0.75rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .addressInputWrapper {
-  flex: 1;
+  flex: 1 1 22rem;
+  min-width: 0;
   position: relative;
 }
 
@@ -177,6 +184,7 @@
 }
 
 .fetchButton {
+  flex: 0 0 auto;
   padding: 0.875rem 1.5rem;
   font-size: 1rem;
   font-weight: 600;
@@ -204,4 +212,32 @@
 .fieldErrorMsg {
   font-size: 0.85rem;
   color: #ef4444;
+}
+
+@media (max-width: 520px) {
+  .addressLabelRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .addressRow {
+    align-items: stretch;
+  }
+
+  .addressInputWrapper {
+    flex-basis: 100%;
+  }
+
+  .bookmarkButton {
+    flex: 0 0 3.5rem;
+  }
+
+  .detectProxyLabel {
+    flex: 1 1 auto;
+    min-height: 3.25rem;
+  }
+
+  .fetchButton {
+    flex: 1 1 100%;
+  }
 }
