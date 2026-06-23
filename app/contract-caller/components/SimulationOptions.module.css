@@ -49,7 +49,8 @@
   align-items: center;
   gap: 0.5rem;
   flex: 1;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .simOptionInput {
@@ -119,6 +120,7 @@
   border-radius: 6px;
   flex-shrink: 0;
   margin-left: auto;
+  flex-wrap: wrap;
 }
 
 .cheatcodeInlineItem {
@@ -297,4 +299,28 @@
 
 .bookmarked {
   color: #f59e0b;
+}
+
+@media (max-width: 620px) {
+  .simOptionsSection {
+    padding: 0.75rem;
+  }
+
+  .simOptionsInline,
+  .simOptionsHeader {
+    align-items: stretch;
+  }
+
+  .simOptionInput,
+  .simOptionInputSmall,
+  .simOptionFromAddress {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .cheatcodesInline {
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
 }

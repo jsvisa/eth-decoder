@@ -2,6 +2,7 @@
 
 import React from "react";
 import styles from "./ArgsInput.module.css";
+import TupleArgInput from "./TupleArgInput";
 
 const isPayable = (func) => func && func.stateMutability === "payable";
 const isReadOnly = (func) =>
@@ -121,24 +122,16 @@ export default function ArgsInput({
   if (hasArgs) {
     const argFields = inputs.map((input, index) => {
       const argError = fieldErrors[`arg_${index}`];
-      const argInput = ArgInputComponent
-        ? React.createElement(ArgInputComponent, {
-            input: input,
-            value: args[index],
-            onChange: (value) => handleArgChange(index, value),
-            addressBook: addressBook,
-            disabled: disabled,
-            onBookmarkClick: onOpenBookmarkModal,
-            error: argError,
-          })
-        : React.createElement("input", {
-            type: "text",
-            value: args[index] || "",
-            onChange: (e) => handleArgChange(index, e.target.value),
-            placeholder: `Enter ${input.type}...`,
-            className: styles.input + (argError ? " " + styles.inputError : ""),
-            disabled: disabled,
-          });
+      const argInput = React.createElement(TupleArgInput, {
+        input,
+        value: args[index],
+        onChange: (value) => handleArgChange(index, value),
+        error: argError,
+        ArgInputComponent,
+        addressBook,
+        disabled,
+        onOpenBookmarkModal,
+      });
 
       return React.createElement(
         "div",

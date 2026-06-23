@@ -93,6 +93,7 @@
   background-color: var(--bg-code);
   border-radius: 8px;
   border: 1px solid var(--border-secondary);
+  min-width: 0;
 }
 
 .argsSectionHeader {
@@ -162,16 +163,18 @@
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
+  min-width: 0;
 }
 
 .argLabel {
   font-size: 0.875rem;
   color: var(--text-secondary);
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
 }
 
 .input {
   width: 100%;
+  min-width: 0;
   padding: 0.875rem 1rem;
   font-size: 1rem;
   border: 2px solid var(--border-primary);
@@ -188,6 +191,82 @@
 
 .input:disabled {
   background-color: var(--bg-hover);
+  cursor: not-allowed;
+}
+
+.tupleGroup,
+.tupleArrayGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background-color: var(--bg-input);
+  min-width: 0;
+}
+
+.tupleGroupError {
+  border-color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.05);
+}
+
+.tupleTitle,
+.tupleArrayIndex {
+  color: var(--text-secondary);
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.tupleField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.tupleLabel {
+  color: var(--text-secondary);
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-size: 0.8rem;
+}
+
+.tupleArrayItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.tupleArrayItemHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.tupleButton {
+  align-self: flex-start;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background-color: var(--bg-hover);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tupleButton:hover:not(:disabled) {
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
+  border-color: var(--border-secondary);
+}
+
+.tupleButton:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
