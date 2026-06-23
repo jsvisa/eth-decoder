@@ -219,13 +219,7 @@ describe("useFunctionSelection — function selection and arg reset", () => {
 
     act(() => {
       result.current.setArgs([
-        [
-          [
-            "0x0000000000000000000000000000000000000001",
-            "25",
-            "0xabcdef",
-          ],
-        ],
+        [["0x0000000000000000000000000000000000000001", "25", "0xabcdef"]],
       ]);
     });
 
