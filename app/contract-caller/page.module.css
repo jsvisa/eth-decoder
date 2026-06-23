@@ -5,6 +5,7 @@
 }
 
 .container {
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
   background: var(--bg-card);
@@ -23,12 +24,14 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  min-width: 0;
 }
 
 .row {
   display: flex;
   gap: 1.5rem;
   align-items: flex-start;
+  min-width: 0;
 }
 
 .networkField {
@@ -48,11 +51,27 @@
   .main {
     padding: 1rem;
   }
+  .container {
+    padding: 1.25rem;
+  }
   .row {
     flex-direction: column;
   }
   .networkField {
     min-width: unset;
     width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .main {
+    padding: 0.5rem;
+  }
+  .container {
+    padding: 1rem;
+    border-radius: 8px;
+  }
+  .title {
+    font-size: 1.75rem;
   }
 }

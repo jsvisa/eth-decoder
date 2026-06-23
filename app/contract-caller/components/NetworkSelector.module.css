@@ -2,16 +2,20 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  width: 100%;
 }
 
 .chainSelectWithIcon {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .chainSelectWithIcon .select {
   flex: 1;
+  min-width: 0;
 }
 
 .chainIconSmall {
