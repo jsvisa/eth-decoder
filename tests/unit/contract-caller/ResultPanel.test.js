@@ -102,6 +102,28 @@ const simResult = {
   ],
 };
 
+const multiLogResult = {
+  simulated: true,
+  success: true,
+  logs: [
+    {
+      name: "Transfer",
+      address: "0xTokenAddress",
+      inputs: [{ name: "value", type: "uint256", value: "100" }],
+    },
+    {
+      name: "Approval",
+      address: "0xTokenAddress",
+      inputs: [{ name: "spender", type: "address", value: "0xSpender" }],
+    },
+    {
+      name: "Deposit",
+      address: "0xVaultAddress",
+      inputs: [{ name: "amount", type: "uint256", value: "50" }],
+    },
+  ],
+};
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -158,6 +180,68 @@ describe("ResultPanel", () => {
     );
     expect(container.textContent).toContain("Event Logs");
     expect(container.textContent).toContain("Transfer");
+    cleanup();
+  });
+
+  it("renders simulation event logs with emitted-order indexes", () => {
+    const { container, cleanup } = renderComponent(
+      React.createElement(ResultPanel, {
+        ...defaultProps,
+        result: multiLogResult,
+      }),
+    );
+
+    expect(container.textContent).toContain("#0");
+    expect(container.textContent).toContain("#1");
+    expect(container.textContent).toContain("#2");
+
+    cleanup();
+  });
+
+  it("hides every simulation event log when Event Logs is collapsed", () => {
+    const { container, cleanup } = renderComponent(
+      React.createElement(ResultPanel, {
+        ...defaultProps,
+        result: multiLogResult,
+      }),
+    );
+
+    const eventLogsSection = container.querySelector(".logsSection");
+    const collapseBtn = eventLogsSection.querySelector(".logsToggleBtn");
+    act(() => {
+      collapseBtn.click();
+    });
+
+    expect(eventLogsSection.textContent).toContain("Event Logs");
+    expect(eventLogsSection.querySelectorAll(".logItem")).toHaveLength(0);
+
+    cleanup();
+  });
+
+  it("filters simulation event logs by selected event name", () => {
+    const { container, cleanup } = renderComponent(
+      React.createElement(ResultPanel, {
+        ...defaultProps,
+        result: multiLogResult,
+      }),
+    );
+
+    const eventFilter = container.querySelector(
+      'select[aria-label="Filter simulation event logs by event name"]',
+    );
+    expect(eventFilter).toBeTruthy();
+
+    act(() => {
+      eventFilter.value = "Approval";
+      eventFilter.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    const renderedLogs = Array.from(container.querySelectorAll(".logItem")).map(
+      (node) => node.textContent,
+    );
+    expect(renderedLogs).toEqual([expect.stringContaining("Approval")]);
+    expect(container.textContent).toContain("1 of 3");
+
     cleanup();
   });
 
