@@ -151,8 +151,23 @@ describe("SimulationOptions", () => {
       makeProps({ useLocalSimulation: true }),
     );
     expect(container.textContent).toContain("deal");
-    expect(container.textContent).toContain("prank");
     expect(container.textContent).toContain("warp");
+    expect(container.textContent).not.toContain("prank");
+    cleanup();
+  });
+
+  it("renders cheatcode controls before the block input in local simulation mode", () => {
+    const { container, cleanup } = renderComponent(
+      makeProps({ useLocalSimulation: true }),
+    );
+    const inputs = Array.from(container.querySelectorAll("input"));
+
+    expect(inputs.slice(0, 2).map((input) => input.type)).toEqual([
+      "checkbox",
+      "checkbox",
+    ]);
+    expect(inputs[2].placeholder).toMatch(/block/i);
+
     cleanup();
   });
 
@@ -160,9 +175,41 @@ describe("SimulationOptions", () => {
     const { container, cleanup } = renderComponent(
       makeProps({ useLocalSimulation: false }),
     );
-    // No deal/prank/warp text (Tenderly mode)
     const checkboxes = container.querySelectorAll("input[type='checkbox']");
     expect(checkboxes).toHaveLength(0);
+    cleanup();
+  });
+
+  it("keeps the from address field as the only prank control", () => {
+    const { container, cleanup } = renderComponent(
+      makeProps({ useLocalSimulation: true }),
+    );
+
+    const prankCheckbox = Array.from(
+      container.querySelectorAll("input[type='checkbox']"),
+    ).find((input) => input.closest("label")?.textContent?.includes("prank"));
+    const fromInput = Array.from(
+      container.querySelectorAll("input[type='text']"),
+    ).find((input) => input.placeholder === "From (prank)");
+
+    expect(prankCheckbox).toBeUndefined();
+    expect(fromInput).toBeTruthy();
+    cleanup();
+  });
+
+  it("does not render a prank expanded row when old state has prank enabled", () => {
+    const cheatcodes = makeCheatcodes({
+      prank: { enabled: true, address: "0xabc" },
+    });
+    const { container, cleanup } = renderComponent(
+      makeProps({ useLocalSimulation: true, expanded: true, cheatcodes }),
+    );
+
+    expect(container.textContent).not.toContain("vm.prank:");
+    const prankInput = Array.from(
+      container.querySelectorAll("input[type='text']"),
+    ).find((input) => input.placeholder === "Impersonate Address");
+    expect(prankInput).toBeUndefined();
     cleanup();
   });
 

@@ -103,10 +103,48 @@ export default function SimulationOptions({
   addressBook = [],
 }) {
   const hasCheatcodesExpanded =
-    expanded &&
-    (cheatcodes.deal.enabled ||
-      cheatcodes.prank.enabled ||
-      cheatcodes.warp.enabled);
+    expanded && (cheatcodes.deal.enabled || cheatcodes.warp.enabled);
+
+  const cheatcodeControls =
+    useLocalSimulation &&
+    React.createElement(
+      "div",
+      { className: styles.cheatcodesInline },
+      React.createElement(
+        "label",
+        {
+          className: styles.cheatcodeInlineItem,
+          title: "vm.deal - Set ETH balance",
+        },
+        React.createElement("input", {
+          type: "checkbox",
+          checked: cheatcodes.deal.enabled,
+          onChange: (e) =>
+            onCheatcodesChange({
+              ...cheatcodes,
+              deal: { ...cheatcodes.deal, enabled: e.target.checked },
+            }),
+        }),
+        React.createElement("span", null, "deal"),
+      ),
+      React.createElement(
+        "label",
+        {
+          className: styles.cheatcodeInlineItem,
+          title: "vm.warp - Set timestamp",
+        },
+        React.createElement("input", {
+          type: "checkbox",
+          checked: cheatcodes.warp.enabled,
+          onChange: (e) =>
+            onCheatcodesChange({
+              ...cheatcodes,
+              warp: { ...cheatcodes.warp, enabled: e.target.checked },
+            }),
+        }),
+        React.createElement("span", null, "warp"),
+      ),
+    );
 
   // -- Inline section (always visible) --
   const inlineItems = [];
@@ -145,66 +183,7 @@ export default function SimulationOptions({
     ),
   );
 
-  if (useLocalSimulation) {
-    // Cheatcode checkboxes
-    inlineItems.push(
-      React.createElement(
-        "div",
-        { key: "cheatcodesInline", className: styles.cheatcodesInline },
-        React.createElement(
-          "label",
-          {
-            className: styles.cheatcodeInlineItem,
-            title: "vm.deal - Set ETH balance",
-          },
-          React.createElement("input", {
-            type: "checkbox",
-            checked: cheatcodes.deal.enabled,
-            onChange: (e) =>
-              onCheatcodesChange({
-                ...cheatcodes,
-                deal: { ...cheatcodes.deal, enabled: e.target.checked },
-              }),
-          }),
-          React.createElement("span", null, "deal"),
-        ),
-        React.createElement(
-          "label",
-          {
-            className: styles.cheatcodeInlineItem,
-            title: "vm.prank - Impersonate address",
-          },
-          React.createElement("input", {
-            type: "checkbox",
-            checked: cheatcodes.prank.enabled,
-            onChange: (e) =>
-              onCheatcodesChange({
-                ...cheatcodes,
-                prank: { ...cheatcodes.prank, enabled: e.target.checked },
-              }),
-          }),
-          React.createElement("span", null, "prank"),
-        ),
-        React.createElement(
-          "label",
-          {
-            className: styles.cheatcodeInlineItem,
-            title: "vm.warp - Set timestamp",
-          },
-          React.createElement("input", {
-            type: "checkbox",
-            checked: cheatcodes.warp.enabled,
-            onChange: (e) =>
-              onCheatcodesChange({
-                ...cheatcodes,
-                warp: { ...cheatcodes.warp, enabled: e.target.checked },
-              }),
-          }),
-          React.createElement("span", null, "warp"),
-        ),
-      ),
-    );
-  } else {
+  if (!useLocalSimulation) {
     // Tenderly override controls
     inlineItems.push(
       React.createElement(
@@ -255,14 +234,20 @@ export default function SimulationOptions({
     hasCheatcodesExpanded &&
     React.createElement(
       "div",
-      { className: styles.simOptionsExpanded },
+      {
+        className: `${styles.simOptionsExpanded} ${styles.cheatcodesExpanded}`,
+      },
       cheatcodes.deal.enabled &&
         React.createElement(
           "div",
-          { className: styles.cheatcodeExpandedRow },
+          {
+            className: `${styles.cheatcodeExpandedRow} ${styles.cheatcodeDealRow}`,
+          },
           React.createElement(
             "span",
-            { className: styles.cheatcodeLabel },
+            {
+              className: `${styles.cheatcodeLabel} ${styles.cheatcodeLabelDeal}`,
+            },
             "vm.deal:",
           ),
           React.createElement("input", {
@@ -288,34 +273,17 @@ export default function SimulationOptions({
             className: `${styles.simOptionInputSmall} ${fieldErrors.dealAmount ? styles.inputError : ""}`,
           }),
         ),
-      cheatcodes.prank.enabled &&
-        React.createElement(
-          "div",
-          { className: styles.cheatcodeExpandedRow },
-          React.createElement(
-            "span",
-            { className: styles.cheatcodeLabel },
-            "vm.prank:",
-          ),
-          React.createElement("input", {
-            type: "text",
-            value: cheatcodes.prank.address,
-            onChange: (e) =>
-              onCheatcodesChange({
-                ...cheatcodes,
-                prank: { ...cheatcodes.prank, address: e.target.value },
-              }),
-            placeholder: "Impersonate Address",
-            className: `${styles.simOptionInput} ${fieldErrors.prankAddress ? styles.inputError : ""}`,
-          }),
-        ),
       cheatcodes.warp.enabled &&
         React.createElement(
           "div",
-          { className: styles.cheatcodeExpandedRow },
+          {
+            className: `${styles.cheatcodeExpandedRow} ${styles.cheatcodeWarpRow}`,
+          },
           React.createElement(
             "span",
-            { className: styles.cheatcodeLabel },
+            {
+              className: `${styles.cheatcodeLabel} ${styles.cheatcodeLabelWarp}`,
+            },
             "vm.warp:",
           ),
           React.createElement("input", {
@@ -479,6 +447,7 @@ export default function SimulationOptions({
         },
         expanded ? "▼" : "▶",
       ),
+      cheatcodeControls,
       React.createElement(
         "div",
         { className: styles.simOptionsInline },
