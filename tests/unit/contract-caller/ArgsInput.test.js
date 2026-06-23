@@ -54,6 +54,42 @@ const NO_ARGS_READ_FN = {
   outputs: [{ name: "", type: "uint256" }],
 };
 
+const TUPLE_FN = {
+  type: "function",
+  name: "fillOrder",
+  stateMutability: "nonpayable",
+  inputs: [
+    {
+      name: "_order",
+      type: "tuple",
+      components: [
+        { name: "maker", type: "address" },
+        { name: "amount", type: "uint256" },
+        { name: "token", type: "address" },
+      ],
+    },
+  ],
+  outputs: [],
+};
+
+const TUPLE_ARRAY_FN = {
+  type: "function",
+  name: "executeRoute",
+  stateMutability: "nonpayable",
+  inputs: [
+    {
+      name: "_route",
+      type: "tuple[]",
+      components: [
+        { name: "target", type: "address" },
+        { name: "value", type: "uint256" },
+        { name: "data", type: "bytes" },
+      ],
+    },
+  ],
+  outputs: [],
+};
+
 function makeProps(overrides = {}) {
   return {
     fn: null,
@@ -169,6 +205,101 @@ describe("ArgsInput", () => {
       'input[placeholder="Enter address..."]',
     );
     expect(argInput.disabled).toBe(true);
+    cleanup();
+  });
+
+  it("renders tuple argument component fields instead of one flat input", () => {
+    const { container, cleanup } = renderComponent(
+      makeProps({
+        fn: TUPLE_FN,
+        args: [
+          [
+            "0x1111111111111111111111111111111111111111",
+            "100",
+            "0x2222222222222222222222222222222222222222",
+          ],
+        ],
+      }),
+    );
+
+    expect(container.textContent).toContain("_order (tuple)");
+    expect(container.textContent).toContain("maker (address)");
+    expect(container.textContent).toContain("amount (uint256)");
+    expect(container.textContent).toContain("token (address)");
+    expect(
+      container.querySelector(
+        'input[value="0x1111111111111111111111111111111111111111"]',
+      ),
+    ).toBeTruthy();
+    expect(
+      container.querySelector('input[placeholder="Enter tuple..."]'),
+    ).toBeNull();
+    cleanup();
+  });
+
+  it("updates only the edited tuple component value", () => {
+    const onArgsChange = vi.fn();
+    const { container, cleanup } = renderComponent(
+      makeProps({
+        fn: TUPLE_FN,
+        args: [
+          [
+            "0x1111111111111111111111111111111111111111",
+            "100",
+            "0x2222222222222222222222222222222222222222",
+          ],
+        ],
+        onArgsChange,
+      }),
+    );
+
+    const amountInput = container.querySelector('input[value="100"]');
+    act(() => {
+      fireInputChange(amountInput, "250");
+    });
+
+    expect(onArgsChange).toHaveBeenCalledWith([
+      [
+        "0x1111111111111111111111111111111111111111",
+        "250",
+        "0x2222222222222222222222222222222222222222",
+      ],
+    ]);
+    cleanup();
+  });
+
+  it("renders tuple array item fields and can add another tuple item", () => {
+    const onArgsChange = vi.fn();
+    const { container, cleanup } = renderComponent(
+      makeProps({
+        fn: TUPLE_ARRAY_FN,
+        args: [
+          [["0x3333333333333333333333333333333333333333", "0", "0xabcdef"]],
+        ],
+        onArgsChange,
+      }),
+    );
+
+    expect(container.textContent).toContain("_route (tuple[])");
+    expect(container.textContent).toContain("#0");
+    expect(container.textContent).toContain("target (address)");
+    expect(container.textContent).toContain("value (uint256)");
+    expect(container.textContent).toContain("data (bytes)");
+
+    const addButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Add tuple",
+    );
+    expect(addButton).toBeTruthy();
+    act(() => {
+      addButton.click();
+    });
+
+    expect(onArgsChange).toHaveBeenCalledWith([
+      [
+        ["0x3333333333333333333333333333333333333333", "0", "0xabcdef"],
+        ["", "", ""],
+      ],
+    ]);
     cleanup();
   });
 });
