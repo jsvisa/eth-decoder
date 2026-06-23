@@ -13,6 +13,7 @@ import { test, expect } from "@playwright/test";
 const TOKEN_ADDR = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"; // USDC on Ethereum
 const FROM_ADDR = "0xb826224b742ead5cf91ea432340e3763fac09cdd";
 const TO_ADDR = "0xdeadbeef00000000000000000000000000000001";
+const ZERO_NET_ADDR = "0xcccc62962d17b8914c62d74ffb843d73b2a3cccc";
 const TRANSFER_TOPIC =
   "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
@@ -115,7 +116,11 @@ const MOCK_HISTORY_ITEM = {
 // ── Helpers ────────────────────────────────────────────────────────────
 
 /** Pre-seed localStorage so the page loads with a pre-existing history entry */
-async function seedLocalStorage(page) {
+async function seedHistoryItem(
+  page,
+  historyItem,
+  contractAddress = TOKEN_ADDR,
+) {
   await page.addInitScript(
     ({ historyKey, historyItem, abiKey, abi }) => {
       localStorage.setItem(historyKey, JSON.stringify([historyItem]));
@@ -126,11 +131,15 @@ async function seedLocalStorage(page) {
     },
     {
       historyKey: "contract_caller_history",
-      historyItem: MOCK_HISTORY_ITEM,
-      abiKey: `abi-ethereum-${TOKEN_ADDR}`,
+      historyItem,
+      abiKey: `abi-ethereum-${contractAddress}`,
       abi: MOCK_ABI,
     },
   );
+}
+
+async function seedLocalStorage(page) {
+  await seedHistoryItem(page, MOCK_HISTORY_ITEM);
 }
 
 function parsePostBody(route) {
@@ -276,6 +285,65 @@ test.describe("Simulation result UI features", () => {
 
     // TO account: +1,000 USDC ($1,000) = total + $1,000.00
     await expect(section.locator("text=$1,000.00").first()).toBeVisible();
+  });
+
+  test("Balance Changes table merges address and total cells per account", async ({
+    page,
+  }) => {
+    await seedLocalStorage(page);
+    await mockCallContract(page);
+    await mockTokenPrice(page);
+
+    await loadHistoryResult(page);
+
+    const section = page.locator("[class*=bdSection]");
+    const firstRowCells = section.locator("tbody tr").first().locator("td");
+
+    await expect(firstRowCells.first()).toHaveAttribute("rowspan", "2");
+    await expect(firstRowCells.last()).toHaveAttribute("rowspan", "2");
+    await expect(
+      section.locator("[class*=bdTotalBadge]", { hasText: "$4,000.00" }),
+    ).toHaveCount(1);
+  });
+
+  test("Balance Changes table hides zero net token balance rows", async ({
+    page,
+  }) => {
+    const historyWithZeroNetToken = {
+      ...MOCK_HISTORY_ITEM,
+      output: {
+        ...MOCK_SIMULATE_OUTPUT,
+        balanceChanges: [],
+        logs: [
+          {
+            ...MOCK_SIMULATE_OUTPUT.logs[0],
+            topics: [
+              TRANSFER_TOPIC,
+              padTopicAddress(FROM_ADDR),
+              padTopicAddress(ZERO_NET_ADDR),
+            ],
+          },
+          {
+            ...MOCK_SIMULATE_OUTPUT.logs[0],
+            topics: [
+              TRANSFER_TOPIC,
+              padTopicAddress(ZERO_NET_ADDR),
+              padTopicAddress(TO_ADDR),
+            ],
+          },
+        ],
+      },
+    };
+
+    await seedHistoryItem(page, historyWithZeroNetToken);
+    await mockCallContract(page);
+    await mockTokenPrice(page);
+
+    await loadHistoryResult(page);
+
+    const section = page.locator("[class*=bdSection]");
+    await expect(section.locator("text=0xcccc6296…b2a3cccc")).toHaveCount(0);
+    await expect(section.locator("[class*=bdRow]")).toHaveCount(2);
   });
 });
 
