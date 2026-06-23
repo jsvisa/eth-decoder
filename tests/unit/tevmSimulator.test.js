@@ -69,7 +69,7 @@ const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
 const USDT_HOLDER = "0xF977814e90dA44bFA03b6295A0616a897441aceC";
 const USDT_RECIPIENT = "0x000000000000000000000000000000000000dEaD";
 const USDT_TRANSFER_AMOUNT = "1000000";
-const MAINNET_FORK_BLOCK = "25299137";
+const MAINNET_FORK_BLOCK = "latest";
 
 async function readTokenBalance(client, blockNumber, tokenAddress, account) {
   const result = await simulateWithClient(client, blockNumber, {
