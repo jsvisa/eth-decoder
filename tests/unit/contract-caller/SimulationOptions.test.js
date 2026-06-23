@@ -156,6 +156,22 @@ describe("SimulationOptions", () => {
     cleanup();
   });
 
+  it("renders cheatcode controls before the block input in local simulation mode", () => {
+    const { container, cleanup } = renderComponent(
+      makeProps({ useLocalSimulation: true }),
+    );
+    const inputs = Array.from(container.querySelectorAll("input"));
+
+    expect(inputs.slice(0, 3).map((input) => input.type)).toEqual([
+      "checkbox",
+      "checkbox",
+      "checkbox",
+    ]);
+    expect(inputs[3].placeholder).toMatch(/block/i);
+
+    cleanup();
+  });
+
   it("does not render cheatcode checkboxes when useLocalSimulation=false", () => {
     const { container, cleanup } = renderComponent(
       makeProps({ useLocalSimulation: false }),

@@ -116,7 +116,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.25rem 0.5rem;
-  background: rgba(99, 102, 241, 0.1);
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.22);
   border-radius: 6px;
   flex-shrink: 0;
   margin-left: auto;
@@ -129,14 +130,14 @@
   gap: 0.3rem;
   font-size: 0.75rem;
   font-weight: 500;
-  color: #6366f1;
+  color: #8b5cf6;
   cursor: pointer;
   padding: 0.2rem 0.4rem;
   border-radius: 4px;
   transition: all 0.2s;
 }
 
-.cheatcodeInlineItem input[type='checkbox'] {
+.cheatcodeInlineItem input[type="checkbox"] {
   width: 0.85rem;
   height: 0.85rem;
   cursor: pointer;
@@ -145,7 +146,7 @@
 
 .cheatcodeInlineItem:hover {
   background: rgba(99, 102, 241, 0.15);
-  color: #4f46e5;
+  color: #7c3aed;
 }
 
 .simOptionsExpanded {
@@ -163,7 +164,8 @@
   gap: 0.5rem;
   flex-wrap: wrap;
   padding: 0.5rem;
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--bg-code);
+  border: 1px solid var(--border-secondary);
   border-radius: 6px;
 }
 
@@ -175,19 +177,48 @@
   border-radius: 4px;
 }
 
-.cheatcodeExpandedRow:nth-child(1) .cheatcodeLabel {
+.cheatcodeLabelDeal {
   color: #059669;
   background: rgba(5, 150, 105, 0.1);
 }
 
-.cheatcodeExpandedRow:nth-child(2) .cheatcodeLabel {
+.cheatcodeLabelPrank {
   color: #d97706;
   background: rgba(217, 119, 6, 0.1);
 }
 
-.cheatcodeExpandedRow:nth-child(3) .cheatcodeLabel {
+.cheatcodeLabelWarp {
   color: #7c3aed;
   background: rgba(124, 58, 237, 0.1);
+}
+
+:global([data-theme="dark"]) .cheatcodesInline {
+  background: rgba(139, 92, 246, 0.16);
+  border-color: rgba(168, 85, 247, 0.35);
+}
+
+:global([data-theme="dark"]) .cheatcodeInlineItem {
+  color: #c4b5fd;
+}
+
+:global([data-theme="dark"]) .cheatcodeInlineItem:hover {
+  color: #ddd6fe;
+  background: rgba(139, 92, 246, 0.22);
+}
+
+:global([data-theme="dark"]) .cheatcodeLabelDeal {
+  color: #34d399;
+  background: var(--accent-green-light);
+}
+
+:global([data-theme="dark"]) .cheatcodeLabelPrank {
+  color: #fbbf24;
+  background: var(--accent-orange-light);
+}
+
+:global([data-theme="dark"]) .cheatcodeLabelWarp {
+  color: #c4b5fd;
+  background: rgba(124, 58, 237, 0.22);
 }
 
 /* From address wrapper in simulation options */
