@@ -158,6 +158,12 @@
   gap: 0.5rem;
 }
 
+.cheatcodesExpanded {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
 .cheatcodeExpandedRow {
   display: flex;
   align-items: center;
@@ -167,6 +173,14 @@
   background: var(--bg-code);
   border: 1px solid var(--border-secondary);
   border-radius: 6px;
+}
+
+.cheatcodeDealRow {
+  flex: 2 1 420px;
+}
+
+.cheatcodeWarpRow {
+  flex: 1 1 240px;
 }
 
 .cheatcodeLabel {
@@ -180,11 +194,6 @@
 .cheatcodeLabelDeal {
   color: #059669;
   background: rgba(5, 150, 105, 0.1);
-}
-
-.cheatcodeLabelPrank {
-  color: #d97706;
-  background: rgba(217, 119, 6, 0.1);
 }
 
 .cheatcodeLabelWarp {
@@ -209,11 +218,6 @@
 :global([data-theme="dark"]) .cheatcodeLabelDeal {
   color: #34d399;
   background: var(--accent-green-light);
-}
-
-:global([data-theme="dark"]) .cheatcodeLabelPrank {
-  color: #fbbf24;
-  background: var(--accent-orange-light);
 }
 
 :global([data-theme="dark"]) .cheatcodeLabelWarp {

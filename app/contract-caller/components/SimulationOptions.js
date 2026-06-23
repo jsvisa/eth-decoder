@@ -103,10 +103,7 @@ export default function SimulationOptions({
   addressBook = [],
 }) {
   const hasCheatcodesExpanded =
-    expanded &&
-    (cheatcodes.deal.enabled ||
-      cheatcodes.prank.enabled ||
-      cheatcodes.warp.enabled);
+    expanded && (cheatcodes.deal.enabled || cheatcodes.warp.enabled);
 
   const cheatcodeControls =
     useLocalSimulation &&
@@ -129,23 +126,6 @@ export default function SimulationOptions({
             }),
         }),
         React.createElement("span", null, "deal"),
-      ),
-      React.createElement(
-        "label",
-        {
-          className: styles.cheatcodeInlineItem,
-          title: "vm.prank - Impersonate address",
-        },
-        React.createElement("input", {
-          type: "checkbox",
-          checked: cheatcodes.prank.enabled,
-          onChange: (e) =>
-            onCheatcodesChange({
-              ...cheatcodes,
-              prank: { ...cheatcodes.prank, enabled: e.target.checked },
-            }),
-        }),
-        React.createElement("span", null, "prank"),
       ),
       React.createElement(
         "label",
@@ -254,11 +234,15 @@ export default function SimulationOptions({
     hasCheatcodesExpanded &&
     React.createElement(
       "div",
-      { className: styles.simOptionsExpanded },
+      {
+        className: `${styles.simOptionsExpanded} ${styles.cheatcodesExpanded}`,
+      },
       cheatcodes.deal.enabled &&
         React.createElement(
           "div",
-          { className: styles.cheatcodeExpandedRow },
+          {
+            className: `${styles.cheatcodeExpandedRow} ${styles.cheatcodeDealRow}`,
+          },
           React.createElement(
             "span",
             {
@@ -289,33 +273,12 @@ export default function SimulationOptions({
             className: `${styles.simOptionInputSmall} ${fieldErrors.dealAmount ? styles.inputError : ""}`,
           }),
         ),
-      cheatcodes.prank.enabled &&
-        React.createElement(
-          "div",
-          { className: styles.cheatcodeExpandedRow },
-          React.createElement(
-            "span",
-            {
-              className: `${styles.cheatcodeLabel} ${styles.cheatcodeLabelPrank}`,
-            },
-            "vm.prank:",
-          ),
-          React.createElement("input", {
-            type: "text",
-            value: cheatcodes.prank.address,
-            onChange: (e) =>
-              onCheatcodesChange({
-                ...cheatcodes,
-                prank: { ...cheatcodes.prank, address: e.target.value },
-              }),
-            placeholder: "Impersonate Address",
-            className: `${styles.simOptionInput} ${fieldErrors.prankAddress ? styles.inputError : ""}`,
-          }),
-        ),
       cheatcodes.warp.enabled &&
         React.createElement(
           "div",
-          { className: styles.cheatcodeExpandedRow },
+          {
+            className: `${styles.cheatcodeExpandedRow} ${styles.cheatcodeWarpRow}`,
+          },
           React.createElement(
             "span",
             {
