@@ -7,6 +7,7 @@ import { buildTokenAccountMap } from "../../utils/tokenTransfers";
 import { CHAINS } from "../../utils/chains";
 import styles from "./ResultPanel.module.css";
 import MetricsPanel from "./MetricsPanel";
+import SimulatedEventLogs from "./SimulatedEventLogs";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -367,10 +368,16 @@ export default function ResultPanel({
   const [isYaml, setIsYaml] = useState(false);
   const [copied, setCopied] = useState(false);
   const [simLogsExpanded, setSimLogsExpanded] = useState(true);
+  const [selectedSimLogNames, setSelectedSimLogNames] = useState([]);
   const [bdExpandedAddrs, setBdExpandedAddrs] = useState(new Set());
   const [bdExpandedTokens, setBdExpandedTokens] = useState(new Set());
 
   const getExplorerAddressUrl = (addr) => buildExplorerAddressUrl(chain, addr);
+  const getLogContractName = (addr) => getContractNameFromCache(chain, addr);
+  const getLogTokenSymbol = (addr) =>
+    tokenSymbols[addr] || getCachedTokenSymbol(chain, addr);
+  const getLogTokenDecimals = (addr) =>
+    tokenDecimals[addr] ?? getCachedTokenDecimals(chain, addr);
 
   // Build display content (syntax-highlighted JSON or YAML)
   const getDisplayContent = () => {
@@ -526,169 +533,17 @@ export default function ResultPanel({
               )}
 
               {/* Event Logs (simulation only) */}
-              {result.simulated && result.logs && result.logs.length > 0 && (
-                <div className={styles.logsSection}>
-                  <h3 className={styles.logsTitle}>
-                    Event Logs ({result.logs.length})
-                    <button
-                      className={styles.logsToggleBtn}
-                      onClick={() => setSimLogsExpanded((v) => !v)}
-                    >
-                      {simLogsExpanded ? "Collapse" : "Expand"}
-                    </button>
-                  </h3>
-                  {(simLogsExpanded
-                    ? result.logs
-                    : result.logs.slice(0, 5)
-                  ).map((log, index) => {
-                    const contractName = getContractNameFromCache(
-                      chain,
-                      log.address,
-                    );
-                    const logAddress = log.address?.toLowerCase();
-                    const symbol =
-                      log.name === "Transfer" && logAddress
-                        ? tokenSymbols[logAddress] ||
-                          getCachedTokenSymbol(chain, logAddress)
-                        : null;
-                    const logDecimals =
-                      log.name === "Transfer" && logAddress
-                        ? (tokenDecimals[logAddress] ??
-                          getCachedTokenDecimals(chain, logAddress))
-                        : null;
-                    return (
-                      <div key={index} className={styles.logItem}>
-                        <div className={styles.logHeader}>
-                          <span className={styles.logName}>
-                            {log.name || "Unknown Event"}
-                            {symbol && (
-                              <span className={styles.logTokenSymbol}>
-                                [{symbol}]
-                              </span>
-                            )}
-                          </span>
-                          <span className={styles.logAddress}>
-                            {contractName && (
-                              <span className={styles.logContractName}>
-                                {contractName}
-                              </span>
-                            )}
-                            {(() => {
-                              const url = log.address
-                                ? getExplorerAddressUrl(log.address)
-                                : null;
-                              return url ? (
-                                <a
-                                  href={url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={styles.logAddressLink}
-                                >
-                                  {log.address}
-                                </a>
-                              ) : (
-                                log.address
-                              );
-                            })()}
-                          </span>
-                        </div>
-                        {log.inputs && log.inputs.length > 0 && (
-                          <div className={styles.logInputs}>
-                            {log.inputs.map((input, i) => {
-                              const isTransferValue =
-                                log.name === "Transfer" &&
-                                (input.name === "value" ||
-                                  input.name === "wad") &&
-                                input.type === "uint256" &&
-                                logDecimals !== null;
-                              const formattedAmt = isTransferValue
-                                ? formatTokenAmount(input.value, logDecimals)
-                                : null;
-                              return (
-                                <div key={i} className={styles.logInput}>
-                                  <span className={styles.logInputName}>
-                                    {input.name || `arg${i}`}
-                                  </span>
-                                  <span className={styles.logInputType}>
-                                    ({input.type})
-                                  </span>
-                                  {input.indexed && (
-                                    <span className={styles.logIndexed}>
-                                      indexed
-                                    </span>
-                                  )}
-                                  <span className={styles.logInputValue}>
-                                    {input.type === "address" &&
-                                    typeof input.value === "string"
-                                      ? (() => {
-                                          const url = getExplorerAddressUrl(
-                                            input.value,
-                                          );
-                                          return url ? (
-                                            <a
-                                              href={url}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                            >
-                                              {input.value}
-                                            </a>
-                                          ) : (
-                                            input.value
-                                          );
-                                        })()
-                                      : typeof input.value === "object"
-                                        ? JSON.stringify(input.value)
-                                        : String(input.value)}
-                                    {formattedAmt !== null && (
-                                      <span className={styles.tokenAmount}>
-                                        {" "}
-                                        ({formattedAmt} {symbol || ""})
-                                      </span>
-                                    )}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                        {(!log.inputs || log.inputs.length === 0) &&
-                          log.topics &&
-                          log.topics.length > 0 && (
-                            <div className={styles.logTopics}>
-                              <div className={styles.logTopicsLabel}>
-                                Topics:
-                              </div>
-                              {log.topics.map((topic, i) => (
-                                <div key={i} className={styles.logTopic}>
-                                  [{i}] {topic}
-                                </div>
-                              ))}
-                              {log.data && log.data !== "0x" && (
-                                <div className={styles.logData}>
-                                  <span className={styles.logDataLabel}>
-                                    Data:
-                                  </span>{" "}
-                                  {log.data}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                      </div>
-                    );
-                  })}
-                  {!simLogsExpanded && result.logs.length > 5 && (
-                    <div className={styles.logsMoreIndicator}>
-                      … {result.logs.length - 5} more —{" "}
-                      <button
-                        className={styles.logsToggleBtn}
-                        onClick={() => setSimLogsExpanded(true)}
-                      >
-                        show all
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
+              <SimulatedEventLogs
+                logs={result.simulated ? result.logs : []}
+                expanded={simLogsExpanded}
+                onToggleExpanded={() => setSimLogsExpanded((value) => !value)}
+                selectedEventNames={selectedSimLogNames}
+                onSelectedEventNamesChange={setSelectedSimLogNames}
+                getExplorerAddressUrl={getExplorerAddressUrl}
+                getContractName={getLogContractName}
+                getTokenSymbol={getLogTokenSymbol}
+                getTokenDecimals={getLogTokenDecimals}
+              />
 
               {/* Call Trace Tree (simulation only) */}
               {result.simulated && result.callTrace && (

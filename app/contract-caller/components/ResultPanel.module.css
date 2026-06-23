@@ -232,6 +232,73 @@
   border-color: #666;
 }
 
+.logsEventFilter {
+  padding: 2px 8px;
+  color: #d4d4d4;
+  background-color: #2d2d2d;
+  border: 1px solid #444;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.logsEventFilter:focus {
+  outline: none;
+  border-color: #666;
+}
+
+.logsEventFilterMenu {
+  position: relative;
+  display: inline-flex;
+}
+
+.logsEventFilterDropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  display: none;
+  min-width: 180px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 0.35rem;
+  color: #d4d4d4;
+  background-color: #252525;
+  border: 1px solid #444;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.logsEventFilterMenu:hover .logsEventFilterDropdown,
+.logsEventFilterMenu:focus-within .logsEventFilterDropdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.logsEventFilterOption {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.45rem;
+  color: #d4d4d4;
+  font-size: 0.75rem;
+  font-weight: 400;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.logsEventFilterOption:hover {
+  background-color: #333;
+}
+
+.logsEventFilterOption input {
+  cursor: pointer;
+  accent-color: #9cdcfe;
+}
+
 .logsMoreIndicator {
   color: #666;
   font-size: 0.8rem;
@@ -256,6 +323,20 @@
   align-items: center;
   margin-bottom: 0.75rem;
   gap: 1rem;
+  min-width: 0;
+}
+
+.logNameGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.logIndex {
+  color: #808080;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .logName {
@@ -275,6 +356,8 @@
   color: #808080;
   font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.8rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .logAddressLink {
@@ -284,6 +367,24 @@
 
 .logAddressLink:hover {
   text-decoration: underline;
+}
+
+@media (max-width: 620px) {
+  .logsTitle,
+  .logHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .logsEventFilter,
+  .logsEventFilterMenu,
+  .logsToggleBtn {
+    max-width: 100%;
+  }
+
+  .logNameGroup {
+    flex-wrap: wrap;
+  }
 }
 
 .logContractName {
