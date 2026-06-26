@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import ResultPanel from "../../../app/contract-caller/components/ResultPanel.js";
@@ -417,6 +417,168 @@ describe("ResultPanel", () => {
     // After collapsing, decoded output is hidden
     expect(container.textContent).not.toContain("Decoded Output");
 
+    cleanup();
+  });
+});
+
+describe("ResultPanel – call trace name resolution", () => {
+  const addr = "0xaabbccdd11111111111111111111111111111111";
+  const abiKey = `abi-ethereum-${addr}`;
+
+  function makeTraceResult(toName) {
+    return {
+      simulated: true,
+      success: true,
+      logs: [],
+      callTrace: {
+        type: "CALL",
+        to: addr,
+        toName,
+        functionName: "transfer",
+        input: "0xa9059cbb",
+        decodedInputs: [],
+        decodedOutputs: [],
+        calls: [],
+        logs: [],
+      },
+    };
+  }
+
+  function contractLabels(container) {
+    return Array.from(container.querySelectorAll(".traceContract")).map(
+      (n) => n.textContent,
+    );
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("shows contractName from ABI cache when toName is null", () => {
+    localStorage.setItem(abiKey, JSON.stringify({ contractName: "USDC" }));
+
+    const { container, cleanup } = renderComponent(
+      React.createElement(ResultPanel, {
+        ...defaultProps,
+        result: makeTraceResult(null),
+      }),
+    );
+
+    expect(contractLabels(container)[0]).toBe("USDC");
+    cleanup();
+  });
+
+  it("prefers implContractName over contractName from ABI cache", () => {
+    localStorage.setItem(
+      abiKey,
+      JSON.stringify({
+        contractName: "Proxy",
+        implContractName: "UniswapV3Pool",
+      }),
+    );
+
+    const { container, cleanup } = renderComponent(
+      React.createElement(ResultPanel, {
+        ...defaultProps,
+        result: makeTraceResult(null),
+      }),
+    );
+
+    expect(contractLabels(container)[0]).toBe("UniswapV3Pool");
+    cleanup();
+  });
+
+  it("shows address book label when ABI cache is absent", () => {
+    localStorage.setItem(
+      "address_book",
+      JSON.stringify([
+        { id: 1, label: "My USDC", address: addr, contractName: "" },
+      ]),
+    );
+
+    const { container, cleanup } = renderComponent(
+      React.createElement(ResultPanel, {
+        ...defaultProps,
+        result: makeTraceResult(null),
+      }),
+    );
+
+    expect(contractLabels(container)[0]).toBe("My USDC");
+    cleanup();
+  });
+
+  it("falls back to address book contractName when label is empty", () => {
+    localStorage.setItem(
+      "address_book",
+      JSON.stringify([
+        { id: 1, label: "", address: addr, contractName: "ERC20Token" },
+      ]),
+    );
+
+    const { container, cleanup } = renderComponent(
+      React.createElement(ResultPanel, {
+        ...defaultProps,
+        result: makeTraceResult(null),
+      }),
+    );
+
+    expect(contractLabels(container)[0]).toBe("ERC20Token");
+    cleanup();
+  });
+
+  it("toName takes priority over ABI cache and address book", () => {
+    localStorage.setItem(abiKey, JSON.stringify({ contractName: "USDC" }));
+    localStorage.setItem(
+      "address_book",
+      JSON.stringify([
+        { id: 1, label: "My Token", address: addr, contractName: "" },
+      ]),
+    );
+
+    const { container, cleanup } = renderComponent(
+      React.createElement(ResultPanel, {
+        ...defaultProps,
+        result: makeTraceResult("ExplicitName"),
+      }),
+    );
+
+    expect(contractLabels(container)[0]).toBe("ExplicitName");
+    cleanup();
+  });
+
+  it("ABI cache takes priority over address book", () => {
+    localStorage.setItem(abiKey, JSON.stringify({ contractName: "USDC" }));
+    localStorage.setItem(
+      "address_book",
+      JSON.stringify([
+        { id: 1, label: "My Token", address: addr, contractName: "" },
+      ]),
+    );
+
+    const { container, cleanup } = renderComponent(
+      React.createElement(ResultPanel, {
+        ...defaultProps,
+        result: makeTraceResult(null),
+      }),
+    );
+
+    expect(contractLabels(container)[0]).toBe("USDC");
+    cleanup();
+  });
+
+  it("falls back to truncated address when no name source is available", () => {
+    const { container, cleanup } = renderComponent(
+      React.createElement(ResultPanel, {
+        ...defaultProps,
+        result: makeTraceResult(null),
+      }),
+    );
+
+    expect(contractLabels(container)[0]).toBe("0xaabbccdd...");
     cleanup();
   });
 });
