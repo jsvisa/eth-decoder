@@ -40,6 +40,7 @@ export async function POST(request) {
     value = "0x0",
     blockNumber = "latest",
     apiKeys = {},
+    rpcUrl = null,
   } = body;
 
   if (!chainId) {
@@ -143,7 +144,7 @@ export async function POST(request) {
   try {
     const result = await simulateWithTevm({
       chain: chain.slug,
-      rpcUrl: chain.forkRpcUrl,
+      rpcUrl: rpcUrl || chain.forkRpcUrl,
       address: to,
       functionName,
       callData: data,

@@ -120,6 +120,35 @@ describe("POST /api/simulate-tx — validation", () => {
     expect((await res.json()).error).toMatch(/unsupported chainid/i);
   });
 
+  it("returns 200 when custom rpcUrl is provided", async () => {
+    const res = await POST(
+      makeRequest({
+        ...VALID_BODY,
+        rpcUrl: "https://custom-rpc.example.com",
+      }),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("passes custom rpcUrl to simulateWithTevm when provided", async () => {
+    const customRpc = "https://custom-rpc.example.com";
+    await POST(makeRequest({ ...VALID_BODY, rpcUrl: customRpc }));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rpcUrl: customRpc,
+      }),
+    );
+  });
+
+  it("uses default FORK_RPC_URL when custom rpcUrl is not provided", async () => {
+    await POST(makeRequest(VALID_BODY));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rpcUrl: expect.stringContaining("publicnode"),
+      }),
+    );
+  });
+
   it("returns 400 for invalid to address", async () => {
     const res = await POST(
       makeRequest({ ...VALID_BODY, to: "not-an-address" }),

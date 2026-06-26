@@ -184,6 +184,7 @@ Simulate a raw transaction against forked chain state and return decoded results
 | `blockNumber` | No       | Hex block number or `"latest"` (default `"latest"`)                                                             |
 | `gas`         | No       | Hex gas limit (passed through; tevm estimates if omitted)                                                       |
 | `apiKeys`     | No       | `{ "etherscan": "...", "routescan": "..." }` — falls back to `ETHERSCAN_API_KEY` / `ROUTESCAN_API_KEY` env vars |
+| `rpcUrl`      | No       | Custom RPC URL for forking chain state. Falls back to default public node if omitted.                           |
 
 **Example:**
 
