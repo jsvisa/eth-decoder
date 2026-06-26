@@ -168,6 +168,50 @@ GET /api/v1/fetch-abi?address=0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48&chain=e
 
 > `/api/v1/decode` and `/api/v1/decode-event` require `BACKEND_URL` to be set. `/api/v1/fetch-abi` is self-contained.
 
+### `POST /api/simulate-tx`
+
+Simulate a raw transaction against forked chain state and return decoded results. Fetches and caches the contract ABI server-side at `~/.cache/eth-decoder/<chainId>/<address>.json`.
+
+**Request body:**
+
+| Field         | Required | Description                                                                                                     |
+| ------------- | -------- | --------------------------------------------------------------------------------------------------------------- |
+| `chainId`     | Yes      | Numeric chain ID (1 = Ethereum, 42161 = Arbitrum, 8453 = Base, 137 = Polygon, 56 = BSC)                         |
+| `to`          | Yes      | Contract address                                                                                                |
+| `data`        | Yes      | Hex-encoded calldata                                                                                            |
+| `from`        | Yes      | Sender address — used as `msg.sender` in simulation                                                             |
+| `value`       | No       | Hex-encoded ETH value (default `"0x0"`)                                                                         |
+| `blockNumber` | No       | Hex block number or `"latest"` (default `"latest"`)                                                             |
+| `gas`         | No       | Hex gas limit (passed through; tevm estimates if omitted)                                                       |
+| `apiKeys`     | No       | `{ "etherscan": "...", "routescan": "..." }` — falls back to `ETHERSCAN_API_KEY` / `ROUTESCAN_API_KEY` env vars |
+
+**Example:**
+
+```bash
+curl -X POST http://localhost:3000/api/simulate-tx \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chainId": 1,
+    "to": "0x99161BA892ECae335616624c84FAA418F64FF9A6",
+    "data": "0x5e7db13d000000000000000000000000e556aba6fe6036275ec1f87eda296be72c811bce0000000000000000000000000000000000000000000000000000000000000001",
+    "from": "0xd719fc03782E9617e81D138a3e9B1875da4D6a03",
+    "value": "0x0"
+  }'
+```
+
+**Response:** Same JSON shape as the browser simulation result — `success`, `simulated`, `localSimulation`, `blockNumber`, `gasUsed`, `logs` (decoded), `callTrace` (decoded with inputs/outputs), `assetChanges`, `stateChanges`, `metrics`.
+
+**Error responses:**
+
+| Status                   | Condition                                                                |
+| ------------------------ | ------------------------------------------------------------------------ |
+| `400`                    | Missing required field, invalid address format, or unsupported `chainId` |
+| `422`                    | Contract ABI not found (unverified) or calldata could not be decoded     |
+| `200` (`success: false`) | EVM revert or execution error — `error` field is set                     |
+| `500`                    | Unexpected server error                                                  |
+
+**ABI cache:** Fetched ABIs are cached at `~/.cache/eth-decoder/<chainId>/<address>.json`. Delete a file to force a fresh fetch.
+
 ## Deploy to Vercel
 
 ### Method 1: Deploy via Vercel CLI
