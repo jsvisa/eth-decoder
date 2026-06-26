@@ -48,6 +48,9 @@ export default [
         afterAll: 'readonly',
       },
     },
+    rules: {
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' }],
+    },
   },
   {
     ignores: ['node_modules/', '.next/', 'coverage/', '.claude/', '.vercel/', '.worktrees/'],

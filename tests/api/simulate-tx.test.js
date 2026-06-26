@@ -1,0 +1,257 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { POST } from "../../app/api/simulate-tx/route.js";
+
+// Minimal ABI matching selector 0x5e7db13d = unlockAsset(address,uint256)
+const UNLOCK_ABI = [
+  {
+    type: "function",
+    name: "unlockAsset",
+    inputs: [
+      { name: "_asset", type: "address" },
+      { name: "_lockIndex", type: "uint256" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+];
+
+const CACHE_ENTRY = {
+  abi: UNLOCK_ABI,
+  isProxy: false,
+  implAddress: null,
+  contractName: "TokenLocker",
+  implContractName: null,
+  fetchedAt: 1719360000000,
+};
+
+const VALID_BODY = {
+  chainId: 1,
+  to: "0x99161BA892ECae335616624c84FAA418F64FF9A6",
+  data: "0x5e7db13d000000000000000000000000e556aba6fe6036275ec1f87eda296be72c811bce0000000000000000000000000000000000000000000000000000000000000001",
+  from: "0xd719fc03782E9617e81D138a3e9B1875da4D6a03",
+  value: "0x0",
+  blockNumber: "latest",
+};
+
+const SIM_RESULT = {
+  success: true,
+  simulated: true,
+  localSimulation: true,
+  blockNumber: "latest",
+  rawData: "0x",
+  decoded: [],
+  gasUsed: 63086,
+  logs: [],
+  callTrace: null,
+  assetChanges: [],
+  balanceChanges: [],
+  stateChanges: [],
+  accessList: [],
+  error: null,
+  undecodedAddresses: [],
+  metrics: {},
+};
+
+vi.mock("../../app/api/fetch-abi/route.js", () => ({
+  fetchAbi: vi.fn(),
+}));
+vi.mock("../../app/utils/serverAbiCache.js", () => ({
+  getAbiFromCache: vi.fn(),
+  setAbiInCache: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock("../../app/utils/tevmSimulator.js", () => ({
+  simulateWithTevm: vi.fn(),
+}));
+
+import { fetchAbi } from "../../app/api/fetch-abi/route.js";
+import {
+  getAbiFromCache,
+  setAbiInCache,
+} from "../../app/utils/serverAbiCache.js";
+import { simulateWithTevm } from "../../app/utils/tevmSimulator.js";
+
+function makeRequest(body) {
+  return { json: async () => body };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  getAbiFromCache.mockResolvedValue(null);
+  fetchAbi.mockResolvedValue({ ...CACHE_ENTRY });
+  simulateWithTevm.mockResolvedValue(SIM_RESULT);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("POST /api/simulate-tx — validation", () => {
+  it("returns 400 when chainId is missing", async () => {
+    const { chainId: _, ...body } = VALID_BODY;
+    const res = await POST(makeRequest(body));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/chainid/i);
+  });
+
+  it("returns 400 when to is missing", async () => {
+    const { to: _, ...body } = VALID_BODY;
+    const res = await POST(makeRequest(body));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/to/i);
+  });
+
+  it("returns 400 when data is missing", async () => {
+    const { data: _, ...body } = VALID_BODY;
+    const res = await POST(makeRequest(body));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/data/i);
+  });
+
+  it("returns 400 when from is missing", async () => {
+    const { from: _, ...body } = VALID_BODY;
+    const res = await POST(makeRequest(body));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/from/i);
+  });
+
+  it("returns 400 for an unsupported chainId", async () => {
+    const res = await POST(makeRequest({ ...VALID_BODY, chainId: 999999 }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/unsupported chainid/i);
+  });
+
+  it("returns 200 when custom rpcUrl is provided", async () => {
+    const res = await POST(
+      makeRequest({
+        ...VALID_BODY,
+        rpcUrl: "https://custom-rpc.example.com",
+      }),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("passes custom rpcUrl to simulateWithTevm when provided", async () => {
+    const customRpc = "https://custom-rpc.example.com";
+    await POST(makeRequest({ ...VALID_BODY, rpcUrl: customRpc }));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rpcUrl: customRpc,
+      }),
+    );
+  });
+
+  it("uses default FORK_RPC_URL when custom rpcUrl is not provided", async () => {
+    await POST(makeRequest(VALID_BODY));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rpcUrl: expect.stringContaining("publicnode"),
+      }),
+    );
+  });
+
+  it("returns 400 for invalid to address", async () => {
+    const res = await POST(
+      makeRequest({ ...VALID_BODY, to: "not-an-address" }),
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/to/i);
+  });
+
+  it("returns 400 for invalid from address", async () => {
+    const res = await POST(makeRequest({ ...VALID_BODY, from: "invalid" }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/from/i);
+  });
+
+  it("returns 400 for invalid value format", async () => {
+    const res = await POST(makeRequest({ ...VALID_BODY, value: "0xZZ" }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/value/i);
+  });
+});
+
+describe("POST /api/simulate-tx — ABI resolution", () => {
+  it("returns 422 when ABI cannot be fetched", async () => {
+    fetchAbi.mockResolvedValue(null);
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(422);
+    expect((await res.json()).error).toMatch(/abi not found/i);
+  });
+
+  it("uses the cached ABI on a cache hit and skips fetchAbi", async () => {
+    getAbiFromCache.mockResolvedValue(CACHE_ENTRY);
+    await POST(makeRequest(VALID_BODY));
+    expect(fetchAbi).not.toHaveBeenCalled();
+    expect(setAbiInCache).not.toHaveBeenCalled();
+  });
+
+  it("fetches ABI and saves to cache on a cache miss", async () => {
+    await POST(makeRequest(VALID_BODY));
+    expect(fetchAbi).toHaveBeenCalledOnce();
+    expect(setAbiInCache).toHaveBeenCalledOnce();
+    const [chainId, address, entry] = setAbiInCache.mock.calls[0];
+    expect(chainId).toBe(1);
+    expect(address.toLowerCase()).toBe(VALID_BODY.to.toLowerCase());
+    expect(entry.abi).toEqual(UNLOCK_ABI);
+    expect(typeof entry.fetchedAt).toBe("number");
+  });
+
+  it("passes apiKeys from the request to fetchAbi", async () => {
+    const apiKeys = { etherscan: "MY_KEY", routescan: "MY_RS" };
+    await POST(makeRequest({ ...VALID_BODY, apiKeys }));
+    expect(fetchAbi).toHaveBeenCalledWith(
+      VALID_BODY.to,
+      1,
+      expect.objectContaining({
+        etherscanKey: "MY_KEY",
+        routescanKey: "MY_RS",
+      }),
+    );
+  });
+});
+
+describe("POST /api/simulate-tx — simulation", () => {
+  it("calls simulateWithTevm with the correct params", async () => {
+    await POST(makeRequest(VALID_BODY));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chain: "ethereum",
+        address: VALID_BODY.to,
+        functionName: "unlockAsset",
+        callData: VALID_BODY.data,
+        fromAddress: VALID_BODY.from,
+        value: "0",
+        valueUnit: "Wei",
+        blockNumber: "latest",
+      }),
+    );
+  });
+
+  it("returns 200 with the simulation result on success", async () => {
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.gasUsed).toBe(63086);
+  });
+
+  it("returns 200 with success:false when the EVM reverts", async () => {
+    simulateWithTevm.mockResolvedValue({
+      ...SIM_RESULT,
+      success: false,
+      error: "Transaction reverted",
+    });
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(false);
+    expect(body.error).toBe("Transaction reverted");
+  });
+
+  it("returns 500 when simulateWithTevm throws", async () => {
+    simulateWithTevm.mockRejectedValue(new Error("tevm internal error"));
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toMatch(/tevm internal error/i);
+  });
+});
