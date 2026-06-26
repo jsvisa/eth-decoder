@@ -8,6 +8,7 @@ import { CHAINS } from "../../utils/chains";
 import styles from "./ResultPanel.module.css";
 import MetricsPanel from "./MetricsPanel";
 import SimulatedEventLogs from "./SimulatedEventLogs";
+import { getBookmarkedAddress } from "../../utils/addressBook";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -47,6 +48,14 @@ function getContractNameFromCache(chain, address) {
   const cached = getCachedAbi(chain, address);
   if (!cached) return null;
   return cached.implContractName || cached.contractName || null;
+}
+
+function resolveAddressName(chain, addr) {
+  if (!addr) return null;
+  const cached = getContractNameFromCache(chain, addr);
+  if (cached) return cached;
+  const entry = getBookmarkedAddress(addr);
+  return entry?.label || entry?.contractName || null;
 }
 
 function getCachedTokenSymbol(chain, address) {
@@ -186,7 +195,9 @@ function CallTraceNode({ trace, depth, chain }) {
   if (trace.type === "STATICCALL") return null;
 
   const contractName =
-    trace.toName || (trace.to ? `${trace.to.slice(0, 10)}...` : "?");
+    trace.toName ||
+    resolveAddressName(chain, trace.to) ||
+    (trace.to ? `${trace.to.slice(0, 10)}...` : "?");
   const contractAddress = trace.to || "";
   const funcName = trace.functionName || trace.input?.slice(0, 10) || "()";
   const { contractLabel, functionLabel } = getTraceLabelParts(
