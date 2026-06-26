@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
 import { decodeFunctionData } from "viem";
-import {
-  BUILT_IN_CHAIN_IDS,
-  VIEM_CHAINS,
-  FORK_RPC_URLS,
-  DEFAULT_RPC_URLS,
-} from "../../utils/chains";
+import { BUILT_IN_CHAIN_IDS, getChainConfig } from "../../utils/chains";
 import { fetchAbi } from "../fetch-abi/route";
 import { getAbiFromCache, setAbiInCache } from "../../utils/serverAbiCache";
 import { simulateWithTevm } from "../../utils/tevmSimulator";
@@ -15,13 +10,7 @@ function resolveChain(numericId) {
   const slug = Object.keys(BUILT_IN_CHAIN_IDS).find(
     (s) => BUILT_IN_CHAIN_IDS[s] === numericId,
   );
-  if (!slug) return null;
-  return {
-    slug,
-    viemChain: VIEM_CHAINS[slug],
-    rpcUrl: DEFAULT_RPC_URLS[slug],
-    forkRpcUrl: FORK_RPC_URLS[slug],
-  };
+  return slug ? getChainConfig(slug) : null;
 }
 
 export async function POST(request) {
@@ -82,7 +71,8 @@ export async function POST(request) {
     );
   }
 
-  const chain = resolveChain(Number(chainId));
+  const numericChainId = Number(chainId);
+  const chain = resolveChain(numericChainId);
   if (!chain) {
     return NextResponse.json(
       { error: `Unsupported chainId: ${chainId}` },
@@ -93,10 +83,9 @@ export async function POST(request) {
   const etherscanKey = apiKeys.etherscan || process.env.ETHERSCAN_API_KEY || "";
   const routescanKey = apiKeys.routescan || process.env.ROUTESCAN_API_KEY || "";
 
-  // ABI: check filesystem cache, otherwise fetch and cache
-  let abiEntry = await getAbiFromCache(Number(chainId), to);
+  let abiEntry = await getAbiFromCache(numericChainId, to);
   if (!abiEntry) {
-    const fetched = await fetchAbi(to, Number(chainId), {
+    const fetched = await fetchAbi(to, numericChainId, {
       etherscanKey,
       routescanKey,
       viemChain: chain.viemChain,
@@ -110,10 +99,13 @@ export async function POST(request) {
       );
     }
     abiEntry = { ...fetched, fetchedAt: Date.now() };
-    await setAbiInCache(Number(chainId), to, abiEntry);
+    try {
+      await setAbiInCache(numericChainId, to, abiEntry);
+    } catch {
+      // Cache write failure is non-fatal; simulation can proceed without it
+    }
   }
 
-  // Decode calldata to get functionName (required by simulateWithTevm)
   let functionName;
   try {
     ({ functionName } = decodeFunctionData({
@@ -127,10 +119,8 @@ export async function POST(request) {
     );
   }
 
-  // Build abiCache map so tevm can decode sub-call logs
   const abiCacheMap = new Map([[to.toLowerCase(), abiEntry.abi]]);
 
-  // Parse and validate value
   let valueStr;
   try {
     valueStr = String(BigInt(value));
@@ -143,7 +133,7 @@ export async function POST(request) {
 
   try {
     const result = await simulateWithTevm({
-      chain: chain.slug,
+      chain: chain.id,
       rpcUrl: rpcUrl || chain.forkRpcUrl,
       address: to,
       functionName,
