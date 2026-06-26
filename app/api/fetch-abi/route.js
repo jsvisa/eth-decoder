@@ -294,6 +294,77 @@ function mergeAbis(proxyAbi, implAbi) {
   return Array.from(seen.values());
 }
 
+/**
+ * Fetch and resolve the ABI for a contract address.
+ * Handles proxy detection and ABI merging.
+ *
+ * @param {string} address - Contract address
+ * @param {number} chainId - Numeric chain ID
+ * @param {object} opts
+ * @param {string} [opts.etherscanKey] - Etherscan API key
+ * @param {string} [opts.routescanKey] - RouteScan API key
+ * @param {object} [opts.viemChain] - viem chain object (required for on-chain proxy detection)
+ * @param {string} [opts.rpcUrl] - RPC URL (required for on-chain proxy detection)
+ * @param {boolean} [opts.detectProxy=true] - Whether to detect proxy contracts on-chain
+ * @returns {Promise<{abi, contractName, implContractName, isProxy, implAddress}|null>}
+ */
+export async function fetchAbi(
+  address,
+  chainId,
+  {
+    etherscanKey = "",
+    routescanKey = "",
+    viemChain = null,
+    rpcUrl = null,
+    detectProxy = true,
+  } = {},
+) {
+  const proxyInfo = await fetchContractInfo(
+    address,
+    chainId,
+    etherscanKey,
+    routescanKey,
+  );
+  if (!proxyInfo || !proxyInfo.abi) return null;
+
+  let implAddress = null;
+  if (proxyInfo.isProxy && proxyInfo.implementation) {
+    implAddress = proxyInfo.implementation;
+  } else if (detectProxy && viemChain && rpcUrl) {
+    const client = createPublicClient({
+      chain: viemChain,
+      transport: http(rpcUrl),
+    });
+    implAddress = await getImplementationAddress(client, address);
+  }
+
+  if (implAddress) {
+    const implInfo = await fetchContractInfo(
+      implAddress,
+      chainId,
+      etherscanKey,
+      routescanKey,
+    );
+    if (implInfo && implInfo.abi) {
+      return {
+        abi: mergeAbis(proxyInfo.abi, implInfo.abi),
+        contractName: proxyInfo.contractName,
+        implContractName: implInfo.contractName,
+        isProxy: true,
+        implAddress,
+      };
+    }
+  }
+
+  return {
+    abi: proxyInfo.abi,
+    contractName: proxyInfo.contractName,
+    implContractName: null,
+    isProxy: false,
+    implAddress: null,
+  };
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -307,7 +378,6 @@ export async function GET(request) {
       );
     }
 
-    // Validate address format
     if (!isValidEthAddress(address)) {
       return NextResponse.json(
         { error: "Invalid address format" },
@@ -315,27 +385,20 @@ export async function GET(request) {
       );
     }
 
-    // Use custom RPC if provided, otherwise use default
     const customRpcUrl = searchParams.get("rpcUrl");
-    // Get custom chain ID from query params (for non-built-in chains)
     const customChainIdParam = searchParams.get("chainId");
 
-    // Determine chain ID and config
     let chainId = BUILT_IN_CHAIN_IDS[chain];
     let chainConfig = VIEM_CHAINS[chain];
     let rpcUrl = customRpcUrl || DEFAULT_RPC_URLS[chain];
 
-    // Handle custom chains (chain IDs starting with "chain-")
     if (!chainId && customChainIdParam && customRpcUrl) {
       chainId = parseInt(customChainIdParam, 10);
-      // Create a custom chain config for non-built-in chains
       chainConfig = defineChain({
         id: chainId,
         name: chain,
         nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-        rpcUrls: {
-          default: { http: [customRpcUrl] },
-        },
+        rpcUrls: { default: { http: [customRpcUrl] } },
       });
       rpcUrl = customRpcUrl;
     }
@@ -349,7 +412,6 @@ export async function GET(request) {
       );
     }
 
-    // Get API keys from query params (user-provided) or fall back to env vars
     const etherscanApiKey =
       searchParams.get("etherscanApiKey") ||
       process.env.ETHERSCAN_API_KEY ||
@@ -358,64 +420,24 @@ export async function GET(request) {
       searchParams.get("routescanApiKey") ||
       process.env.ROUTESCAN_API_KEY ||
       "";
+    const detectProxy = searchParams.get("detectProxy") === "true";
 
-    // Fetch the contract's ABI and name
-    const proxyInfo = await fetchContractInfo(
-      address,
-      chainId,
-      etherscanApiKey,
-      routescanApiKey,
-    );
+    const result = await fetchAbi(address, chainId, {
+      etherscanKey: etherscanApiKey,
+      routescanKey: routescanApiKey,
+      viemChain: chainConfig,
+      rpcUrl,
+      detectProxy,
+    });
 
-    if (!proxyInfo || !proxyInfo.abi) {
+    if (!result || !result.abi) {
       return NextResponse.json(
         { error: "Failed to fetch ABI. Contract may not be verified." },
         { status: 400 },
       );
     }
 
-    // Determine implementation address: prefer Etherscan's proxy info,
-    // only fall back to on-chain detection when explicitly requested
-    const detectProxy = searchParams.get("detectProxy") === "true";
-    let implAddress = null;
-
-    if (proxyInfo.isProxy && proxyInfo.implementation) {
-      implAddress = proxyInfo.implementation;
-    } else if (detectProxy) {
-      const client = createPublicClient({
-        chain: chainConfig,
-        transport: http(rpcUrl),
-      });
-      implAddress = await getImplementationAddress(client, address);
-    }
-
-    if (implAddress) {
-      // It's a proxy! Fetch implementation ABI and merge
-      const implInfo = await fetchContractInfo(
-        implAddress,
-        chainId,
-        etherscanApiKey,
-        routescanApiKey,
-      );
-
-      if (implInfo && implInfo.abi) {
-        const mergedAbi = mergeAbis(proxyInfo.abi, implInfo.abi);
-        return NextResponse.json({
-          abi: mergedAbi,
-          contractName: proxyInfo.contractName,
-          implContractName: implInfo.contractName,
-          isProxy: true,
-          implAddress: implAddress,
-        });
-      }
-    }
-
-    // Not a proxy or couldn't fetch implementation ABI
-    return NextResponse.json({
-      abi: proxyInfo.abi,
-      contractName: proxyInfo.contractName,
-      isProxy: false,
-    });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Fetch ABI error:", error);
     return NextResponse.json(
