@@ -30,11 +30,13 @@ export async function setAbiInCache(
   entry,
   cacheDir = DEFAULT_CACHE_DIR,
 ) {
-  const dir = join(cacheDir, String(chainId));
-  await fs.mkdir(dir, { recursive: true });
-  await fs.writeFile(
-    cachePath(chainId, address, cacheDir),
-    JSON.stringify(entry),
-    "utf-8",
-  );
+  try {
+    const dir = join(cacheDir, String(chainId));
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(
+      cachePath(chainId, address, cacheDir),
+      JSON.stringify(entry),
+      "utf-8",
+    );
+  } catch {}
 }

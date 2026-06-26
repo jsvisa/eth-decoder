@@ -99,11 +99,7 @@ export async function POST(request) {
       );
     }
     abiEntry = { ...fetched, fetchedAt: Date.now() };
-    try {
-      await setAbiInCache(numericChainId, to, abiEntry);
-    } catch {
-      // Cache write failure is non-fatal; simulation can proceed without it
-    }
+    await setAbiInCache(numericChainId, to, abiEntry);
   }
 
   let functionName;
