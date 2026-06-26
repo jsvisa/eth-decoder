@@ -475,7 +475,10 @@ describe("ResultPanel – call trace name resolution", () => {
   it("prefers implContractName over contractName from ABI cache", () => {
     localStorage.setItem(
       abiKey,
-      JSON.stringify({ contractName: "Proxy", implContractName: "UniswapV3Pool" }),
+      JSON.stringify({
+        contractName: "Proxy",
+        implContractName: "UniswapV3Pool",
+      }),
     );
 
     const { container, cleanup } = renderComponent(
@@ -492,7 +495,9 @@ describe("ResultPanel – call trace name resolution", () => {
   it("shows address book label when ABI cache is absent", () => {
     localStorage.setItem(
       "address_book",
-      JSON.stringify([{ id: 1, label: "My USDC", address: addr, contractName: "" }]),
+      JSON.stringify([
+        { id: 1, label: "My USDC", address: addr, contractName: "" },
+      ]),
     );
 
     const { container, cleanup } = renderComponent(
@@ -529,7 +534,9 @@ describe("ResultPanel – call trace name resolution", () => {
     localStorage.setItem(abiKey, JSON.stringify({ contractName: "USDC" }));
     localStorage.setItem(
       "address_book",
-      JSON.stringify([{ id: 1, label: "My Token", address: addr, contractName: "" }]),
+      JSON.stringify([
+        { id: 1, label: "My Token", address: addr, contractName: "" },
+      ]),
     );
 
     const { container, cleanup } = renderComponent(
@@ -547,7 +554,9 @@ describe("ResultPanel – call trace name resolution", () => {
     localStorage.setItem(abiKey, JSON.stringify({ contractName: "USDC" }));
     localStorage.setItem(
       "address_book",
-      JSON.stringify([{ id: 1, label: "My Token", address: addr, contractName: "" }]),
+      JSON.stringify([
+        { id: 1, label: "My Token", address: addr, contractName: "" },
+      ]),
     );
 
     const { container, cleanup } = renderComponent(
