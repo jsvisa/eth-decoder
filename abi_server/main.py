@@ -8,8 +8,9 @@ import sqlite3
 import psycopg2
 from typing import List, Dict
 from eth_utils.abi import collapse_if_tuple
-from multicall.eth_decode import eth_decode_input, eth_decode_log_as_dict
+from multicall.eth_decode import eth_decode_input
 from fastapi import FastAPI, HTTPException, Query
+from serialization import decode_event_log, serialize_value
 
 logging.basicConfig(
     format="[%(asctime)s] - %(levelname)s - %(message)s", level=logging.INFO
@@ -183,7 +184,7 @@ def decode_with_data(data, count=1, with_abi=False, with_sign=False) -> List[Dic
         abi = row[1]
         try:
             func, args = eth_decode_input(abi, data)
-            item = {"func": func, "args": args}
+            item = {"func": func, "args": serialize_value(args)}
             if with_sign is True:
                 item["sign"] = sign
             if with_abi is True:
@@ -230,25 +231,6 @@ def get_event_abi_by_topic(topic0: str, count: int = 1, num_indexed: int | None 
         ]
 
     return rows[:count]
-
-
-def serialize_value(value):
-    """Recursively convert Python decoded values to JSON-serialisable types."""
-    if isinstance(value, int):
-        return str(value)
-    if isinstance(value, (list, tuple)):
-        return [serialize_value(v) for v in value]
-    if isinstance(value, dict):
-        return {k: serialize_value(v) for k, v in value.items()}
-    return value
-
-
-def decode_event_log(abi: Dict, topics: List[str], data: str) -> Dict:
-    """Decode an event log using eth_decode_log_as_dict from multicall."""
-    parameter = eth_decode_log_as_dict(abi, topics, data or "0x")
-    if parameter is None:
-        raise ValueError("ABI type mismatch or unsupported event")
-    return {"event": abi.get("name"), "args": serialize_value(parameter)}
 
 
 @app.get("/api/v1/query-event")

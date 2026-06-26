@@ -22,4 +22,4 @@ test = ["pytest>=8", "httpx>=0.27"]
 abi-server = "main:main"
 
 [tool.setuptools]
-py-modules = ["main"]
+py-modules = ["main", "serialization"]
