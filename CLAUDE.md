@@ -14,7 +14,6 @@ npm run format        # Prettier format — run after any code changes
 npm test              # Vitest unit + API tests (vitest run)
 npm run test:watch    # Vitest in watch mode
 npm run test:coverage # Vitest with v8 coverage
-npm run test:e2e      # Playwright end-to-end tests
 ./scripts/run-e2e.sh  # Full E2E: sets up abi_server, builds, runs Playwright
 ```
 
