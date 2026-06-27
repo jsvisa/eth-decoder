@@ -38,5 +38,10 @@ export async function setAbiInCache(
       JSON.stringify(entry),
       "utf-8",
     );
-  } catch {}
+  } catch (e) {
+    console.warn(
+      `Failed to write ABI cache for chain ${chainId} address ${address}:`,
+      e.message,
+    );
+  }
 }

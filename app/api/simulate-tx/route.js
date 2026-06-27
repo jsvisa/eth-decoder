@@ -1,16 +1,23 @@
 import { NextResponse } from "next/server";
-import { decodeFunctionData } from "viem";
-import { BUILT_IN_CHAIN_IDS, getChainConfig } from "../../utils/chains";
+import { decodeFunctionData, defineChain } from "viem";
+import { getChainConfigByChainId } from "../../utils/chains";
 import { fetchAbi } from "../fetch-abi/route";
 import { getAbiFromCache, setAbiInCache } from "../../utils/serverAbiCache";
 import { simulateWithTevm } from "../../utils/tevmSimulator";
 import { isValidEthAddress } from "../../utils/validation";
 
-function resolveChain(numericId) {
-  const slug = Object.keys(BUILT_IN_CHAIN_IDS).find(
-    (s) => BUILT_IN_CHAIN_IDS[s] === numericId,
-  );
-  return slug ? getChainConfig(slug) : null;
+function buildChainConfig(numericChainId, rpcUrl) {
+  return {
+    id: `chain-${numericChainId}`,
+    rpcUrl,
+    forkRpcUrl: rpcUrl,
+    viemChain: defineChain({
+      id: numericChainId,
+      name: `chain-${numericChainId}`,
+      nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+      rpcUrls: { default: { http: [rpcUrl] } },
+    }),
+  };
 }
 
 export async function POST(request) {
@@ -27,6 +34,7 @@ export async function POST(request) {
     data,
     from,
     value = "0x0",
+    gas = null,
     blockNumber = "latest",
     apiKeys = {},
     rpcUrl = null,
@@ -71,11 +79,38 @@ export async function POST(request) {
     );
   }
 
+  if (gas !== null && gas !== undefined) {
+    try {
+      BigInt(gas);
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid 'gas' format — must be a decimal or hex integer" },
+        { status: 400 },
+      );
+    }
+  }
+
+  if (blockNumber !== "latest") {
+    if (!/^(0x[0-9a-fA-F]+|\d+)$/.test(String(blockNumber).trim())) {
+      return NextResponse.json(
+        {
+          error:
+            "Invalid 'blockNumber' — must be 'latest', a decimal integer, or a hex string",
+        },
+        { status: 400 },
+      );
+    }
+  }
+
   const numericChainId = Number(chainId);
-  const chain = resolveChain(numericChainId);
+  const chain = rpcUrl
+    ? buildChainConfig(numericChainId, rpcUrl)
+    : getChainConfigByChainId(numericChainId);
   if (!chain) {
     return NextResponse.json(
-      { error: `Unsupported chainId: ${chainId}` },
+      {
+        error: `Unsupported chainId: ${chainId}. Provide an rpcUrl to simulate on a non-builtin chain.`,
+      },
       { status: 400 },
     );
   }
@@ -130,7 +165,8 @@ export async function POST(request) {
   try {
     const result = await simulateWithTevm({
       chain: chain.id,
-      rpcUrl: rpcUrl || chain.forkRpcUrl,
+      rpcUrl: chain.forkRpcUrl,
+      ...(rpcUrl ? { customChainId: numericChainId } : {}),
       address: to,
       functionName,
       callData: data,
@@ -138,7 +174,9 @@ export async function POST(request) {
       fromAddress: from,
       value: valueStr,
       valueUnit: "Wei",
-      blockNumber,
+      gas: gas != null ? String(BigInt(gas)) : null,
+      blockNumber:
+        blockNumber === "latest" ? "latest" : String(BigInt(blockNumber)),
       abiCache: abiCacheMap,
     });
     return NextResponse.json(result);

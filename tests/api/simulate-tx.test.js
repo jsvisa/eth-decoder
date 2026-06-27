@@ -114,20 +114,34 @@ describe("POST /api/simulate-tx — validation", () => {
     expect((await res.json()).error).toMatch(/from/i);
   });
 
-  it("returns 400 for an unsupported chainId", async () => {
+  it("returns 400 for an unsupported chainId without rpcUrl", async () => {
     const res = await POST(makeRequest({ ...VALID_BODY, chainId: 999999 }));
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/unsupported chainid/i);
   });
 
-  it("returns 200 when custom rpcUrl is provided", async () => {
+  it("returns 200 for non-builtin chainId when rpcUrl is provided", async () => {
     const res = await POST(
       makeRequest({
         ...VALID_BODY,
+        chainId: 999999,
         rpcUrl: "https://custom-rpc.example.com",
       }),
     );
     expect(res.status).toBe(200);
+  });
+
+  it("passes custom rpcUrl and customChainId to simulateWithTevm for non-builtin chain", async () => {
+    const customRpc = "https://custom-rpc.example.com";
+    await POST(
+      makeRequest({ ...VALID_BODY, chainId: 999999, rpcUrl: customRpc }),
+    );
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rpcUrl: customRpc,
+        customChainId: 999999,
+      }),
+    );
   });
 
   it("passes custom rpcUrl to simulateWithTevm when provided", async () => {
@@ -147,6 +161,54 @@ describe("POST /api/simulate-tx — validation", () => {
         rpcUrl: expect.stringContaining("publicnode"),
       }),
     );
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        customChainId: expect.anything(),
+      }),
+    );
+  });
+
+  it("returns 400 for invalid gas format", async () => {
+    const res = await POST(makeRequest({ ...VALID_BODY, gas: "abc" }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/gas/i);
+  });
+
+  it("accepts valid hex gas", async () => {
+    const res = await POST(makeRequest({ ...VALID_BODY, gas: "0x5208" }));
+    expect(res.status).toBe(200);
+  });
+
+  it("accepts valid decimal gas", async () => {
+    const res = await POST(makeRequest({ ...VALID_BODY, gas: "21000" }));
+    expect(res.status).toBe(200);
+  });
+
+  it("returns 400 for invalid blockNumber format", async () => {
+    const res = await POST(makeRequest({ ...VALID_BODY, blockNumber: "abc" }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/blocknumber/i);
+  });
+
+  it("accepts latest as blockNumber", async () => {
+    const res = await POST(
+      makeRequest({ ...VALID_BODY, blockNumber: "latest" }),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("accepts valid decimal blockNumber", async () => {
+    const res = await POST(
+      makeRequest({ ...VALID_BODY, blockNumber: "12345" }),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("accepts valid hex blockNumber", async () => {
+    const res = await POST(
+      makeRequest({ ...VALID_BODY, blockNumber: "0x1a2b3c" }),
+    );
+    expect(res.status).toBe(200);
   });
 
   it("returns 400 for invalid to address", async () => {

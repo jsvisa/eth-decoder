@@ -100,6 +100,17 @@ export function getChainConfig(id) {
   };
 }
 
+/**
+ * Returns full config for a numeric chain ID, or undefined.
+ * Same shape as getChainConfig: { id, name, icon, chainId, rpcUrl, forkRpcUrl, viemChain }
+ */
+export function getChainConfigByChainId(numericId) {
+  const slug = Object.keys(BUILT_IN_CHAIN_IDS).find(
+    (s) => BUILT_IN_CHAIN_IDS[s] === numericId,
+  );
+  return slug ? getChainConfig(slug) : undefined;
+}
+
 /** True iff `id` is a built-in chain slug. */
 export function isBuiltInChain(id) {
   return Object.prototype.hasOwnProperty.call(BUILT_IN_CHAIN_IDS, id);
