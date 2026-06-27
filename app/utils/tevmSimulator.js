@@ -628,7 +628,7 @@ export async function createTevmClient(
       typeof blockNumber === "string"
         ? blockNumber.trim()
         : String(blockNumber);
-    if (numericBlock && /^\d+$/.test(numericBlock)) {
+    if (numericBlock && /^(0x[0-9a-fA-F]+|\d+)$/.test(numericBlock)) {
       blockTag = BigInt(numericBlock);
     }
   }

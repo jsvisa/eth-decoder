@@ -91,11 +91,11 @@ export async function POST(request) {
   }
 
   if (blockNumber !== "latest") {
-    if (!/^\d+$/.test(String(blockNumber).trim())) {
+    if (!/^(0x[0-9a-fA-F]+|\d+)$/.test(String(blockNumber).trim())) {
       return NextResponse.json(
         {
           error:
-            "Invalid 'blockNumber' — must be 'latest' or a decimal integer",
+            "Invalid 'blockNumber' — must be 'latest', a decimal integer, or a hex string",
         },
         { status: 400 },
       );

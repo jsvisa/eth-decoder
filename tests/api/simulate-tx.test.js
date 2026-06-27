@@ -204,6 +204,13 @@ describe("POST /api/simulate-tx — validation", () => {
     expect(res.status).toBe(200);
   });
 
+  it("accepts valid hex blockNumber", async () => {
+    const res = await POST(
+      makeRequest({ ...VALID_BODY, blockNumber: "0x1a2b3c" }),
+    );
+    expect(res.status).toBe(200);
+  });
+
   it("returns 400 for invalid to address", async () => {
     const res = await POST(
       makeRequest({ ...VALID_BODY, to: "not-an-address" }),
