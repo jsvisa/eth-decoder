@@ -82,7 +82,7 @@ export async function POST(request) {
       etherscanKey,
       routescanKey,
       viemChain: chain.viemChain,
-      rpcUrl: chain.rpcUrl,
+      rpcUrl: rpcUrl || chain.rpcUrl,
       detectProxy: true,
     });
     if (!fetched || !fetched.abi) {
