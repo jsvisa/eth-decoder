@@ -174,8 +174,9 @@ export async function POST(request) {
       fromAddress: from,
       value: valueStr,
       valueUnit: "Wei",
-      gas,
-      blockNumber,
+      gas: gas != null ? String(BigInt(gas)) : null,
+      blockNumber:
+        blockNumber === "latest" ? "latest" : String(BigInt(blockNumber)),
       abiCache: abiCacheMap,
     });
     return NextResponse.json(result);
