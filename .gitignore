@@ -43,3 +43,5 @@ docs/superpowers/
 .playwright-mcp/*
 .claude/*
 .claire/*
+playwright-report/
+abi_server/abi_server.egg-info/
