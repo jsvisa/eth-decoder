@@ -19,6 +19,7 @@ npm run test:e2e      # Playwright end-to-end tests
 ```
 
 **After any code change, always run:**
+
 ```bash
 npm run format && npm run lint && npm test && ./scripts/run-e2e.sh
 ```
