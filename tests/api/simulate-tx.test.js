@@ -316,4 +316,98 @@ describe("POST /api/simulate-tx — simulation", () => {
     expect(res.status).toBe(500);
     expect((await res.json()).error).toMatch(/tevm internal error/i);
   });
+
+  it("returns 400 for invalid JSON body", async () => {
+    const res = await POST({
+      json: async () => {
+        throw new Error("Unexpected token");
+      },
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/invalid json/i);
+  });
+
+  it("normalizes hex value to decimal string", async () => {
+    await POST(makeRequest({ ...VALID_BODY, value: "0xe10" }));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({ value: "3600" }),
+    );
+  });
+
+  it("normalizes decimal value to string", async () => {
+    await POST(makeRequest({ ...VALID_BODY, value: "1000000" }));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({ value: "1000000" }),
+    );
+  });
+
+  it("defaults value to 0 when not provided", async () => {
+    const { value: _, ...body } = VALID_BODY;
+    await POST(makeRequest(body));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({ value: "0" }),
+    );
+  });
+
+  it("normalizes hex gas to decimal string", async () => {
+    await POST(makeRequest({ ...VALID_BODY, gas: "0x5208" }));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({ gas: "21000" }),
+    );
+  });
+
+  it("normalizes decimal gas to string", async () => {
+    await POST(makeRequest({ ...VALID_BODY, gas: "100000" }));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({ gas: "100000" }),
+    );
+  });
+
+  it("passes null gas when not provided", async () => {
+    await POST(makeRequest(VALID_BODY));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({ gas: null }),
+    );
+  });
+
+  it("normalizes hex blockNumber to decimal string", async () => {
+    await POST(makeRequest({ ...VALID_BODY, blockNumber: "0x1a2b3c" }));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({ blockNumber: "1715004" }),
+    );
+  });
+
+  it("normalizes decimal blockNumber to string", async () => {
+    await POST(makeRequest({ ...VALID_BODY, blockNumber: "12345" }));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({ blockNumber: "12345" }),
+    );
+  });
+
+  it("keeps latest as-is for blockNumber", async () => {
+    await POST(makeRequest({ ...VALID_BODY, blockNumber: "latest" }));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({ blockNumber: "latest" }),
+    );
+  });
+
+  it("returns 422 when calldata does not match the ABI", async () => {
+    const mismatchData = "0xdeadbeef";
+    const res = await POST(makeRequest({ ...VALID_BODY, data: mismatchData }));
+    expect(res.status).toBe(422);
+    expect((await res.json()).error).toMatch(/failed to decode calldata/i);
+  });
+
+  it("returns 422 when fetchAbi returns an entry without abi", async () => {
+    fetchAbi.mockResolvedValue({ abi: null, isProxy: false });
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(422);
+    expect((await res.json()).error).toMatch(/abi not found/i);
+  });
+
+  it("passes address as-is to cache lookup", async () => {
+    const mixedCase = "0x99161ba892ECae335616624c84FAA418F64FF9A6";
+    await POST(makeRequest({ ...VALID_BODY, to: mixedCase }));
+    expect(getAbiFromCache).toHaveBeenCalledWith(1, mixedCase);
+  });
 });
