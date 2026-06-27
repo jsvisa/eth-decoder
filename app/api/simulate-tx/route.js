@@ -1,10 +1,24 @@
 import { NextResponse } from "next/server";
-import { decodeFunctionData } from "viem";
+import { decodeFunctionData, defineChain } from "viem";
 import { getChainConfigByChainId } from "../../utils/chains";
 import { fetchAbi } from "../fetch-abi/route";
 import { getAbiFromCache, setAbiInCache } from "../../utils/serverAbiCache";
 import { simulateWithTevm } from "../../utils/tevmSimulator";
 import { isValidEthAddress } from "../../utils/validation";
+
+function buildChainConfig(numericChainId, rpcUrl) {
+  return {
+    id: `chain-${numericChainId}`,
+    rpcUrl,
+    forkRpcUrl: rpcUrl,
+    viemChain: defineChain({
+      id: numericChainId,
+      name: `chain-${numericChainId}`,
+      nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+      rpcUrls: { default: { http: [rpcUrl] } },
+    }),
+  };
+}
 
 export async function POST(request) {
   let body;
@@ -65,11 +79,38 @@ export async function POST(request) {
     );
   }
 
+  if (gas !== null && gas !== undefined) {
+    try {
+      BigInt(gas);
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid 'gas' format — must be a decimal or hex integer" },
+        { status: 400 },
+      );
+    }
+  }
+
+  if (blockNumber !== "latest") {
+    if (!/^\d+$/.test(String(blockNumber).trim())) {
+      return NextResponse.json(
+        {
+          error:
+            "Invalid 'blockNumber' — must be 'latest' or a decimal integer",
+        },
+        { status: 400 },
+      );
+    }
+  }
+
   const numericChainId = Number(chainId);
-  const chain = getChainConfigByChainId(numericChainId);
+  const chain = rpcUrl
+    ? buildChainConfig(numericChainId, rpcUrl)
+    : getChainConfigByChainId(numericChainId);
   if (!chain) {
     return NextResponse.json(
-      { error: `Unsupported chainId: ${chainId}` },
+      {
+        error: `Unsupported chainId: ${chainId}. Provide an rpcUrl to simulate on a non-builtin chain.`,
+      },
       { status: 400 },
     );
   }
@@ -83,7 +124,7 @@ export async function POST(request) {
       etherscanKey,
       routescanKey,
       viemChain: chain.viemChain,
-      rpcUrl: rpcUrl || chain.rpcUrl,
+      rpcUrl: chain.rpcUrl,
       detectProxy: true,
     });
     if (!fetched || !fetched.abi) {
@@ -124,7 +165,8 @@ export async function POST(request) {
   try {
     const result = await simulateWithTevm({
       chain: chain.id,
-      rpcUrl: rpcUrl || chain.forkRpcUrl,
+      rpcUrl: chain.forkRpcUrl,
+      ...(rpcUrl ? { customChainId: numericChainId } : {}),
       address: to,
       functionName,
       callData: data,
