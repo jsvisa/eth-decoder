@@ -840,6 +840,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     rpcBatchSize = 1,
     callData: rawCallData = null,
     persistState = false,
+    gas = null,
   } = params;
 
   // Validate inputs before the try/catch so callers receive a rejected promise
@@ -1129,6 +1130,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       from: sender,
       data: callData,
       value: valueInWei,
+      ...(gas ? { gasLimit: BigInt(gas) } : {}),
       createAccessList: true,
       throwOnFail: false, // return errors in result instead of throwing, so rawData is accessible
       addToBlockchain: persistState ? "on-success" : undefined,

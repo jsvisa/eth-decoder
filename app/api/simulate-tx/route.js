@@ -20,6 +20,7 @@ export async function POST(request) {
     data,
     from,
     value = "0x0",
+    gas = null,
     blockNumber = "latest",
     apiKeys = {},
     rpcUrl = null,
@@ -131,6 +132,7 @@ export async function POST(request) {
       fromAddress: from,
       value: valueStr,
       valueUnit: "Wei",
+      gas,
       blockNumber,
       abiCache: abiCacheMap,
     });
