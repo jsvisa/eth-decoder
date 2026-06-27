@@ -1,17 +1,10 @@
 import { NextResponse } from "next/server";
 import { decodeFunctionData } from "viem";
-import { BUILT_IN_CHAIN_IDS, getChainConfig } from "../../utils/chains";
+import { getChainConfigByChainId } from "../../utils/chains";
 import { fetchAbi } from "../fetch-abi/route";
 import { getAbiFromCache, setAbiInCache } from "../../utils/serverAbiCache";
 import { simulateWithTevm } from "../../utils/tevmSimulator";
 import { isValidEthAddress } from "../../utils/validation";
-
-function resolveChain(numericId) {
-  const slug = Object.keys(BUILT_IN_CHAIN_IDS).find(
-    (s) => BUILT_IN_CHAIN_IDS[s] === numericId,
-  );
-  return slug ? getChainConfig(slug) : null;
-}
 
 export async function POST(request) {
   let body;
@@ -72,7 +65,7 @@ export async function POST(request) {
   }
 
   const numericChainId = Number(chainId);
-  const chain = resolveChain(numericChainId);
+  const chain = getChainConfigByChainId(numericChainId);
   if (!chain) {
     return NextResponse.json(
       { error: `Unsupported chainId: ${chainId}` },
