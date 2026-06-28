@@ -483,6 +483,25 @@ function collectUndecodedCallAddresses(node, result = new Set()) {
   return result;
 }
 
+/**
+ * Collect ALL to-addresses from the entire call trace tree (root excluded).
+ * Unlike collectUndecodedCallAddresses, this includes addresses whose
+ * function WAS decoded — so we can try to fetch their ABIs and labels too.
+ * @param {object} node - Call trace node (typically the root)
+ * @param {Set<string>} [result] - Accumulator set of lowercase addresses
+ * @returns {Set<string>}
+ */
+export function collectAllCallAddresses(node, result = new Set()) {
+  if (!node) return result;
+  for (const child of node.calls || []) {
+    if (child.to) {
+      result.add(child.to.toLowerCase());
+    }
+    collectAllCallAddresses(child, result);
+  }
+  return result;
+}
+
 // Flatten all logs from the entire call trace tree into a single array (for the Logs tab)
 function flattenLogsFromTree(node) {
   if (!node) return [];
@@ -1394,6 +1413,23 @@ function redecodeTreeNode(node, eventAbisByAddress) {
       redecodeTreeNode(child, eventAbisByAddress),
     ),
   };
+}
+
+/**
+ * Walk the call trace tree and set toName on every node whose address has a
+ * known display name. The lookup callback is called with a lowercase address
+ * and should return a human-readable name or null.
+ * @param {object} node - Call trace node (mutated in place)
+ * @param {(address: string) => string|null} resolveName
+ */
+export function populateTraceToNames(node, resolveName) {
+  if (!node) return;
+  if (node.to && !node.toName) {
+    node.toName = resolveName(node.to.toLowerCase()) || null;
+  }
+  for (const child of node.calls || []) {
+    populateTraceToNames(child, resolveName);
+  }
 }
 
 /**
