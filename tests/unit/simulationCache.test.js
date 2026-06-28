@@ -72,39 +72,47 @@ describe("simulationCache", () => {
 
   it("returns null and deletes expired entries", async () => {
     const oldTtl = process.env.SIMULATION_RESULT_TTL;
-    process.env.SIMULATION_RESULT_TTL = "1";
-    await withCacheDir(async () => {
-      const id = await saveSimulationResult(SIM_DATA);
-      await new Promise((r) => setTimeout(r, 10));
-      const result = await getSimulationResult(id);
-      expect(result).toBeNull();
-      await expect(fs.access(join(TEST_DIR, `${id}.json`))).rejects.toThrow();
-    });
-    if (oldTtl) process.env.SIMULATION_RESULT_TTL = oldTtl;
-    else delete process.env.SIMULATION_RESULT_TTL;
+    try {
+      process.env.SIMULATION_RESULT_TTL = "1";
+      await withCacheDir(async () => {
+        const id = await saveSimulationResult(SIM_DATA);
+        await new Promise((r) => setTimeout(r, 10));
+        const result = await getSimulationResult(id);
+        expect(result).toBeNull();
+        await expect(fs.access(join(TEST_DIR, `${id}.json`))).rejects.toThrow();
+      });
+    } finally {
+      if (oldTtl) process.env.SIMULATION_RESULT_TTL = oldTtl;
+      else delete process.env.SIMULATION_RESULT_TTL;
+    }
   });
 
   it("pruneExpiredResults removes only expired entries", async () => {
     const oldTtl = process.env.SIMULATION_RESULT_TTL;
+    try {
+      process.env.SIMULATION_RESULT_TTL = "1";
+      const expiredId = await withCacheDir(() =>
+        saveSimulationResult(SIM_DATA),
+      );
 
-    process.env.SIMULATION_RESULT_TTL = "1";
-    const expiredId = await withCacheDir(() => saveSimulationResult(SIM_DATA));
+      process.env.SIMULATION_RESULT_TTL = "600000";
+      const validId = await withCacheDir(() => saveSimulationResult(SIM_DATA));
 
-    process.env.SIMULATION_RESULT_TTL = "600000";
-    const validId = await withCacheDir(() => saveSimulationResult(SIM_DATA));
+      await new Promise((r) => setTimeout(r, 10));
 
-    await new Promise((r) => setTimeout(r, 10));
+      const pruned = await withCacheDir(() => pruneExpiredResults());
+      expect(pruned).toBe(1);
 
-    const pruned = await withCacheDir(() => pruneExpiredResults());
-    expect(pruned).toBe(1);
-
-    expect(await withCacheDir(() => getSimulationResult(expiredId))).toBeNull();
-    expect(await withCacheDir(() => getSimulationResult(validId))).toEqual(
-      SIM_DATA,
-    );
-
-    if (oldTtl) process.env.SIMULATION_RESULT_TTL = oldTtl;
-    else delete process.env.SIMULATION_RESULT_TTL;
+      expect(
+        await withCacheDir(() => getSimulationResult(expiredId)),
+      ).toBeNull();
+      expect(await withCacheDir(() => getSimulationResult(validId))).toEqual(
+        SIM_DATA,
+      );
+    } finally {
+      if (oldTtl) process.env.SIMULATION_RESULT_TTL = oldTtl;
+      else delete process.env.SIMULATION_RESULT_TTL;
+    }
   });
 
   it("pruneExpiredResults handles empty directory", async () => {

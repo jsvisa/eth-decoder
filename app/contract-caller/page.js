@@ -343,9 +343,7 @@ export default function ContractCallerPage() {
           exec.setResult(data);
           if (data.requestBody) {
             const { chainId, to, from, value } = data.requestBody;
-            if (chainId && BUILT_IN_CHAIN_IDS[chainId] != null) {
-              setChain(chainId);
-            } else if (chainId) {
+            if (chainId) {
               const builtInSlug = Object.keys(BUILT_IN_CHAIN_IDS).find(
                 (s) => BUILT_IN_CHAIN_IDS[s] === Number(chainId),
               );
