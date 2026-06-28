@@ -9,10 +9,13 @@ import {
   redecodeCallTrace,
   decodeLogsViaServer,
   decodeCallTraceLogsViaServer,
+  collectAllCallAddresses,
+  populateTraceToNames,
 } from "../../utils/tevmSimulator";
 import {
   buildAbiCacheFromStorage,
   fetchAbisForAddresses,
+  getCachedAbi,
 } from "../../utils/abiCache";
 import {
   isValidEthAddress,
@@ -388,6 +391,44 @@ export function useCallExecution({
               }
             }
           }
+        }
+
+        // Fetch ABIs for ALL call trace addresses (not just undecoded ones)
+        // so that contract labels appear on inner call frames.
+        if (data.callTrace) {
+          const allTraceAddrs = collectAllCallAddresses(data.callTrace);
+          const uncachedAddrs = [...allTraceAddrs].filter(
+            (addr) => !initialAbiCache.has(addr),
+          );
+          if (uncachedAddrs.length > 0) {
+            const newAbis = await fetchAbisForAddresses(
+              chain,
+              uncachedAddrs,
+              apiKeys?.etherscan,
+              rpcSettings?.[chain],
+              chainIdForSimulation,
+              apiKeys?.routescan,
+            );
+            for (const [addr, abi] of newAbis) {
+              initialAbiCache.set(addr, abi);
+            }
+            if (newAbis.size > 0) {
+              if (data.callTrace) {
+                data.callTrace = redecodeCallTrace(
+                  data.callTrace,
+                  initialAbiCache,
+                );
+              }
+              data.logs = redecodeLogs(data.logs, initialAbiCache);
+            }
+          }
+          // Populate toName on every trace node using the now-cached names
+          populateTraceToNames(data.callTrace, (addr) => {
+            const cached = getCachedAbi(chain, addr);
+            return cached
+              ? cached.implContractName || cached.contractName || null
+              : null;
+          });
         }
 
         await decodeLogsViaServer(data.logs);

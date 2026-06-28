@@ -6,6 +6,8 @@ import {
   ensureTevmNodeCompat,
   sanitizeForkRpcResult,
   simulateWithClient,
+  collectAllCallAddresses,
+  populateTraceToNames,
 } from "../../app/utils/tevmSimulator.js";
 
 // Pre-encoded revert payloads (selector + ABI-encoded args).
@@ -308,5 +310,155 @@ describe("ensureTevmNodeCompat", () => {
     expect(client.transport.tevm.getNextBlockTimestamp).toBe(
       getNextBlockTimestamp,
     );
+  });
+});
+
+describe("collectAllCallAddresses", () => {
+  const ADDR_A = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  const ADDR_B = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+  const ADDR_C = "0xcccccccccccccccccccccccccccccccccccccccc";
+
+  it("returns empty set for null input", () => {
+    const result = collectAllCallAddresses(null);
+    expect(result).toBeInstanceOf(Set);
+    expect(result.size).toBe(0);
+  });
+
+  it("returns empty set when node has no calls", () => {
+    const node = { to: ADDR_A, calls: [] };
+    const result = collectAllCallAddresses(node);
+    expect(result.size).toBe(0);
+  });
+
+  it("collects addresses from direct children (root excluded)", () => {
+    const node = {
+      to: ADDR_A,
+      calls: [
+        { to: ADDR_B, calls: [] },
+        { to: ADDR_C, calls: [] },
+      ],
+    };
+    const result = collectAllCallAddresses(node);
+    expect(result).toEqual(
+      new Set([ADDR_B.toLowerCase(), ADDR_C.toLowerCase()]),
+    );
+    expect(result.has(ADDR_A.toLowerCase())).toBe(false);
+  });
+
+  it("collects addresses from nested children", () => {
+    const node = {
+      to: ADDR_A,
+      calls: [
+        {
+          to: ADDR_B,
+          calls: [{ to: ADDR_C, calls: [] }],
+        },
+      ],
+    };
+    const result = collectAllCallAddresses(node);
+    expect(result).toEqual(
+      new Set([ADDR_B.toLowerCase(), ADDR_C.toLowerCase()]),
+    );
+  });
+
+  it("skips children without a to field", () => {
+    const node = {
+      to: ADDR_A,
+      calls: [{ calls: [] }, { to: ADDR_B, calls: [] }],
+    };
+    const result = collectAllCallAddresses(node);
+    expect(result).toEqual(new Set([ADDR_B.toLowerCase()]));
+  });
+
+  it("deduplicates repeated addresses", () => {
+    const node = {
+      to: ADDR_A,
+      calls: [
+        { to: ADDR_B, calls: [] },
+        { to: ADDR_B, calls: [] },
+      ],
+    };
+    const result = collectAllCallAddresses(node);
+    expect(result.size).toBe(1);
+    expect(result.has(ADDR_B.toLowerCase())).toBe(true);
+  });
+
+  it("normalizes addresses to lowercase", () => {
+    const mixed = "0xAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAa";
+    const node = {
+      to: ADDR_A,
+      calls: [{ to: mixed, calls: [] }],
+    };
+    const result = collectAllCallAddresses(node);
+    expect(result.has(mixed.toLowerCase())).toBe(true);
+    expect(result.has(mixed)).toBe(false);
+  });
+});
+
+describe("populateTraceToNames", () => {
+  const ADDR_A = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  const ADDR_B = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+  it("does nothing for null input", () => {
+    expect(() => populateTraceToNames(null, () => null)).not.toThrow();
+  });
+
+  it("sets toName on node when resolveName returns a name", () => {
+    const node = { to: ADDR_A, toName: null, calls: [] };
+    populateTraceToNames(node, (addr) =>
+      addr === ADDR_A.toLowerCase() ? "ContractA" : null,
+    );
+    expect(node.toName).toBe("ContractA");
+  });
+
+  it("does not set toName when resolveName returns null", () => {
+    const node = { to: ADDR_A, toName: null, calls: [] };
+    populateTraceToNames(node, () => null);
+    expect(node.toName).toBeNull();
+  });
+
+  it("does not overwrite an existing toName", () => {
+    const node = { to: ADDR_A, toName: "Existing", calls: [] };
+    populateTraceToNames(node, () => "Override");
+    expect(node.toName).toBe("Existing");
+  });
+
+  it("does not set toName when node has no to field", () => {
+    const node = { to: null, toName: null, calls: [] };
+    populateTraceToNames(node, () => "ShouldNotSet");
+    expect(node.toName).toBeNull();
+  });
+
+  it("resolves names on nested child nodes", () => {
+    const node = {
+      to: ADDR_A,
+      toName: null,
+      calls: [
+        {
+          to: ADDR_B,
+          toName: null,
+          calls: [],
+        },
+      ],
+    };
+    populateTraceToNames(node, (addr) => {
+      if (addr === ADDR_A.toLowerCase()) return "Root";
+      if (addr === ADDR_B.toLowerCase()) return "Child";
+      return null;
+    });
+    expect(node.toName).toBe("Root");
+    expect(node.calls[0].toName).toBe("Child");
+  });
+
+  it("calls resolveName with lowercase address", () => {
+    const mixedCase = "0xAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAa";
+    const node = { to: mixedCase, toName: null, calls: [] };
+    const calls = [];
+    const resolveName = (addr) => {
+      calls.push(addr);
+      return null;
+    };
+    populateTraceToNames(node, resolveName);
+    expect(calls).toEqual([mixedCase.toLowerCase()]);
   });
 });
