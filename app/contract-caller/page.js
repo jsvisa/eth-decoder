@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useSettings } from "../contexts/SettingsContext";
-import { CHAINS } from "../utils/chains";
+import { CHAINS, BUILT_IN_CHAIN_IDS } from "../utils/chains";
 import { isValidEthAddress } from "../utils/validation";
 
 import { useAbi } from "./hooks/useAbi";
@@ -326,6 +326,44 @@ export default function ContractCallerPage() {
     contractName: abi.contractName,
   });
   const addChain = useAddChainModal({ chain, setChain });
+
+  // Load simulation result from query param on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const querySimulationId = params.get("simulationId");
+    if (querySimulationId) {
+      exec.setLoading(true);
+      fetch(`/api/simulate-result/${encodeURIComponent(querySimulationId)}`)
+        .then((res) => {
+          if (!res.ok)
+            throw new Error("Simulation result not found or expired");
+          return res.json();
+        })
+        .then((data) => {
+          exec.setResult(data);
+          if (data.requestBody) {
+            const { chainId, to, from, value } = data.requestBody;
+            if (chainId && BUILT_IN_CHAIN_IDS[chainId] != null) {
+              setChain(chainId);
+            } else if (chainId) {
+              const builtInSlug = Object.keys(BUILT_IN_CHAIN_IDS).find(
+                (s) => BUILT_IN_CHAIN_IDS[s] === Number(chainId),
+              );
+              if (builtInSlug) setChain(builtInSlug);
+            }
+            if (to) setAddress(to);
+            if (from) simOpts.setFromAddress(from);
+            if (value) fn.setEthValue(value);
+          }
+        })
+        .catch((err) => {
+          exec.setError(err.message);
+        })
+        .finally(() => {
+          exec.setLoading(false);
+        });
+    }
+  }, []);
 
   // Derive isWrite from selected function
   const selectedFn = abi.parsedAbi?.find(
