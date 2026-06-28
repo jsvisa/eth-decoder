@@ -104,6 +104,8 @@ export function useCallExecution({
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [simProgress, setSimProgress] = useState(null);
+  const [simulationId, setSimulationId] = useState(null);
+  const [savingSimulation, setSavingSimulation] = useState(false);
 
   // ── result-display toggles ─────────────────────────────────────────────────
   const [isYaml, setIsYaml] = useState(false);
@@ -274,6 +276,7 @@ export function useCallExecution({
     setLoading(true);
     setError(null);
     setResult(null);
+    setSimulationId(null);
 
     try {
       let data;
@@ -515,6 +518,10 @@ export function useCallExecution({
         }
       }
 
+      if (data.simulationId) {
+        setSimulationId(data.simulationId);
+      }
+
       if (isWrite && data.success === false) {
         setError(data.error || "Simulation failed: transaction would revert");
         setResult(data);
@@ -566,31 +573,67 @@ export function useCallExecution({
     }
   };
 
+  // ── handleSaveSimulation ──────────────────────────────────────────────────
+
+  const handleSaveSimulation = async () => {
+    if (!result) return;
+    try {
+      setSavingSimulation(true);
+      const response = await fetch("/api/save-simulation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(result),
+      });
+      if (!response.ok) throw new Error("Failed to save simulation");
+      const { simulationId: id } = await response.json();
+      setSimulationId(id);
+      return id;
+    } catch (err) {
+      console.error("Failed to save simulation:", err);
+    } finally {
+      setSavingSimulation(false);
+    }
+  };
+
   // ── handleShareUrl ─────────────────────────────────────────────────────────
 
   const handleShareUrl = async () => {
     try {
-      const params = new URLSearchParams();
-      params.set("chain", chain);
-      params.set("address", address);
+      let shareUrl;
 
-      if (selectedFunction) {
-        params.set("function", selectedFunction);
+      const id = simulationId || result?.simulationId;
+      if (id) {
+        shareUrl = `${window.location.origin}${window.location.pathname}?simulationId=${id}`;
+      } else if (result) {
+        const savedId = await handleSaveSimulation();
+        if (savedId) {
+          shareUrl = `${window.location.origin}${window.location.pathname}?simulationId=${savedId}`;
+        }
       }
 
-      if (args?.length > 0 && args.some((a) => a !== "")) {
-        params.set("args", JSON.stringify(args));
-      }
+      if (!shareUrl) {
+        const params = new URLSearchParams();
+        params.set("chain", chain);
+        params.set("address", address);
 
-      if (fromAddress) {
-        params.set("from", fromAddress);
-      }
+        if (selectedFunction) {
+          params.set("function", selectedFunction);
+        }
 
-      if (ethValue) {
-        params.set("value", ethValue);
-      }
+        if (args?.length > 0 && args.some((a) => a !== "")) {
+          params.set("args", JSON.stringify(args));
+        }
 
-      const shareUrl = `${window.location.origin}${window.location.pathname}?${params}`;
+        if (fromAddress) {
+          params.set("from", fromAddress);
+        }
+
+        if (ethValue) {
+          params.set("value", ethValue);
+        }
+
+        shareUrl = `${window.location.origin}${window.location.pathname}?${params}`;
+      }
 
       await navigator.clipboard.writeText(shareUrl);
       setUrlCopied(true);
@@ -608,7 +651,10 @@ export function useCallExecution({
     error,
     setError,
     loading,
+    setLoading,
     simProgress,
+    simulationId,
+    savingSimulation,
     isYaml,
     setIsYaml,
     copied,
@@ -629,5 +675,6 @@ export function useCallExecution({
     handleCancel,
     handleCopy,
     handleShareUrl,
+    handleSaveSimulation,
   };
 }

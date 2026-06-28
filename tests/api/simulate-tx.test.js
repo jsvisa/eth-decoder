@@ -52,6 +52,8 @@ const SIM_RESULT = {
   metrics: {},
 };
 
+const FAKE_SIMULATION_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+
 vi.mock("../../app/api/fetch-abi/route.js", () => ({
   fetchAbi: vi.fn(),
 }));
@@ -62,6 +64,7 @@ vi.mock("../../app/utils/serverAbiCache.js", () => ({
 vi.mock("../../app/utils/tevmSimulator.js", () => ({
   simulateWithTevm: vi.fn(),
 }));
+vi.mock("../../app/utils/simulationCache.js");
 
 import { fetchAbi } from "../../app/api/fetch-abi/route.js";
 import {
@@ -69,6 +72,10 @@ import {
   setAbiInCache,
 } from "../../app/utils/serverAbiCache.js";
 import { simulateWithTevm } from "../../app/utils/tevmSimulator.js";
+import {
+  saveSimulationResult,
+  pruneExpiredResults,
+} from "../../app/utils/simulationCache.js";
 
 function makeRequest(body) {
   return { json: async () => body };
@@ -79,6 +86,8 @@ beforeEach(() => {
   getAbiFromCache.mockResolvedValue(null);
   fetchAbi.mockResolvedValue({ ...CACHE_ENTRY });
   simulateWithTevm.mockResolvedValue(SIM_RESULT);
+  saveSimulationResult.mockResolvedValue(FAKE_SIMULATION_ID);
+  pruneExpiredResults.mockResolvedValue(0);
 });
 
 afterEach(() => {
@@ -297,6 +306,25 @@ describe("POST /api/simulate-tx — simulation", () => {
     expect(body.gasUsed).toBe(63086);
   });
 
+  it("includes simulationId and requestBody in the response", async () => {
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.simulationId).toBe(FAKE_SIMULATION_ID);
+    expect(body.requestBody).toBeDefined();
+    expect(body.requestBody.chainId).toBe(1);
+    expect(body.requestBody.to).toBe(VALID_BODY.to);
+  });
+
+  it("caches the simulation result via saveSimulationResult", async () => {
+    await POST(makeRequest(VALID_BODY));
+    expect(saveSimulationResult).toHaveBeenCalledOnce();
+    const saved = saveSimulationResult.mock.calls[0][0];
+    expect(saved.success).toBe(true);
+    expect(saved.requestBody).toBeDefined();
+    expect(saved.requestBody.chainId).toBe(1);
+  });
+
   it("returns 200 with success:false when the EVM reverts", async () => {
     simulateWithTevm.mockResolvedValue({
       ...SIM_RESULT,
@@ -310,11 +338,32 @@ describe("POST /api/simulate-tx — simulation", () => {
     expect(body.error).toBe("Transaction reverted");
   });
 
+  it("includes simulationId even when the EVM reverts", async () => {
+    simulateWithTevm.mockResolvedValue({
+      ...SIM_RESULT,
+      success: false,
+      error: "Transaction reverted",
+    });
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.simulationId).toBe(FAKE_SIMULATION_ID);
+  });
+
   it("returns 500 when simulateWithTevm throws", async () => {
     simulateWithTevm.mockRejectedValue(new Error("tevm internal error"));
     const res = await POST(makeRequest(VALID_BODY));
     expect(res.status).toBe(500);
     expect((await res.json()).error).toMatch(/tevm internal error/i);
+  });
+
+  it("includes simulationId even when simulateWithTevm throws", async () => {
+    simulateWithTevm.mockRejectedValue(new Error("tevm internal error"));
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.simulationId).toBe(FAKE_SIMULATION_ID);
+    expect(body.success).toBe(false);
   });
 
   it("returns 400 for invalid JSON body", async () => {

@@ -5,6 +5,10 @@ import { fetchAbi } from "../fetch-abi/route";
 import { getAbiFromCache, setAbiInCache } from "../../utils/serverAbiCache";
 import { simulateWithTevm } from "../../utils/tevmSimulator";
 import { isValidEthAddress } from "../../utils/validation";
+import {
+  saveSimulationResult,
+  pruneExpiredResults,
+} from "../../utils/simulationCache";
 
 function buildChainConfig(numericChainId, rpcUrl) {
   return {
@@ -162,6 +166,19 @@ export async function POST(request) {
     );
   }
 
+  pruneExpiredResults().catch(() => {});
+
+  const requestBody = {
+    chainId: numericChainId,
+    to,
+    data,
+    from,
+    value,
+    gas,
+    blockNumber,
+    rpcUrl,
+  };
+
   try {
     const result = await simulateWithTevm({
       chain: chain.id,
@@ -179,11 +196,17 @@ export async function POST(request) {
         blockNumber === "latest" ? "latest" : String(BigInt(blockNumber)),
       abiCache: abiCacheMap,
     });
-    return NextResponse.json(result);
+
+    const resultWithRequest = { ...result, requestBody };
+    const simulationId = await saveSimulationResult(resultWithRequest);
+    return NextResponse.json({ ...result, simulationId, requestBody });
   } catch (error) {
-    return NextResponse.json(
-      { error: error.message || "Simulation failed" },
-      { status: 500 },
-    );
+    const errorResult = {
+      success: false,
+      error: error.message || "Simulation failed",
+      requestBody,
+    };
+    const simulationId = await saveSimulationResult(errorResult);
+    return NextResponse.json({ ...errorResult, simulationId }, { status: 500 });
   }
 }
