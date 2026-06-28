@@ -11,11 +11,14 @@ vi.mock("../../../app/utils/tevmSimulator.js", () => ({
   redecodeCallTrace: vi.fn((trace) => trace),
   decodeLogsViaServer: vi.fn(async () => {}),
   decodeCallTraceLogsViaServer: vi.fn(async () => {}),
+  collectAllCallAddresses: vi.fn(() => new Set()),
+  populateTraceToNames: vi.fn(),
 }));
 
 vi.mock("../../../app/utils/abiCache.js", () => ({
   buildAbiCacheFromStorage: vi.fn(() => new Map()),
   fetchAbisForAddresses: vi.fn(async () => new Map()),
+  getCachedAbi: vi.fn(() => null),
 }));
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -309,5 +312,88 @@ describe("useCallExecution – toggle state setters", () => {
     });
 
     expect(result.current.resultCollapsed).toBe(true);
+  });
+});
+
+describe("useCallExecution – local sim populates trace toName labels", () => {
+  const INNER_ADDR = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+  it("fetches ABIs for uncached inner trace addresses and populates toName", async () => {
+    const tevm = await import("../../../app/utils/tevmSimulator.js");
+    const abiCache = await import("../../../app/utils/abiCache.js");
+
+    tevm.collectAllCallAddresses.mockReturnValue(new Set([INNER_ADDR]));
+    tevm.simulateWithTevm.mockResolvedValue({
+      success: true,
+      simulated: true,
+      callTrace: {
+        type: "CALL",
+        to: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        toName: null,
+        functionName: "transfer(address,uint256)",
+        calls: [
+          {
+            type: "CALL",
+            to: INNER_ADDR,
+            toName: null,
+            functionName: "someFunc",
+            calls: [],
+          },
+        ],
+      },
+      logs: [],
+      gasUsed: 50000,
+      undecodedAddresses: [],
+    });
+
+    abiCache.fetchAbisForAddresses.mockResolvedValue(
+      new Map([
+        [
+          INNER_ADDR,
+          [{ type: "function", name: "someFunc", inputs: [], outputs: [] }],
+        ],
+      ]),
+    );
+    abiCache.getCachedAbi.mockReturnValue({
+      contractName: "InnerContract",
+      implContractName: null,
+    });
+
+    const params = {
+      ...baseParams,
+      parsedAbi: TRANSFER_ABI,
+      selectedFunction: "transfer(address,uint256)",
+      args: ["0x1234567890123456789012345678901234567890", "100"],
+      fromAddress: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      useLocalSimulation: true,
+    };
+
+    const { result } = renderHook(() => useCallExecution(params));
+
+    await act(async () => {
+      await result.current.handleCall();
+    });
+
+    expect(abiCache.fetchAbisForAddresses).toHaveBeenCalledWith(
+      params.chain,
+      expect.arrayContaining([INNER_ADDR]),
+      undefined,
+      undefined,
+      1,
+      undefined,
+    );
+
+    expect(tevm.collectAllCallAddresses).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "CALL" }),
+    );
+
+    expect(tevm.populateTraceToNames).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "CALL" }),
+      expect.any(Function),
+    );
+
+    expect(result.current.result).toEqual(
+      expect.objectContaining({ success: true, simulated: true }),
+    );
   });
 });
