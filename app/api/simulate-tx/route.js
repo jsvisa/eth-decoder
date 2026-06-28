@@ -169,7 +169,7 @@ export async function POST(request) {
   pruneExpiredResults().catch(() => {});
 
   const requestBody = {
-    chainId: chain.id,
+    chainId: numericChainId,
     to,
     data,
     from,

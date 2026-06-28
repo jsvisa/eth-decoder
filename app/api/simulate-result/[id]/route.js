@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSimulationResult } from "../../../utils/simulationCache";
 
 export async function GET(request, { params }) {
-  const { id } = params;
+  const { id } = await params;
 
   if (!id || typeof id !== "string" || id.length < 8) {
     return NextResponse.json(
