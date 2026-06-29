@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import {
-  createShareableSimulationId,
+  saveSimulationResult,
   pruneExpiredResults,
 } from "../../utils/simulationCache";
 
@@ -22,7 +22,7 @@ export async function POST(request) {
   pruneExpiredResults().catch(() => {});
 
   try {
-    const simulationId = await createShareableSimulationId(body);
+    const simulationId = await saveSimulationResult(body);
     return NextResponse.json({ simulationId });
   } catch (error) {
     return NextResponse.json(

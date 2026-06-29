@@ -5,6 +5,7 @@ import { getServerCacheBaseDir } from "./serverCacheDir";
 
 const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SHARE_ID_PREFIX = "z1_";
+const VERCEL_BLOB_ID_PREFIX = "vb1_";
 
 function getCacheDir() {
   return (
@@ -24,6 +25,21 @@ function getTTL() {
 
 function resultPath(id, cacheDir) {
   return join(cacheDir, `${id}.json`);
+}
+
+function isVercelRuntime() {
+  return process.env.VERCEL === "1" || process.env.VERCEL === "true";
+}
+
+function hasVercelBlobCredentials() {
+  return Boolean(
+    process.env.BLOB_READ_WRITE_TOKEN ||
+    (process.env.BLOB_STORE_ID && process.env.VERCEL_OIDC_TOKEN),
+  );
+}
+
+function shouldUseVercelBlob() {
+  return isVercelRuntime() && hasVercelBlobCredentials();
 }
 
 function buildEntry(data) {
@@ -67,7 +83,45 @@ function getShareableSimulationResult(id) {
   }
 }
 
+function blobPath(id) {
+  return `simulations/${id.slice(VERCEL_BLOB_ID_PREFIX.length)}.json`;
+}
+
+async function saveToVercelBlob(data) {
+  const { randomUUID } = await import("crypto");
+  const { put } = await import("@vercel/blob");
+  const id = `${VERCEL_BLOB_ID_PREFIX}${randomUUID()}`;
+  const entry = buildEntry(data);
+  await put(blobPath(id), JSON.stringify(entry), {
+    access: "private",
+    contentType: "application/json",
+    allowOverwrite: false,
+    cacheControlMaxAge: 60,
+  });
+  return id;
+}
+
+async function getVercelBlobSimulationResult(id) {
+  if (!id.startsWith(VERCEL_BLOB_ID_PREFIX)) {
+    return undefined;
+  }
+
+  try {
+    const { get } = await import("@vercel/blob");
+    const result = await get(blobPath(id), { access: "private" });
+    if (!result || !result.stream) return null;
+    const raw = await new Response(result.stream).text();
+    return getDataFromEntry(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
 export async function saveSimulationResult(data) {
+  if (shouldUseVercelBlob()) {
+    return saveToVercelBlob(data);
+  }
+
   const { randomUUID } = await import("crypto");
   const id = randomUUID();
   const entry = buildEntry(data);
@@ -81,6 +135,11 @@ export async function getSimulationResult(id) {
   const shareableResult = getShareableSimulationResult(id);
   if (shareableResult !== undefined) {
     return shareableResult;
+  }
+
+  const blobResult = await getVercelBlobSimulationResult(id);
+  if (blobResult !== undefined) {
+    return blobResult;
   }
 
   const cacheDir = getCacheDir();

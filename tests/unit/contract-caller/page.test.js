@@ -430,14 +430,14 @@ describe("ContractCallerPage wiring", () => {
         json: async () => sharedResult,
       }),
     );
-    window.history.pushState(null, "", "/?simulationId=z1_share-token");
+    window.history.pushState(null, "", "/?simulationId=vb1_share-token");
 
     const { unmount } = renderPage();
 
     await vi.waitFor(() => {
       expect(callExecutionState.setResult).toHaveBeenCalledWith(sharedResult);
     });
-    expect(fetch).toHaveBeenCalledWith("/api/simulate-result/z1_share-token");
+    expect(fetch).toHaveBeenCalledWith("/api/simulate-result/vb1_share-token");
     expect(simulationOptionsState.setFromAddress).toHaveBeenCalledWith(
       sharedResult.requestBody.from,
     );

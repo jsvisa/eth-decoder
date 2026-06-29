@@ -73,7 +73,7 @@ import {
 } from "../../app/utils/serverAbiCache.js";
 import { simulateWithTevm } from "../../app/utils/tevmSimulator.js";
 import {
-  createShareableSimulationId,
+  saveSimulationResult,
   pruneExpiredResults,
 } from "../../app/utils/simulationCache.js";
 
@@ -86,7 +86,7 @@ beforeEach(() => {
   getAbiFromCache.mockResolvedValue(null);
   fetchAbi.mockResolvedValue({ ...CACHE_ENTRY });
   simulateWithTevm.mockResolvedValue(SIM_RESULT);
-  createShareableSimulationId.mockResolvedValue(FAKE_SIMULATION_ID);
+  saveSimulationResult.mockResolvedValue(FAKE_SIMULATION_ID);
   pruneExpiredResults.mockResolvedValue(0);
 });
 
@@ -316,10 +316,10 @@ describe("POST /api/simulate-tx — simulation", () => {
     expect(body.requestBody.to).toBe(VALID_BODY.to);
   });
 
-  it("creates a shareable simulation id with the full result", async () => {
+  it("saves the full result for shared lookup", async () => {
     await POST(makeRequest(VALID_BODY));
-    expect(createShareableSimulationId).toHaveBeenCalledOnce();
-    const saved = createShareableSimulationId.mock.calls[0][0];
+    expect(saveSimulationResult).toHaveBeenCalledOnce();
+    const saved = saveSimulationResult.mock.calls[0][0];
     expect(saved.success).toBe(true);
     expect(saved.requestBody).toBeDefined();
     expect(saved.requestBody.chainId).toBe(1);

@@ -170,7 +170,7 @@ GET /api/v1/fetch-abi?address=0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48&chain=e
 
 ### `POST /api/simulate-tx`
 
-Simulate a raw transaction against forked chain state and return decoded results. Fetches and caches the contract ABI server-side at `~/.cache/eth-decoder/<chainId>/<address>.json`.
+Simulate a raw transaction against forked chain state and return decoded results. Fetches and caches the contract ABI server-side at `~/.cache/eth-decoder/<chainId>/<address>.json` outside Vercel, or `/tmp/eth-decoder/<chainId>/<address>.json` on Vercel.
 
 **Request body:**
 
@@ -211,7 +211,14 @@ curl -X POST http://localhost:3000/api/simulate-tx \
 | `200` (`success: false`) | EVM revert or execution error — `error` field is set                     |
 | `500`                    | Unexpected server error                                                  |
 
-**ABI cache:** Fetched ABIs are cached at `~/.cache/eth-decoder/<chainId>/<address>.json`. Delete a file to force a fresh fetch.
+**ABI cache:** Fetched ABIs are cached at `~/.cache/eth-decoder/<chainId>/<address>.json` outside Vercel, or `/tmp/eth-decoder/<chainId>/<address>.json` on Vercel. Set `CACHE_DIR` to override the base directory. Delete a file to force a fresh fetch.
+
+**Shared simulation result storage:** Simulation result links use short result IDs. On Vercel, configure Vercel Blob so results are stored as private blobs and can be read across function instances and deployments. Without Blob credentials, Vercel falls back to `/tmp`, which is only a temporary instance-local cache. Outside Vercel, results are stored in `~/.cache/eth-decoder/simulations` unless `SIMULATION_CACHE_DIR` or `CACHE_DIR` overrides the path.
+
+Required Vercel Blob environment:
+
+- `BLOB_READ_WRITE_TOKEN`, or
+- `BLOB_STORE_ID` with `VERCEL_OIDC_TOKEN`
 
 ## Deploy to Vercel
 

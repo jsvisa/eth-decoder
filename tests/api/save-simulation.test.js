@@ -2,16 +2,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST } from "../../app/api/save-simulation/route.js";
 
 vi.mock("../../app/utils/simulationCache.js", () => ({
-  createShareableSimulationId: vi.fn(),
+  saveSimulationResult: vi.fn(),
   pruneExpiredResults: vi.fn(),
 }));
 
 import {
-  createShareableSimulationId,
+  saveSimulationResult,
   pruneExpiredResults,
 } from "../../app/utils/simulationCache.js";
 
-const FAKE_SIMULATION_ID = "z1_fake-share-token";
+const FAKE_SIMULATION_ID = "vb1_fake-share-token";
 const SIM_RESULT = {
   success: true,
   simulated: true,
@@ -24,7 +24,7 @@ function makeRequest(body) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  createShareableSimulationId.mockResolvedValue(FAKE_SIMULATION_ID);
+  saveSimulationResult.mockResolvedValue(FAKE_SIMULATION_ID);
   pruneExpiredResults.mockResolvedValue(0);
 });
 
@@ -47,11 +47,11 @@ describe("POST /api/save-simulation", () => {
     expect((await res.json()).error).toMatch(/json object/i);
   });
 
-  it("creates a shareable simulation id", async () => {
+  it("saves the simulation result and returns its id", async () => {
     const res = await POST(makeRequest(SIM_RESULT));
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ simulationId: FAKE_SIMULATION_ID });
-    expect(createShareableSimulationId).toHaveBeenCalledWith(SIM_RESULT);
+    expect(saveSimulationResult).toHaveBeenCalledWith(SIM_RESULT);
   });
 });
