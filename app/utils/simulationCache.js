@@ -52,6 +52,9 @@ export async function saveSimulationResult(data) {
 }
 
 export async function getSimulationResult(id) {
+  if (!/^[\w-]+$/.test(id)) {
+    return null;
+  }
   const cacheDir = getCacheDir();
   const path = resultPath(id, cacheDir);
   try {

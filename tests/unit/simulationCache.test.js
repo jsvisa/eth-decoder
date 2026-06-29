@@ -91,6 +91,13 @@ describe("simulationCache", () => {
     expect(result).toBeNull();
   });
 
+  it("rejects path traversal in ID", async () => {
+    const result = await withCacheDir(() =>
+      getSimulationResult("../../../etc/passwd"),
+    );
+    expect(result).toBeNull();
+  });
+
   it("returns null for corrupt cache file without throwing", async () => {
     await withCacheDir(async () => {
       await fs.mkdir(TEST_DIR, { recursive: true });
