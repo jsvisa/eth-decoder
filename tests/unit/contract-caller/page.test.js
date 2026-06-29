@@ -91,6 +91,7 @@ const callExecutionState = {
   error: null,
   setError: vi.fn(),
   loading: false,
+  setLoading: vi.fn(),
   simProgress: null,
   urlCopied: false,
   handleCall: vi.fn(),
@@ -332,14 +333,20 @@ describe("ContractCallerPage wiring", () => {
     eventLogsArgs = undefined;
     settingsState.setShowSettings.mockReset();
     settingsState.getChainId.mockClear();
+    callExecutionState.setResult.mockReset();
     callExecutionState.setError.mockReset();
+    callExecutionState.setLoading.mockReset();
     functionSelectionState.setSelectedFunction.mockReset();
     functionSelectionState.setArgs.mockReset();
     functionSelectionState.setPasteCalldataValue.mockReset();
     functionSelectionState.setPasteCalldataError.mockReset();
+    functionSelectionState.setEthValue.mockReset();
     functionSelectionState.applyPendingArgs.mockReset();
+    simulationOptionsState.setFromAddress.mockReset();
     abiHookState.getCachedAddresses.mockClear();
     abiHookState.setCachedAddressesState.mockClear();
+    vi.unstubAllGlobals();
+    window.history.pushState(null, "", "/");
   });
 
   it("passes live integration callbacks instead of stubs", () => {
@@ -401,6 +408,43 @@ describe("ContractCallerPage wiring", () => {
     expect(callExecutionState.setError).toHaveBeenLastCalledWith(
       "Fetch failed",
     );
+
+    unmount();
+  });
+
+  it("loads a shared simulation result from the simulationId URL param", async () => {
+    const sharedResult = {
+      success: true,
+      simulated: true,
+      requestBody: {
+        chainId: 1,
+        to: "0x99161BA892ECae335616624c84FAA418F64FF9A6",
+        from: "0xd719fc03782E9617e81D138a3e9B1875da4D6a03",
+        value: "0x0",
+      },
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => sharedResult,
+      }),
+    );
+    window.history.pushState(null, "", "/?simulationId=z1_share-token");
+
+    const { unmount } = renderPage();
+
+    await vi.waitFor(() => {
+      expect(callExecutionState.setResult).toHaveBeenCalledWith(sharedResult);
+    });
+    expect(fetch).toHaveBeenCalledWith("/api/simulate-result/z1_share-token");
+    expect(simulationOptionsState.setFromAddress).toHaveBeenCalledWith(
+      sharedResult.requestBody.from,
+    );
+    expect(functionSelectionState.setEthValue).toHaveBeenCalledWith(
+      sharedResult.requestBody.value,
+    );
+    expect(callExecutionState.setLoading).toHaveBeenLastCalledWith(false);
 
     unmount();
   });

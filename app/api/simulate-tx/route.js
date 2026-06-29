@@ -6,7 +6,7 @@ import { getAbiFromCache, setAbiInCache } from "../../utils/serverAbiCache";
 import { simulateWithTevm } from "../../utils/tevmSimulator";
 import { isValidEthAddress } from "../../utils/validation";
 import {
-  saveSimulationResult,
+  createShareableSimulationId,
   pruneExpiredResults,
 } from "../../utils/simulationCache";
 
@@ -198,7 +198,7 @@ export async function POST(request) {
     });
 
     const resultWithRequest = { ...result, requestBody };
-    const simulationId = await saveSimulationResult(resultWithRequest);
+    const simulationId = await createShareableSimulationId(resultWithRequest);
     return NextResponse.json({ ...result, simulationId, requestBody });
   } catch (error) {
     const errorResult = {
@@ -206,7 +206,7 @@ export async function POST(request) {
       error: error.message || "Simulation failed",
       requestBody,
     };
-    const simulationId = await saveSimulationResult(errorResult);
+    const simulationId = await createShareableSimulationId(errorResult);
     return NextResponse.json({ ...errorResult, simulationId }, { status: 500 });
   }
 }
