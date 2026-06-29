@@ -1,7 +1,7 @@
 import { homedir, tmpdir } from "os";
 import { join } from "path";
 
-function isVercelRuntime() {
+export function isVercelRuntime() {
   return process.env.VERCEL === "1" || process.env.VERCEL === "true";
 }
 

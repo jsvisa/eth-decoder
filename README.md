@@ -213,7 +213,12 @@ curl -X POST http://localhost:3000/api/simulate-tx \
 
 **ABI cache:** Fetched ABIs are cached at `~/.cache/eth-decoder/<chainId>/<address>.json` outside Vercel, or `/tmp/eth-decoder/<chainId>/<address>.json` on Vercel. Set `CACHE_DIR` to override the base directory. Delete a file to force a fresh fetch.
 
-**Simulation result caching:** Simulation results are stored as JSON files in `~/.cache/eth-decoder/simulations` (outside Vercel) or `/tmp/eth-decoder/simulations` (on Vercel). Each result gets a UUID-based filename. Set `SIMULATION_CACHE_DIR` to override this path; `CACHE_DIR` is used as a fallback base.
+**Shared simulation result storage:** Simulation result links use short result IDs. On Vercel, configure Vercel Blob so results are stored as private blobs and can be read across function instances and deployments. Without Blob credentials, Vercel falls back to `/tmp`, which is only a temporary instance-local cache. Outside Vercel, results are stored in `~/.cache/eth-decoder/simulations` unless `SIMULATION_CACHE_DIR` or `CACHE_DIR` overrides the path.
+
+Required Vercel Blob environment:
+
+- `BLOB_READ_WRITE_TOKEN`, or
+- `BLOB_STORE_ID` with `VERCEL_OIDC_TOKEN`
 
 ## Deploy to Vercel
 
