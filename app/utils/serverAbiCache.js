@@ -1,8 +1,6 @@
 import { promises as fs } from "fs";
 import { join } from "path";
-import { homedir } from "os";
-
-const DEFAULT_CACHE_DIR = join(homedir(), ".cache", "eth-decoder");
+import { getServerCacheBaseDir } from "./serverCacheDir";
 
 function cachePath(chainId, address, cacheDir) {
   return join(cacheDir, String(chainId), `${address.toLowerCase()}.json`);
@@ -11,7 +9,7 @@ function cachePath(chainId, address, cacheDir) {
 export async function getAbiFromCache(
   chainId,
   address,
-  cacheDir = DEFAULT_CACHE_DIR,
+  cacheDir = getServerCacheBaseDir(),
 ) {
   try {
     const raw = await fs.readFile(
@@ -28,7 +26,7 @@ export async function setAbiInCache(
   chainId,
   address,
   entry,
-  cacheDir = DEFAULT_CACHE_DIR,
+  cacheDir = getServerCacheBaseDir(),
 ) {
   try {
     const dir = join(cacheDir, String(chainId));

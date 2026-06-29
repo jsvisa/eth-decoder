@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { join } from "path";
 import { tmpdir } from "os";
 import { promises as fs } from "fs";
@@ -9,6 +9,14 @@ import {
 } from "../../app/utils/simulationCache.js";
 
 const TEST_DIR = join(tmpdir(), `simulationCache-test-${process.pid}`);
+const DEFAULT_CACHE_TEST_DIR = join(
+  tmpdir(),
+  `simulationCache-default-test-${process.pid}`,
+);
+const OVERRIDE_CACHE_TEST_DIR = join(
+  tmpdir(),
+  `simulationCache-env-test-${process.pid}`,
+);
 const SIM_DATA = {
   success: true,
   simulated: true,
@@ -30,9 +38,16 @@ async function withCacheDir(fn) {
 
 afterAll(async () => {
   await fs.rm(TEST_DIR, { recursive: true, force: true });
+  await fs.rm(DEFAULT_CACHE_TEST_DIR, { recursive: true, force: true });
+  await fs.rm(OVERRIDE_CACHE_TEST_DIR, { recursive: true, force: true });
 });
 
 describe("simulationCache", () => {
+  async function importWithEnv() {
+    vi.resetModules();
+    return import("../../app/utils/simulationCache.js");
+  }
+
   beforeEach(async () => {
     await fs.rm(TEST_DIR, { recursive: true, force: true });
   });
@@ -121,5 +136,83 @@ describe("simulationCache", () => {
       return pruneExpiredResults();
     });
     expect(count).toBe(0);
+  });
+
+  it("uses tmpdir by default", async () => {
+    const oldCacheDir = process.env.CACHE_DIR;
+    const oldSimulationCacheDir = process.env.SIMULATION_CACHE_DIR;
+    const oldHome = process.env.HOME;
+    const oldTmpdir = process.env.TMPDIR;
+    delete process.env.CACHE_DIR;
+    process.env.HOME = join(DEFAULT_CACHE_TEST_DIR, "home");
+    process.env.TMPDIR = join(DEFAULT_CACHE_TEST_DIR, "tmp");
+    delete process.env.SIMULATION_CACHE_DIR;
+    await fs.rm(DEFAULT_CACHE_TEST_DIR, { recursive: true, force: true });
+
+    try {
+      const cache = await importWithEnv();
+      const id = await cache.saveSimulationResult(SIM_DATA);
+
+      await expect(
+        fs.access(
+          join(
+            DEFAULT_CACHE_TEST_DIR,
+            "tmp",
+            "eth-decoder",
+            "simulations",
+            `${id}.json`,
+          ),
+        ),
+      ).resolves.toBeUndefined();
+      await expect(
+        fs.access(
+          join(
+            DEFAULT_CACHE_TEST_DIR,
+            "home",
+            ".cache",
+            "eth-decoder",
+            "simulations",
+            `${id}.json`,
+          ),
+        ),
+      ).rejects.toThrow();
+      await expect(cache.getSimulationResult(id)).resolves.toEqual(SIM_DATA);
+    } finally {
+      if (oldCacheDir) process.env.CACHE_DIR = oldCacheDir;
+      else delete process.env.CACHE_DIR;
+      if (oldSimulationCacheDir)
+        process.env.SIMULATION_CACHE_DIR = oldSimulationCacheDir;
+      else delete process.env.SIMULATION_CACHE_DIR;
+      if (oldHome) process.env.HOME = oldHome;
+      else delete process.env.HOME;
+      if (oldTmpdir) process.env.TMPDIR = oldTmpdir;
+      else delete process.env.TMPDIR;
+      vi.resetModules();
+    }
+  });
+
+  it("uses CACHE_DIR as the default base when provided", async () => {
+    const oldCacheDir = process.env.CACHE_DIR;
+    const oldSimulationCacheDir = process.env.SIMULATION_CACHE_DIR;
+    process.env.CACHE_DIR = OVERRIDE_CACHE_TEST_DIR;
+    delete process.env.SIMULATION_CACHE_DIR;
+    await fs.rm(OVERRIDE_CACHE_TEST_DIR, { recursive: true, force: true });
+
+    try {
+      const cache = await importWithEnv();
+      const id = await cache.saveSimulationResult(SIM_DATA);
+
+      await expect(
+        fs.access(join(OVERRIDE_CACHE_TEST_DIR, "simulations", `${id}.json`)),
+      ).resolves.toBeUndefined();
+      await expect(cache.getSimulationResult(id)).resolves.toEqual(SIM_DATA);
+    } finally {
+      if (oldCacheDir) process.env.CACHE_DIR = oldCacheDir;
+      else delete process.env.CACHE_DIR;
+      if (oldSimulationCacheDir)
+        process.env.SIMULATION_CACHE_DIR = oldSimulationCacheDir;
+      else delete process.env.SIMULATION_CACHE_DIR;
+      vi.resetModules();
+    }
   });
 });
