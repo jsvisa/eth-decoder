@@ -437,7 +437,10 @@ describe("ContractCallerPage wiring", () => {
     await vi.waitFor(() => {
       expect(callExecutionState.setResult).toHaveBeenCalledWith(sharedResult);
     });
-    expect(fetch).toHaveBeenCalledWith("/api/simulate-result/vb1_share-token");
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/simulate-result/vb1_share-token",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
     expect(simulationOptionsState.setFromAddress).toHaveBeenCalledWith(
       sharedResult.requestBody.from,
     );

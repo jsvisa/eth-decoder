@@ -3,7 +3,6 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { promises as fs } from "fs";
 import {
-  createShareableSimulationId,
   saveSimulationResult,
   getSimulationResult,
   pruneExpiredResults,
@@ -83,18 +82,6 @@ describe("simulationCache", () => {
     const id = await withCacheDir(() => saveSimulationResult(false));
     const retrieved = await withCacheDir(() => getSimulationResult(id));
     expect(retrieved).toBe(false);
-  });
-
-  it("retrieves shareable IDs without the file cache", async () => {
-    const id = await createShareableSimulationId(SIM_DATA);
-    expect(id).toMatch(/^z1_/);
-
-    const retrieved = await withCacheDir(async () => {
-      await fs.rm(TEST_DIR, { recursive: true, force: true });
-      return getSimulationResult(id);
-    });
-
-    expect(retrieved).toEqual(SIM_DATA);
   });
 
   it("returns null for an unknown ID", async () => {

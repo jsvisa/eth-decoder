@@ -331,36 +331,43 @@ export default function ContractCallerPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const querySimulationId = params.get("simulationId");
-    if (querySimulationId) {
-      exec.setLoading(true);
-      fetch(`/api/simulate-result/${encodeURIComponent(querySimulationId)}`)
-        .then((res) => {
-          if (!res.ok)
-            throw new Error("Simulation result not found or expired");
-          return res.json();
-        })
-        .then((data) => {
-          exec.setResult(data);
-          if (data.requestBody) {
-            const { chainId, to, from, value } = data.requestBody;
-            if (chainId) {
-              const builtInSlug = Object.keys(BUILT_IN_CHAIN_IDS).find(
-                (s) => BUILT_IN_CHAIN_IDS[s] === Number(chainId),
-              );
-              if (builtInSlug) setChain(builtInSlug);
-            }
-            if (to) setAddress(to);
-            if (from) simOpts.setFromAddress(from);
-            if (value) fn.setEthValue(value);
+    if (!querySimulationId) return;
+
+    const controller = new AbortController();
+    exec.setLoading(true);
+    fetch(`/api/simulate-result/${encodeURIComponent(querySimulationId)}`, {
+      signal: controller.signal,
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Simulation result not found or expired");
+        return res.json();
+      })
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        exec.setResult(data);
+        if (data.requestBody) {
+          const { chainId, to, from, value } = data.requestBody;
+          if (chainId) {
+            const builtInSlug = Object.keys(BUILT_IN_CHAIN_IDS).find(
+              (s) => BUILT_IN_CHAIN_IDS[s] === Number(chainId),
+            );
+            if (builtInSlug) setChain(builtInSlug);
           }
-        })
-        .catch((err) => {
-          exec.setError(err.message);
-        })
-        .finally(() => {
-          exec.setLoading(false);
-        });
-    }
+          if (to) setAddress(to);
+          if (from) simOpts.setFromAddress(from);
+          if (value) fn.setEthValue(value);
+        }
+      })
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        exec.setError(err.message);
+      })
+      .finally(() => {
+        if (controller.signal.aborted) return;
+        exec.setLoading(false);
+      });
+
+    return () => controller.abort();
   }, []);
 
   // Derive isWrite from selected function
