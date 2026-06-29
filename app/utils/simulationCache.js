@@ -1,17 +1,14 @@
 import { promises as fs } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { getServerCacheBaseDir } from "./serverCacheDir";
 
-const DEFAULT_CACHE_DIR = join(
-  homedir(),
-  ".cache",
-  "eth-decoder",
-  "simulations",
-);
 const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function getCacheDir() {
-  return process.env.SIMULATION_CACHE_DIR || DEFAULT_CACHE_DIR;
+  return (
+    process.env.SIMULATION_CACHE_DIR ||
+    join(getServerCacheBaseDir(), "simulations")
+  );
 }
 
 function getTTL() {
