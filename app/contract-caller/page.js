@@ -346,7 +346,15 @@ export default function ContractCallerPage() {
         if (controller.signal.aborted) return;
         exec.setResult(data);
         if (data.requestBody) {
-          const { chainId, to, from, value } = data.requestBody;
+          const {
+            chainId,
+            to,
+            from,
+            value,
+            functionName,
+            args,
+            data: calldata,
+          } = data.requestBody;
           if (chainId) {
             const builtInSlug = Object.keys(BUILT_IN_CHAIN_IDS).find(
               (s) => BUILT_IN_CHAIN_IDS[s] === Number(chainId),
@@ -356,6 +364,12 @@ export default function ContractCallerPage() {
           if (to) setAddress(to);
           if (from) simOpts.setFromAddress(from);
           if (value) fn.setEthValue(value);
+          if (functionName && args) {
+            fn.applyPendingArgs({ functionSig: functionName, args });
+          } else if (calldata) {
+            fn.setPasteCalldataValue(calldata);
+            fn.setPasteCalldataExpanded(true);
+          }
         }
       })
       .catch((err) => {

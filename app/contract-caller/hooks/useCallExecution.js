@@ -579,10 +579,22 @@ export function useCallExecution({
     if (!result) return;
     try {
       setSavingSimulation(true);
+      const chainIdVal = getChainId?.(chain);
+      const payload = {
+        ...result,
+        requestBody: {
+          chainId: chainIdVal,
+          to: address,
+          from: fromAddress || undefined,
+          value: ethValue || undefined,
+          functionName: selectedFunction,
+          args,
+        },
+      };
       const response = await fetch("/api/save-simulation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(result),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error("Failed to save simulation");
       const { simulationId: id } = await response.json();
