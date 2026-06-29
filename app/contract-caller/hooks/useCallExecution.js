@@ -119,6 +119,7 @@ export function useCallExecution({
   const [urlCopied, setUrlCopied] = useState(false);
 
   const simAbortRef = useRef(null);
+  const saveExtraRef = useRef(null);
 
   // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -580,8 +581,10 @@ export function useCallExecution({
     try {
       setSavingSimulation(true);
       const chainIdVal = getChainId?.(chain);
+      const extra = saveExtraRef.current;
       const payload = {
         ...result,
+        ...(extra ? { _tokenMeta: extra } : {}),
         requestBody: {
           chainId: chainIdVal,
           to: address,
@@ -655,6 +658,12 @@ export function useCallExecution({
     }
   };
 
+  // ── setSaveExtra: store extra metadata (e.g. token prices) to include when saving ──
+
+  const setSaveExtra = (data) => {
+    saveExtraRef.current = data;
+  };
+
   // ── return ─────────────────────────────────────────────────────────────────
 
   return {
@@ -688,5 +697,6 @@ export function useCallExecution({
     handleCopy,
     handleShareUrl,
     handleSaveSimulation,
+    setSaveExtra,
   };
 }

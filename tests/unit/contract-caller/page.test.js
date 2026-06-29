@@ -97,6 +97,7 @@ const callExecutionState = {
   handleCall: vi.fn(),
   handleCancel: vi.fn(),
   handleShareUrl: vi.fn(),
+  setSaveExtra: vi.fn(),
 };
 
 const historyState = {
@@ -178,6 +179,11 @@ const tokenMetadataState = {
   tokenSymbols: {},
   tokenDecimals: {},
   tokenPrices: {},
+  setTokenSymbols: vi.fn(),
+  setTokenDecimals: vi.fn(),
+  setTokenPrices: vi.fn(),
+  fetchTokenSymbolsForLogs: vi.fn(),
+  fetchTokenDataForSimulation: vi.fn(),
 };
 
 let abiHookArgs;

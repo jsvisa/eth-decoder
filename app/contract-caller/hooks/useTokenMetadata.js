@@ -252,6 +252,9 @@ export function useTokenMetadata(chain, rpcSettings = {}) {
     tokenSymbols,
     tokenDecimals,
     tokenPrices,
+    setTokenSymbols,
+    setTokenDecimals,
+    setTokenPrices,
     fetchTokenSymbolsForLogs,
     fetchTokenDataForSimulation,
   };

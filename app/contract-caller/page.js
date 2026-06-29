@@ -312,6 +312,15 @@ export default function ContractCallerPage() {
     );
   }, [exec.result, chain, getChainId]);
 
+  // Sync token metadata to saveExtra so it's included when saving simulation
+  useEffect(() => {
+    exec.setSaveExtra({
+      tokenSymbols: tokens.tokenSymbols,
+      tokenDecimals: tokens.tokenDecimals,
+      tokenPrices: tokens.tokenPrices,
+    });
+  }, [tokens.tokenSymbols, tokens.tokenDecimals, tokens.tokenPrices]);
+
   const events = useEventLogs({
     chain,
     address,
@@ -370,6 +379,16 @@ export default function ContractCallerPage() {
             fn.setPasteCalldataValue(calldata);
             fn.setPasteCalldataExpanded(true);
           }
+        }
+        if (data._tokenMeta) {
+          const {
+            tokenSymbols: sym,
+            tokenDecimals: dec,
+            tokenPrices: prices,
+          } = data._tokenMeta;
+          if (sym) tokens.setTokenSymbols(sym);
+          if (dec) tokens.setTokenDecimals(dec);
+          if (prices) tokens.setTokenPrices(prices);
         }
       })
       .catch((err) => {
