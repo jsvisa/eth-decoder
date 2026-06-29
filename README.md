@@ -47,13 +47,11 @@ A web application for decoding EVM transaction input data and interacting with s
 
 ## URL Parameters
 
-You can share decode results by using URL parameters:
+### Transaction Decoder
 
 ```
 https://your-domain.vercel.app/tx-decoder?data=0x1234abcd...&with_abi=true&with_sign=true
 ```
-
-Parameters:
 
 - `data` (required): Hex string to decode
 - `with_abi` (optional): Set to `true` to include the matched ABI in the response
@@ -62,6 +60,14 @@ Parameters:
 Multicall is detected automatically from the function selector — no parameter needed.
 
 The app will automatically populate the input and trigger decoding when these parameters are present.
+
+### Contract Caller
+
+```
+https://your-domain.vercel.app/?simulationId=<uuid>
+```
+
+- `simulationId` (required): UUID returned by `/api/simulate-tx` or generated when saving a simulation result via the Share URL button. Loads a previously-saved simulation result from the server-side cache (Vercel Blob in production, local filesystem in development), restores the network, contract address, from address, function + arguments, and token prices.
 
 ## Local Development
 
@@ -200,7 +206,7 @@ curl -X POST http://localhost:3000/api/simulate-tx \
   }'
 ```
 
-**Response:** Same JSON shape as the browser simulation result — `success`, `simulated`, `localSimulation`, `blockNumber`, `gasUsed`, `logs` (decoded), `callTrace` (decoded with inputs/outputs), `assetChanges`, `stateChanges`, `metrics`.
+**Response:** Same JSON shape as the browser simulation result — `success`, `simulated`, `localSimulation`, `blockNumber`, `gasUsed`, `logs` (decoded), `callTrace` (decoded with inputs/outputs), `assetChanges`, `stateChanges`, `metrics`, plus `simulationId` (UUID for retrieving the cached result later) and `requestBody` (the input parameters used for the simulation — `chainId`, `to`, `data`, `from`, `value`, `gas`, `blockNumber`, `functionName` — restored when loading via `?simulationId=`).
 
 **Error responses:**
 
