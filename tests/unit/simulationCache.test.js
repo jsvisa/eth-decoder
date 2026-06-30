@@ -9,10 +9,6 @@ import {
 } from "../../app/utils/simulationCache.js";
 
 const TEST_DIR = join(tmpdir(), `simulationCache-test-${process.pid}`);
-const DEFAULT_CACHE_TEST_DIR = join(
-  tmpdir(),
-  `simulationCache-default-test-${process.pid}`,
-);
 const OVERRIDE_CACHE_TEST_DIR = join(
   tmpdir(),
   `simulationCache-env-test-${process.pid}`,
@@ -24,6 +20,19 @@ const SIM_DATA = {
   logs: [],
   callTrace: null,
 };
+const ORIGINAL_ENV = {
+  VERCEL: process.env.VERCEL,
+  BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
+  BLOB_STORE_ID: process.env.BLOB_STORE_ID,
+  VERCEL_OIDC_TOKEN: process.env.VERCEL_OIDC_TOKEN,
+};
+
+function restoreEnv() {
+  for (const [key, value] of Object.entries(ORIGINAL_ENV)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+}
 
 async function withCacheDir(fn) {
   const old = process.env.SIMULATION_CACHE_DIR;
@@ -38,8 +47,8 @@ async function withCacheDir(fn) {
 
 afterAll(async () => {
   await fs.rm(TEST_DIR, { recursive: true, force: true });
-  await fs.rm(DEFAULT_CACHE_TEST_DIR, { recursive: true, force: true });
   await fs.rm(OVERRIDE_CACHE_TEST_DIR, { recursive: true, force: true });
+  restoreEnv();
 });
 
 describe("simulationCache", () => {
@@ -50,6 +59,10 @@ describe("simulationCache", () => {
 
   beforeEach(async () => {
     await fs.rm(TEST_DIR, { recursive: true, force: true });
+    delete process.env.VERCEL;
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+    delete process.env.BLOB_STORE_ID;
+    delete process.env.VERCEL_OIDC_TOKEN;
   });
 
   it("saves data and returns a UUID", async () => {
@@ -65,9 +78,22 @@ describe("simulationCache", () => {
     expect(retrieved).toEqual(SIM_DATA);
   });
 
+  it("retrieves falsy saved data values", async () => {
+    const id = await withCacheDir(() => saveSimulationResult(false));
+    const retrieved = await withCacheDir(() => getSimulationResult(id));
+    expect(retrieved).toBe(false);
+  });
+
   it("returns null for an unknown ID", async () => {
     const result = await withCacheDir(() =>
       getSimulationResult("00000000-0000-0000-0000-000000000000"),
+    );
+    expect(result).toBeNull();
+  });
+
+  it("rejects path traversal in ID", async () => {
+    const result = await withCacheDir(() =>
+      getSimulationResult("../../../etc/passwd"),
     );
     expect(result).toBeNull();
   });
@@ -136,59 +162,6 @@ describe("simulationCache", () => {
       return pruneExpiredResults();
     });
     expect(count).toBe(0);
-  });
-
-  it("uses tmpdir by default", async () => {
-    const oldCacheDir = process.env.CACHE_DIR;
-    const oldSimulationCacheDir = process.env.SIMULATION_CACHE_DIR;
-    const oldHome = process.env.HOME;
-    const oldTmpdir = process.env.TMPDIR;
-    delete process.env.CACHE_DIR;
-    process.env.HOME = join(DEFAULT_CACHE_TEST_DIR, "home");
-    process.env.TMPDIR = join(DEFAULT_CACHE_TEST_DIR, "tmp");
-    delete process.env.SIMULATION_CACHE_DIR;
-    await fs.rm(DEFAULT_CACHE_TEST_DIR, { recursive: true, force: true });
-
-    try {
-      const cache = await importWithEnv();
-      const id = await cache.saveSimulationResult(SIM_DATA);
-
-      await expect(
-        fs.access(
-          join(
-            DEFAULT_CACHE_TEST_DIR,
-            "tmp",
-            "eth-decoder",
-            "simulations",
-            `${id}.json`,
-          ),
-        ),
-      ).resolves.toBeUndefined();
-      await expect(
-        fs.access(
-          join(
-            DEFAULT_CACHE_TEST_DIR,
-            "home",
-            ".cache",
-            "eth-decoder",
-            "simulations",
-            `${id}.json`,
-          ),
-        ),
-      ).rejects.toThrow();
-      await expect(cache.getSimulationResult(id)).resolves.toEqual(SIM_DATA);
-    } finally {
-      if (oldCacheDir) process.env.CACHE_DIR = oldCacheDir;
-      else delete process.env.CACHE_DIR;
-      if (oldSimulationCacheDir)
-        process.env.SIMULATION_CACHE_DIR = oldSimulationCacheDir;
-      else delete process.env.SIMULATION_CACHE_DIR;
-      if (oldHome) process.env.HOME = oldHome;
-      else delete process.env.HOME;
-      if (oldTmpdir) process.env.TMPDIR = oldTmpdir;
-      else delete process.env.TMPDIR;
-      vi.resetModules();
-    }
   });
 
   it("uses CACHE_DIR as the default base when provided", async () => {

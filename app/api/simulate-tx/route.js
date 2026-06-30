@@ -177,6 +177,7 @@ export async function POST(request) {
     gas,
     blockNumber,
     rpcUrl,
+    functionName,
   };
 
   try {

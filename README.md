@@ -47,13 +47,11 @@ A web application for decoding EVM transaction input data and interacting with s
 
 ## URL Parameters
 
-You can share decode results by using URL parameters:
+### Transaction Decoder
 
 ```
 https://your-domain.vercel.app/tx-decoder?data=0x1234abcd...&with_abi=true&with_sign=true
 ```
-
-Parameters:
 
 - `data` (required): Hex string to decode
 - `with_abi` (optional): Set to `true` to include the matched ABI in the response
@@ -62,6 +60,14 @@ Parameters:
 Multicall is detected automatically from the function selector — no parameter needed.
 
 The app will automatically populate the input and trigger decoding when these parameters are present.
+
+### Contract Caller
+
+```
+https://your-domain.vercel.app/?simulationId=<uuid>
+```
+
+- `simulationId` (required): UUID returned by `/api/simulate-tx` or generated when saving a simulation result via the Share URL button. Loads a previously-saved simulation result from the server-side cache (Vercel Blob in production, local filesystem in development), restores the network, contract address, from address, function + arguments, and token prices.
 
 ## Local Development
 
@@ -170,7 +176,7 @@ GET /api/v1/fetch-abi?address=0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48&chain=e
 
 ### `POST /api/simulate-tx`
 
-Simulate a raw transaction against forked chain state and return decoded results. Fetches and caches the contract ABI server-side at `~/.cache/eth-decoder/<chainId>/<address>.json`.
+Simulate a raw transaction against forked chain state and return decoded results. Fetches and caches the contract ABI server-side at `~/.cache/eth-decoder/<chainId>/<address>.json` outside Vercel, or `/tmp/eth-decoder/<chainId>/<address>.json` on Vercel.
 
 **Request body:**
 
@@ -200,7 +206,7 @@ curl -X POST http://localhost:3000/api/simulate-tx \
   }'
 ```
 
-**Response:** Same JSON shape as the browser simulation result — `success`, `simulated`, `localSimulation`, `blockNumber`, `gasUsed`, `logs` (decoded), `callTrace` (decoded with inputs/outputs), `assetChanges`, `stateChanges`, `metrics`.
+**Response:** Same JSON shape as the browser simulation result — `success`, `simulated`, `localSimulation`, `blockNumber`, `gasUsed`, `logs` (decoded), `callTrace` (decoded with inputs/outputs), `assetChanges`, `stateChanges`, `metrics`, plus `simulationId` (UUID for retrieving the cached result later) and `requestBody` (the input parameters used for the simulation — `chainId`, `to`, `data`, `from`, `value`, `gas`, `blockNumber`, `functionName` — restored when loading via `?simulationId=`).
 
 **Error responses:**
 
@@ -211,7 +217,14 @@ curl -X POST http://localhost:3000/api/simulate-tx \
 | `200` (`success: false`) | EVM revert or execution error — `error` field is set                     |
 | `500`                    | Unexpected server error                                                  |
 
-**ABI cache:** Fetched ABIs are cached at `~/.cache/eth-decoder/<chainId>/<address>.json`. Delete a file to force a fresh fetch.
+**ABI cache:** Fetched ABIs are cached at `~/.cache/eth-decoder/<chainId>/<address>.json` outside Vercel, or `/tmp/eth-decoder/<chainId>/<address>.json` on Vercel. Set `CACHE_DIR` to override the base directory. Delete a file to force a fresh fetch.
+
+**Shared simulation result storage:** Simulation result links use short result IDs. On Vercel, configure Vercel Blob so results are stored as private blobs and can be read across function instances and deployments. Without Blob credentials, Vercel falls back to `/tmp`, which is only a temporary instance-local cache. Outside Vercel, results are stored in `~/.cache/eth-decoder/simulations` unless `SIMULATION_CACHE_DIR` or `CACHE_DIR` overrides the path.
+
+Required Vercel Blob environment:
+
+- `BLOB_READ_WRITE_TOKEN`, or
+- `BLOB_STORE_ID` with `VERCEL_OIDC_TOKEN`
 
 ## Deploy to Vercel
 

@@ -119,6 +119,7 @@ export function useCallExecution({
   const [urlCopied, setUrlCopied] = useState(false);
 
   const simAbortRef = useRef(null);
+  const saveExtraRef = useRef(null);
 
   // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -579,10 +580,24 @@ export function useCallExecution({
     if (!result) return;
     try {
       setSavingSimulation(true);
+      const chainIdVal = getChainId?.(chain);
+      const extra = saveExtraRef.current;
+      const payload = {
+        ...result,
+        ...(extra ? { _tokenMeta: extra } : {}),
+        requestBody: {
+          chainId: chainIdVal,
+          to: address,
+          from: fromAddress || undefined,
+          value: ethValue || undefined,
+          functionName: selectedFunction,
+          args,
+        },
+      };
       const response = await fetch("/api/save-simulation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(result),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error("Failed to save simulation");
       const { simulationId: id } = await response.json();
@@ -643,6 +658,12 @@ export function useCallExecution({
     }
   };
 
+  // ── setSaveExtra: store extra metadata (e.g. token prices) to include when saving ──
+
+  const setSaveExtra = (data) => {
+    saveExtraRef.current = data;
+  };
+
   // ── return ─────────────────────────────────────────────────────────────────
 
   return {
@@ -676,5 +697,6 @@ export function useCallExecution({
     handleCopy,
     handleShareUrl,
     handleSaveSimulation,
+    setSaveExtra,
   };
 }

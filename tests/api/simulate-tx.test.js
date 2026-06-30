@@ -316,7 +316,7 @@ describe("POST /api/simulate-tx — simulation", () => {
     expect(body.requestBody.to).toBe(VALID_BODY.to);
   });
 
-  it("caches the simulation result via saveSimulationResult", async () => {
+  it("saves the full result for shared lookup", async () => {
     await POST(makeRequest(VALID_BODY));
     expect(saveSimulationResult).toHaveBeenCalledOnce();
     const saved = saveSimulationResult.mock.calls[0][0];

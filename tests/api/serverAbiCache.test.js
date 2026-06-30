@@ -79,13 +79,15 @@ describe("serverAbiCache", () => {
     expect(stat.isDirectory()).toBe(true);
   });
 
-  it("uses tmpdir by default", async () => {
+  it("uses home cache by default outside Vercel", async () => {
     const oldCacheDir = process.env.CACHE_DIR;
     const oldHome = process.env.HOME;
     const oldTmpdir = process.env.TMPDIR;
+    const oldVercel = process.env.VERCEL;
     delete process.env.CACHE_DIR;
     process.env.HOME = join(DEFAULT_CACHE_TEST_DIR, "home");
     process.env.TMPDIR = join(DEFAULT_CACHE_TEST_DIR, "tmp");
+    delete process.env.VERCEL;
     await fs.rm(DEFAULT_CACHE_TEST_DIR, { recursive: true, force: true });
 
     try {
@@ -96,7 +98,8 @@ describe("serverAbiCache", () => {
         fs.access(
           join(
             DEFAULT_CACHE_TEST_DIR,
-            "tmp",
+            "home",
+            ".cache",
             "eth-decoder",
             "1",
             "0xdead.json",
@@ -107,7 +110,58 @@ describe("serverAbiCache", () => {
         fs.access(
           join(
             DEFAULT_CACHE_TEST_DIR,
-            "home",
+            "tmp",
+            "eth-decoder",
+            "1",
+            "0xdead.json",
+          ),
+        ),
+      ).rejects.toThrow();
+      await expect(cache.getAbiFromCache(1, "0xDEAD")).resolves.toEqual(ENTRY);
+    } finally {
+      if (oldCacheDir) process.env.CACHE_DIR = oldCacheDir;
+      else delete process.env.CACHE_DIR;
+      if (oldHome) process.env.HOME = oldHome;
+      else delete process.env.HOME;
+      if (oldTmpdir) process.env.TMPDIR = oldTmpdir;
+      else delete process.env.TMPDIR;
+      if (oldVercel) process.env.VERCEL = oldVercel;
+      else delete process.env.VERCEL;
+      vi.resetModules();
+    }
+  });
+
+  it("uses tmpdir on Vercel", async () => {
+    const oldCacheDir = process.env.CACHE_DIR;
+    const oldHome = process.env.HOME;
+    const oldTmpdir = process.env.TMPDIR;
+    const oldVercel = process.env.VERCEL;
+    delete process.env.CACHE_DIR;
+    process.env.HOME = join(DEFAULT_CACHE_TEST_DIR, "vercel-home");
+    process.env.TMPDIR = join(DEFAULT_CACHE_TEST_DIR, "vercel-tmp");
+    process.env.VERCEL = "1";
+    await fs.rm(DEFAULT_CACHE_TEST_DIR, { recursive: true, force: true });
+
+    try {
+      const cache = await importWithEnv();
+      await cache.setAbiInCache(1, "0xDEAD", ENTRY);
+
+      await expect(
+        fs.access(
+          join(
+            DEFAULT_CACHE_TEST_DIR,
+            "vercel-tmp",
+            "eth-decoder",
+            "1",
+            "0xdead.json",
+          ),
+        ),
+      ).resolves.toBeUndefined();
+      await expect(
+        fs.access(
+          join(
+            DEFAULT_CACHE_TEST_DIR,
+            "vercel-home",
             ".cache",
             "eth-decoder",
             "1",
@@ -123,6 +177,8 @@ describe("serverAbiCache", () => {
       else delete process.env.HOME;
       if (oldTmpdir) process.env.TMPDIR = oldTmpdir;
       else delete process.env.TMPDIR;
+      if (oldVercel) process.env.VERCEL = oldVercel;
+      else delete process.env.VERCEL;
       vi.resetModules();
     }
   });
