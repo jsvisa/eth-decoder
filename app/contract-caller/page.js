@@ -15,6 +15,10 @@ import { useHistory } from "./hooks/useHistory";
 import { useBookmarkModal } from "./hooks/useBookmarkModal";
 import { useAddChainModal } from "./hooks/useAddChainModal";
 import { useTokenMetadata } from "./hooks/useTokenMetadata";
+import {
+  NATIVE_TOKEN_SYMBOLS,
+  enrichBalanceChanges,
+} from "../utils/balanceChanges";
 
 import NetworkSelector from "./components/NetworkSelector";
 import ContractAddressInput from "./components/ContractAddressInput";
@@ -163,6 +167,11 @@ export default function ContractCallerPage() {
   const [address, setAddress] = useState("");
 
   const allChains = [...CHAINS, ...customChains];
+  const nativeTokenSymbol =
+    allChains.find((chainInfo) => chainInfo.id === chain)?.nativeCurrency
+      ?.symbol ||
+    NATIVE_TOKEN_SYMBOLS[chain] ||
+    "ETH";
 
   // Stable callback refs to break circular hook dependencies
   const saveBundleRef = useRef(null);
@@ -314,12 +323,30 @@ export default function ContractCallerPage() {
 
   // Sync token metadata to saveExtra so it's included when saving simulation
   useEffect(() => {
+    const balanceChanges = exec.result?.simulated
+      ? enrichBalanceChanges({
+          logs: exec.result.logs,
+          balanceChanges: exec.result.balanceChanges,
+          tokenSymbols: tokens.tokenSymbols,
+          tokenDecimals: tokens.tokenDecimals,
+          tokenPrices: tokens.tokenPrices,
+          nativeTokenSymbol,
+        })
+      : undefined;
+
     exec.setSaveExtra({
       tokenSymbols: tokens.tokenSymbols,
       tokenDecimals: tokens.tokenDecimals,
       tokenPrices: tokens.tokenPrices,
+      balanceChanges,
     });
-  }, [tokens.tokenSymbols, tokens.tokenDecimals, tokens.tokenPrices]);
+  }, [
+    exec.result,
+    nativeTokenSymbol,
+    tokens.tokenSymbols,
+    tokens.tokenDecimals,
+    tokens.tokenPrices,
+  ]);
 
   const events = useEventLogs({
     chain,

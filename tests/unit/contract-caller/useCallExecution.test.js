@@ -292,6 +292,74 @@ describe("useCallExecution – handleCopy", () => {
   });
 });
 
+describe("useCallExecution – handleShareUrl", () => {
+  it("stores enriched balanceChanges outside token metadata when saving a simulation", async () => {
+    const enrichedBalanceChanges = [
+      {
+        address: "0xb826224b742ead5cf91ea432340e3763fac09cdd",
+        tokenAddress: "0x0000000000000000000000000000000000000000",
+        symbol: "ETH",
+        name: "ETH",
+        decimals: 18,
+        rawAmount: "-1000000000000000000",
+        amount: "-1",
+        price: 2500,
+        valueUsd: -2500,
+        diff: "-1000000000000000000",
+      },
+    ];
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ simulationId: "vb1_saved" }),
+    });
+    const { result } = renderHook(() => useCallExecution(baseParams));
+
+    await act(async () => {
+      result.current.setResult({
+        success: true,
+        simulated: true,
+        balanceChanges: [
+          {
+            address: enrichedBalanceChanges[0].address,
+            before: "10000000000000000000",
+            after: "9000000000000000000",
+            diff: "-1000000000000000000",
+          },
+        ],
+      });
+      result.current.setSaveExtra({
+        tokenSymbols: {},
+        tokenDecimals: {},
+        tokenPrices: {},
+        balanceChanges: enrichedBalanceChanges,
+      });
+    });
+
+    await act(async () => {
+      await result.current.handleShareUrl();
+    });
+
+    const payload = JSON.parse(global.fetch.mock.calls[0][1].body);
+    expect(payload.balanceChanges).toEqual(enrichedBalanceChanges);
+    expect(payload.rawBalanceChanges).toEqual([
+      {
+        address: enrichedBalanceChanges[0].address,
+        before: "10000000000000000000",
+        after: "9000000000000000000",
+        diff: "-1000000000000000000",
+      },
+    ]);
+    expect(payload._tokenMeta).toEqual({
+      tokenSymbols: {},
+      tokenDecimals: {},
+      tokenPrices: {},
+    });
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      "http://localhost:3000/?simulationId=vb1_saved",
+    );
+  });
+});
+
 describe("useCallExecution – toggle state setters", () => {
   it("setIsYaml toggles isYaml", async () => {
     const { result } = renderHook(() => useCallExecution(baseParams));
