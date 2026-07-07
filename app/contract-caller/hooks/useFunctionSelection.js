@@ -69,7 +69,19 @@ export function useFunctionSelection({
     if (pendingHistoryRef.current !== null) {
       const pending = pendingHistoryRef.current;
       const pendingArgs = pending.args || [];
+      const pendingCalldata =
+        typeof pending.calldata === "string" ? pending.calldata.trim() : "";
+      const pendingFuncFromCalldata =
+        pendingCalldata.startsWith("0x") && pendingCalldata.length >= 10
+          ? parsedAbi.find(
+              (item) =>
+                item.type === "function" &&
+                getFunctionSelector(item) ===
+                  pendingCalldata.slice(0, 10).toLowerCase(),
+            )
+          : null;
       const pendingFunc =
+        pendingFuncFromCalldata ||
         func ||
         parsedAbi.find(
           (item) =>
@@ -83,6 +95,26 @@ export function useFunctionSelection({
         if (selectedFunction !== resolvedSig) {
           setSelectedFunction(resolvedSig);
           return;
+        }
+
+        if (pendingCalldata) {
+          try {
+            const { args: decoded } = decodeFunctionData({
+              abi: [pendingFunc],
+              data: pendingCalldata,
+            });
+            const decodedArgs = pendingFunc.inputs.map((input, i) =>
+              viemDecodedToArgValue(decoded?.[i], input),
+            );
+            pendingHistoryRef.current = null;
+            setPasteCalldataValue(pendingCalldata);
+            setPasteCalldataError(null);
+            setArgs(decodedArgs);
+            return;
+          } catch {
+            pendingHistoryRef.current = null;
+            setPasteCalldataError("Invalid calldata");
+          }
         }
 
         const expectedInputs = pendingFunc.inputs?.length || 0;
@@ -214,13 +246,18 @@ export function useFunctionSelection({
 
   // --- Callback: apply pending args from external source (e.g. history navigation) ---
   const applyPendingArgs = useCallback(
-    ({ functionSig, args: pendingArgs, timestamp } = {}) => {
+    ({ functionSig, args: pendingArgs, calldata, timestamp } = {}) => {
       if (!functionSig) return;
       pendingHistoryRef.current = {
         functionSig,
         args: pendingArgs || [],
+        calldata,
         timestamp: timestamp || Date.now(),
       };
+      if (typeof calldata === "string" && calldata.trim()) {
+        setPasteCalldataValue(calldata.trim());
+        setPasteCalldataExpanded(true);
+      }
       setSelectedFunction(functionSig);
     },
     [],
