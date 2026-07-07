@@ -19,7 +19,10 @@ const SIM_RESULT = {
 };
 
 function makeRequest(body) {
-  return { json: async () => body };
+  return {
+    url: "https://eth-decoder.vercel.app/api/save-simulation",
+    json: async () => body,
+  };
 }
 
 beforeEach(() => {
@@ -51,7 +54,10 @@ describe("POST /api/save-simulation", () => {
     const res = await POST(makeRequest(SIM_RESULT));
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ simulationId: FAKE_SIMULATION_ID });
+    expect(await res.json()).toEqual({
+      simulationId: FAKE_SIMULATION_ID,
+      simulationLink: `https://eth-decoder.vercel.app/?simulationId=${FAKE_SIMULATION_ID}`,
+    });
     expect(saveSimulationResult).toHaveBeenCalledWith(SIM_RESULT);
   });
 });

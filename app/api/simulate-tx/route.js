@@ -9,6 +9,7 @@ import {
   saveSimulationResult,
   pruneExpiredResults,
 } from "../../utils/simulationCache";
+import { buildSimulationLink } from "../../utils/simulationLinks";
 
 function buildChainConfig(numericChainId, rpcUrl) {
   return {
@@ -200,7 +201,12 @@ export async function POST(request) {
 
     const resultWithRequest = { ...result, requestBody };
     const simulationId = await saveSimulationResult(resultWithRequest);
-    return NextResponse.json({ ...result, simulationId, requestBody });
+    return NextResponse.json({
+      ...result,
+      simulationId,
+      simulationLink: buildSimulationLink(request, simulationId),
+      requestBody,
+    });
   } catch (error) {
     const errorResult = {
       success: false,
@@ -208,6 +214,13 @@ export async function POST(request) {
       requestBody,
     };
     const simulationId = await saveSimulationResult(errorResult);
-    return NextResponse.json({ ...errorResult, simulationId }, { status: 500 });
+    return NextResponse.json(
+      {
+        ...errorResult,
+        simulationId,
+        simulationLink: buildSimulationLink(request, simulationId),
+      },
+      { status: 500 },
+    );
   }
 }
