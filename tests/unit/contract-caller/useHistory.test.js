@@ -104,6 +104,18 @@ describe("initial state", () => {
       timestamp: expect.any(Number),
     });
   });
+
+  it("preserves simulationId share URLs during state sync", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/contract-caller?simulationId=vb1_share-token",
+    );
+
+    renderHook(() => useHistory(makeParams()));
+
+    expect(window.location.search).toBe("?simulationId=vb1_share-token");
+  });
 });
 
 // ── saveToHistory (happy path) ─────────────────────────────────────────────

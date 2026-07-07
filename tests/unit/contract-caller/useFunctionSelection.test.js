@@ -393,4 +393,34 @@ describe("useFunctionSelection — applyPendingArgs", () => {
       "7",
     ]);
   });
+
+  it("decodes pending calldata into function args", async () => {
+    const { encodeFunctionData } = await import("viem");
+    const calldata = encodeFunctionData({
+      abi: TRANSFER_ABI,
+      functionName: "transfer",
+      args: ["0x0000000000000000000000000000000000000005", 900n],
+    });
+
+    const { result } = renderHook(() =>
+      useFunctionSelection({
+        parsedAbi: TRANSFER_ABI,
+        functions: TRANSFER_ABI,
+        address: "0xabc",
+      }),
+    );
+
+    act(() => {
+      result.current.applyPendingArgs({
+        functionSig: "transfer",
+        calldata,
+      });
+    });
+
+    expect(result.current.selectedFunction).toBe("transfer(address,uint256)");
+    expect(result.current.args).toEqual([
+      "0x0000000000000000000000000000000000000005",
+      "900",
+    ]);
+  });
 });

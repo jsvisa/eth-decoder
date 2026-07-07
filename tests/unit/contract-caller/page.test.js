@@ -453,6 +453,8 @@ describe("ContractCallerPage wiring", () => {
         to: "0x99161BA892ECae335616624c84FAA418F64FF9A6",
         from: "0xd719fc03782E9617e81D138a3e9B1875da4D6a03",
         value: "0x0",
+        functionName: "unlockAsset",
+        data: "0x12345678",
       },
     };
     vi.stubGlobal(
@@ -488,6 +490,11 @@ describe("ContractCallerPage wiring", () => {
     expect(tokenMetadataState.setTokenPrices).toHaveBeenCalledWith(
       sharedResult._tokenMeta.tokenPrices,
     );
+    expect(functionSelectionState.applyPendingArgs).toHaveBeenCalledWith({
+      functionSig: sharedResult.requestBody.functionName,
+      calldata: sharedResult.requestBody.data,
+      timestamp: expect.any(Number),
+    });
     expect(callExecutionState.setLoading).toHaveBeenLastCalledWith(false);
 
     unmount();

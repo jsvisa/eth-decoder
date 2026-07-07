@@ -400,8 +400,13 @@ export default function ContractCallerPage() {
           if (to) setAddress(to);
           if (from) simOpts.setFromAddress(from);
           if (value) fn.setEthValue(value);
-          if (functionName && args) {
-            fn.applyPendingArgs({ functionSig: functionName, args });
+          if (functionName && (args || calldata)) {
+            fn.applyPendingArgs({
+              functionSig: functionName,
+              ...(args ? { args } : {}),
+              ...(calldata ? { calldata } : {}),
+              timestamp: Date.now(),
+            });
           } else if (calldata) {
             fn.setPasteCalldataValue(calldata);
             fn.setPasteCalldataExpanded(true);
