@@ -440,6 +440,14 @@ describe("ContractCallerPage wiring", () => {
     const sharedResult = {
       success: true,
       simulated: true,
+      _tokenMeta: {
+        tokenSymbols: { [TOKEN_ADDRESS]: "USDC" },
+        tokenDecimals: { [TOKEN_ADDRESS]: 6 },
+        tokenPrices: {
+          [NATIVE_TOKEN_ADDRESS]: 2500,
+          [TOKEN_ADDRESS]: 1,
+        },
+      },
       requestBody: {
         chainId: 1,
         to: "0x99161BA892ECae335616624c84FAA418F64FF9A6",
@@ -470,6 +478,15 @@ describe("ContractCallerPage wiring", () => {
     );
     expect(functionSelectionState.setEthValue).toHaveBeenCalledWith(
       sharedResult.requestBody.value,
+    );
+    expect(tokenMetadataState.setTokenSymbols).toHaveBeenCalledWith(
+      sharedResult._tokenMeta.tokenSymbols,
+    );
+    expect(tokenMetadataState.setTokenDecimals).toHaveBeenCalledWith(
+      sharedResult._tokenMeta.tokenDecimals,
+    );
+    expect(tokenMetadataState.setTokenPrices).toHaveBeenCalledWith(
+      sharedResult._tokenMeta.tokenPrices,
     );
     expect(callExecutionState.setLoading).toHaveBeenLastCalledWith(false);
 

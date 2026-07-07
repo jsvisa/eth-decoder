@@ -318,7 +318,14 @@ describe("useCallExecution – handleShareUrl", () => {
       result.current.setResult({
         success: true,
         simulated: true,
-        balanceChanges: [{ address: enrichedBalanceChanges[0].address }],
+        balanceChanges: [
+          {
+            address: enrichedBalanceChanges[0].address,
+            before: "10000000000000000000",
+            after: "9000000000000000000",
+            diff: "-1000000000000000000",
+          },
+        ],
       });
       result.current.setSaveExtra({
         tokenSymbols: {},
@@ -334,6 +341,14 @@ describe("useCallExecution – handleShareUrl", () => {
 
     const payload = JSON.parse(global.fetch.mock.calls[0][1].body);
     expect(payload.balanceChanges).toEqual(enrichedBalanceChanges);
+    expect(payload.rawBalanceChanges).toEqual([
+      {
+        address: enrichedBalanceChanges[0].address,
+        before: "10000000000000000000",
+        after: "9000000000000000000",
+        diff: "-1000000000000000000",
+      },
+    ]);
     expect(payload._tokenMeta).toEqual({
       tokenSymbols: {},
       tokenDecimals: {},

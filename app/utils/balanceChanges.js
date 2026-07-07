@@ -4,12 +4,55 @@ import { buildTokenAccountMap } from "./tokenTransfers";
 export const NATIVE_TOKEN_ADDRESS =
   "0x0000000000000000000000000000000000000000";
 
+export const NATIVE_TOKEN_SYMBOLS = {
+  ethereum: "ETH",
+  arbitrum: "ETH",
+  base: "ETH",
+  polygon: "MATIC",
+  bsc: "BNB",
+};
+
 function parseBigInt(value) {
   try {
     return BigInt(String(value));
   } catch {
     return null;
   }
+}
+
+function normalizeDecimals(value) {
+  const decimals = Number(value);
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 255) return 18;
+  return decimals;
+}
+
+function normalizePrice(value) {
+  if (value == null) return null;
+  const price = Number(value);
+  return Number.isFinite(price) && price >= 0 ? price : null;
+}
+
+function normalizeSymbol(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function decimalAmountNumber(rawAmount, decimals) {
+  const sign = rawAmount < 0n ? -1 : 1;
+  const absValue = rawAmount < 0n ? -rawAmount : rawAmount;
+  const digits = absValue.toString();
+
+  if (decimals === 0) {
+    const integerValue = Number(digits);
+    return Number.isFinite(integerValue) ? sign * integerValue : null;
+  }
+
+  const padded = digits.padStart(decimals + 1, "0");
+  const whole = padded.slice(0, -decimals) || "0";
+  const fraction = padded.slice(-decimals).replace(/0+$/, "");
+  const decimalValue = Number(
+    fraction ? `${whole}.${fraction.slice(0, 18)}` : whole,
+  );
+  return Number.isFinite(decimalValue) ? sign * decimalValue : null;
 }
 
 function signedAmount(rawAmount, decimals) {
@@ -19,46 +62,61 @@ function signedAmount(rawAmount, decimals) {
 }
 
 function usdValue(rawAmount, decimals, price) {
-  if (price == null) return null;
-  return (Number(rawAmount) / 10 ** decimals) * price;
+  const normalizedPrice = normalizePrice(price);
+  if (normalizedPrice === null) return null;
+  const tokenAmount = decimalAmountNumber(rawAmount, decimals);
+  return tokenAmount === null ? null : tokenAmount * normalizedPrice;
 }
 
 function tokenName(tokenAddress, symbol) {
-  if (tokenAddress === NATIVE_TOKEN_ADDRESS) return "ETH";
+  if (tokenAddress === NATIVE_TOKEN_ADDRESS) return symbol;
   return symbol || `${tokenAddress.slice(0, 6)}…`;
 }
 
-function enrichNativeChange(change, rawAmount, price) {
+function changeKey(address, tokenAddress) {
+  return `${address}:${tokenAddress}`;
+}
+
+function enrichNativeChange(change, rawAmount, options) {
   const amount = signedAmount(rawAmount, 18);
   if (amount === null) return null;
+  const symbol = normalizeSymbol(options.nativeTokenSymbol) || "ETH";
+  const price = normalizePrice(options.tokenPrices[NATIVE_TOKEN_ADDRESS]);
   return {
     ...change,
     address: change.address?.toLowerCase(),
     tokenAddress: NATIVE_TOKEN_ADDRESS,
-    symbol: "ETH",
-    name: "ETH",
+    symbol,
+    name: symbol,
     decimals: 18,
     rawAmount: rawAmount.toString(),
     amount,
-    price: price ?? null,
+    price,
     valueUsd: usdValue(rawAmount, 18, price),
     diff: rawAmount.toString(),
   };
 }
 
 function enrichTokenChange(address, tokenAddress, rawAmount, options) {
-  const decimals =
+  const storedChange =
+    options.storedTokenChanges[changeKey(address, tokenAddress)];
+  const decimals = normalizeDecimals(
     options.tokenDecimals[tokenAddress] ??
-    options.resolveTokenDecimals(tokenAddress) ??
-    18;
+      storedChange?.decimals ??
+      options.resolveTokenDecimals(tokenAddress) ??
+      18,
+  );
   const amount = signedAmount(rawAmount, decimals);
   if (amount === null) return null;
-  const symbol =
+  const symbol = normalizeSymbol(
     options.tokenSymbols[tokenAddress] ||
-    options.resolveTokenSymbol(tokenAddress) ||
-    null;
-  const price = options.tokenPrices[tokenAddress];
+      storedChange?.symbol ||
+      storedChange?.name ||
+      options.resolveTokenSymbol(tokenAddress),
+  );
+  const price = options.tokenPrices[tokenAddress] ?? storedChange?.price;
   return {
+    ...storedChange,
     address,
     tokenAddress,
     symbol: tokenName(tokenAddress, symbol),
@@ -66,7 +124,7 @@ function enrichTokenChange(address, tokenAddress, rawAmount, options) {
     decimals,
     rawAmount: rawAmount.toString(),
     amount,
-    price: price ?? null,
+    price: normalizePrice(price),
     valueUsd: usdValue(rawAmount, decimals, price),
     diff: rawAmount.toString(),
   };
@@ -77,7 +135,7 @@ function isNativeChange(change) {
   return !tokenAddress || tokenAddress === NATIVE_TOKEN_ADDRESS;
 }
 
-function addStoredTokenChange(accountMap, change) {
+function addStoredTokenChange(accountMap, storedTokenChanges, change) {
   const address = change.address?.toLowerCase();
   const tokenAddress = change.tokenAddress?.toLowerCase();
   if (!address || !tokenAddress || tokenAddress === NATIVE_TOKEN_ADDRESS) {
@@ -88,6 +146,7 @@ function addStoredTokenChange(accountMap, change) {
   if (!accountMap[address]) accountMap[address] = { native: null, tokens: {} };
   if (accountMap[address].tokens[tokenAddress] == null) {
     accountMap[address].tokens[tokenAddress] = rawAmount;
+    storedTokenChanges[changeKey(address, tokenAddress)] = change;
   }
 }
 
@@ -99,16 +158,18 @@ export function enrichBalanceChanges({
   tokenPrices = {},
   resolveTokenSymbol = () => null,
   resolveTokenDecimals = () => null,
+  nativeTokenSymbol = "ETH",
 }) {
-  const accountMap = buildTokenAccountMap(logs);
+  const accountMap = buildTokenAccountMap(Array.isArray(logs) ? logs : []);
   const nativeChanges = {};
+  const storedTokenChanges = {};
 
-  for (const change of balanceChanges ?? []) {
+  for (const change of Array.isArray(balanceChanges) ? balanceChanges : []) {
     const address = change.address?.toLowerCase();
     if (!address) continue;
 
     if (!isNativeChange(change)) {
-      addStoredTokenChange(accountMap, change);
+      addStoredTokenChange(accountMap, storedTokenChanges, change);
       continue;
     }
 
@@ -126,6 +187,8 @@ export function enrichBalanceChanges({
     tokenPrices,
     resolveTokenSymbol,
     resolveTokenDecimals,
+    nativeTokenSymbol,
+    storedTokenChanges,
   };
   const rows = [];
   for (const [address, data] of Object.entries(accountMap)) {
@@ -133,7 +196,7 @@ export function enrichBalanceChanges({
       const nativeRow = enrichNativeChange(
         nativeChanges[address] ?? { address },
         data.native,
-        tokenPrices[NATIVE_TOKEN_ADDRESS],
+        options,
       );
       if (nativeRow) rows.push(nativeRow);
     }

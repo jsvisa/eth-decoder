@@ -80,4 +80,94 @@ describe("enrichBalanceChanges", () => {
       },
     ]);
   });
+
+  it("uses the selected chain native token symbol", () => {
+    const rows = enrichBalanceChanges({
+      balanceChanges: [
+        {
+          address: FROM,
+          diff: "-1000000000000000000",
+        },
+      ],
+      nativeTokenSymbol: "MATIC",
+    });
+
+    expect(rows).toEqual([
+      expect.objectContaining({
+        address: FROM,
+        tokenAddress: NATIVE_TOKEN_ADDRESS,
+        symbol: "MATIC",
+        name: "MATIC",
+        amount: "-1",
+      }),
+    ]);
+  });
+
+  it("normalizes malformed metadata without throwing", () => {
+    const rows = enrichBalanceChanges({
+      logs: [
+        {
+          address: TOKEN,
+          topics: [TRANSFER_TOPIC, padAddress(FROM), padAddress(TO)],
+          data: encodeUint256("1000000000"),
+        },
+      ],
+      balanceChanges: "not-an-array",
+      tokenSymbols: { [TOKEN]: 123 },
+      tokenDecimals: { [TOKEN]: "bad-decimals" },
+      tokenPrices: { [TOKEN]: "bad-price" },
+    });
+
+    expect(rows).toEqual([
+      expect.objectContaining({
+        address: FROM,
+        tokenAddress: TOKEN,
+        symbol: "0xa0b8…",
+        name: "0xa0b8…",
+        decimals: 18,
+        price: null,
+        valueUsd: null,
+      }),
+      expect.objectContaining({
+        address: TO,
+        tokenAddress: TOKEN,
+        symbol: "0xa0b8…",
+        name: "0xa0b8…",
+        decimals: 18,
+        price: null,
+        valueUsd: null,
+      }),
+    ]);
+  });
+
+  it("preserves metadata from stored enriched token rows without side metadata", () => {
+    const rows = enrichBalanceChanges({
+      balanceChanges: [
+        {
+          address: FROM,
+          tokenAddress: TOKEN,
+          symbol: "USDC",
+          name: "USDC",
+          decimals: 6,
+          rawAmount: "-1000000000",
+          price: 1,
+          valueUsd: -1000,
+        },
+      ],
+    });
+
+    expect(rows).toEqual([
+      expect.objectContaining({
+        address: FROM,
+        tokenAddress: TOKEN,
+        symbol: "USDC",
+        name: "USDC",
+        decimals: 6,
+        amount: "-1,000",
+        price: 1,
+        valueUsd: -1000,
+        diff: "-1000000000",
+      }),
+    ]);
+  });
 });

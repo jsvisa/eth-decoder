@@ -585,6 +585,9 @@ export function useCallExecution({
       const { balanceChanges, ...tokenMeta } = extra ?? {};
       const payload = {
         ...result,
+        ...(Array.isArray(balanceChanges)
+          ? { rawBalanceChanges: result.balanceChanges }
+          : {}),
         ...(Array.isArray(balanceChanges) ? { balanceChanges } : {}),
         ...(extra ? { _tokenMeta: tokenMeta } : {}),
         requestBody: {

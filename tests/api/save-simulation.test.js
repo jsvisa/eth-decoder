@@ -16,6 +16,24 @@ const SIM_RESULT = {
   success: true,
   simulated: true,
   gasUsed: 63086,
+  balanceChanges: [
+    {
+      address: "0xb826224b742ead5cf91ea432340e3763fac09cdd",
+      tokenAddress: "0x0000000000000000000000000000000000000000",
+      name: "ETH",
+      amount: "-1",
+      price: 2500,
+      valueUsd: -2500,
+      diff: "-1000000000000000000",
+    },
+  ],
+  _tokenMeta: {
+    tokenSymbols: {},
+    tokenDecimals: {},
+    tokenPrices: {
+      "0x0000000000000000000000000000000000000000": 2500,
+    },
+  },
 };
 
 function makeRequest(body) {

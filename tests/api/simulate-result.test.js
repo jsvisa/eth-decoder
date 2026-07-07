@@ -11,6 +11,28 @@ const MOCK_RESULT = {
   success: true,
   simulated: true,
   gasUsed: 63086,
+  balanceChanges: [
+    {
+      address: "0xb826224b742ead5cf91ea432340e3763fac09cdd",
+      tokenAddress: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      name: "USDC",
+      amount: "-1,000",
+      price: 1,
+      valueUsd: -1000,
+      diff: "-1000000000",
+    },
+  ],
+  _tokenMeta: {
+    tokenSymbols: {
+      "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": "USDC",
+    },
+    tokenDecimals: {
+      "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": 6,
+    },
+    tokenPrices: {
+      "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": 1,
+    },
+  },
 };
 
 describe("GET /api/simulate-result/:id", () => {

@@ -5,6 +5,7 @@ import yaml from "js-yaml";
 import { formatTokenAmount } from "../../utils/tokenFormatting";
 import {
   NATIVE_TOKEN_ADDRESS,
+  NATIVE_TOKEN_SYMBOLS,
   enrichBalanceChanges,
 } from "../../utils/balanceChanges";
 import { CHAINS } from "../../utils/chains";
@@ -81,6 +82,24 @@ function getCachedTokenDecimals(chain, address) {
   }
 }
 
+function parseBigIntOrNull(value) {
+  try {
+    return BigInt(String(value));
+  } catch {
+    return null;
+  }
+}
+
+function formatNativeWhole(value) {
+  const parsed = parseBigIntOrNull(value);
+  return parsed === null ? "?" : (parsed / BigInt(10 ** 18)).toString();
+}
+
+function isNonNegativeBigInt(value) {
+  const parsed = parseBigIntOrNull(value);
+  return parsed !== null && parsed >= 0n;
+}
+
 function getCustomChains() {
   try {
     const raw = localStorage.getItem("custom_chains");
@@ -100,6 +119,15 @@ function buildExplorerAddressUrl(chain, address) {
   const explorer = chainInfo?.explorers?.[0];
   if (explorer?.url) return `${explorer.url}/address/${address}`;
   return null;
+}
+
+function getNativeTokenSymbol(chain) {
+  const customChain = getCustomChains().find(
+    (chainInfo) => chainInfo.id === chain,
+  );
+  return (
+    customChain?.nativeCurrency?.symbol || NATIVE_TOKEN_SYMBOLS[chain] || "ETH"
+  );
 }
 
 function getFunctionBaseName(functionName) {
@@ -391,17 +419,18 @@ export default function ResultPanel({
     tokenSymbols[addr] || getCachedTokenSymbol(chain, addr);
   const getLogTokenDecimals = (addr) =>
     tokenDecimals[addr] ?? getCachedTokenDecimals(chain, addr);
-  const legacyNativeBalanceChanges = (result?.balanceChanges ?? []).filter(
-    (change) => {
-      const tokenAddress = change.tokenAddress?.toLowerCase();
-      return (
-        change.before != null &&
-        change.after != null &&
-        change.diff != null &&
-        (!tokenAddress || tokenAddress === NATIVE_TOKEN_ADDRESS)
-      );
-    },
-  );
+  const nativeTokenSymbol = getNativeTokenSymbol(chain);
+  const legacyNativeBalanceChanges = (
+    Array.isArray(result?.balanceChanges) ? result.balanceChanges : []
+  ).filter((change) => {
+    const tokenAddress = change.tokenAddress?.toLowerCase();
+    return (
+      change.before != null &&
+      change.after != null &&
+      change.diff != null &&
+      (!tokenAddress || tokenAddress === NATIVE_TOKEN_ADDRESS)
+    );
+  });
 
   // Build display content (syntax-highlighted JSON or YAML)
   const getDisplayContent = () => {
@@ -709,31 +738,19 @@ export default function ResultPanel({
                       </div>
                       <div className={styles.balanceValues}>
                         <span className={styles.balanceBefore}>
-                          {change.before != null
-                            ? (
-                                BigInt(change.before) / BigInt(10 ** 18)
-                              ).toString()
-                            : "?"}{" "}
-                          ETH
+                          {formatNativeWhole(change.before)} {nativeTokenSymbol}
                         </span>
                         <span className={styles.balanceArrow}>→</span>
                         <span className={styles.balanceAfter}>
-                          {change.after != null
-                            ? (
-                                BigInt(change.after) / BigInt(10 ** 18)
-                              ).toString()
-                            : "?"}{" "}
-                          ETH
+                          {formatNativeWhole(change.after)} {nativeTokenSymbol}
                         </span>
-                        {change.diff != null && (
+                        {parseBigIntOrNull(change.diff) !== null && (
                           <span
-                            className={`${styles.balanceDiff} ${BigInt(change.diff) >= 0n ? styles.balanceDiffPositive : styles.balanceDiffNegative}`}
+                            className={`${styles.balanceDiff} ${isNonNegativeBigInt(change.diff) ? styles.balanceDiffPositive : styles.balanceDiffNegative}`}
                           >
-                            ({BigInt(change.diff) >= 0n ? "+" : ""}
-                            {(
-                              BigInt(change.diff) / BigInt(10 ** 18)
-                            ).toString()}{" "}
-                            ETH)
+                            ({isNonNegativeBigInt(change.diff) ? "+" : ""}
+                            {formatNativeWhole(change.diff)} {nativeTokenSymbol}
+                            )
                           </span>
                         )}
                       </div>
@@ -751,6 +768,7 @@ export default function ResultPanel({
                     tokenSymbols,
                     tokenDecimals,
                     tokenPrices,
+                    nativeTokenSymbol,
                     resolveTokenSymbol: (tokenAddr) =>
                       getCachedTokenSymbol(chain, tokenAddr),
                     resolveTokenDecimals: (tokenAddr) =>
