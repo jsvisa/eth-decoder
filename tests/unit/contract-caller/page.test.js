@@ -186,6 +186,17 @@ const tokenMetadataState = {
   fetchTokenDataForSimulation: vi.fn(),
 };
 
+const TRANSFER_TOPIC =
+  "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+const NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000";
+const TOKEN_ADDRESS = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
+const FROM_ADDRESS = "0xb826224b742ead5cf91ea432340e3763fac09cdd";
+const TO_ADDRESS = "0xdeadbeef00000000000000000000000000000001";
+
+const padAddress = (address) => `0x${address.slice(2).padStart(64, "0")}`;
+const encodeUint256 = (value) =>
+  `0x${BigInt(value).toString(16).padStart(64, "0")}`;
+
 let abiHookArgs;
 let callExecutionArgs;
 let historyHookArgs;
@@ -337,6 +348,10 @@ describe("ContractCallerPage wiring", () => {
     callExecutionArgs = undefined;
     historyHookArgs = undefined;
     eventLogsArgs = undefined;
+    callExecutionState.result = null;
+    tokenMetadataState.tokenSymbols = {};
+    tokenMetadataState.tokenDecimals = {};
+    tokenMetadataState.tokenPrices = {};
     settingsState.setShowSettings.mockReset();
     settingsState.getChainId.mockClear();
     callExecutionState.setResult.mockReset();
@@ -349,6 +364,9 @@ describe("ContractCallerPage wiring", () => {
     functionSelectionState.setEthValue.mockReset();
     functionSelectionState.applyPendingArgs.mockReset();
     simulationOptionsState.setFromAddress.mockReset();
+    tokenMetadataState.fetchTokenSymbolsForLogs.mockReset();
+    tokenMetadataState.fetchTokenDataForSimulation.mockReset();
+    callExecutionState.setSaveExtra.mockReset();
     abiHookState.getCachedAddresses.mockClear();
     abiHookState.setCachedAddressesState.mockClear();
     vi.unstubAllGlobals();
@@ -454,6 +472,67 @@ describe("ContractCallerPage wiring", () => {
       sharedResult.requestBody.value,
     );
     expect(callExecutionState.setLoading).toHaveBeenLastCalledWith(false);
+
+    unmount();
+  });
+
+  it("adds enriched balanceChanges to save metadata for simulated results", async () => {
+    callExecutionState.result = {
+      success: true,
+      simulated: true,
+      logs: [
+        {
+          address: TOKEN_ADDRESS,
+          topics: [
+            TRANSFER_TOPIC,
+            padAddress(FROM_ADDRESS),
+            padAddress(TO_ADDRESS),
+          ],
+          data: encodeUint256("1000000000"),
+        },
+      ],
+      balanceChanges: [
+        {
+          address: FROM_ADDRESS,
+          before: "10000000000000000000",
+          after: "9000000000000000000",
+          diff: "-1000000000000000000",
+        },
+      ],
+    };
+    tokenMetadataState.tokenSymbols = { [TOKEN_ADDRESS]: "USDC" };
+    tokenMetadataState.tokenDecimals = { [TOKEN_ADDRESS]: 6 };
+    tokenMetadataState.tokenPrices = {
+      [NATIVE_TOKEN_ADDRESS]: 2500,
+      [TOKEN_ADDRESS]: 1,
+    };
+
+    const { unmount } = renderPage();
+
+    await vi.waitFor(() => {
+      expect(callExecutionState.setSaveExtra).toHaveBeenCalledWith(
+        expect.objectContaining({
+          balanceChanges: expect.arrayContaining([
+            expect.objectContaining({
+              address: FROM_ADDRESS,
+              tokenAddress: NATIVE_TOKEN_ADDRESS,
+              amount: "-1",
+              name: "ETH",
+              price: 2500,
+              valueUsd: -2500,
+            }),
+            expect.objectContaining({
+              address: FROM_ADDRESS,
+              tokenAddress: TOKEN_ADDRESS,
+              amount: "-1,000",
+              name: "USDC",
+              price: 1,
+              valueUsd: -1000,
+            }),
+          ]),
+        }),
+      );
+    });
 
     unmount();
   });

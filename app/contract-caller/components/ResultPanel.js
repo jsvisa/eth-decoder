@@ -3,7 +3,10 @@
 import { useState } from "react";
 import yaml from "js-yaml";
 import { formatTokenAmount } from "../../utils/tokenFormatting";
-import { buildTokenAccountMap } from "../../utils/tokenTransfers";
+import {
+  NATIVE_TOKEN_ADDRESS,
+  enrichBalanceChanges,
+} from "../../utils/balanceChanges";
 import { CHAINS } from "../../utils/chains";
 import styles from "./ResultPanel.module.css";
 import MetricsPanel from "./MetricsPanel";
@@ -14,7 +17,6 @@ import { getBookmarkedAddress } from "../../utils/addressBook";
 // Constants
 // ---------------------------------------------------------------------------
 
-const NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000";
 const ABI_CACHE_PREFIX = "abi-";
 const TOKEN_SYMBOL_CACHE_PREFIX = "token-symbol-";
 const TOKEN_DECIMALS_CACHE_PREFIX = "token-decimals-";
@@ -389,6 +391,17 @@ export default function ResultPanel({
     tokenSymbols[addr] || getCachedTokenSymbol(chain, addr);
   const getLogTokenDecimals = (addr) =>
     tokenDecimals[addr] ?? getCachedTokenDecimals(chain, addr);
+  const legacyNativeBalanceChanges = (result?.balanceChanges ?? []).filter(
+    (change) => {
+      const tokenAddress = change.tokenAddress?.toLowerCase();
+      return (
+        change.before != null &&
+        change.after != null &&
+        change.diff != null &&
+        (!tokenAddress || tokenAddress === NATIVE_TOKEN_ADDRESS)
+      );
+    },
+  );
 
   // Build display content (syntax-highlighted JSON or YAML)
   const getDisplayContent = () => {
@@ -683,129 +696,92 @@ export default function ResultPanel({
                 )}
 
               {/* Balance Changes (legacy ETH before/after — simulation only) */}
-              {result.simulated &&
-                result.balanceChanges &&
-                result.balanceChanges.length > 0 && (
-                  <div className={styles.balanceSection}>
-                    <h3 className={styles.balanceTitle}>
-                      Balance Changes ({result.balanceChanges.length})
-                    </h3>
-                    {result.balanceChanges.map((change, index) => (
-                      <div key={index} className={styles.balanceItem}>
-                        <div className={styles.balanceAddress}>
-                          {change.address?.slice(0, 10)}...
-                          {change.address?.slice(-8)}
-                        </div>
-                        <div className={styles.balanceValues}>
-                          <span className={styles.balanceBefore}>
-                            {change.before != null
-                              ? (
-                                  BigInt(change.before) / BigInt(10 ** 18)
-                                ).toString()
-                              : "?"}{" "}
-                            ETH
-                          </span>
-                          <span className={styles.balanceArrow}>→</span>
-                          <span className={styles.balanceAfter}>
-                            {change.after != null
-                              ? (
-                                  BigInt(change.after) / BigInt(10 ** 18)
-                                ).toString()
-                              : "?"}{" "}
-                            ETH
-                          </span>
-                          {change.diff != null && (
-                            <span
-                              className={`${styles.balanceDiff} ${BigInt(change.diff) >= 0n ? styles.balanceDiffPositive : styles.balanceDiffNegative}`}
-                            >
-                              ({BigInt(change.diff) >= 0n ? "+" : ""}
-                              {(
-                                BigInt(change.diff) / BigInt(10 ** 18)
-                              ).toString()}{" "}
-                              ETH)
-                            </span>
-                          )}
-                        </div>
+              {result.simulated && legacyNativeBalanceChanges.length > 0 && (
+                <div className={styles.balanceSection}>
+                  <h3 className={styles.balanceTitle}>
+                    Balance Changes ({legacyNativeBalanceChanges.length})
+                  </h3>
+                  {legacyNativeBalanceChanges.map((change, index) => (
+                    <div key={index} className={styles.balanceItem}>
+                      <div className={styles.balanceAddress}>
+                        {change.address?.slice(0, 10)}...
+                        {change.address?.slice(-8)}
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <div className={styles.balanceValues}>
+                        <span className={styles.balanceBefore}>
+                          {change.before != null
+                            ? (
+                                BigInt(change.before) / BigInt(10 ** 18)
+                              ).toString()
+                            : "?"}{" "}
+                          ETH
+                        </span>
+                        <span className={styles.balanceArrow}>→</span>
+                        <span className={styles.balanceAfter}>
+                          {change.after != null
+                            ? (
+                                BigInt(change.after) / BigInt(10 ** 18)
+                              ).toString()
+                            : "?"}{" "}
+                          ETH
+                        </span>
+                        {change.diff != null && (
+                          <span
+                            className={`${styles.balanceDiff} ${BigInt(change.diff) >= 0n ? styles.balanceDiffPositive : styles.balanceDiffNegative}`}
+                          >
+                            ({BigInt(change.diff) >= 0n ? "+" : ""}
+                            {(
+                              BigInt(change.diff) / BigInt(10 ** 18)
+                            ).toString()}{" "}
+                            ETH)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Balance Changes table (simulation only) */}
               {result.simulated &&
                 (() => {
-                  const accountMap = buildTokenAccountMap(result.logs);
-
-                  if (result.balanceChanges) {
-                    for (const change of result.balanceChanges) {
-                      const addr = change.address?.toLowerCase();
-                      if (!addr || change.diff == null) continue;
-                      if (!accountMap[addr])
-                        accountMap[addr] = { native: null, tokens: {} };
-                      accountMap[addr].native = change.diff;
-                    }
-                  }
-
-                  const nativePrice = tokenPrices[NATIVE_TOKEN_ADDRESS];
-
-                  const rows = [];
-                  for (const [addr, data] of Object.entries(accountMap)) {
-                    if (data.native != null) {
+                  const rows = enrichBalanceChanges({
+                    logs: result.logs,
+                    balanceChanges: result.balanceChanges,
+                    tokenSymbols,
+                    tokenDecimals,
+                    tokenPrices,
+                    resolveTokenSymbol: (tokenAddr) =>
+                      getCachedTokenSymbol(chain, tokenAddr),
+                    resolveTokenDecimals: (tokenAddr) =>
+                      getCachedTokenDecimals(chain, tokenAddr),
+                  })
+                    .map((change) => {
                       let diff;
                       try {
-                        diff = BigInt(String(data.native));
+                        diff = BigInt(String(change.rawAmount ?? change.diff));
                       } catch {
-                        diff = null;
+                        return null;
                       }
-                      if (diff !== null) {
-                        const usd =
-                          nativePrice != null
-                            ? (Number(diff) / 1e18) * nativePrice
-                            : null;
-                        if (diff !== 0n) {
-                          rows.push({
-                            addr,
-                            symbol: "ETH",
-                            tokenAddr: NATIVE_TOKEN_ADDRESS,
-                            diff,
-                            absFormatted: formatTokenAmount(
-                              diff < 0n ? -diff : diff,
-                              18,
-                            ),
-                            usd,
-                          });
-                        }
-                      }
-                    }
-                    for (const [tokenAddr, rawDiff] of Object.entries(
-                      data.tokens,
-                    )) {
-                      if (rawDiff === 0n) continue;
-                      const decimals =
-                        tokenDecimals[tokenAddr] ??
-                        getCachedTokenDecimals(chain, tokenAddr) ??
-                        18;
-                      const sym =
-                        tokenSymbols[tokenAddr] ||
-                        getCachedTokenSymbol(chain, tokenAddr);
-                      const price = tokenPrices[tokenAddr];
-                      const usd =
-                        price != null
-                          ? (Number(rawDiff) / 10 ** decimals) * price
-                          : null;
-                      rows.push({
-                        addr,
-                        symbol: sym || `${tokenAddr.slice(0, 6)}…`,
+                      if (diff === 0n) return null;
+                      const tokenAddr =
+                        change.tokenAddress || NATIVE_TOKEN_ADDRESS;
+                      return {
+                        addr: change.address,
+                        symbol:
+                          change.symbol ||
+                          change.name ||
+                          `${tokenAddr.slice(0, 6)}…`,
                         tokenAddr,
-                        diff: rawDiff,
+                        diff,
                         absFormatted: formatTokenAmount(
-                          rawDiff < 0n ? -rawDiff : rawDiff,
-                          decimals,
+                          diff < 0n ? -diff : diff,
+                          change.decimals ?? 18,
                         ),
-                        usd,
-                      });
-                    }
-                  }
+                        usd: change.valueUsd,
+                      };
+                    })
+                    .filter(Boolean);
 
                   if (rows.length === 0) return null;
 

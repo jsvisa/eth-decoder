@@ -105,6 +105,7 @@ export function useTokenMetadata(chain, rpcSettings = {}) {
     if (!logs || logs.length === 0) return;
 
     const transferAddresses = new Set();
+    const newSymbols = {};
     for (const log of logs) {
       if (
         log.address &&
@@ -112,15 +113,22 @@ export function useTokenMetadata(chain, rpcSettings = {}) {
         TOKEN_TRANSFER_TOPICS.has(log.topics[0])
       ) {
         const addr = log.address.toLowerCase();
-        if (!getCachedTokenSymbol(chain, addr)) {
+        const cachedSymbol = getCachedTokenSymbol(chain, addr);
+        if (cachedSymbol) {
+          newSymbols[addr] = cachedSymbol;
+        } else {
           transferAddresses.add(addr);
         }
       }
     }
 
-    if (transferAddresses.size === 0) return;
+    if (transferAddresses.size === 0) {
+      if (Object.keys(newSymbols).length > 0) {
+        setTokenSymbols((prev) => ({ ...prev, ...newSymbols }));
+      }
+      return;
+    }
 
-    const newSymbols = {};
     const fetchPromises = Array.from(transferAddresses).map(async (addr) => {
       try {
         const response = await fetch("/api/call-contract", {

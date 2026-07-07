@@ -81,8 +81,7 @@ describe("useTokenMetadata — fetchTokenSymbolsForLogs happy path", () => {
     });
 
     expect(mockFetch).not.toHaveBeenCalled();
-    // tokenSymbols state is not pre-populated from cache (cache is only used to
-    // skip network fetch); the cached value lives in localStorage.
+    expect(result.current.tokenSymbols[addr]).toBe("USDC");
     expect(localStorage.getItem(`token-symbol-${CHAIN}-${addr}`)).toBe("USDC");
   });
 

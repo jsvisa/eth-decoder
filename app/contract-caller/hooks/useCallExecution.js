@@ -582,9 +582,11 @@ export function useCallExecution({
       setSavingSimulation(true);
       const chainIdVal = getChainId?.(chain);
       const extra = saveExtraRef.current;
+      const { balanceChanges, ...tokenMeta } = extra ?? {};
       const payload = {
         ...result,
-        ...(extra ? { _tokenMeta: extra } : {}),
+        ...(Array.isArray(balanceChanges) ? { balanceChanges } : {}),
+        ...(extra ? { _tokenMeta: tokenMeta } : {}),
         requestBody: {
           chainId: chainIdVal,
           to: address,
