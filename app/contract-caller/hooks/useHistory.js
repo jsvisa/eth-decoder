@@ -171,9 +171,13 @@ export function useHistory({
 
   // ── Effect 4 (lines 1507-1531): sync URL with current chain + address ────
   useEffect(() => {
+    const currentParams = new URLSearchParams(window.location.search);
+    if (currentParams.has("simulationId")) {
+      return;
+    }
+
     if (!address) {
-      const params = new URLSearchParams(window.location.search);
-      if (params.has("chain") || params.has("address")) {
+      if (currentParams.has("chain") || currentParams.has("address")) {
         window.history.replaceState(null, "", window.location.pathname);
       }
       return;
