@@ -3,6 +3,7 @@ import {
   saveSimulationResult,
   pruneExpiredResults,
 } from "../../utils/simulationCache";
+import { buildSimulationLink } from "../../utils/simulationLinks";
 
 export async function POST(request) {
   let body;
@@ -23,7 +24,10 @@ export async function POST(request) {
 
   try {
     const simulationId = await saveSimulationResult(body);
-    return NextResponse.json({ simulationId });
+    return NextResponse.json({
+      simulationId,
+      simulationLink: buildSimulationLink(request, simulationId),
+    });
   } catch (error) {
     return NextResponse.json(
       { error: `Failed to save simulation: ${error.message}` },

@@ -78,7 +78,10 @@ import {
 } from "../../app/utils/simulationCache.js";
 
 function makeRequest(body) {
-  return { json: async () => body };
+  return {
+    url: "https://eth-decoder.vercel.app/api/simulate-tx",
+    json: async () => body,
+  };
 }
 
 beforeEach(() => {
@@ -311,6 +314,9 @@ describe("POST /api/simulate-tx — simulation", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.simulationId).toBe(FAKE_SIMULATION_ID);
+    expect(body.simulationLink).toBe(
+      `https://eth-decoder.vercel.app/?simulationId=${FAKE_SIMULATION_ID}`,
+    );
     expect(body.requestBody).toBeDefined();
     expect(body.requestBody.chainId).toBe(1);
     expect(body.requestBody.to).toBe(VALID_BODY.to);
@@ -363,6 +369,9 @@ describe("POST /api/simulate-tx — simulation", () => {
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.simulationId).toBe(FAKE_SIMULATION_ID);
+    expect(body.simulationLink).toBe(
+      `https://eth-decoder.vercel.app/?simulationId=${FAKE_SIMULATION_ID}`,
+    );
     expect(body.success).toBe(false);
   });
 
