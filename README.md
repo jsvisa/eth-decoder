@@ -35,13 +35,12 @@ A web application for decoding EVM transaction input data and interacting with s
   - ETH value input for payable functions
 - **Read Functions**: Direct RPC calls to read contract state
 - **Write Functions (Simulation)**:
-  - **Local simulation (tevm)** — default backend for fast, in-browser transaction simulation
+  - **Local simulation (tevm)** — in-browser transaction simulation using forked chain state
   - Decoded event logs with parameter names and types
   - Call trace tree visualization with nested contract calls
   - Asset/balance changes display
   - State changes (storage diff) display
   - Gas usage estimation
-  - Tenderly integration (legacy) — available for advanced simulation scenarios
 - **History**: Recent calls saved with function name, args, and decoded output
 - **API Key Validation**: Test buttons to verify Etherscan API keys
 
@@ -103,12 +102,6 @@ The app requires API keys for full functionality:
 
 - Optional fallback for ABI fetching when Etherscan doesn't cover a chain
 - Get your API key from [Routescan](https://routescan.io/api-key)
-
-### Tenderly API Settings
-
-- Required for simulating write functions
-- Get your credentials from [Tenderly Dashboard](https://dashboard.tenderly.co/account/authorization)
-- Required fields: Access Key, Account Slug, Project Slug
 
 All API keys are stored locally in your browser and never sent to our servers.
 
@@ -292,7 +285,7 @@ vercel --prod
 2. ABI is fetched via the resolution sequence below, or loaded from localStorage cache
 3. User selects function and enters arguments
 4. For read functions: Direct RPC call via `/api/call-contract`
-5. For write functions: Simulation via Tenderly API through `/api/simulate`
+5. For write functions: Local simulation via tevm
 6. Results displayed with decoded outputs, logs, and call traces
 
 This architecture keeps the backend endpoints secure and hidden from the client-side code.
@@ -345,8 +338,6 @@ decoder/
 │   │   │   └── route.js           # Contract read function calls
 │   │   ├── fetch-abi/
 │   │   │   └── route.js           # ABI fetching from explorers
-│   │   └── simulate/
-│   │       └── route.js           # Tenderly simulation API
 │   ├── components/
 │   │   ├── Nav.js                 # Navigation component
 │   │   └── Nav.module.css         # Navigation styles

@@ -3,12 +3,9 @@ import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 
 const settingsState = {
-  useLocalSimulation: true,
   rpcBatchSize: 1,
-  tenderlySettings: {},
   apiKeys: {},
   rpcSettings: { ethereum: "" },
-  isTenderlyConfigured: vi.fn(() => true),
   getChainId: vi.fn(() => 1),
   customChains: [],
   setShowSettings: vi.fn(),

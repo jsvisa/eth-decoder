@@ -163,7 +163,7 @@ export function useTokenMetadata(chain, rpcSettings = {}) {
    * Fetch decimals and prices for all tokens involved in a simulation result.
    *
    * @param {Array|null} logs - Raw log objects
-   * @param {Array|null} assetChanges - Asset change objects from Tenderly
+   * @param {Array|null} assetChanges - Asset change objects from simulation
    * @param {Array|null} balanceChanges - Balance change objects (native token)
    * @param {number} chainNumericId - Numeric chain ID
    */

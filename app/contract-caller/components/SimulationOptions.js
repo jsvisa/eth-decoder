@@ -5,25 +5,15 @@ import styles from "./SimulationOptions.module.css";
 
 /**
  * SimulationOptions — write-mode panel for fork-block, from-address,
- * cheatcodes (local sim) and balance/storage/timestamp overrides (Tenderly).
- *
- * Pure presentational: no useState/useEffect beyond what's needed for
- * the inline AddressArgInput dropdown.
+ * and cheatcodes.
  *
  * Props:
- *   useLocalSimulation       {boolean}
  *   forkBlockNumber          {string}
  *   onForkBlockChange        {(s: string) => void}
  *   fromAddress              {string}
  *   onFromAddressChange      {(s: string) => void}
  *   cheatcodes               {Cheatcodes}
  *   onCheatcodesChange       {(c: Cheatcodes) => void}
- *   balanceOverrides         {BalanceOverride[]}
- *   onBalanceOverridesChange {(arr) => void}
- *   storageOverrides         {StorageOverride[]}
- *   onStorageOverridesChange {(arr) => void}
- *   timestampOverride        {string}
- *   onTimestampOverrideChange {(s: string) => void}
  *   expanded                 {boolean}
  *   onToggleExpanded         {() => void}
  *   fieldErrors              {Record<string,string>}
@@ -82,19 +72,12 @@ function AddressArgInput({
 }
 
 export default function SimulationOptions({
-  useLocalSimulation,
   forkBlockNumber,
   onForkBlockChange,
   fromAddress,
   onFromAddressChange,
   cheatcodes,
   onCheatcodesChange,
-  balanceOverrides,
-  onBalanceOverridesChange,
-  storageOverrides,
-  onStorageOverridesChange,
-  timestampOverride,
-  onTimestampOverrideChange,
   expanded,
   onToggleExpanded,
   fieldErrors = {},
@@ -105,46 +88,44 @@ export default function SimulationOptions({
   const hasCheatcodesExpanded =
     expanded && (cheatcodes.deal.enabled || cheatcodes.warp.enabled);
 
-  const cheatcodeControls =
-    useLocalSimulation &&
+  const cheatcodeControls = React.createElement(
+    "div",
+    { className: styles.cheatcodesInline },
     React.createElement(
-      "div",
-      { className: styles.cheatcodesInline },
-      React.createElement(
-        "label",
-        {
-          className: styles.cheatcodeInlineItem,
-          title: "vm.deal - Set ETH balance",
-        },
-        React.createElement("input", {
-          type: "checkbox",
-          checked: cheatcodes.deal.enabled,
-          onChange: (e) =>
-            onCheatcodesChange({
-              ...cheatcodes,
-              deal: { ...cheatcodes.deal, enabled: e.target.checked },
-            }),
-        }),
-        React.createElement("span", null, "deal"),
-      ),
-      React.createElement(
-        "label",
-        {
-          className: styles.cheatcodeInlineItem,
-          title: "vm.warp - Set timestamp",
-        },
-        React.createElement("input", {
-          type: "checkbox",
-          checked: cheatcodes.warp.enabled,
-          onChange: (e) =>
-            onCheatcodesChange({
-              ...cheatcodes,
-              warp: { ...cheatcodes.warp, enabled: e.target.checked },
-            }),
-        }),
-        React.createElement("span", null, "warp"),
-      ),
-    );
+      "label",
+      {
+        className: styles.cheatcodeInlineItem,
+        title: "vm.deal - Set ETH balance",
+      },
+      React.createElement("input", {
+        type: "checkbox",
+        checked: cheatcodes.deal.enabled,
+        onChange: (e) =>
+          onCheatcodesChange({
+            ...cheatcodes,
+            deal: { ...cheatcodes.deal, enabled: e.target.checked },
+          }),
+      }),
+      React.createElement("span", null, "deal"),
+    ),
+    React.createElement(
+      "label",
+      {
+        className: styles.cheatcodeInlineItem,
+        title: "vm.warp - Set timestamp",
+      },
+      React.createElement("input", {
+        type: "checkbox",
+        checked: cheatcodes.warp.enabled,
+        onChange: (e) =>
+          onCheatcodesChange({
+            ...cheatcodes,
+            warp: { ...cheatcodes.warp, enabled: e.target.checked },
+          }),
+      }),
+      React.createElement("span", null, "warp"),
+    ),
+  );
 
   // -- Inline section (always visible) --
   const inlineItems = [];
@@ -182,52 +163,6 @@ export default function SimulationOptions({
       }),
     ),
   );
-
-  if (!useLocalSimulation) {
-    // Tenderly override controls
-    inlineItems.push(
-      React.createElement(
-        "button",
-        {
-          key: "addBalance",
-          type: "button",
-          className: styles.addOverrideBtn,
-          onClick: () =>
-            onBalanceOverridesChange([
-              ...balanceOverrides,
-              { address: "", balance: "" },
-            ]),
-          title: "Add balance override",
-        },
-        "+ Balance",
-      ),
-      React.createElement(
-        "button",
-        {
-          key: "addStorage",
-          type: "button",
-          className: styles.addOverrideBtn,
-          onClick: () =>
-            onStorageOverridesChange([
-              ...storageOverrides,
-              { address: "", slot: "", value: "" },
-            ]),
-          title: "Add storage override",
-        },
-        "+ Storage",
-      ),
-      React.createElement("input", {
-        key: "timestamp",
-        type: "text",
-        value: timestampOverride,
-        onChange: (e) => onTimestampOverrideChange(e.target.value),
-        placeholder: "Timestamp (unix)",
-        className: styles.simOptionInputSmall,
-        disabled: disabled,
-        title: "Override block timestamp",
-      }),
-    );
-  }
 
   // -- Expanded cheatcode rows (local sim) --
   const expandedCheatcodes =
@@ -300,132 +235,6 @@ export default function SimulationOptions({
         ),
     );
 
-  // -- Balance overrides (Tenderly) --
-  const balanceOverrideSection =
-    !useLocalSimulation &&
-    balanceOverrides.length > 0 &&
-    React.createElement(
-      "div",
-      { className: styles.simOptionsExpanded },
-      React.createElement(
-        "div",
-        { className: styles.overridesLabel },
-        "Balance Overrides:",
-      ),
-      ...balanceOverrides.map((override, index) =>
-        React.createElement(
-          "div",
-          { key: index, className: styles.cheatcodeExpandedRow },
-          React.createElement("input", {
-            type: "text",
-            value: override.address,
-            onChange: (e) => {
-              const next = balanceOverrides.map((o, i) =>
-                i === index ? { ...o, address: e.target.value } : o,
-              );
-              onBalanceOverridesChange(next);
-            },
-            placeholder: "Address (0x...)",
-            className: styles.simOptionInput,
-          }),
-          React.createElement("input", {
-            type: "text",
-            value: override.balance,
-            onChange: (e) => {
-              const next = balanceOverrides.map((o, i) =>
-                i === index ? { ...o, balance: e.target.value } : o,
-              );
-              onBalanceOverridesChange(next);
-            },
-            placeholder: "ETH Balance",
-            className: styles.simOptionInputSmall,
-          }),
-          React.createElement(
-            "button",
-            {
-              type: "button",
-              className: styles.removeOverrideBtn,
-              onClick: () =>
-                onBalanceOverridesChange(
-                  balanceOverrides.filter((_, i) => i !== index),
-                ),
-              title: "Remove override",
-            },
-            "×",
-          ),
-        ),
-      ),
-    );
-
-  // -- Storage overrides (Tenderly) --
-  const storageOverrideSection =
-    !useLocalSimulation &&
-    storageOverrides.length > 0 &&
-    React.createElement(
-      "div",
-      { className: styles.simOptionsExpanded },
-      React.createElement(
-        "div",
-        { className: styles.overridesLabel },
-        "Storage Overrides:",
-      ),
-      ...storageOverrides.map((override, index) =>
-        React.createElement(
-          "div",
-          { key: index, className: styles.cheatcodeExpandedRow },
-          React.createElement("input", {
-            type: "text",
-            value: override.address,
-            onChange: (e) => {
-              const next = storageOverrides.map((o, i) =>
-                i === index ? { ...o, address: e.target.value } : o,
-              );
-              onStorageOverridesChange(next);
-            },
-            placeholder: "Contract (0x...)",
-            className: styles.simOptionInput,
-          }),
-          React.createElement("input", {
-            type: "text",
-            value: override.slot,
-            onChange: (e) => {
-              const next = storageOverrides.map((o, i) =>
-                i === index ? { ...o, slot: e.target.value } : o,
-              );
-              onStorageOverridesChange(next);
-            },
-            placeholder: "Slot (0x...)",
-            className: styles.simOptionInputSmall,
-          }),
-          React.createElement("input", {
-            type: "text",
-            value: override.value,
-            onChange: (e) => {
-              const next = storageOverrides.map((o, i) =>
-                i === index ? { ...o, value: e.target.value } : o,
-              );
-              onStorageOverridesChange(next);
-            },
-            placeholder: "Value (0x...)",
-            className: styles.simOptionInputSmall,
-          }),
-          React.createElement(
-            "button",
-            {
-              type: "button",
-              className: styles.removeOverrideBtn,
-              onClick: () =>
-                onStorageOverridesChange(
-                  storageOverrides.filter((_, i) => i !== index),
-                ),
-              title: "Remove override",
-            },
-            "×",
-          ),
-        ),
-      ),
-    );
-
   return React.createElement(
     "div",
     { className: styles.simOptionsSection },
@@ -456,9 +265,5 @@ export default function SimulationOptions({
     ),
     // Expanded cheatcodes
     expandedCheatcodes,
-    // Balance overrides
-    balanceOverrideSection,
-    // Storage overrides
-    storageOverrideSection,
   );
 }

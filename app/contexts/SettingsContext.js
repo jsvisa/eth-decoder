@@ -3,7 +3,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { CHAINS, BUILT_IN_CHAIN_IDS } from "../utils/chains";
 
-const TENDERLY_SETTINGS_KEY = "tenderly_settings";
 const API_KEYS_STORAGE_KEY = "api_keys_settings";
 const RPC_SETTINGS_KEY = "rpc_settings";
 const SIMULATION_SETTINGS_KEY = "simulation_settings";
@@ -13,25 +12,15 @@ const SettingsContext = createContext(null);
 
 export function SettingsProvider({ children }) {
   const [showSettings, setShowSettings] = useState(false);
-  const [tenderlySettings, setTenderlySettings] = useState({
-    accessKey: "",
-    account: "",
-    project: "",
-  });
   const [apiKeys, setApiKeys] = useState({ etherscan: "", routescan: "" });
   const [rpcSettings, setRpcSettings] = useState(() =>
     CHAINS.reduce((acc, c) => ({ ...acc, [c.id]: "" }), {}),
   );
-  const [useLocalSimulation, setUseLocalSimulation] = useState(true);
   const [rpcBatchSize, setRpcBatchSize] = useState(1);
   const [customChains, setCustomChains] = useState([]);
 
   // Load all settings from localStorage on mount
   useEffect(() => {
-    try {
-      const t = localStorage.getItem(TENDERLY_SETTINGS_KEY);
-      if (t) setTenderlySettings(JSON.parse(t));
-    } catch {}
     try {
       const a = localStorage.getItem(API_KEYS_STORAGE_KEY);
       if (a) setApiKeys(JSON.parse(a));
@@ -44,8 +33,6 @@ export function SettingsProvider({ children }) {
       const s = localStorage.getItem(SIMULATION_SETTINGS_KEY);
       if (s) {
         const parsed = JSON.parse(s);
-        if (typeof parsed.useLocalSimulation === "boolean")
-          setUseLocalSimulation(parsed.useLocalSimulation);
         if (typeof parsed.rpcBatchSize === "number" && parsed.rpcBatchSize >= 1)
           setRpcBatchSize(parsed.rpcBatchSize);
       }
@@ -55,13 +42,6 @@ export function SettingsProvider({ children }) {
       if (c) setCustomChains(JSON.parse(c));
     } catch {}
   }, []);
-
-  const saveTenderlySettings = (s) => {
-    setTenderlySettings(s);
-    try {
-      localStorage.setItem(TENDERLY_SETTINGS_KEY, JSON.stringify(s));
-    } catch {}
-  };
 
   const saveApiKeys = (k) => {
     setApiKeys(k);
@@ -77,14 +57,12 @@ export function SettingsProvider({ children }) {
     } catch {}
   };
 
-  const saveSimulationSettings = (useLocal, batchSize) => {
-    setUseLocalSimulation(useLocal);
+  const saveSimulationSettings = (batchSize) => {
     setRpcBatchSize(batchSize);
     try {
       localStorage.setItem(
         SIMULATION_SETTINGS_KEY,
         JSON.stringify({
-          useLocalSimulation: useLocal,
           rpcBatchSize: batchSize,
         }),
       );
@@ -97,13 +75,6 @@ export function SettingsProvider({ children }) {
       localStorage.setItem(CUSTOM_CHAINS_KEY, JSON.stringify(chains));
     } catch {}
   };
-
-  const isTenderlyConfigured = () =>
-    !!(
-      tenderlySettings.accessKey &&
-      tenderlySettings.account &&
-      tenderlySettings.project
-    );
 
   const isEtherscanConfigured = () => !!apiKeys.etherscan;
 
@@ -123,18 +94,14 @@ export function SettingsProvider({ children }) {
         showSettings,
         setShowSettings,
         toggleSettings,
-        tenderlySettings,
-        saveTenderlySettings,
         apiKeys,
         saveApiKeys,
         rpcSettings,
         saveRpcSettings,
-        useLocalSimulation,
         rpcBatchSize,
         saveSimulationSettings,
         customChains,
         saveCustomChains,
-        isTenderlyConfigured,
         isEtherscanConfigured,
         isRoutescanConfigured,
         getChainId,

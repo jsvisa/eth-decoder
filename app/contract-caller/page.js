@@ -151,12 +151,9 @@ const validateAddressesInArg = (
 export default function ContractCallerPage() {
   // --- Settings ---
   const {
-    useLocalSimulation,
     rpcBatchSize,
-    tenderlySettings,
     apiKeys,
     rpcSettings,
-    isTenderlyConfigured,
     getChainId,
     customChains,
     setShowSettings,
@@ -250,12 +247,9 @@ export default function ContractCallerPage() {
     ethValueUnit: fn.ethValueUnit,
     forkBlockNumber: simOpts.forkBlockNumber,
     readBlockNumber: fn.readBlockNumber,
-    tenderlySettings,
     apiKeys,
     rpcSettings,
-    useLocalSimulation,
     rpcBatchSize,
-    isTenderlyConfigured,
     sessionActive: session.sessionActive,
     sessionStarting: session.sessionStarting,
     sessionClientRef: session.tevmClientRef,
@@ -263,9 +257,6 @@ export default function ContractCallerPage() {
     setSessionHistory: session.appendToSessionHistory,
     contractName: abi.contractName,
     cheatcodes: simOpts.cheatcodes,
-    balanceOverrides: simOpts.balanceOverrides,
-    storageOverrides: simOpts.storageOverrides,
-    timestampOverride: simOpts.timestampOverride,
     setFieldErrors: fn.setFieldErrors,
     setShowSettings,
     getChainId,
@@ -514,19 +505,12 @@ export default function ContractCallerPage() {
                   disabled={exec.loading}
                 />
                 <SimulationOptions
-                  useLocalSimulation={useLocalSimulation}
                   forkBlockNumber={simOpts.forkBlockNumber}
                   onForkBlockChange={simOpts.setForkBlockNumber}
                   fromAddress={simOpts.fromAddress}
                   onFromAddressChange={simOpts.setFromAddress}
                   cheatcodes={simOpts.cheatcodes}
                   onCheatcodesChange={simOpts.setCheatcodes}
-                  balanceOverrides={simOpts.balanceOverrides}
-                  onBalanceOverridesChange={simOpts.setBalanceOverrides}
-                  storageOverrides={simOpts.storageOverrides}
-                  onStorageOverridesChange={simOpts.setStorageOverrides}
-                  timestampOverride={simOpts.timestampOverride}
-                  onTimestampOverrideChange={simOpts.setTimestampOverride}
                   expanded={simOpts.simOptionsExpanded}
                   onToggleExpanded={() =>
                     simOpts.setSimOptionsExpanded((v) => !v)
@@ -591,7 +575,6 @@ export default function ContractCallerPage() {
             selectedFunction={fn.selectedFunction}
             isWrite={isWrite}
             loading={exec.loading}
-            useLocalSimulation={useLocalSimulation}
             simProgress={exec.simProgress}
             sessionActive={session.sessionActive}
             sessionBlock={session.sessionBlock}
