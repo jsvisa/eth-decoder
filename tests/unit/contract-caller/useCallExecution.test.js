@@ -57,12 +57,9 @@ const baseParams = {
   ethValueUnit: "ETH",
   forkBlockNumber: "",
   readBlockNumber: "",
-  tenderlySettings: {},
   apiKeys: {},
   rpcSettings: {},
-  useLocalSimulation: false,
   rpcBatchSize: 100,
-  isTenderlyConfigured: vi.fn(() => false),
   sessionActive: false,
   sessionStarting: false,
   sessionClientRef: { current: null },
@@ -76,9 +73,7 @@ const baseParams = {
   },
   balanceOverrides: [],
   storageOverrides: [],
-  timestampOverride: "",
   setFieldErrors: vi.fn(),
-  setShowSettings: vi.fn(),
   getChainId: vi.fn(() => 1),
   setCachedAddresses: vi.fn(),
   getCachedAddresses: vi.fn(() => []),
@@ -209,65 +204,6 @@ describe("useCallExecution – handleCall API error", () => {
 
     expect(result.current.error).toBe("contract reverted");
     expect(result.current.result).toBeNull();
-    expect(result.current.loading).toBe(false);
-  });
-});
-
-describe("useCallExecution – handleCancel", () => {
-  it("aborts an in-flight remote simulation", async () => {
-    let finishFetch;
-    const responsePromise = new Promise((resolve) => {
-      finishFetch = () =>
-        resolve({
-          ok: true,
-          json: async () => ({ success: true }),
-        });
-    });
-
-    global.fetch.mockImplementationOnce((_url, options) => {
-      options.signal?.addEventListener("abort", () => {
-        finishFetch();
-      });
-      return responsePromise;
-    });
-
-    const params = {
-      ...baseParams,
-      parsedAbi: TRANSFER_ABI,
-      selectedFunction: "transfer(address,uint256)",
-      args: ["0x1234567890123456789012345678901234567890", "100"],
-      fromAddress: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      useLocalSimulation: false,
-      isTenderlyConfigured: vi.fn(() => true),
-      tenderlySettings: {
-        accessKey: "token",
-        account: "account",
-        project: "project",
-      },
-    };
-
-    const { result } = renderHook(() => useCallExecution(params));
-
-    let callPromise;
-    await act(async () => {
-      callPromise = result.current.handleCall();
-    });
-
-    await vi.waitFor(() => expect(result.current.loading).toBe(true));
-
-    await act(async () => {
-      result.current.handleCancel();
-      finishFetch();
-      await callPromise;
-    });
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      "/api/simulate",
-      expect.objectContaining({
-        signal: expect.any(AbortSignal),
-      }),
-    );
-    expect(result.current.error).toBeNull();
     expect(result.current.loading).toBe(false);
   });
 });
@@ -433,7 +369,6 @@ describe("useCallExecution – local sim populates trace toName labels", () => {
       selectedFunction: "transfer(address,uint256)",
       args: ["0x1234567890123456789012345678901234567890", "100"],
       fromAddress: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      useLocalSimulation: true,
     };
 
     const { result } = renderHook(() => useCallExecution(params));

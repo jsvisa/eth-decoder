@@ -3,9 +3,6 @@ import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import CallActionBar from "../../../app/contract-caller/components/CallActionBar.js";
 
-// ---------------------------------------------------------------------------
-// Minimal render helper (mirrors pattern used by other tests in this dir)
-// ---------------------------------------------------------------------------
 function renderComponent(props) {
   const container = document.createElement("div");
   document.body.appendChild(container);
@@ -25,7 +22,6 @@ function makeProps(overrides = {}) {
     selectedFunction: "transfer",
     isWrite: false,
     loading: false,
-    useLocalSimulation: false,
     simProgress: null,
     sessionActive: false,
     sessionBlock: null,
@@ -82,8 +78,8 @@ describe("CallActionBar", () => {
     const { container, cleanup } = renderComponent(
       makeProps({ selectedFunction: "" }),
     );
-    const btns = container.querySelectorAll("button");
-    const callBtn = btns[0];
+    const btns = Array.from(container.querySelectorAll("button"));
+    const callBtn = btns.find((b) => /call contract/i.test(b.textContent));
     expect(callBtn.disabled).toBe(true);
     cleanup();
   });
@@ -92,8 +88,8 @@ describe("CallActionBar", () => {
     const { container, cleanup } = renderComponent(
       makeProps({ loading: true }),
     );
-    const btns = container.querySelectorAll("button");
-    const callBtn = btns[0];
+    const btns = Array.from(container.querySelectorAll("button"));
+    const callBtn = btns.find((b) => /calling/i.test(b.textContent));
     expect(callBtn.disabled).toBe(true);
     cleanup();
   });
@@ -101,8 +97,10 @@ describe("CallActionBar", () => {
   it("calls onCall when call button is clicked", () => {
     const props = makeProps();
     const { container, cleanup } = renderComponent(props);
+    const btns = Array.from(container.querySelectorAll("button"));
+    const callBtn = btns.find((b) => /call contract/i.test(b.textContent));
     act(() => {
-      container.querySelector("button").click();
+      callBtn.click();
     });
     expect(props.onCall).toHaveBeenCalledTimes(1);
     cleanup();
@@ -233,10 +231,8 @@ describe("CallActionBar", () => {
     cleanup();
   });
 
-  it("shows session banner with Start Session when useLocalSimulation is true", () => {
-    const { container, cleanup } = renderComponent(
-      makeProps({ useLocalSimulation: true }),
-    );
+  it("shows session banner with Start Session button", () => {
+    const { container, cleanup } = renderComponent(makeProps());
     const btns = Array.from(container.querySelectorAll("button"));
     const startBtn = btns.find((b) => /start session/i.test(b.textContent));
     expect(startBtn).toBeTruthy();
@@ -245,7 +241,7 @@ describe("CallActionBar", () => {
 
   it("shows Starting... when sessionStarting is true", () => {
     const { container, cleanup } = renderComponent(
-      makeProps({ useLocalSimulation: true, sessionStarting: true }),
+      makeProps({ sessionStarting: true }),
     );
     expect(container.textContent).toMatch(/starting/i);
     cleanup();
@@ -254,7 +250,6 @@ describe("CallActionBar", () => {
   it("shows session active info with block number when sessionActive is true", () => {
     const { container, cleanup } = renderComponent(
       makeProps({
-        useLocalSimulation: true,
         sessionActive: true,
         sessionBlock: 21000000,
       }),
@@ -268,7 +263,7 @@ describe("CallActionBar", () => {
   });
 
   it("calls onStartSession when Start Session is clicked", () => {
-    const props = makeProps({ useLocalSimulation: true });
+    const props = makeProps();
     const { container, cleanup } = renderComponent(props);
     const btns = Array.from(container.querySelectorAll("button"));
     const startBtn = btns.find((b) => /start session/i.test(b.textContent));
@@ -281,7 +276,6 @@ describe("CallActionBar", () => {
 
   it("calls onResetSession when Reset is clicked", () => {
     const props = makeProps({
-      useLocalSimulation: true,
       sessionActive: true,
       sessionBlock: 100,
     });
@@ -292,30 +286,6 @@ describe("CallActionBar", () => {
       resetBtn.click();
     });
     expect(props.onResetSession).toHaveBeenCalledTimes(1);
-    cleanup();
-  });
-
-  it("hides session banner when useLocalSimulation is false", () => {
-    const { container, cleanup } = renderComponent(
-      makeProps({ useLocalSimulation: false }),
-    );
-    expect(container.textContent).not.toMatch(/start session/i);
-    cleanup();
-  });
-
-  it("shows L mode tag when useLocalSimulation is true and isWrite is true", () => {
-    const { container, cleanup } = renderComponent(
-      makeProps({ useLocalSimulation: true, isWrite: true }),
-    );
-    expect(container.textContent).toContain("L");
-    cleanup();
-  });
-
-  it("shows T mode tag when useLocalSimulation is false and isWrite is true", () => {
-    const { container, cleanup } = renderComponent(
-      makeProps({ useLocalSimulation: false, isWrite: true }),
-    );
-    expect(container.textContent).toContain("T");
     cleanup();
   });
 });

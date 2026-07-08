@@ -10,7 +10,6 @@ const STORAGE_KEY = "contract_caller_history";
 const ABI_CACHE_PREFIX = "abi-";
 const TOKEN_SYMBOL_CACHE_PREFIX = "token-symbol-";
 const TOKEN_DECIMALS_CACHE_PREFIX = "token-decimals-";
-const TENDERLY_SETTINGS_KEY = "tenderly_settings";
 const API_KEYS_STORAGE_KEY = "api_keys_settings";
 const RPC_SETTINGS_KEY = "rpc_settings";
 const SIMULATION_SETTINGS_KEY = "simulation_settings";
@@ -20,17 +19,13 @@ export default function SettingsPanel() {
   const {
     showSettings,
     setShowSettings,
-    tenderlySettings,
-    saveTenderlySettings,
     apiKeys,
     saveApiKeys,
     rpcSettings,
     saveRpcSettings,
-    useLocalSimulation,
     rpcBatchSize,
     saveSimulationSettings,
     customChains,
-    isTenderlyConfigured,
     isEtherscanConfigured,
     isRoutescanConfigured,
     getChainId,
@@ -41,8 +36,6 @@ export default function SettingsPanel() {
   const [etherscanTestResult, setEtherscanTestResult] = useState(null);
   const [testingRoutescan, setTestingRoutescan] = useState(false);
   const [routescanTestResult, setRoutescanTestResult] = useState(null);
-  const [testingTenderly, setTestingTenderly] = useState(false);
-  const [tenderlyTestResult, setTenderlyTestResult] = useState(null);
   const [testingRpc, setTestingRpc] = useState({});
   const [rpcTestResult, setRpcTestResult] = useState({});
   const [selectedRpcChain, setSelectedRpcChain] = useState("ethereum");
@@ -99,24 +92,6 @@ export default function SettingsPanel() {
     }
   };
 
-  const testTenderlyKey = async () => {
-    if (!isTenderlyConfigured()) return;
-    setTestingTenderly(true);
-    setTenderlyTestResult(null);
-    try {
-      const res = await fetch(
-        `https://api.tenderly.co/api/v1/account/${tenderlySettings.account}/project/${tenderlySettings.project}`,
-        { headers: { "X-Access-Key": tenderlySettings.accessKey } },
-      );
-      setTenderlyTestResult(res.ok ? "success" : "error");
-    } catch {
-      setTenderlyTestResult("error");
-    } finally {
-      setTestingTenderly(false);
-      setTimeout(() => setTenderlyTestResult(null), 3000);
-    }
-  };
-
   const testRpcEndpoint = async (chainId) => {
     const rpcUrl = rpcSettings[chainId];
     if (!rpcUrl) return;
@@ -164,7 +139,6 @@ export default function SettingsPanel() {
   const exportSettings = () => {
     const data = {};
     const exactKeys = [
-      TENDERLY_SETTINGS_KEY,
       API_KEYS_STORAGE_KEY,
       RPC_SETTINGS_KEY,
       SIMULATION_SETTINGS_KEY,
@@ -326,30 +300,14 @@ export default function SettingsPanel() {
           </div>
         </div>
 
-        {/* Simulation Mode */}
+        {/* Simulation Settings */}
         <div className={styles.settingsGroup}>
-          <h3 className={styles.settingsTitle}>
-            Simulation Mode
-            {useLocalSimulation && (
-              <span className={styles.settingsCheck}>✓ Local</span>
-            )}
-          </h3>
+          <h3 className={styles.settingsTitle}>Simulation Settings</h3>
           <p className={styles.settingsDesc}>
-            Choose between local browser-based simulation (Tevm) or Tenderly
-            API.
+            All write functions are simulated locally in-browser using Tevm.
           </p>
           <div className={styles.settingsFields}>
             <div className={styles.settingRow}>
-              <label className={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={useLocalSimulation}
-                  onChange={(e) =>
-                    saveSimulationSettings(e.target.checked, rpcBatchSize)
-                  }
-                />
-                <span>Use Local Simulation (Tevm — no API keys required)</span>
-              </label>
               <label className={styles.settingLabel}>
                 Batch Size
                 <span className={styles.settingHint}> (1 = no batching)</span>
@@ -361,97 +319,12 @@ export default function SettingsPanel() {
                   className={styles.settingInput}
                   onChange={(e) =>
                     saveSimulationSettings(
-                      useLocalSimulation,
                       Math.max(1, parseInt(e.target.value) || 1),
                     )
                   }
                 />
               </label>
             </div>
-          </div>
-        </div>
-
-        {/* Tenderly Settings */}
-        <div className={styles.settingsGroup}>
-          <h3 className={styles.settingsTitle}>
-            Tenderly API Settings
-            {isTenderlyConfigured() && (
-              <span className={styles.settingsCheck}>✓</span>
-            )}
-          </h3>
-          <p className={styles.settingsDesc}>
-            {useLocalSimulation
-              ? "Optional when using Local Simulation."
-              : "Required for simulating write functions."}{" "}
-            Get your credentials from{" "}
-            <a
-              href="https://dashboard.tenderly.co/account/authorization"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Tenderly Dashboard
-            </a>
-          </p>
-          <div className={styles.tenderlyRow}>
-            <div className={styles.tenderlyField}>
-              <label className={styles.tenderlyLabel}>Access Key</label>
-              <input
-                type="password"
-                value={tenderlySettings.accessKey}
-                onChange={(e) =>
-                  saveTenderlySettings({
-                    ...tenderlySettings,
-                    accessKey: e.target.value,
-                  })
-                }
-                placeholder="Access key..."
-                className={styles.settingsInput}
-              />
-            </div>
-            <div className={styles.tenderlyField}>
-              <label className={styles.tenderlyLabel}>Account Slug</label>
-              <input
-                type="text"
-                value={tenderlySettings.account}
-                onChange={(e) =>
-                  saveTenderlySettings({
-                    ...tenderlySettings,
-                    account: e.target.value,
-                  })
-                }
-                placeholder="Account slug..."
-                className={styles.settingsInput}
-              />
-            </div>
-            <div className={styles.tenderlyField}>
-              <label className={styles.tenderlyLabel}>Project Slug</label>
-              <input
-                type="text"
-                value={tenderlySettings.project}
-                onChange={(e) =>
-                  saveTenderlySettings({
-                    ...tenderlySettings,
-                    project: e.target.value,
-                  })
-                }
-                placeholder="Project slug..."
-                className={styles.settingsInput}
-              />
-            </div>
-            <button
-              onClick={testTenderlyKey}
-              disabled={!isTenderlyConfigured() || testingTenderly}
-              className={`${styles.testButton} ${tenderlyTestResult === "success" ? styles.testSuccess : ""} ${tenderlyTestResult === "error" ? styles.testError : ""}`}
-              style={{ alignSelf: "flex-end" }}
-            >
-              {testingTenderly
-                ? "Testing..."
-                : tenderlyTestResult === "success"
-                  ? "✓ Valid"
-                  : tenderlyTestResult === "error"
-                    ? "✗ Invalid"
-                    : "Test"}
-            </button>
           </div>
         </div>
 

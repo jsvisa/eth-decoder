@@ -51,7 +51,7 @@ All state is React `useState` + `localStorage`. No external state library. Keys:
 - `evm_decoder_history`, `contract_caller_history` — recent activity
 - `abi-{chain}-{address}` — cached contract ABIs
 - `address_book` — saved addresses
-- `tenderly_settings`, `api_keys_settings`, `rpc_settings`, `simulation_settings`, `custom_chains` — user settings
+- `api_keys_settings`, `rpc_settings`, `simulation_settings`, `custom_chains` — user settings
 
 ## Key Patterns (Footguns)
 

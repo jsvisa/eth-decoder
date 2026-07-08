@@ -3,12 +3,9 @@ import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 
 const settingsState = {
-  useLocalSimulation: true,
   rpcBatchSize: 1,
-  tenderlySettings: {},
   apiKeys: {},
   rpcSettings: { ethereum: "" },
-  isTenderlyConfigured: vi.fn(() => true),
   getChainId: vi.fn(() => 1),
   customChains: [],
   setShowSettings: vi.fn(),
@@ -68,8 +65,6 @@ const simulationOptionsState = {
   setBalanceOverrides: vi.fn(),
   storageOverrides: [],
   setStorageOverrides: vi.fn(),
-  timestampOverride: "",
-  setTimestampOverride: vi.fn(),
   simOptionsExpanded: false,
   setSimOptionsExpanded: vi.fn(),
 };
@@ -376,9 +371,6 @@ describe("ContractCallerPage wiring", () => {
   it("passes live integration callbacks instead of stubs", () => {
     const { unmount } = renderPage();
 
-    expect(callExecutionArgs.setShowSettings).toBe(
-      settingsState.setShowSettings,
-    );
     expect(callExecutionArgs.setCachedAddresses).toBe(
       abiHookState.setCachedAddressesState,
     );

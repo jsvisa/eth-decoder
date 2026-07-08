@@ -26,8 +26,7 @@ import {
 
 /**
  * Manages execution of contract calls (read via /api/call-contract,
- * write via Tenderly /api/simulate, or local tevm), plus all
- * result-display toggle state.
+ * write via local tevm), plus all result-display toggle state.
  *
  * @param {object} params
  * @param {string}   params.chain
@@ -40,12 +39,9 @@ import {
  * @param {string}   params.ethValueUnit       - "ETH" | "Wei"
  * @param {string}   params.forkBlockNumber
  * @param {string}   params.readBlockNumber
- * @param {object}   params.tenderlySettings
  * @param {object}   params.apiKeys            - { etherscan, routescan, ... }
  * @param {object}   params.rpcSettings        - chain -> rpcUrl map
- * @param {boolean}  params.useLocalSimulation
  * @param {number}   params.rpcBatchSize
- * @param {Function} params.isTenderlyConfigured
  * @param {boolean}  params.sessionActive
  * @param {boolean}  params.sessionStarting
  * @param {object}   params.sessionClientRef   - React ref holding tevm client
@@ -53,11 +49,9 @@ import {
  * @param {Function} params.setSessionHistory
  * @param {string}   params.contractName
  * @param {object}   params.cheatcodes         - { deal, prank, warp }
- * @param {Array}    params.balanceOverrides
- * @param {Array}    params.storageOverrides
- * @param {string}   params.timestampOverride
+ * @param {Array}    params.balanceOverrides   - [{address, balance}, ...] applied via tevmSetAccount
+ * @param {Array}    params.storageOverrides   - [{address, slot, value}, ...] applied via tevmSetAccount state map
  * @param {Function} params.setFieldErrors
- * @param {Function} params.setShowSettings
  * @param {Function} params.getChainId          - (chain) => numericId
  * @param {Function} params.setCachedAddresses
  * @param {Function} params.getCachedAddresses
@@ -75,12 +69,9 @@ export function useCallExecution({
   ethValueUnit,
   forkBlockNumber,
   readBlockNumber,
-  tenderlySettings,
   apiKeys,
   rpcSettings,
-  useLocalSimulation,
   rpcBatchSize,
-  isTenderlyConfigured,
   sessionActive,
   sessionStarting,
   sessionClientRef,
@@ -90,9 +81,7 @@ export function useCallExecution({
   cheatcodes,
   balanceOverrides,
   storageOverrides,
-  timestampOverride,
   setFieldErrors,
-  setShowSettings,
   getChainId,
   setCachedAddresses,
   getCachedAddresses,
@@ -172,14 +161,6 @@ export function useCallExecution({
     const selectedFunc = getSelectedFunction();
     const isWrite = !isReadOnly(selectedFunc);
 
-    if (isWrite && !useLocalSimulation && !isTenderlyConfigured?.()) {
-      setError(
-        "Please configure Tenderly API settings or enable Local Simulation to simulate write functions",
-      );
-      if (typeof setShowSettings === "function") setShowSettings(true);
-      return;
-    }
-
     // ── validation ────────────────────────────────────────────────────────────
     const errors = {};
 
@@ -204,7 +185,7 @@ export function useCallExecution({
       errors.ethValue = true;
     }
 
-    if (isWrite && useLocalSimulation && cheatcodes) {
+    if (isWrite && cheatcodes) {
       if (cheatcodes.deal?.enabled) {
         if (
           cheatcodes.deal.address &&
@@ -282,7 +263,7 @@ export function useCallExecution({
     try {
       let data;
 
-      if (useLocalSimulation && (isWrite || sessionActive)) {
+      if (isWrite || sessionActive) {
         const activeCheatcodes = {};
         if (
           cheatcodes?.deal?.enabled &&
@@ -326,6 +307,8 @@ export function useCallExecution({
           rpcUrl: rpcSettings?.[chain] || undefined,
           blockNumber: forkBlockNumber || "latest",
           cheatcodes: activeCheatcodes,
+          balanceOverrides,
+          storageOverrides,
           customChainId: chainIdForSimulation,
           abiCache: initialAbiCache,
           onProgress: (pct) => setSimProgress(pct),
@@ -447,8 +430,6 @@ export function useCallExecution({
           setCachedAddresses(getCachedAddresses());
         }
       } else {
-        const apiEndpoint = isWrite ? "/api/simulate" : "/api/call-contract";
-
         const requestBody = {
           chain,
           address,
@@ -466,46 +447,15 @@ export function useCallExecution({
           requestBody.rpcUrl = rpcSettings[chain];
         }
 
-        if (!isWrite && readBlockNumber) {
+        if (readBlockNumber) {
           requestBody.blockNumber = readBlockNumber;
-        }
-
-        if (isWrite) {
-          requestBody.fromAddress = fromAddress || undefined;
-          requestBody.tenderlyAccessKey = tenderlySettings?.accessKey;
-          requestBody.tenderlyAccount = tenderlySettings?.account;
-          requestBody.tenderlyProject = tenderlySettings?.project;
-          if (forkBlockNumber) {
-            requestBody.blockNumber = forkBlockNumber;
-          }
-          const ethValueInfo = getEthValueWithUnit();
-          if (ethValueInfo.value) {
-            requestBody.value = ethValueInfo.value;
-            requestBody.valueUnit = ethValueInfo.unit;
-          }
-          if (balanceOverrides?.length > 0 || storageOverrides?.length > 0) {
-            requestBody.stateOverrides = {};
-            if (balanceOverrides?.length > 0) {
-              requestBody.stateOverrides.balances = balanceOverrides.filter(
-                (o) => o.address && o.balance,
-              );
-            }
-            if (storageOverrides?.length > 0) {
-              requestBody.stateOverrides.storage = storageOverrides.filter(
-                (o) => o.address && o.slot && o.value,
-              );
-            }
-          }
-          if (timestampOverride) {
-            requestBody.blockHeaderOverrides = { timestamp: timestampOverride };
-          }
         }
 
         const abortController = new AbortController();
         simAbortRef.current?.abort();
         simAbortRef.current = abortController;
 
-        const response = await fetch(apiEndpoint, {
+        const response = await fetch("/api/call-contract", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestBody),

@@ -11,7 +11,6 @@ import styles from "./CallActionBar.module.css";
  *   selectedFunction   {string}       – disable when none picked
  *   isWrite            {boolean}      – show simulate vs call label
  *   loading            {boolean}      – in-flight state
- *   useLocalSimulation {boolean}      – show L vs T mode label
  *   simProgress        {number|null}  – 0–100 percent, or null when idle
  *   sessionActive      {boolean}      – session banner visible
  *   sessionBlock       {number|null}  – session block label
@@ -30,7 +29,6 @@ export default function CallActionBar({
   selectedFunction,
   isWrite,
   loading,
-  useLocalSimulation,
   simProgress,
   sessionActive,
   sessionBlock,
@@ -78,17 +76,7 @@ export default function CallActionBar({
   if (loading) {
     callButtonLabel = isWrite ? "Simulating..." : "Calling...";
   } else if (isWrite) {
-    callButtonLabel = React.createElement(
-      React.Fragment,
-      null,
-      sessionActive ? "Execute in Session" : "Simulate Call",
-      " ",
-      React.createElement(
-        "span",
-        { className: styles.simModeTag },
-        useLocalSimulation ? "L" : "T",
-      ),
-    );
+    callButtonLabel = sessionActive ? "Execute in Session" : "Simulate Call";
   } else {
     callButtonLabel = "Call Contract";
   }
@@ -102,13 +90,12 @@ export default function CallActionBar({
     React.Fragment,
     null,
 
-    // Session mode banner — only shown in local simulation mode
-    useLocalSimulation &&
-      React.createElement(
-        "div",
-        { className: styles.sessionBanner },
-        sessionBannerContent,
-      ),
+    // Session mode banner
+    React.createElement(
+      "div",
+      { className: styles.sessionBanner },
+      sessionBannerContent,
+    ),
 
     // Action buttons — only shown on the functions tab
     activeTab === "functions" &&

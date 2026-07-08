@@ -29,14 +29,9 @@ async function seedStorage(page, extra = {}) {
       for (const [k, v] of Object.entries(data)) localStorage.setItem(k, v);
     },
     {
-      tenderly_settings: JSON.stringify({
-        accessKey: "tk",
-        account: "acc",
-        project: "proj",
-      }),
       api_keys_settings: JSON.stringify({ etherscan: "ek123" }),
       rpc_settings: JSON.stringify({ ethereum: "https://my-rpc.example.com" }),
-      simulation_settings: JSON.stringify({ useLocalSimulation: false }),
+      simulation_settings: JSON.stringify({ rpcBatchSize: 5 }),
       custom_chains: JSON.stringify([
         {
           id: "mychain",
@@ -89,7 +84,6 @@ test.describe("Export settings", () => {
     const filePath = await download.path();
     const json = JSON.parse(fs.readFileSync(filePath, "utf8"));
 
-    expect(json).toHaveProperty("tenderly_settings");
     expect(json).toHaveProperty("api_keys_settings");
     expect(json).toHaveProperty("rpc_settings");
     expect(json).toHaveProperty("simulation_settings");
@@ -148,10 +142,6 @@ test.describe("Export settings", () => {
     const filePath = await download.path();
     const json = JSON.parse(fs.readFileSync(filePath, "utf8"));
 
-    const tenderly = JSON.parse(json.tenderly_settings);
-    expect(tenderly.accessKey).toBe("tk");
-    expect(tenderly.account).toBe("acc");
-
     const apiKeys = JSON.parse(json.api_keys_settings);
     expect(apiKeys.etherscan).toBe("ek123");
   });
@@ -181,11 +171,6 @@ test.describe("Import settings", () => {
     await openSettingsClean(page);
 
     const payload = {
-      tenderly_settings: JSON.stringify({
-        accessKey: "imported-key",
-        account: "imp-acc",
-        project: "imp-proj",
-      }),
       api_keys_settings: JSON.stringify({ etherscan: "imported-etherscan" }),
     };
     const tmpFile = writeTempJson(payload);
@@ -204,11 +189,10 @@ test.describe("Import settings", () => {
 
     // Verify localStorage was written with the imported values
     const stored = await page.evaluate(() =>
-      localStorage.getItem("tenderly_settings"),
+      localStorage.getItem("api_keys_settings"),
     );
     const parsed = JSON.parse(stored);
-    expect(parsed.accessKey).toBe("imported-key");
-    expect(parsed.account).toBe("imp-acc");
+    expect(parsed.etherscan).toBe("imported-etherscan");
   });
 
   test("importing merges with existing keys without clearing unrelated ones", async ({

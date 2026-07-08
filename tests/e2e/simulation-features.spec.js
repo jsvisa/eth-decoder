@@ -534,3 +534,108 @@ test.describe("Balance Changes click-to-expand", () => {
     await expect(tokenAddrSpan).not.toBeAttached();
   });
 });
+
+// ── State override UI tests ──────────────────────────────────────────────
+
+test.describe("Simulation state overrides UI", () => {
+  test("adds and removes balance override rows", async ({ page }) => {
+    await page.goto("/contract-caller");
+    await page.locator("button").filter({ hasText: /^▶$/ }).click();
+
+    await page.locator("button").filter({ hasText: "+ Balance" }).click();
+    await expect(page.locator("text=Balance Overrides:")).toBeVisible();
+
+    const addrInput = page.locator("input[placeholder='Address (0x...)']");
+    await expect(addrInput).toBeVisible();
+    await addrInput.fill("0xabc");
+
+    const balInput = page.locator("input[placeholder='ETH Balance']");
+    await expect(balInput).toBeVisible();
+    await balInput.fill("1.5");
+
+    await page.locator("button[title='Remove override']").click();
+    await expect(page.locator("text=Balance Overrides:")).not.toBeVisible();
+  });
+
+  test("adds and removes storage override rows", async ({ page }) => {
+    await page.goto("/contract-caller");
+    await page.locator("button").filter({ hasText: /^▶$/ }).click();
+
+    await page.locator("button").filter({ hasText: "+ Storage" }).click();
+    await expect(page.locator("text=Storage Overrides:")).toBeVisible();
+
+    const addrInput = page.locator("input[placeholder='Contract (0x...)']");
+    await expect(addrInput).toBeVisible();
+    await addrInput.fill("0xdef");
+
+    const slotInput = page.locator("input[placeholder='Slot (0x...)']");
+    await expect(slotInput).toBeVisible();
+    await slotInput.fill("0x0");
+
+    const valInput = page.locator("input[placeholder='Value (0x...)']");
+    await expect(valInput).toBeVisible();
+    await valInput.fill("0xff");
+
+    await page.locator("button[title='Remove override']").click();
+    await expect(page.locator("text=Storage Overrides:")).not.toBeVisible();
+  });
+
+  test("balance override inputs update values on typing", async ({ page }) => {
+    await page.goto("/contract-caller");
+    await page.locator("button").filter({ hasText: /^▶$/ }).click();
+
+    await page.locator("button").filter({ hasText: "+ Balance" }).click();
+
+    const addrInput = page.locator("input[placeholder='Address (0x...)']");
+    await addrInput.fill("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+    await expect(addrInput).toHaveValue(
+      "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    );
+
+    const balInput = page.locator("input[placeholder='ETH Balance']");
+    await balInput.fill("10");
+    await expect(balInput).toHaveValue("10");
+  });
+
+  test("storage override inputs update values on typing", async ({ page }) => {
+    await page.goto("/contract-caller");
+    await page.locator("button").filter({ hasText: /^▶$/ }).click();
+
+    await page.locator("button").filter({ hasText: "+ Storage" }).click();
+
+    const addrInput = page.locator("input[placeholder='Contract (0x...)']");
+    await addrInput.fill("0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc");
+    await expect(addrInput).toHaveValue(
+      "0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc",
+    );
+
+    const slotInput = page.locator("input[placeholder='Slot (0x...)']");
+    await slotInput.fill("0x1");
+    await expect(slotInput).toHaveValue("0x1");
+
+    const valInput = page.locator("input[placeholder='Value (0x...)']");
+    await valInput.fill("0x2a");
+    await expect(valInput).toHaveValue("0x2a");
+  });
+
+  test("multiple balance overrides can be added and each removed independently", async ({
+    page,
+  }) => {
+    await page.goto("/contract-caller");
+    await page.locator("button").filter({ hasText: /^▶$/ }).click();
+
+    await page.locator("button").filter({ hasText: "+ Balance" }).click();
+    await page.locator("button").filter({ hasText: "+ Balance" }).click();
+
+    const addrInputs = page.locator("input[placeholder='Address (0x...)']");
+    await expect(addrInputs).toHaveCount(2);
+
+    const removeBtns = page.locator("button[title='Remove override']");
+    await expect(removeBtns).toHaveCount(2);
+
+    await removeBtns.first().click();
+    await expect(page.locator("button[title='Remove override']")).toHaveCount(
+      1,
+    );
+  });
+});
