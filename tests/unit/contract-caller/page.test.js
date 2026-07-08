@@ -373,9 +373,6 @@ describe("ContractCallerPage wiring", () => {
   it("passes live integration callbacks instead of stubs", () => {
     const { unmount } = renderPage();
 
-    expect(callExecutionArgs.setShowSettings).toBe(
-      settingsState.setShowSettings,
-    );
     expect(callExecutionArgs.setCachedAddresses).toBe(
       abiHookState.setCachedAddressesState,
     );

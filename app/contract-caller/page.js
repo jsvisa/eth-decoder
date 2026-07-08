@@ -260,7 +260,6 @@ export default function ContractCallerPage() {
     balanceOverrides: simOpts.balanceOverrides,
     storageOverrides: simOpts.storageOverrides,
     setFieldErrors: fn.setFieldErrors,
-    setShowSettings,
     getChainId,
     setCachedAddresses: abi.setCachedAddressesState,
     getCachedAddresses: abi.getCachedAddresses,

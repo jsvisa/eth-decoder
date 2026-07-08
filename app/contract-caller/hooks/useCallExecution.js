@@ -50,7 +50,6 @@ import {
  * @param {string}   params.contractName
  * @param {object}   params.cheatcodes         - { deal, prank, warp }
  * @param {Function} params.setFieldErrors
- * @param {Function} params.setShowSettings
  * @param {Function} params.getChainId          - (chain) => numericId
  * @param {Function} params.setCachedAddresses
  * @param {Function} params.getCachedAddresses
@@ -81,7 +80,6 @@ export function useCallExecution({
   balanceOverrides,
   storageOverrides,
   setFieldErrors,
-  setShowSettings,
   getChainId,
   setCachedAddresses,
   getCachedAddresses,
