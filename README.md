@@ -184,17 +184,17 @@ Simulate a raw transaction against forked chain state and return decoded results
 | `gas`              | No       | Hex gas limit (passed through; tevm estimates if omitted)                                                       |
 | `apiKeys`          | No       | `{ "etherscan": "...", "routescan": "..." }` — falls back to `ETHERSCAN_API_KEY` / `ROUTESCAN_API_KEY` env vars |
 | `rpcUrl`           | No       | Custom RPC URL for forking chain state. Falls back to default public node if omitted.                           |
-| `balanceOverrides` | No  | Array of `{address, balance}` — sets native ETH balance for addresses before simulation (same as `vm.deal`)    |
-| `storageOverrides` | No  | Array of `{address, slot, value}` — sets contract storage slots before simulation                              |
-| `cheatcodes`       | No  | Object with `deal`, `warp`, or `prank` keys. See cheatcodes details below.                                     |
+| `balanceOverrides` | No       | Array of `{address, balance}` — sets native ETH balance for addresses before simulation (same as `vm.deal`)     |
+| `storageOverrides` | No       | Array of `{address, slot, value}` — sets contract storage slots before simulation                               |
+| `cheatcodes`       | No       | Object with `deal`, `warp`, or `prank` keys. See cheatcodes details below.                                      |
 
 **Cheatcodes:**
 
-| Field                    | Description                                                                       |
-| ------------------------ | --------------------------------------------------------------------------------- |
-| `cheatcodes.deal`        | `{address, amount}` — sets ETH balance (same as balanceOverrides, single address) |
-| `cheatcodes.warp`        | `{timestamp}` — sets block timestamp (Unix seconds, number)                       |
-| `cheatcodes.prank`       | `{address}` — impersonates `msg.sender` (overrides `from`)                       |
+| Field              | Description                                                                       |
+| ------------------ | --------------------------------------------------------------------------------- |
+| `cheatcodes.deal`  | `{address, amount}` — sets ETH balance (same as balanceOverrides, single address) |
+| `cheatcodes.warp`  | `{timestamp}` — sets block timestamp (Unix seconds, number)                       |
+| `cheatcodes.prank` | `{address}` — impersonates `msg.sender` (overrides `from`)                        |
 
 **Example:**
 
