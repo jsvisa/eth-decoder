@@ -468,3 +468,35 @@ describe("POST /api/simulate-tx — simulation", () => {
     expect(getAbiFromCache).toHaveBeenCalledWith(1, mixedCase);
   });
 });
+
+describe("POST /api/simulate-tx — state overrides", () => {
+  it("passes balanceOverrides to simulateWithTevm", async () => {
+    const balanceOverrides = [{ address: "0xabc", balance: "1.5" }];
+    await POST(makeRequest({ ...VALID_BODY, balanceOverrides }));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({ balanceOverrides }),
+    );
+  });
+
+  it("passes storageOverrides to simulateWithTevm", async () => {
+    const storageOverrides = [{ address: "0xdef", slot: "0x0", value: "0xff" }];
+    await POST(makeRequest({ ...VALID_BODY, storageOverrides }));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({ storageOverrides }),
+    );
+  });
+
+  it("defaults balanceOverrides to empty array when not provided", async () => {
+    await POST(makeRequest(VALID_BODY));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({ balanceOverrides: [] }),
+    );
+  });
+
+  it("defaults storageOverrides to empty array when not provided", async () => {
+    await POST(makeRequest(VALID_BODY));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({ storageOverrides: [] }),
+    );
+  });
+});

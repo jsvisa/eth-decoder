@@ -173,17 +173,19 @@ Simulate a raw transaction against forked chain state and return decoded results
 
 **Request body:**
 
-| Field         | Required | Description                                                                                                     |
-| ------------- | -------- | --------------------------------------------------------------------------------------------------------------- |
-| `chainId`     | Yes      | Numeric chain ID (1 = Ethereum, 42161 = Arbitrum, 8453 = Base, 137 = Polygon, 56 = BSC)                         |
-| `to`          | Yes      | Contract address                                                                                                |
-| `data`        | Yes      | Hex-encoded calldata                                                                                            |
-| `from`        | Yes      | Sender address — used as `msg.sender` in simulation                                                             |
-| `value`       | No       | Hex-encoded ETH value (default `"0x0"`)                                                                         |
-| `blockNumber` | No       | Hex block number or `"latest"` (default `"latest"`)                                                             |
-| `gas`         | No       | Hex gas limit (passed through; tevm estimates if omitted)                                                       |
-| `apiKeys`     | No       | `{ "etherscan": "...", "routescan": "..." }` — falls back to `ETHERSCAN_API_KEY` / `ROUTESCAN_API_KEY` env vars |
-| `rpcUrl`      | No       | Custom RPC URL for forking chain state. Falls back to default public node if omitted.                           |
+| Field              | Required | Description                                                                                                     |
+| ------------------ | -------- | --------------------------------------------------------------------------------------------------------------- |
+| `chainId`          | Yes      | Numeric chain ID (1 = Ethereum, 42161 = Arbitrum, 8453 = Base, 137 = Polygon, 56 = BSC)                         |
+| `to`               | Yes      | Contract address                                                                                                |
+| `data`             | Yes      | Hex-encoded calldata                                                                                            |
+| `from`             | Yes      | Sender address — used as `msg.sender` in simulation                                                             |
+| `value`            | No       | Hex-encoded ETH value (default `"0x0"`)                                                                         |
+| `blockNumber`      | No       | Hex block number or `"latest"` (default `"latest"`)                                                             |
+| `gas`              | No       | Hex gas limit (passed through; tevm estimates if omitted)                                                       |
+| `apiKeys`          | No       | `{ "etherscan": "...", "routescan": "..." }` — falls back to `ETHERSCAN_API_KEY` / `ROUTESCAN_API_KEY` env vars |
+| `rpcUrl`           | No       | Custom RPC URL for forking chain state. Falls back to default public node if omitted.                           |
+| `balanceOverrides` | No       | Array of `{address, balance}` — sets native ETH balance for addresses before simulation (same as `vm.deal`)     |
+| `storageOverrides` | No       | Array of `{address, slot, value}` — sets contract storage slots before simulation                               |
 
 **Example:**
 
