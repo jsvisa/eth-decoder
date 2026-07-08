@@ -43,6 +43,8 @@ export async function POST(request) {
     blockNumber = "latest",
     apiKeys = {},
     rpcUrl = null,
+    balanceOverrides = [],
+    storageOverrides = [],
   } = body;
 
   if (!chainId) {
@@ -197,6 +199,8 @@ export async function POST(request) {
       blockNumber:
         blockNumber === "latest" ? "latest" : String(BigInt(blockNumber)),
       abiCache: abiCacheMap,
+      balanceOverrides,
+      storageOverrides,
     });
 
     const resultWithRequest = { ...result, requestBody };
