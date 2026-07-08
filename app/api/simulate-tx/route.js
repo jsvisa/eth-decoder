@@ -45,6 +45,7 @@ export async function POST(request) {
     rpcUrl = null,
     balanceOverrides = [],
     storageOverrides = [],
+    cheatcodes = {},
   } = body;
 
   if (!chainId) {
@@ -201,6 +202,7 @@ export async function POST(request) {
       abiCache: abiCacheMap,
       balanceOverrides,
       storageOverrides,
+      cheatcodes,
     });
 
     const resultWithRequest = { ...result, requestBody };

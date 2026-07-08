@@ -184,8 +184,17 @@ Simulate a raw transaction against forked chain state and return decoded results
 | `gas`              | No       | Hex gas limit (passed through; tevm estimates if omitted)                                                       |
 | `apiKeys`          | No       | `{ "etherscan": "...", "routescan": "..." }` — falls back to `ETHERSCAN_API_KEY` / `ROUTESCAN_API_KEY` env vars |
 | `rpcUrl`           | No       | Custom RPC URL for forking chain state. Falls back to default public node if omitted.                           |
-| `balanceOverrides` | No       | Array of `{address, balance}` — sets native ETH balance for addresses before simulation (same as `vm.deal`)     |
-| `storageOverrides` | No       | Array of `{address, slot, value}` — sets contract storage slots before simulation                               |
+| `balanceOverrides` | No  | Array of `{address, balance}` — sets native ETH balance for addresses before simulation (same as `vm.deal`)    |
+| `storageOverrides` | No  | Array of `{address, slot, value}` — sets contract storage slots before simulation                              |
+| `cheatcodes`       | No  | Object with `deal`, `warp`, or `prank` keys. See cheatcodes details below.                                     |
+
+**Cheatcodes:**
+
+| Field                    | Description                                                                       |
+| ------------------------ | --------------------------------------------------------------------------------- |
+| `cheatcodes.deal`        | `{address, amount}` — sets ETH balance (same as balanceOverrides, single address) |
+| `cheatcodes.warp`        | `{timestamp}` — sets block timestamp (Unix seconds, number)                       |
+| `cheatcodes.prank`       | `{address}` — impersonates `msg.sender` (overrides `from`)                       |
 
 **Example:**
 
@@ -202,6 +211,24 @@ curl -X POST http://localhost:3000/api/simulate-tx \
 ```
 
 **Response:** Same JSON shape as the browser simulation result — `success`, `simulated`, `blockNumber`, `gasUsed`, `logs` (decoded), `callTrace` (decoded with inputs/outputs), `assetChanges`, `stateChanges`, `metrics`, plus `simulationId` (UUID for retrieving the cached result later) and `requestBody` (the input parameters used for the simulation — `chainId`, `to`, `data`, `from`, `value`, `gas`, `blockNumber`, `functionName` — restored when loading via `?simulationId=`).
+
+**Example with cheatcodes:**
+
+```bash
+curl -X POST http://localhost:3000/api/simulate-tx \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chainId": 1,
+    "to": "0x99161BA892ECae335616624c84FAA418F64FF9A6",
+    "data": "0x5e7db13d...",
+    "from": "0xd719fc03782E9617e81D138a3e9B1875da4D6a03",
+    "cheatcodes": {
+      "deal": { "address": "0xabc", "amount": "100" },
+      "warp": { "timestamp": 1700000000 },
+      "prank": { "address": "0xdef" }
+    }
+  }'
+```
 
 **Error responses:**
 

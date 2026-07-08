@@ -499,4 +499,23 @@ describe("POST /api/simulate-tx — state overrides", () => {
       expect.objectContaining({ storageOverrides: [] }),
     );
   });
+
+  it("passes cheatcodes to simulateWithTevm", async () => {
+    const cheatcodes = {
+      deal: { address: "0xabc", amount: "1.5" },
+      warp: { timestamp: 1700000000 },
+      prank: { address: "0xdef" },
+    };
+    await POST(makeRequest({ ...VALID_BODY, cheatcodes }));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({ cheatcodes }),
+    );
+  });
+
+  it("defaults cheatcodes to empty object when not provided", async () => {
+    await POST(makeRequest(VALID_BODY));
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({ cheatcodes: {} }),
+    );
+  });
 });
