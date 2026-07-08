@@ -49,6 +49,8 @@ import {
  * @param {Function} params.setSessionHistory
  * @param {string}   params.contractName
  * @param {object}   params.cheatcodes         - { deal, prank, warp }
+ * @param {Array}    params.balanceOverrides   - [{address, balance}, ...] applied via tevmSetAccount
+ * @param {Array}    params.storageOverrides   - [{address, slot, value}, ...] applied via tevmSetAccount state map
  * @param {Function} params.setFieldErrors
  * @param {Function} params.getChainId          - (chain) => numericId
  * @param {Function} params.setCachedAddresses

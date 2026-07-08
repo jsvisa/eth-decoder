@@ -65,8 +65,6 @@ const simulationOptionsState = {
   setBalanceOverrides: vi.fn(),
   storageOverrides: [],
   setStorageOverrides: vi.fn(),
-  timestampOverride: "",
-  setTimestampOverride: vi.fn(),
   simOptionsExpanded: false,
   setSimOptionsExpanded: vi.fn(),
 };
