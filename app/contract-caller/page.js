@@ -257,6 +257,8 @@ export default function ContractCallerPage() {
     setSessionHistory: session.appendToSessionHistory,
     contractName: abi.contractName,
     cheatcodes: simOpts.cheatcodes,
+    balanceOverrides: simOpts.balanceOverrides,
+    storageOverrides: simOpts.storageOverrides,
     setFieldErrors: fn.setFieldErrors,
     setShowSettings,
     getChainId,
@@ -511,6 +513,10 @@ export default function ContractCallerPage() {
                   onFromAddressChange={simOpts.setFromAddress}
                   cheatcodes={simOpts.cheatcodes}
                   onCheatcodesChange={simOpts.setCheatcodes}
+                  balanceOverrides={simOpts.balanceOverrides}
+                  onBalanceOverridesChange={simOpts.setBalanceOverrides}
+                  storageOverrides={simOpts.storageOverrides}
+                  onStorageOverridesChange={simOpts.setStorageOverrides}
                   expanded={simOpts.simOptionsExpanded}
                   onToggleExpanded={() =>
                     simOpts.setSimOptionsExpanded((v) => !v)

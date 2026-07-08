@@ -34,6 +34,10 @@ function makeProps(overrides = {}) {
     onFromAddressChange: vi.fn(),
     cheatcodes: makeCheatcodes(),
     onCheatcodesChange: vi.fn(),
+    balanceOverrides: [],
+    onBalanceOverridesChange: vi.fn(),
+    storageOverrides: [],
+    onStorageOverridesChange: vi.fn(),
     expanded: false,
     onToggleExpanded: vi.fn(),
     fieldErrors: {},
@@ -245,6 +249,103 @@ describe("SimulationOptions", () => {
       (i) => i.placeholder === "Unix Timestamp",
     );
     expect(tsInput).toBeTruthy();
+    cleanup();
+  });
+
+  it("renders + Balance and + Storage buttons", () => {
+    const { container, cleanup } = renderComponent(makeProps());
+    const buttons = container.querySelectorAll("button");
+    const btnTexts = Array.from(buttons).map((b) => b.textContent.trim());
+    expect(btnTexts).toContain("+ Balance");
+    expect(btnTexts).toContain("+ Storage");
+    cleanup();
+  });
+
+  it("calls onBalanceOverridesChange when + Balance button is clicked", () => {
+    const props = makeProps();
+    const { container, cleanup } = renderComponent(props);
+    const buttons = container.querySelectorAll("button");
+    const balanceBtn = Array.from(buttons).find(
+      (b) => b.textContent.trim() === "+ Balance",
+    );
+    act(() => {
+      balanceBtn.click();
+    });
+    expect(props.onBalanceOverridesChange).toHaveBeenCalledWith([
+      { address: "", balance: "" },
+    ]);
+    cleanup();
+  });
+
+  it("calls onStorageOverridesChange when + Storage button is clicked", () => {
+    const props = makeProps();
+    const { container, cleanup } = renderComponent(props);
+    const buttons = container.querySelectorAll("button");
+    const storageBtn = Array.from(buttons).find(
+      (b) => b.textContent.trim() === "+ Storage",
+    );
+    act(() => {
+      storageBtn.click();
+    });
+    expect(props.onStorageOverridesChange).toHaveBeenCalledWith([
+      { address: "", slot: "", value: "" },
+    ]);
+    cleanup();
+  });
+
+  it("renders balance override rows when expanded", () => {
+    const balanceOverrides = [{ address: "0x123", balance: "1.5" }];
+    const { container, cleanup } = renderComponent(
+      makeProps({ expanded: true, balanceOverrides }),
+    );
+    expect(container.textContent).toContain("Balance Overrides:");
+    const inputs = container.querySelectorAll("input[type='text']");
+    const addressInput = Array.from(inputs).find((i) => i.value === "0x123");
+    expect(addressInput).toBeTruthy();
+    const balInput = Array.from(inputs).find((i) => i.value === "1.5");
+    expect(balInput).toBeTruthy();
+    cleanup();
+  });
+
+  it("renders storage override rows when expanded", () => {
+    const storageOverrides = [{ address: "0xabc", slot: "0x0", value: "0x1" }];
+    const { container, cleanup } = renderComponent(
+      makeProps({ expanded: true, storageOverrides }),
+    );
+    expect(container.textContent).toContain("Storage Overrides:");
+    const inputs = container.querySelectorAll("input[type='text']");
+    const addrInput = Array.from(inputs).find((i) => i.value === "0xabc");
+    expect(addrInput).toBeTruthy();
+    cleanup();
+  });
+
+  it("calls onBalanceOverridesChange(filtered) when a balance override × is clicked", () => {
+    const balanceOverrides = [
+      { address: "0x1", balance: "1" },
+      { address: "0x2", balance: "2" },
+    ];
+    const props = makeProps({ expanded: true, balanceOverrides });
+    const { container, cleanup } = renderComponent(props);
+    const removeBtns = Array.from(container.querySelectorAll("button")).filter(
+      (b) => b.title === "Remove override",
+    );
+    act(() => {
+      removeBtns[0].click();
+    });
+    expect(props.onBalanceOverridesChange).toHaveBeenCalledWith([
+      { address: "0x2", balance: "2" },
+    ]);
+    cleanup();
+  });
+
+  it("does not show override rows when expanded=false", () => {
+    const balanceOverrides = [{ address: "0x1", balance: "1" }];
+    const storageOverrides = [{ address: "0x2", slot: "0x0", value: "0xff" }];
+    const { container, cleanup } = renderComponent(
+      makeProps({ expanded: false, balanceOverrides, storageOverrides }),
+    );
+    expect(container.textContent).not.toContain("Balance Overrides:");
+    expect(container.textContent).not.toContain("Storage Overrides:");
     cleanup();
   });
 });

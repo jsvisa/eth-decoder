@@ -4,7 +4,7 @@ import { useState } from "react";
 
 /**
  * Owns write-mode simulation knobs: from address, fork block, cheatcodes,
- * and the options-section expanded flag.
+ * state overrides, and the options-section expanded flag.
  */
 export function useSimulationOptions() {
   const [fromAddress, setFromAddress] = useState("");
@@ -14,9 +14,10 @@ export function useSimulationOptions() {
     prank: { enabled: false, address: "" },
     warp: { enabled: false, timestamp: "" },
   });
+  const [balanceOverrides, setBalanceOverrides] = useState([]);
+  const [storageOverrides, setStorageOverrides] = useState([]);
   const [simOptionsExpanded, setSimOptionsExpanded] = useState(false);
 
-  // Reset all write-mode simulation options to their initial defaults.
   const resetWriteOptions = () => {
     setFromAddress("");
     setForkBlockNumber("");
@@ -25,6 +26,8 @@ export function useSimulationOptions() {
       prank: { enabled: false, address: "" },
       warp: { enabled: false, timestamp: "" },
     });
+    setBalanceOverrides([]);
+    setStorageOverrides([]);
     setSimOptionsExpanded(false);
   };
 
@@ -35,6 +38,10 @@ export function useSimulationOptions() {
     setForkBlockNumber,
     cheatcodes,
     setCheatcodes,
+    balanceOverrides,
+    setBalanceOverrides,
+    storageOverrides,
+    setStorageOverrides,
     simOptionsExpanded,
     setSimOptionsExpanded,
     resetWriteOptions,

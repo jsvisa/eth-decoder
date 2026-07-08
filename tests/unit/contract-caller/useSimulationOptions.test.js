@@ -13,6 +13,8 @@ describe("useSimulationOptions – initial state", () => {
       prank: { enabled: false, address: "" },
       warp: { enabled: false, timestamp: "" },
     });
+    expect(result.current.balanceOverrides).toEqual([]);
+    expect(result.current.storageOverrides).toEqual([]);
     expect(result.current.simOptionsExpanded).toBe(false);
     expect(typeof result.current.resetWriteOptions).toBe("function");
   });
@@ -54,6 +56,24 @@ describe("useSimulationOptions – happy path", () => {
     // Other cheatcodes are untouched
     expect(result.current.cheatcodes.prank.enabled).toBe(false);
     expect(result.current.cheatcodes.warp.enabled).toBe(false);
+
+    act(() => {
+      result.current.setBalanceOverrides([
+        { address: "0xabc", balance: "1.5" },
+      ]);
+    });
+    expect(result.current.balanceOverrides).toEqual([
+      { address: "0xabc", balance: "1.5" },
+    ]);
+
+    act(() => {
+      result.current.setStorageOverrides([
+        { address: "0xdef", slot: "0x0", value: "0x1" },
+      ]);
+    });
+    expect(result.current.storageOverrides).toEqual([
+      { address: "0xdef", slot: "0x0", value: "0x1" },
+    ]);
   });
 });
 
@@ -68,6 +88,10 @@ describe("useSimulationOptions – resetWriteOptions", () => {
       );
       result.current.setForkBlockNumber("18000000");
       result.current.setSimOptionsExpanded(true);
+      result.current.setBalanceOverrides([{ address: "0x1", balance: "5" }]);
+      result.current.setStorageOverrides([
+        { address: "0x2", slot: "0x1", value: "0xff" },
+      ]);
       result.current.setCheatcodes({
         deal: { enabled: true, address: "0x3", amount: "1" },
         prank: { enabled: true, address: "0x4" },
@@ -77,6 +101,7 @@ describe("useSimulationOptions – resetWriteOptions", () => {
 
     // Verify they were set
     expect(result.current.fromAddress).not.toBe("");
+    expect(result.current.balanceOverrides).toHaveLength(1);
 
     // Reset
     act(() => {
@@ -90,6 +115,8 @@ describe("useSimulationOptions – resetWriteOptions", () => {
       prank: { enabled: false, address: "" },
       warp: { enabled: false, timestamp: "" },
     });
+    expect(result.current.balanceOverrides).toEqual([]);
+    expect(result.current.storageOverrides).toEqual([]);
     expect(result.current.simOptionsExpanded).toBe(false);
   });
 
@@ -107,6 +134,8 @@ describe("useSimulationOptions – resetWriteOptions", () => {
       prank: { enabled: false, address: "" },
       warp: { enabled: false, timestamp: "" },
     });
+    expect(result.current.balanceOverrides).toEqual([]);
+    expect(result.current.storageOverrides).toEqual([]);
     expect(result.current.simOptionsExpanded).toBe(false);
   });
 });

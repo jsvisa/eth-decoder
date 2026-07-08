@@ -14,6 +14,10 @@ import styles from "./SimulationOptions.module.css";
  *   onFromAddressChange      {(s: string) => void}
  *   cheatcodes               {Cheatcodes}
  *   onCheatcodesChange       {(c: Cheatcodes) => void}
+ *   balanceOverrides         {Array<{address:string,balance:string}>}
+ *   onBalanceOverridesChange {(Array) => void}
+ *   storageOverrides         {Array<{address:string,slot:string,value:string}>}
+ *   onStorageOverridesChange {(Array) => void}
  *   expanded                 {boolean}
  *   onToggleExpanded         {() => void}
  *   fieldErrors              {Record<string,string>}
@@ -78,6 +82,10 @@ export default function SimulationOptions({
   onFromAddressChange,
   cheatcodes,
   onCheatcodesChange,
+  balanceOverrides = [],
+  onBalanceOverridesChange,
+  storageOverrides = [],
+  onStorageOverridesChange,
   expanded,
   onToggleExpanded,
   fieldErrors = {},
@@ -161,6 +169,40 @@ export default function SimulationOptions({
         onBookmarkClick: onOpenBookmarkModal,
         error: fieldErrors.fromAddress,
       }),
+    ),
+  );
+
+  // State override buttons
+  inlineItems.push(
+    React.createElement(
+      "button",
+      {
+        key: "addBalance",
+        type: "button",
+        className: styles.addOverrideBtn,
+        onClick: () =>
+          onBalanceOverridesChange([
+            ...balanceOverrides,
+            { address: "", balance: "" },
+          ]),
+        title: "Add balance override",
+      },
+      "+ Balance",
+    ),
+    React.createElement(
+      "button",
+      {
+        key: "addStorage",
+        type: "button",
+        className: styles.addOverrideBtn,
+        onClick: () =>
+          onStorageOverridesChange([
+            ...storageOverrides,
+            { address: "", slot: "", value: "" },
+          ]),
+        title: "Add storage override",
+      },
+      "+ Storage",
     ),
   );
 
@@ -265,5 +307,127 @@ export default function SimulationOptions({
     ),
     // Expanded cheatcodes
     expandedCheatcodes,
+    // Balance overrides
+    expanded &&
+      balanceOverrides.length > 0 &&
+      React.createElement(
+        "div",
+        { className: styles.simOptionsExpanded },
+        React.createElement(
+          "div",
+          { className: styles.overridesLabel },
+          "Balance Overrides:",
+        ),
+        ...balanceOverrides.map((override, index) =>
+          React.createElement(
+            "div",
+            { key: index, className: styles.cheatcodeExpandedRow },
+            React.createElement("input", {
+              type: "text",
+              value: override.address,
+              onChange: (e) => {
+                const next = balanceOverrides.map((o, i) =>
+                  i === index ? { ...o, address: e.target.value } : o,
+                );
+                onBalanceOverridesChange(next);
+              },
+              placeholder: "Address (0x...)",
+              className: styles.simOptionInput,
+            }),
+            React.createElement("input", {
+              type: "text",
+              value: override.balance,
+              onChange: (e) => {
+                const next = balanceOverrides.map((o, i) =>
+                  i === index ? { ...o, balance: e.target.value } : o,
+                );
+                onBalanceOverridesChange(next);
+              },
+              placeholder: "ETH Balance",
+              className: styles.simOptionInputSmall,
+            }),
+            React.createElement(
+              "button",
+              {
+                type: "button",
+                className: styles.removeOverrideBtn,
+                onClick: () =>
+                  onBalanceOverridesChange(
+                    balanceOverrides.filter((_, i) => i !== index),
+                  ),
+                title: "Remove override",
+              },
+              "×",
+            ),
+          ),
+        ),
+      ),
+    // Storage overrides
+    expanded &&
+      storageOverrides.length > 0 &&
+      React.createElement(
+        "div",
+        { className: styles.simOptionsExpanded },
+        React.createElement(
+          "div",
+          { className: styles.overridesLabel },
+          "Storage Overrides:",
+        ),
+        ...storageOverrides.map((override, index) =>
+          React.createElement(
+            "div",
+            { key: index, className: styles.cheatcodeExpandedRow },
+            React.createElement("input", {
+              type: "text",
+              value: override.address,
+              onChange: (e) => {
+                const next = storageOverrides.map((o, i) =>
+                  i === index ? { ...o, address: e.target.value } : o,
+                );
+                onStorageOverridesChange(next);
+              },
+              placeholder: "Contract (0x...)",
+              className: styles.simOptionInput,
+            }),
+            React.createElement("input", {
+              type: "text",
+              value: override.slot,
+              onChange: (e) => {
+                const next = storageOverrides.map((o, i) =>
+                  i === index ? { ...o, slot: e.target.value } : o,
+                );
+                onStorageOverridesChange(next);
+              },
+              placeholder: "Slot (0x...)",
+              className: styles.simOptionInputSmall,
+            }),
+            React.createElement("input", {
+              type: "text",
+              value: override.value,
+              onChange: (e) => {
+                const next = storageOverrides.map((o, i) =>
+                  i === index ? { ...o, value: e.target.value } : o,
+                );
+                onStorageOverridesChange(next);
+              },
+              placeholder: "Value (0x...)",
+              className: styles.simOptionInputSmall,
+            }),
+            React.createElement(
+              "button",
+              {
+                type: "button",
+                className: styles.removeOverrideBtn,
+                onClick: () =>
+                  onStorageOverridesChange(
+                    storageOverrides.filter((_, i) => i !== index),
+                  ),
+                title: "Remove override",
+              },
+              "×",
+            ),
+          ),
+        ),
+      ),
   );
 }

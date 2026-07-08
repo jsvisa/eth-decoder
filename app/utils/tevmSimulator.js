@@ -853,6 +853,8 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     valueUnit = "ETH",
     rpcUrl,
     cheatcodes = {},
+    balanceOverrides = [],
+    storageOverrides = [],
     abiCache = new Map(),
     onProgress = null,
     abortSignal = null,
@@ -902,6 +904,26 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
 
     // Apply cheatcodes
     const { prankAddress } = await applyCheatcodes(client, cheatcodes);
+
+    // Apply balance overrides (additional deal-style balance sets)
+    for (const ov of balanceOverrides) {
+      if (ov.address && ov.balance) {
+        await client.tevmSetAccount({
+          address: ov.address,
+          balance: parseEther(ov.balance.toString()),
+        });
+      }
+    }
+
+    // Apply storage overrides
+    for (const ov of storageOverrides) {
+      if (ov.address && ov.slot && ov.value) {
+        await client.tevmSetAccount({
+          address: ov.address,
+          state: { [ov.slot]: ov.value },
+        });
+      }
+    }
 
     // Determine sender address
     const sender =
