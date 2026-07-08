@@ -540,7 +540,7 @@ test.describe("Balance Changes click-to-expand", () => {
 test.describe("Simulation state overrides UI", () => {
   test("adds and removes balance override rows", async ({ page }) => {
     await page.goto("/contract-caller");
-    await page.locator("button").filter({ hasText: "▶" }).click();
+    await page.locator("button").filter({ hasText: /^▶$/ }).click();
 
     await page.locator("button").filter({ hasText: "+ Balance" }).click();
     await expect(page.locator("text=Balance Overrides:")).toBeVisible();
@@ -559,7 +559,7 @@ test.describe("Simulation state overrides UI", () => {
 
   test("adds and removes storage override rows", async ({ page }) => {
     await page.goto("/contract-caller");
-    await page.locator("button").filter({ hasText: "▶" }).click();
+    await page.locator("button").filter({ hasText: /^▶$/ }).click();
 
     await page.locator("button").filter({ hasText: "+ Storage" }).click();
     await expect(page.locator("text=Storage Overrides:")).toBeVisible();
@@ -582,7 +582,7 @@ test.describe("Simulation state overrides UI", () => {
 
   test("balance override inputs update values on typing", async ({ page }) => {
     await page.goto("/contract-caller");
-    await page.locator("button").filter({ hasText: "▶" }).click();
+    await page.locator("button").filter({ hasText: /^▶$/ }).click();
 
     await page.locator("button").filter({ hasText: "+ Balance" }).click();
 
@@ -599,7 +599,7 @@ test.describe("Simulation state overrides UI", () => {
 
   test("storage override inputs update values on typing", async ({ page }) => {
     await page.goto("/contract-caller");
-    await page.locator("button").filter({ hasText: "▶" }).click();
+    await page.locator("button").filter({ hasText: /^▶$/ }).click();
 
     await page.locator("button").filter({ hasText: "+ Storage" }).click();
 
@@ -622,7 +622,7 @@ test.describe("Simulation state overrides UI", () => {
     page,
   }) => {
     await page.goto("/contract-caller");
-    await page.locator("button").filter({ hasText: "▶" }).click();
+    await page.locator("button").filter({ hasText: /^▶$/ }).click();
 
     await page.locator("button").filter({ hasText: "+ Balance" }).click();
     await page.locator("button").filter({ hasText: "+ Balance" }).click();
