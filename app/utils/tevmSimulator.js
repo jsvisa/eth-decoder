@@ -1264,7 +1264,6 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     return finalize({
       success,
       simulated: true,
-      localSimulation: true,
       blockNumber: pinnedBlock,
       rawData: rawOutput,
       decoded: decodedOutputs,
@@ -1313,7 +1312,6 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     return finalize({
       success: false,
       simulated: true,
-      localSimulation: true,
       rawData: "0x",
       decoded: [],
       gasUsed: 0,

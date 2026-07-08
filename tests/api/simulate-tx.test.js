@@ -36,7 +36,6 @@ const VALID_BODY = {
 const SIM_RESULT = {
   success: true,
   simulated: true,
-  localSimulation: true,
   blockNumber: "latest",
   rawData: "0x",
   decoded: [],
