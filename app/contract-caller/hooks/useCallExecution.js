@@ -41,6 +41,7 @@ import {
  * @param {string}   params.readBlockNumber
  * @param {object}   params.apiKeys            - { etherscan, routescan, ... }
  * @param {object}   params.rpcSettings        - chain -> rpcUrl map
+ * @param {string}   params.rawCalldata      - raw hex calldata for ABI-less simulation
  * @param {number}   params.rpcBatchSize
  * @param {boolean}  params.sessionActive
  * @param {boolean}  params.sessionStarting
@@ -67,6 +68,7 @@ export function useCallExecution({
   fromAddress,
   ethValue,
   ethValueUnit,
+  rawCalldata,
   forkBlockNumber,
   readBlockNumber,
   apiKeys,
@@ -150,7 +152,7 @@ export function useCallExecution({
   const handleCall = async () => {
     if (typeof setFieldErrors === "function") setFieldErrors({});
 
-    if (!address || !selectedFunction || !parsedAbi) {
+    if (!address || (!selectedFunction && !rawCalldata)) {
       const errors = {};
       if (!address || !isValidEthAddress(address)) errors.address = true;
       if (typeof setFieldErrors === "function") setFieldErrors(errors);
@@ -159,7 +161,8 @@ export function useCallExecution({
     }
 
     const selectedFunc = getSelectedFunction();
-    const isWrite = !isReadOnly(selectedFunc);
+    const isRawCall = !selectedFunc && !!rawCalldata;
+    const isWrite = isRawCall ? true : !isReadOnly(selectedFunc);
 
     // ── validation ────────────────────────────────────────────────────────────
     const errors = {};
@@ -213,7 +216,11 @@ export function useCallExecution({
       }
     }
 
-    if (selectedFunc?.inputs && typeof validateAddressesInArg === "function") {
+    if (
+      !isRawCall &&
+      selectedFunc?.inputs &&
+      typeof validateAddressesInArg === "function"
+    ) {
       const argErrors = [];
       selectedFunc.inputs.forEach((input, index) => {
         const argValue = args[index];
@@ -288,7 +295,9 @@ export function useCallExecution({
         const chainIdForSimulation = getChainId?.(chain);
 
         const initialAbiCache = buildAbiCacheFromStorage(chain);
-        initialAbiCache.set(address.toLowerCase(), parsedAbi);
+        if (parsedAbi) {
+          initialAbiCache.set(address.toLowerCase(), parsedAbi);
+        }
 
         const abortController = new AbortController();
         simAbortRef.current?.abort();
@@ -298,9 +307,10 @@ export function useCallExecution({
         const simParams = {
           chain,
           address,
-          functionName: selectedFunction,
-          args,
-          abi: parsedAbi,
+          functionName: isRawCall ? null : selectedFunction,
+          args: isRawCall ? [] : args,
+          abi: isRawCall ? null : parsedAbi,
+          ...(isRawCall ? { callData: rawCalldata } : {}),
           fromAddress: fromAddress || undefined,
           value: ethValueInfo.value,
           valueUnit: ethValueInfo.unit,
@@ -336,8 +346,8 @@ export function useCallExecution({
                 id: ts,
                 address,
                 contractName: contractName || address.slice(0, 8) + "...",
-                functionName: selectedFunction,
-                type: isWrite ? "write" : "read",
+                functionName: isRawCall ? null : selectedFunction,
+                type: "write",
                 success: data.success,
                 inputs: data.callTrace?.decodedInputs || [],
                 outputs: data.decoded || [],
@@ -429,7 +439,7 @@ export function useCallExecution({
         ) {
           setCachedAddresses(getCachedAddresses());
         }
-      } else {
+      } else if (!isRawCall) {
         const requestBody = {
           chain,
           address,
@@ -484,7 +494,12 @@ export function useCallExecution({
 
       if (typeof saveToHistory === "function") {
         saveToHistory(
-          { chain, address, selectedFunction, args },
+          {
+            chain,
+            address,
+            selectedFunction: isRawCall ? null : selectedFunction,
+            args,
+          },
           data,
           isWrite,
         );

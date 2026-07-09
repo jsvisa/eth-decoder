@@ -8,7 +8,8 @@ import styles from "./CallActionBar.module.css";
  * plus Copy Calldata, Share URL, session banner, and sim progress bar.
  *
  * Props:
- *   selectedFunction   {string}       – disable when none picked
+ *   selectedFunction   {string}       – disable when none picked, unless rawCalldata
+ *   rawCalldata        {string}       – raw hex calldata for ABI-less simulation
  *   isWrite            {boolean}      – show simulate vs call label
  *   loading            {boolean}      – in-flight state
  *   simProgress        {number|null}  – 0–100 percent, or null when idle
@@ -27,6 +28,7 @@ import styles from "./CallActionBar.module.css";
  */
 export default function CallActionBar({
   selectedFunction,
+  rawCalldata,
   isWrite,
   loading,
   simProgress,
@@ -71,10 +73,14 @@ export default function CallActionBar({
         sessionStarting ? "Starting..." : "Start Session",
       );
 
+  const hasCalldata = !!selectedFunction || !!rawCalldata;
+
   // Build call button label
   let callButtonLabel;
   if (loading) {
     callButtonLabel = isWrite ? "Simulating..." : "Calling...";
+  } else if (rawCalldata && !selectedFunction) {
+    callButtonLabel = "Simulate Calldata";
   } else if (isWrite) {
     callButtonLabel = sessionActive ? "Execute in Session" : "Simulate Call";
   } else {
@@ -109,7 +115,7 @@ export default function CallActionBar({
           {
             onClick: onCall,
             className: callButtonClass,
-            disabled: loading || !selectedFunction || sessionStarting,
+            disabled: loading || !hasCalldata || sessionStarting,
           },
           callButtonLabel,
         ),
