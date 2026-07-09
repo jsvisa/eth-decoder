@@ -42,7 +42,6 @@ const SIM_RESULT = {
   gasUsed: 63086,
   logs: [],
   callTrace: null,
-  assetChanges: [],
   balanceChanges: [],
   stateChanges: [],
   accessList: [],

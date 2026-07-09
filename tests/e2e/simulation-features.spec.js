@@ -57,7 +57,6 @@ const MOCK_SIMULATE_OUTPUT = {
       ],
     },
   ],
-  assetChanges: [],
   balanceChanges: [
     {
       address: FROM_ADDR,

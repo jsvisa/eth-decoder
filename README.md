@@ -210,7 +210,7 @@ curl -X POST http://localhost:3000/api/simulate-tx \
   }'
 ```
 
-**Response:** Same JSON shape as the browser simulation result — `success`, `simulated`, `blockNumber`, `gasUsed`, `logs` (decoded), `callTrace` (decoded with inputs/outputs), `assetChanges`, `stateChanges`, `metrics`, plus `simulationId` (UUID for retrieving the cached result later) and `requestBody` (the input parameters used for the simulation — `chainId`, `to`, `data`, `from`, `value`, `gas`, `blockNumber`, `functionName` — restored when loading via `?simulationId=`).
+**Response:** Same JSON shape as the browser simulation result — `success`, `simulated`, `blockNumber`, `gasUsed`, `logs` (decoded), `callTrace` (decoded with inputs/outputs), `balanceChanges`, `stateChanges`, `metrics`, plus `simulationId` (UUID for retrieving the cached result later) and `requestBody` (the input parameters used for the simulation — `chainId`, `to`, `data`, `from`, `value`, `gas`, `blockNumber`, `functionName` — restored when loading via `?simulationId=`).
 
 **Example with cheatcodes:**
 

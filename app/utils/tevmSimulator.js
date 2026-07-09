@@ -14,7 +14,7 @@ import {
 import { isValidEthAddress } from "./validation";
 import { CHAIN_META, FORK_RPC_URLS } from "./chains";
 import { createMetricsCollector } from "./rpcMetrics";
-
+import { buildTokenAccountMap } from "./tokenTransfers";
 // Create an http transport with or without JSON-RPC batching.
 // batchSize=1 → http(url) with NO batch option — guarantees single {…} request
 //               format, compatible with all RPCs including those that reject arrays.
@@ -836,6 +836,23 @@ async function prefetchAccountsFromAccessList({
   }
 }
 
+function extractBalanceChangesFromLogs(logs) {
+  const accountMap = buildTokenAccountMap(logs);
+  const changes = [];
+  for (const [address, data] of Object.entries(accountMap)) {
+    for (const [tokenAddress, rawAmount] of Object.entries(data.tokens)) {
+      if (rawAmount === 0n) continue;
+      changes.push({
+        address,
+        tokenAddress,
+        rawAmount: rawAmount.toString(),
+        diff: rawAmount.toString(),
+      });
+    }
+  }
+  return changes;
+}
+
 /**
  * Inner simulation body. Accepts an already-created tevm client and runs the
  * full simulation on it. Not exported — callers use simulateWithTevm or
@@ -1290,8 +1307,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       rawData: rawOutput,
       decoded: decodedOutputs,
       gasUsed,
-      assetChanges: [],
-      balanceChanges: [],
+      balanceChanges: extractBalanceChangesFromLogs(parsedLogs),
       logs: parsedLogs,
       callTrace: callTraceTree,
       stateChanges: [],
@@ -1337,7 +1353,6 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       rawData: "0x",
       decoded: [],
       gasUsed: 0,
-      assetChanges: [],
       balanceChanges: [],
       logs: [],
       callTrace: null,

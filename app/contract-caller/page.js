@@ -307,7 +307,6 @@ export default function ContractCallerPage() {
     tokens.fetchTokenSymbolsForLogs(exec.result.logs, chainId);
     tokens.fetchTokenDataForSimulation(
       exec.result.logs,
-      exec.result.assetChanges,
       exec.result.balanceChanges,
       chainId,
     );

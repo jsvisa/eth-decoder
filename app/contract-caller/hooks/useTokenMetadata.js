@@ -163,13 +163,10 @@ export function useTokenMetadata(chain, rpcSettings = {}) {
    * Fetch decimals and prices for all tokens involved in a simulation result.
    *
    * @param {Array|null} logs - Raw log objects
-   * @param {Array|null} assetChanges - Asset change objects from simulation
-   * @param {Array|null} balanceChanges - Balance change objects (native token)
    * @param {number} chainNumericId - Numeric chain ID
    */
   const fetchTokenDataForSimulation = async (
     logs,
-    assetChanges,
     balanceChanges,
     chainNumericId,
   ) => {
@@ -183,13 +180,6 @@ export function useTokenMetadata(chain, rpcSettings = {}) {
           TOKEN_TRANSFER_TOPICS.has(log.topics[0])
         ) {
           tokenAddresses.add(log.address.toLowerCase());
-        }
-      }
-    }
-    if (assetChanges) {
-      for (const change of assetChanges) {
-        if (change.token_info?.contract_address) {
-          tokenAddresses.add(change.token_info.contract_address.toLowerCase());
         }
       }
     }
