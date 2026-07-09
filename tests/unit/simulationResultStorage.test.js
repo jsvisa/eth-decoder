@@ -32,7 +32,6 @@ const SIM_DATA = {
       amount: "-1,000",
       price: 1,
       valueUsd: -1000,
-      diff: "-1000000000",
     },
   ],
   _tokenMeta: {

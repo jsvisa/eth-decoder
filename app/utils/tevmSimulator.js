@@ -848,8 +848,7 @@ function extractBalanceChangesFromLogs(logs) {
       changes.push({
         address,
         tokenAddress,
-        rawAmount: rawAmount.toString(),
-        diff: rawAmount.toString(),
+        value: rawAmount.toString(),
       });
     }
   }
@@ -884,8 +883,7 @@ function extractNativeChangesFromTrace(trace) {
     changes.push({
       address,
       tokenAddress: NATIVE_TOKEN_ADDRESS,
-      rawAmount: diff.toString(),
-      diff: diff.toString(),
+      value: diff.toString(),
     });
   }
   return changes;

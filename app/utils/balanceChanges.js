@@ -83,17 +83,16 @@ function enrichNativeChange(change, rawAmount, options) {
   const symbol = normalizeSymbol(options.nativeTokenSymbol) || "ETH";
   const price = normalizePrice(options.tokenPrices[NATIVE_TOKEN_ADDRESS]);
   return {
-    ...change,
+    ...(change || {}),
     address: change.address?.toLowerCase(),
     tokenAddress: NATIVE_TOKEN_ADDRESS,
     symbol,
     name: symbol,
     decimals: 18,
-    rawAmount: rawAmount.toString(),
+    value: rawAmount.toString(),
     amount,
     price,
     valueUsd: usdValue(rawAmount, 18, price),
-    diff: rawAmount.toString(),
   };
 }
 
@@ -116,17 +115,16 @@ function enrichTokenChange(address, tokenAddress, rawAmount, options) {
   );
   const price = options.tokenPrices[tokenAddress] ?? storedChange?.price;
   return {
-    ...storedChange,
+    ...(storedChange || {}),
     address,
     tokenAddress,
     symbol: tokenName(tokenAddress, symbol),
     name: tokenName(tokenAddress, symbol),
     decimals,
-    rawAmount: rawAmount.toString(),
+    value: rawAmount.toString(),
     amount,
     price: normalizePrice(price),
     valueUsd: usdValue(rawAmount, decimals, price),
-    diff: rawAmount.toString(),
   };
 }
 
@@ -141,7 +139,7 @@ function addStoredTokenChange(accountMap, storedTokenChanges, change) {
   if (!address || !tokenAddress || tokenAddress === NATIVE_TOKEN_ADDRESS) {
     return;
   }
-  const rawAmount = parseBigInt(change.rawAmount ?? change.diff);
+  const rawAmount = parseBigInt(change.value);
   if (rawAmount === null || rawAmount === 0n) return;
   if (!accountMap[address]) accountMap[address] = { native: null, tokens: {} };
   if (accountMap[address].tokens[tokenAddress] == null) {
@@ -173,7 +171,7 @@ export function enrichBalanceChanges({
       continue;
     }
 
-    const rawAmount = parseBigInt(change.diff ?? change.rawAmount);
+    const rawAmount = parseBigInt(change.value);
     if (rawAmount === null || rawAmount === 0n) continue;
     if (!accountMap[address])
       accountMap[address] = { native: null, tokens: {} };

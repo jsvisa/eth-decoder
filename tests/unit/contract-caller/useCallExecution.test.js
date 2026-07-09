@@ -237,11 +237,10 @@ describe("useCallExecution – handleShareUrl", () => {
         symbol: "ETH",
         name: "ETH",
         decimals: 18,
-        rawAmount: "-1000000000000000000",
+        value: "-1000000000000000000",
         amount: "-1",
         price: 2500,
         valueUsd: -2500,
-        diff: "-1000000000000000000",
       },
     ];
     global.fetch.mockResolvedValueOnce({
@@ -259,7 +258,6 @@ describe("useCallExecution – handleShareUrl", () => {
             address: enrichedBalanceChanges[0].address,
             before: "10000000000000000000",
             after: "9000000000000000000",
-            diff: "-1000000000000000000",
           },
         ],
       });
@@ -282,7 +280,6 @@ describe("useCallExecution – handleShareUrl", () => {
         address: enrichedBalanceChanges[0].address,
         before: "10000000000000000000",
         after: "9000000000000000000",
-        diff: "-1000000000000000000",
       },
     ]);
     expect(payload._tokenMeta).toEqual({

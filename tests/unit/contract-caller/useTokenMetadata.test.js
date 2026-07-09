@@ -185,7 +185,7 @@ describe("useTokenMetadata — error handling", () => {
     await act(async () => {
       await result.current.fetchTokenDataForSimulation(
         null,
-        [{ address: "0xabc", diff: "1000000000000000000" }],
+        [{ address: "0xabc", value: "1000000000000000000" }],
         CHAIN_ID,
       );
     });

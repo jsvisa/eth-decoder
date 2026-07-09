@@ -427,7 +427,7 @@ export default function ResultPanel({
     return (
       change.before != null &&
       change.after != null &&
-      change.diff != null &&
+      change.value != null &&
       (!tokenAddress || tokenAddress === NATIVE_TOKEN_ADDRESS)
     );
   });
@@ -632,13 +632,13 @@ export default function ResultPanel({
                         <span className={styles.balanceAfter}>
                           {formatNativeWhole(change.after)} {nativeTokenSymbol}
                         </span>
-                        {parseBigIntOrNull(change.diff) !== null && (
+                        {parseBigIntOrNull(change.value) !== null && (
                           <span
-                            className={`${styles.balanceDiff} ${isNonNegativeBigInt(change.diff) ? styles.balanceDiffPositive : styles.balanceDiffNegative}`}
+                            className={`${styles.balanceDiff} ${isNonNegativeBigInt(change.value) ? styles.balanceDiffPositive : styles.balanceDiffNegative}`}
                           >
-                            ({isNonNegativeBigInt(change.diff) ? "+" : ""}
-                            {formatNativeWhole(change.diff)} {nativeTokenSymbol}
-                            )
+                            ({isNonNegativeBigInt(change.value) ? "+" : ""}
+                            {formatNativeWhole(change.value)}{" "}
+                            {nativeTokenSymbol})
                           </span>
                         )}
                       </div>
@@ -665,7 +665,7 @@ export default function ResultPanel({
                     .map((change) => {
                       let diff;
                       try {
-                        diff = BigInt(String(change.rawAmount ?? change.diff));
+                        diff = BigInt(String(change.value));
                       } catch {
                         return null;
                       }
