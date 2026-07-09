@@ -16,6 +16,7 @@ import {
   simulateWithTevm,
   redecodeLogs,
   redecodeCallTrace,
+  collectAllCallAddresses,
 } from "../../utils/tevmSimulator";
 import { isValidEthAddress } from "../../utils/validation";
 import {
@@ -268,34 +269,45 @@ export async function POST(request) {
       cheatcodes,
     });
 
-    // Fetch ABIs for undecoded addresses (parallel) and re-decode logs + call trace
-    if (result.undecodedAddresses?.length > 0) {
+    // Collect all addresses needing ABIs, fetch uncached ones in parallel, re-decode
+    const neededAddrs = new Set(
+      result.undecodedAddresses?.map((a) => a.toLowerCase()),
+    );
+    if (result.callTrace) {
+      for (const addr of collectAllCallAddresses(result.callTrace)) {
+        neededAddrs.add(addr.toLowerCase());
+      }
+    }
+    if (neededAddrs.size > 0) {
       const extraAbis = new Map();
-      await Promise.all(
-        result.undecodedAddresses.map(async (addr) => {
-          // Check server disk cache first
-          let fetched = await getAbiFromCache(numericChainId, addr);
-          if (fetched?.abi) {
-            extraAbis.set(addr.toLowerCase(), fetched.abi);
-            return;
-          }
-          // Not cached — fetch via explorers
-          try {
-            fetched = await fetchAbi(addr, numericChainId, {
-              etherscanKey,
-              routescanKey,
-              viemChain: chain.viemChain,
-              rpcUrl: chain.rpcUrl,
-              detectProxy: true,
-            });
-            if (fetched?.abi) {
-              extraAbis.set(addr.toLowerCase(), fetched.abi);
+      const toFetch = [];
+      for (const addr of neededAddrs) {
+        if (abiCacheMap.has(addr)) continue;
+        const cached = await getAbiFromCache(numericChainId, addr);
+        if (cached?.abi) {
+          extraAbis.set(addr, cached.abi);
+        } else {
+          toFetch.push(addr);
+        }
+      }
+      if (toFetch.length > 0) {
+        await Promise.all(
+          toFetch.map(async (addr) => {
+            try {
+              const fetched = await fetchAbi(addr, numericChainId, {
+                etherscanKey,
+                routescanKey,
+                viemChain: chain.viemChain,
+                rpcUrl: chain.rpcUrl,
+                detectProxy: true,
+              });
+              if (fetched?.abi) extraAbis.set(addr, fetched.abi);
+            } catch {
+              // ABI fetch failed
             }
-          } catch {
-            // ABI fetch failed, event stays undecoded
-          }
-        }),
-      );
+          }),
+        );
+      }
       if (extraAbis.size > 0) {
         for (const [addr, abi] of extraAbis) {
           abiCacheMap.set(addr, abi);
