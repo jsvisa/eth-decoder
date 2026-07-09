@@ -303,7 +303,10 @@ export async function POST(request) {
               });
               if (fetched?.abi) {
                 extraAbis.set(addr, fetched.abi);
-                setAbiInCache(numericChainId, addr, { ...fetched, fetchedAt: Date.now() }).catch(() => {});
+                setAbiInCache(numericChainId, addr, {
+                  ...fetched,
+                  fetchedAt: Date.now(),
+                }).catch(() => {});
               }
             } catch {
               // ABI fetch failed
