@@ -213,24 +213,24 @@ curl -X POST http://localhost:3000/api/simulate-tx \
 
 **Response fields:**
 
-| Field                | Type           | Description                                                                                                |
-| -------------------- | -------------- | ---------------------------------------------------------------------------------------------------------- |
-| `success`            | `boolean`      | `false` if the transaction reverted                                                                        |
-| `simulated`          | `boolean`      | Always `true` for simulated results                                                                        |
-| `blockNumber`        | `string`       | Block height the simulation ran against                                                                    |
-| `gasUsed`            | `number`       | Gas consumed by the execution                                                                              |
-| `logs`               | `Array`        | Decoded event logs (name, topics, data, inputs)                                                            |
-| `callTrace`          | `object\|null` | Tree of call frames with decoded inputs/outputs                                                            |
-| `balanceChanges`     | `Array`        | Token + native ETH balance changes extracted from logs and trace                                           |
-| `stateChanges`       | `Array`        | Storage slot changes (currently always `[]`)                                                               |
-| `metrics`            | `object`       | Timing and RPC call counters                                                                               |
-| `rawData`            | `string`       | Hex-encoded raw return data                                                                                |
-| `decoded`            | `Array`        | Decoded function return values `[{name, type, value}]`                                                     |
-| `error`              | `string\|null` | Human-readable revert reason or `null`                                                                     |
-| `accessList`         | `Array`        | Addresses and storage keys accessed                                                                        |
-| `undecodedAddresses` | `Array`        | Log-emitting addresses whose ABI wasn't available                                                          |
-| `requestBody`        | `object`       | Input params used (`chainId`, `to`, `from`, `value`, `data`, `gas`, `blockNumber`, `functionName`, `args`) |
-| `simulationId`       | `string\|null` | UUID for retrieving a saved result via `?simulationId=`                                                    |
+| Field                | Type           | Description                                                                                                               |
+| -------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `success`            | `boolean`      | `false` if the transaction reverted                                                                                       |
+| `simulated`          | `boolean`      | Always `true` for simulated results                                                                                       |
+| `blockNumber`        | `string`       | Block height the simulation ran against                                                                                   |
+| `gasUsed`            | `number`       | Gas consumed by the execution                                                                                             |
+| `logs`               | `Array`        | Decoded event logs (name, topics, data, inputs)                                                                           |
+| `callTrace`          | `object\|null` | Tree of call frames with decoded inputs/outputs                                                                           |
+| `balanceChanges`     | `Array`        | Token + native ETH balance changes extracted from logs and trace                                                          |
+| `stateChanges`       | `Array`        | Storage slot changes (currently always `[]`)                                                                              |
+| `metrics`            | `object`       | Timing and RPC call counters                                                                                              |
+| `rawData`            | `string`       | Hex-encoded raw return data from the contract call. `"0x"` for void functions (e.g. `transfer`) or when the call reverted |
+| `decoded`            | `Array`        | Decoded function return values `[{name, type, value}]`. Empty `[]` for void functions or when the ABI has no outputs      |
+| `error`              | `string\|null` | Human-readable revert reason or `null`                                                                                    |
+| `accessList`         | `Array`        | Addresses and storage keys accessed                                                                                       |
+| `undecodedAddresses` | `Array`        | Log-emitting addresses whose ABI wasn't available                                                                         |
+| `requestBody`        | `object`       | Input params used (`chainId`, `to`, `from`, `value`, `data`, `gas`, `blockNumber`, `functionName`, `args`)                |
+| `simulationId`       | `string\|null` | UUID for retrieving a saved result via `?simulationId=`                                                                   |
 
 **Example with cheatcodes:**
 
