@@ -935,25 +935,26 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
 
   try {
     // Find the function in ABI — supports both plain name and full signature (e.g. "transfer(address,uint256)")
-    const functionAbi = abi.find((item) => {
-      if (item.type !== "function") return false;
-      if (functionName.includes("(")) {
-        const types = item.inputs?.map((i) => i.type).join(",") || "";
-        return `${item.name}(${types})` === functionName;
-      }
-      return item.name === functionName;
-    });
-
-    if (!functionAbi) {
-      throw new Error(`Function ${functionName} not found in ABI`);
+    let functionAbi = null;
+    if (functionName) {
+      functionAbi = abi.find((item) => {
+        if (item.type !== "function") return false;
+        if (functionName.includes("(")) {
+          const types = item.inputs?.map((i) => i.type).join(",") || "";
+          return `${item.name}(${types})` === functionName;
+        }
+        return item.name === functionName;
+      });
     }
 
-    // Parse args based on types
-    const parsedArgs = (args || []).map((arg, index) => {
-      const input = functionAbi.inputs[index];
-      if (!input) return arg;
-      return parseArgValue(arg, input);
-    });
+    // Parse args based on types (only when function ABI is known)
+    const parsedArgs = functionAbi
+      ? (args || []).map((arg, index) => {
+          const input = functionAbi.inputs[index];
+          if (!input) return arg;
+          return parseArgValue(arg, input);
+        })
+      : [];
 
     // Apply cheatcodes
     const { prankAddress } = await applyCheatcodes(client, cheatcodes);
@@ -1241,7 +1242,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     let decodedOutputs = [];
     if (
       success &&
-      functionAbi.outputs &&
+      functionAbi?.outputs &&
       functionAbi.outputs.length > 0 &&
       rawOutput !== "0x"
     ) {
@@ -1299,12 +1300,16 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     // Annotate root frame with decoded function info
     if (callTraceRoot) {
       callTraceRoot.functionName = functionName;
-      callTraceRoot.decodedInputs = functionAbi.inputs.map((input, index) => ({
-        name: input.name || `input${index}`,
-        type: input.type,
-        value: serializeValue(parsedArgs[index]),
-      }));
-      callTraceRoot.decodedOutputs = decodedOutputs;
+      if (functionAbi) {
+        callTraceRoot.decodedInputs = functionAbi.inputs.map(
+          (input, index) => ({
+            name: input.name || `input${index}`,
+            type: input.type,
+            value: serializeValue(parsedArgs[index]),
+          }),
+        );
+        callTraceRoot.decodedOutputs = decodedOutputs;
+      }
       if (!success && !callTraceRoot.error) {
         callTraceRoot.error =
           callResult.errors?.[0]?.message || "Transaction reverted";

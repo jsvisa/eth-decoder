@@ -447,11 +447,13 @@ describe("POST /api/simulate-tx — simulation", () => {
     );
   });
 
-  it("returns 422 when calldata does not match the ABI", async () => {
+  it("proceeds with simulation when calldata does not match the ABI", async () => {
     const mismatchData = "0xdeadbeef";
     const res = await POST(makeRequest({ ...VALID_BODY, data: mismatchData }));
-    expect(res.status).toBe(422);
-    expect((await res.json()).error).toMatch(/failed to decode calldata/i);
+    expect(res.status).toBe(200);
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({ functionName: null }),
+    );
   });
 
   it("returns 422 when fetchAbi returns an entry without abi", async () => {
