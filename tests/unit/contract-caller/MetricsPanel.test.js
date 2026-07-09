@@ -49,14 +49,12 @@ describe("<MetricsPanel>", () => {
     cleanup();
   });
 
-  it("renders summary numbers", () => {
+  it("renders summary numbers when expanded", () => {
     const { container, cleanup } = renderComponent({ metrics: sample });
     const text = container.textContent;
-    expect(text.includes("1240")).toBeTruthy();
-    expect(text.includes("eth_getCode")).toBeTruthy();
-    expect(text.includes("eth_getStorageAt")).toBeTruthy();
-    expect(text.includes("12 unique addresses")).toBeTruthy();
-    expect(text.includes("28 unique slots")).toBeTruthy();
+    expect(text.includes("1240ms")).toBeTruthy();
+    expect(text.includes("47 rpc calls")).toBeTruthy();
+    expect(text.includes("eth_getCode")).toBeFalsy();
     cleanup();
   });
 
@@ -66,6 +64,8 @@ describe("<MetricsPanel>", () => {
       rpc: { ...sample.rpc, duplicates: 3 },
     };
     const { container, cleanup } = renderComponent({ metrics });
+    const header = container.querySelector("button");
+    act(() => header.click());
     expect(/3 duplicate/i.test(container.textContent)).toBeTruthy();
     cleanup();
   });

@@ -9,7 +9,7 @@ function fmtMs(n) {
 }
 
 export default function MetricsPanel({ metrics }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   if (!metrics) return null;
 
   const { totalMs, phases, rpc, touched } = metrics;
