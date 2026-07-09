@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import yaml from "js-yaml";
+import { formatEther } from "viem";
 import { formatTokenAmount } from "../../utils/tokenFormatting";
 import {
   NATIVE_TOKEN_ADDRESS,
@@ -236,6 +237,17 @@ function CallTraceNode({ trace, depth, chain }) {
     depth,
   );
 
+  const traceValueBadge = (() => {
+    if (!trace.value) return null;
+    try {
+      const val = BigInt(trace.value);
+      if (val <= 0n) return null;
+      return `${formatEther(val)} ETH`;
+    } catch {
+      return null;
+    }
+  })();
+
   const formatValue = (value) => {
     if (value === null || value === undefined) return "null";
     if (typeof value === "object") {
@@ -282,6 +294,9 @@ function CallTraceNode({ trace, depth, chain }) {
         <span className={styles.traceType}>{trace.type}</span>
         <span className={styles.traceSignature}>
           <span className={styles.traceContractWrapper}>
+            {traceValueBadge && (
+              <span className={styles.traceValueBadge}>{traceValueBadge}</span>
+            )}
             <span className={styles.traceContract}>{contractLabel}</span>
             {!hideTooltip && (
               <TraceTooltip
@@ -551,6 +566,23 @@ export default function ResultPanel({
                         {result.callTrace?.to || address}
                       </span>
                     </div>
+                    {result.callTrace?.value &&
+                      (() => {
+                        try {
+                          const val = BigInt(result.callTrace.value);
+                          if (val <= 0n) return null;
+                          return (
+                            <div className={styles.txInfoRow}>
+                              <span className={styles.txInfoLabel}>Value:</span>
+                              <span className={styles.txInfoValue}>
+                                {formatEther(val)} ETH
+                              </span>
+                            </div>
+                          );
+                        } catch {
+                          return null;
+                        }
+                      })()}
                     {result.callTrace?.input && (
                       <div className={styles.txInfoRow}>
                         <span className={styles.txInfoLabel}>Input:</span>

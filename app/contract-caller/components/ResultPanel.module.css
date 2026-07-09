@@ -553,6 +553,18 @@
   border-bottom-color: #6ee7b7;
 }
 
+.traceValueBadge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #1e1e1e;
+  background-color: #f5a623;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  margin-right: 0.35rem;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
 .traceDot {
   color: #808080;
 }
