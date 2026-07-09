@@ -919,12 +919,13 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
 
   // Validate inputs before the try/catch so callers receive a rejected promise
   // rather than a resolved { success: false } for programmer errors.
-  // When functionName and abi are both null, run a raw EVM call without decode.
-  const isRawCall = !functionName && !abi;
+  // When functionName is null, run a raw EVM call without decode/annotation
+  // (the function selector might not be in the provided ABI).
+  const isRawCall = !functionName;
   if (!address) {
     throw new Error("Missing required parameter: address");
   }
-  if (!isRawCall && (!functionName || !abi)) {
+  if (!isRawCall && !abi) {
     throw new Error("Missing required parameters: address, functionName, abi");
   }
   if (!isValidEthAddress(address)) {
@@ -941,7 +942,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
   try {
     let functionAbi = null;
     let parsedArgs = args || [];
-    if (!isRawCall) {
+    if (functionName && abi) {
       // Find the function in ABI — supports both plain name and full signature (e.g. "transfer(address,uint256)")
       functionAbi = abi.find((item) => {
         if (item.type !== "function") return false;
@@ -952,18 +953,15 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
         return item.name === functionName;
       });
 
-      if (!functionAbi) {
-        throw new Error(`Function ${functionName} not found in ABI`);
+      if (functionAbi) {
+        // Parse args based on types
+        parsedArgs = (args || []).map((arg, index) => {
+          const input = functionAbi.inputs[index];
+          if (!input) return arg;
+          return parseArgValue(arg, input);
+        });
       }
-
-      // Parse args based on types
-      parsedArgs = (args || []).map((arg, index) => {
-        const input = functionAbi.inputs[index];
-        if (!input) return arg;
-        return parseArgValue(arg, input);
-      });
     }
-
     // Apply cheatcodes
     const { prankAddress } = await applyCheatcodes(client, cheatcodes);
 

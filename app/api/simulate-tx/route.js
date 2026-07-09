@@ -214,11 +214,8 @@ export async function POST(request) {
         abi: abiEntry.abi,
         data,
       }));
-    } catch (e) {
-      return NextResponse.json(
-        { error: `Failed to decode calldata: ${e.message}` },
-        { status: 422 },
-      );
+    } catch {
+      functionName = null;
     }
     abiCacheMap.set(to.toLowerCase(), abiEntry.abi);
   }
