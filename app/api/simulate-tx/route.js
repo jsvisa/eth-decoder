@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
-import { decodeFunctionData, defineChain } from "viem";
-import { getChainConfigByChainId } from "../../utils/chains";
+import {
+  decodeFunctionData,
+  defineChain,
+  createPublicClient,
+  http,
+} from "viem";
+import {
+  getChainConfigByChainId,
+  CGC_CHAIN_SLUGS,
+  ETH_NATIVE_CHAIN_IDS,
+} from "../../utils/chains";
 import { fetchAbi } from "../fetch-abi/route";
 import { getAbiFromCache, setAbiInCache } from "../../utils/serverAbiCache";
 import { simulateWithTevm } from "../../utils/tevmSimulator";
@@ -10,6 +19,30 @@ import {
   pruneExpiredResults,
 } from "../../utils/simulationCache";
 import { buildSimulationLink } from "../../utils/simulationLinks";
+import { enrichBalanceChanges } from "../../utils/balanceChanges";
+
+const NATIVE_TOKEN = "0x0000000000000000000000000000000000000000";
+const TRANSFER_TOPIC =
+  "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+
+const SYMBOL_ABI = [
+  {
+    type: "function",
+    name: "symbol",
+    inputs: [],
+    outputs: [{ type: "string" }],
+    stateMutability: "view",
+  },
+];
+const DECIMALS_ABI = [
+  {
+    type: "function",
+    name: "decimals",
+    inputs: [],
+    outputs: [{ type: "uint8" }],
+    stateMutability: "view",
+  },
+];
 
 function buildChainConfig(numericChainId, rpcUrl) {
   return {
@@ -46,6 +79,7 @@ export async function POST(request) {
     balanceOverrides = [],
     storageOverrides = [],
     cheatcodes = {},
+    price = true,
   } = body;
 
   if (!chainId) {
@@ -205,10 +239,110 @@ export async function POST(request) {
       cheatcodes,
     });
 
-    const resultWithRequest = { ...result, requestBody };
+    let enrichedResult = result;
+    if (price && result.balanceChanges?.length) {
+      try {
+        const client = chain.rpcUrl
+          ? createPublicClient({
+              chain: chain.viemChain,
+              transport: http(chain.rpcUrl),
+            })
+          : null;
+
+        const tokenAddresses = new Set();
+        for (const log of result.logs || []) {
+          if (
+            log.address &&
+            log.topics?.[0] === TRANSFER_TOPIC &&
+            isValidEthAddress(log.address)
+          ) {
+            tokenAddresses.add(log.address.toLowerCase());
+          }
+        }
+
+        const tokenSymbols = {};
+        const tokenDecimals = {};
+        const tokenPrices = {};
+        const chainSlug = CGC_CHAIN_SLUGS[numericChainId];
+
+        for (const addr of [...tokenAddresses, NATIVE_TOKEN]) {
+          if (addr !== NATIVE_TOKEN && client) {
+            try {
+              const symbol = await client.readContract({
+                address: addr,
+                abi: SYMBOL_ABI,
+                functionName: "symbol",
+              });
+              tokenSymbols[addr] = symbol;
+            } catch {
+              // Symbol fetch failed, skip
+            }
+            try {
+              const decimals = await client.readContract({
+                address: addr,
+                abi: DECIMALS_ABI,
+                functionName: "decimals",
+              });
+              tokenDecimals[addr] = Number(decimals);
+            } catch {
+              // Decimals fetch failed, skip
+            }
+          }
+
+          try {
+            let priceUrl;
+            if (addr === NATIVE_TOKEN) {
+              const cgcId = ETH_NATIVE_CHAIN_IDS.has(numericChainId)
+                ? "ethereum"
+                : chainSlug;
+              if (cgcId) {
+                priceUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${cgcId}&vs_currencies=usd`;
+                const res = await fetch(priceUrl, {
+                  signal: AbortSignal.timeout(5000),
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  tokenPrices[addr] = data[cgcId]?.usd ?? null;
+                }
+              }
+            } else if (chainSlug) {
+              priceUrl = `https://api.coingecko.com/api/v3/simple/token_price/${chainSlug}?contract_addresses=${addr}&vs_currencies=usd`;
+              const res = await fetch(priceUrl, {
+                signal: AbortSignal.timeout(5000),
+              });
+              if (res.ok) {
+                const data = await res.json();
+                tokenPrices[addr] = data[addr]?.usd ?? null;
+              }
+            }
+          } catch {
+            // Price fetch failed, skip
+          }
+        }
+
+        const enriched = enrichBalanceChanges({
+          logs: result.logs,
+          balanceChanges: result.balanceChanges,
+          tokenSymbols,
+          tokenDecimals,
+          tokenPrices,
+          nativeTokenSymbol: chain.viemChain?.nativeCurrency?.symbol || "ETH",
+        });
+
+        enrichedResult = {
+          ...result,
+          balanceChanges: enriched,
+          _tokenMeta: { tokenSymbols, tokenDecimals, tokenPrices },
+        };
+      } catch {
+        // Enrichment failed — return raw result
+      }
+    }
+
+    const resultWithRequest = { ...enrichedResult, requestBody };
     const simulationId = await saveSimulationResult(resultWithRequest);
     return NextResponse.json({
-      ...result,
+      ...enrichedResult,
       simulationId,
       simulationLink: buildSimulationLink(request, simulationId),
       requestBody,
