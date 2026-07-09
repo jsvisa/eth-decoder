@@ -55,7 +55,7 @@ const FAKE_SIMULATION_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 vi.mock("../../app/api/fetch-abi/route.js", () => ({
   fetchAbi: vi.fn(),
 }));
-vi.mock("../../app/utils/serverAbiCache.js", () => ({
+vi.mock("../../app/utils/serverAbiBlobCache.js", () => ({
   getAbiFromCache: vi.fn(),
   setAbiInCache: vi.fn().mockResolvedValue(undefined),
 }));
@@ -68,7 +68,7 @@ import { fetchAbi } from "../../app/api/fetch-abi/route.js";
 import {
   getAbiFromCache,
   setAbiInCache,
-} from "../../app/utils/serverAbiCache.js";
+} from "../../app/utils/serverAbiBlobCache.js";
 import { simulateWithTevm } from "../../app/utils/tevmSimulator.js";
 import {
   saveSimulationResult,
