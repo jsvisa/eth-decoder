@@ -15,6 +15,9 @@ import { isValidEthAddress } from "./validation";
 import { CHAIN_META, FORK_RPC_URLS } from "./chains";
 import { createMetricsCollector } from "./rpcMetrics";
 import { buildTokenAccountMap } from "./tokenTransfers";
+
+const NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000";
+
 // Create an http transport with or without JSON-RPC batching.
 // batchSize=1 → http(url) with NO batch option — guarantees single {…} request
 //               format, compatible with all RPCs including those that reject arrays.
@@ -853,6 +856,42 @@ function extractBalanceChangesFromLogs(logs) {
   return changes;
 }
 
+function extractNativeChangesFromTrace(trace) {
+  const netChanges = {};
+  function walk(node) {
+    if (!node) return;
+    const type = node.type;
+    if (
+      (type === "CALL" || type === "CREATE" || type === "CREATE2") &&
+      node.value &&
+      !node.error
+    ) {
+      const value = BigInt(node.value);
+      if (value > 0n) {
+        const from = node.from?.toLowerCase();
+        const to = node.to?.toLowerCase();
+        if (from) netChanges[from] = (netChanges[from] ?? 0n) - value;
+        if (to) netChanges[to] = (netChanges[to] ?? 0n) + value;
+      }
+    }
+    if (node.calls) {
+      for (const child of node.calls) walk(child);
+    }
+  }
+  walk(trace);
+  const changes = [];
+  for (const [address, diff] of Object.entries(netChanges)) {
+    if (diff === 0n) continue;
+    changes.push({
+      address,
+      tokenAddress: NATIVE_TOKEN_ADDRESS,
+      rawAmount: diff.toString(),
+      diff: diff.toString(),
+    });
+  }
+  return changes;
+}
+
 /**
  * Inner simulation body. Accepts an already-created tevm client and runs the
  * full simulation on it. Not exported — callers use simulateWithTevm or
@@ -1307,7 +1346,10 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       rawData: rawOutput,
       decoded: decodedOutputs,
       gasUsed,
-      balanceChanges: extractBalanceChangesFromLogs(parsedLogs),
+      balanceChanges: [
+        ...extractBalanceChangesFromLogs(parsedLogs),
+        ...extractNativeChangesFromTrace(callTraceTree),
+      ],
       logs: parsedLogs,
       callTrace: callTraceTree,
       stateChanges: [],
