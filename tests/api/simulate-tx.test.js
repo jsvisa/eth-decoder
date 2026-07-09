@@ -243,11 +243,15 @@ describe("POST /api/simulate-tx — validation", () => {
 });
 
 describe("POST /api/simulate-tx — ABI resolution", () => {
-  it("returns 422 when ABI cannot be fetched", async () => {
+  it("proceeds with simulation when ABI cannot be fetched", async () => {
     fetchAbi.mockResolvedValue(null);
     const res = await POST(makeRequest(VALID_BODY));
-    expect(res.status).toBe(422);
-    expect((await res.json()).error).toMatch(/abi not found/i);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.simulated).toBe(true);
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({ functionName: null, abi: null }),
+    );
   });
 
   it("uses the cached ABI on a cache hit and skips fetchAbi", async () => {
@@ -456,11 +460,15 @@ describe("POST /api/simulate-tx — simulation", () => {
     );
   });
 
-  it("returns 422 when fetchAbi returns an entry without abi", async () => {
+  it("proceeds with simulation when fetchAbi returns an entry without abi", async () => {
     fetchAbi.mockResolvedValue({ abi: null, isProxy: false });
     const res = await POST(makeRequest(VALID_BODY));
-    expect(res.status).toBe(422);
-    expect((await res.json()).error).toMatch(/abi not found/i);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.simulated).toBe(true);
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({ functionName: null, abi: null }),
+    );
   });
 
   it("passes address as-is to cache lookup", async () => {

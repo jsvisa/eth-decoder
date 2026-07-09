@@ -246,6 +246,7 @@ export default function ContractCallerPage() {
     parsedAbi: abi.parsedAbi,
     selectedFunction: fn.selectedFunction,
     args: fn.args,
+    rawCalldata: fn.pasteCalldataValue,
     fromAddress: simOpts.fromAddress,
     ethValue: fn.ethValue,
     ethValueUnit: fn.ethValueUnit,
@@ -590,6 +591,7 @@ export default function ContractCallerPage() {
 
           <CallActionBar
             selectedFunction={fn.selectedFunction}
+            rawCalldata={fn.pasteCalldataValue}
             isWrite={isWrite}
             loading={exec.loading}
             simProgress={exec.simProgress}

@@ -183,7 +183,7 @@ describe("simulateWithClient", () => {
         functionName: "transfer",
         abi: [],
       }),
-    ).rejects.toThrow("Missing required parameters");
+    ).rejects.toThrow("Missing required parameter");
   });
 
   it("persists a USDT transfer locally and exposes the new state to balanceOf reads", async () => {

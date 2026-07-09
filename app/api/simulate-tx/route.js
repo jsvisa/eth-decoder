@@ -191,6 +191,7 @@ export async function POST(request) {
   const routescanKey = apiKeys.routescan || process.env.ROUTESCAN_API_KEY || "";
 
   let abiEntry = await getAbiFromCache(numericChainId, to);
+  let functionName = null;
   if (!abiEntry) {
     const fetched = await fetchAbi(to, numericChainId, {
       etherscanKey,
@@ -199,27 +200,25 @@ export async function POST(request) {
       rpcUrl: chain.rpcUrl,
       detectProxy: true,
     });
-    if (!fetched || !fetched.abi) {
-      return NextResponse.json(
-        { error: "ABI not found. Contract may not be verified." },
-        { status: 422 },
-      );
+    if (fetched?.abi) {
+      abiEntry = { ...fetched, fetchedAt: Date.now() };
+      await setAbiInCache(numericChainId, to, abiEntry);
     }
-    abiEntry = { ...fetched, fetchedAt: Date.now() };
-    await setAbiInCache(numericChainId, to, abiEntry);
   }
 
-  let functionName;
-  try {
-    ({ functionName } = decodeFunctionData({
-      abi: abiEntry.abi,
-      data,
-    }));
-  } catch {
-    functionName = null;
-  }
+  const abiCacheMap = new Map();
 
-  const abiCacheMap = new Map([[to.toLowerCase(), abiEntry.abi]]);
+  if (abiEntry?.abi) {
+    try {
+      ({ functionName } = decodeFunctionData({
+        abi: abiEntry.abi,
+        data,
+      }));
+    } catch {
+      functionName = null;
+    }
+    abiCacheMap.set(to.toLowerCase(), abiEntry.abi);
+  }
 
   let valueStr;
   try {
@@ -253,7 +252,7 @@ export async function POST(request) {
       address: to,
       functionName,
       callData: data,
-      abi: abiEntry.abi,
+      abi: abiEntry?.abi || null,
       fromAddress: from,
       value: valueStr,
       valueUnit: "Wei",
