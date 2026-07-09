@@ -12,11 +12,7 @@ import {
 } from "../../utils/chains";
 import { fetchAbi } from "../fetch-abi/route";
 import { getAbiFromCache, setAbiInCache } from "../../utils/serverAbiCache";
-import {
-  simulateWithTevm,
-  redecodeLogs,
-  redecodeCallTrace,
-} from "../../utils/tevmSimulator";
+import { simulateWithTevm } from "../../utils/tevmSimulator";
 import { isValidEthAddress } from "../../utils/validation";
 import {
   saveSimulationResult,
@@ -267,36 +263,6 @@ export async function POST(request) {
       storageOverrides,
       cheatcodes,
     });
-
-    // Fetch ABIs for undecoded event-emitting contracts and re-decode logs
-    if (result.undecodedAddresses?.length > 0) {
-      const extraAbis = new Map();
-      for (const addr of result.undecodedAddresses) {
-        try {
-          const fetched = await fetchAbi(addr, numericChainId, {
-            etherscanKey,
-            routescanKey,
-            viemChain: chain.viemChain,
-            rpcUrl: chain.rpcUrl,
-            detectProxy: true,
-          });
-          if (fetched?.abi) {
-            extraAbis.set(addr.toLowerCase(), fetched.abi);
-          }
-        } catch {
-          // ABI fetch failed, event stays undecoded
-        }
-      }
-      if (extraAbis.size > 0) {
-        for (const [addr, abi] of extraAbis) {
-          abiCacheMap.set(addr, abi);
-        }
-        result.logs = redecodeLogs(result.logs || [], abiCacheMap);
-        if (result.callTrace) {
-          result.callTrace = redecodeCallTrace(result.callTrace, abiCacheMap);
-        }
-      }
-    }
 
     let enrichedResult = result;
     if (price && price !== "false" && result.balanceChanges?.length) {
