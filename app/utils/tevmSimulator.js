@@ -919,7 +919,12 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
 
   // Validate inputs before the try/catch so callers receive a rejected promise
   // rather than a resolved { success: false } for programmer errors.
-  if (!address || !functionName || !abi) {
+  // When functionName and abi are both null, run a raw EVM call without decode.
+  const isRawCall = !functionName && !abi;
+  if (!address) {
+    throw new Error("Missing required parameter: address");
+  }
+  if (!isRawCall && (!functionName || !abi)) {
     throw new Error("Missing required parameters: address, functionName, abi");
   }
   if (!isValidEthAddress(address)) {
@@ -934,26 +939,30 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
   };
 
   try {
-    // Find the function in ABI — supports both plain name and full signature (e.g. "transfer(address,uint256)")
-    const functionAbi = abi.find((item) => {
-      if (item.type !== "function") return false;
-      if (functionName.includes("(")) {
-        const types = item.inputs?.map((i) => i.type).join(",") || "";
-        return `${item.name}(${types})` === functionName;
+    let functionAbi = null;
+    let parsedArgs = args || [];
+    if (!isRawCall) {
+      // Find the function in ABI — supports both plain name and full signature (e.g. "transfer(address,uint256)")
+      functionAbi = abi.find((item) => {
+        if (item.type !== "function") return false;
+        if (functionName.includes("(")) {
+          const types = item.inputs?.map((i) => i.type).join(",") || "";
+          return `${item.name}(${types})` === functionName;
+        }
+        return item.name === functionName;
+      });
+
+      if (!functionAbi) {
+        throw new Error(`Function ${functionName} not found in ABI`);
       }
-      return item.name === functionName;
-    });
 
-    if (!functionAbi) {
-      throw new Error(`Function ${functionName} not found in ABI`);
+      // Parse args based on types
+      parsedArgs = (args || []).map((arg, index) => {
+        const input = functionAbi.inputs[index];
+        if (!input) return arg;
+        return parseArgValue(arg, input);
+      });
     }
-
-    // Parse args based on types
-    const parsedArgs = (args || []).map((arg, index) => {
-      const input = functionAbi.inputs[index];
-      if (!input) return arg;
-      return parseArgValue(arg, input);
-    });
 
     // Apply cheatcodes
     const { prankAddress } = await applyCheatcodes(client, cheatcodes);
@@ -999,13 +1008,20 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     }
 
     // Encode the function call (or use raw calldata if provided)
-    const callData =
-      rawCallData ||
-      encodeFunctionData({
+    let callData;
+    if (rawCallData) {
+      callData = rawCallData;
+    } else if (functionAbi) {
+      callData = encodeFunctionData({
         abi: [functionAbi],
         functionName: functionAbi.name,
         args: parsedArgs,
       });
+    } else {
+      throw new Error(
+        "Missing calldata: either rawCallData or functionName+abi is required",
+      );
+    }
 
     // Convert value to wei based on unit
     let valueInWei = 0n;
@@ -1241,7 +1257,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     let decodedOutputs = [];
     if (
       success &&
-      functionAbi.outputs &&
+      functionAbi?.outputs &&
       functionAbi.outputs.length > 0 &&
       rawOutput !== "0x"
     ) {
@@ -1276,8 +1292,10 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
 
     // Build event ABI map for log decoding
     const eventAbisByAddress = new Map();
-    const mainContractEventAbis = abi.filter((item) => item.type === "event");
-    eventAbisByAddress.set(address.toLowerCase(), mainContractEventAbis);
+    if (abi) {
+      const mainContractEventAbis = abi.filter((item) => item.type === "event");
+      eventAbisByAddress.set(address.toLowerCase(), mainContractEventAbis);
+    }
     for (const [cachedAddress, cachedAbi] of abiCache) {
       const eventAbis = cachedAbi.filter((item) => item.type === "event");
       if (eventAbis.length > 0)
@@ -1299,12 +1317,16 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     // Annotate root frame with decoded function info
     if (callTraceRoot) {
       callTraceRoot.functionName = functionName;
-      callTraceRoot.decodedInputs = functionAbi.inputs.map((input, index) => ({
-        name: input.name || `input${index}`,
-        type: input.type,
-        value: serializeValue(parsedArgs[index]),
-      }));
-      callTraceRoot.decodedOutputs = decodedOutputs;
+      if (functionAbi) {
+        callTraceRoot.decodedInputs = functionAbi.inputs.map(
+          (input, index) => ({
+            name: input.name || `input${index}`,
+            type: input.type,
+            value: serializeValue(parsedArgs[index]),
+          }),
+        );
+        callTraceRoot.decodedOutputs = decodedOutputs;
+      }
       if (!success && !callTraceRoot.error) {
         callTraceRoot.error =
           callResult.errors?.[0]?.message || "Transaction reverted";
@@ -1315,8 +1337,10 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     pruneStaticCalls(callTraceRoot);
 
     // Decode function names + args for sub-calls using the selector map
-    const selectorMap = buildSelectorMap(abi, abiCache);
-    decodeSubCallNodes(callTraceRoot, selectorMap);
+    if (abi || abiCache.size > 0) {
+      const selectorMap = buildSelectorMap(abi || [], abiCache);
+      decodeSubCallNodes(callTraceRoot, selectorMap);
+    }
 
     // Also track sub-call addresses that couldn't be decoded — their ABIs will
     // be fetched and a second decode pass run by the caller (page.js).

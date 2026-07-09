@@ -191,6 +191,7 @@ export async function POST(request) {
   const routescanKey = apiKeys.routescan || process.env.ROUTESCAN_API_KEY || "";
 
   let abiEntry = await getAbiFromCache(numericChainId, to);
+  let functionName = null;
   if (!abiEntry) {
     const fetched = await fetchAbi(to, numericChainId, {
       etherscanKey,
@@ -199,30 +200,28 @@ export async function POST(request) {
       rpcUrl: chain.rpcUrl,
       detectProxy: true,
     });
-    if (!fetched || !fetched.abi) {
+    if (fetched?.abi) {
+      abiEntry = { ...fetched, fetchedAt: Date.now() };
+      await setAbiInCache(numericChainId, to, abiEntry);
+    }
+  }
+
+  const abiCacheMap = new Map();
+
+  if (abiEntry?.abi) {
+    try {
+      ({ functionName } = decodeFunctionData({
+        abi: abiEntry.abi,
+        data,
+      }));
+    } catch (e) {
       return NextResponse.json(
-        { error: "ABI not found. Contract may not be verified." },
+        { error: `Failed to decode calldata: ${e.message}` },
         { status: 422 },
       );
     }
-    abiEntry = { ...fetched, fetchedAt: Date.now() };
-    await setAbiInCache(numericChainId, to, abiEntry);
+    abiCacheMap.set(to.toLowerCase(), abiEntry.abi);
   }
-
-  let functionName;
-  try {
-    ({ functionName } = decodeFunctionData({
-      abi: abiEntry.abi,
-      data,
-    }));
-  } catch (e) {
-    return NextResponse.json(
-      { error: `Failed to decode calldata: ${e.message}` },
-      { status: 422 },
-    );
-  }
-
-  const abiCacheMap = new Map([[to.toLowerCase(), abiEntry.abi]]);
 
   let valueStr;
   try {
@@ -256,7 +255,7 @@ export async function POST(request) {
       address: to,
       functionName,
       callData: data,
-      abi: abiEntry.abi,
+      abi: abiEntry?.abi || null,
       fromAddress: from,
       value: valueStr,
       valueUnit: "Wei",
