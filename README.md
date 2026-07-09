@@ -187,6 +187,7 @@ Simulate a raw transaction against forked chain state and return decoded results
 | `balanceOverrides` | No       | Array of `{address, balance}` — sets native ETH balance for addresses before simulation (same as `vm.deal`)     |
 | `storageOverrides` | No       | Array of `{address, slot, value}` — sets contract storage slots before simulation                               |
 | `cheatcodes`       | No       | Object with `deal`, `warp`, or `prank` keys. See cheatcodes details below.                                      |
+| `price`            | No       | `true` (default) to enrich `balanceChanges` with token symbols, decimals, and USD prices. Pass `false` to skip. |
 
 **Cheatcodes:**
 
