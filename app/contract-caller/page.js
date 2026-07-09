@@ -30,6 +30,7 @@ import AbiPanel from "./components/AbiPanel";
 import FunctionEventsTabs from "./components/FunctionEventsTabs";
 import FunctionSelector from "./components/FunctionSelector";
 import CalldataSection from "./components/CalldataSection";
+import argsStyles from "./components/ArgsInput.module.css";
 import SimulationOptions from "./components/SimulationOptions";
 import ArgsInput from "./components/ArgsInput";
 import EventsTab from "./components/EventsTab";
@@ -518,6 +519,52 @@ export default function ContractCallerPage() {
                   onDecodeAndFill={fn.handleDecodeAndFill}
                   disabled={exec.loading}
                 />
+                {fn.pasteCalldataExpanded && (
+                  <div className={argsStyles.field}>
+                    <label className={argsStyles.label}>ETH Value</label>
+                    <div className={argsStyles.ethValueWrapper}>
+                      <input
+                        type="text"
+                        value={fn.ethValue}
+                        onChange={(e) => fn.setEthValue(e.target.value)}
+                        placeholder={fn.ethValueUnit === "ETH" ? "0.0" : "0"}
+                        className={
+                          argsStyles.ethValueInput +
+                          (fn.fieldErrors.ethValue
+                            ? " " + argsStyles.inputError
+                            : "")
+                        }
+                        disabled={exec.loading}
+                      />
+                      <div className={argsStyles.ethValueUnitToggle}>
+                        <button
+                          type="button"
+                          className={
+                            argsStyles.ethValueUnitBtn +
+                            (fn.ethValueUnit === "Wei"
+                              ? " " + argsStyles.active
+                              : "")
+                          }
+                          onClick={() => fn.setEthValueUnit("Wei")}
+                        >
+                          Wei
+                        </button>
+                        <button
+                          type="button"
+                          className={
+                            argsStyles.ethValueUnitBtn +
+                            (fn.ethValueUnit === "ETH"
+                              ? " " + argsStyles.active
+                              : "")
+                          }
+                          onClick={() => fn.setEthValueUnit("ETH")}
+                        >
+                          ETH
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <SimulationOptions
                   forkBlockNumber={simOpts.forkBlockNumber}
                   onForkBlockChange={simOpts.setForkBlockNumber}
