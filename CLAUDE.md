@@ -61,3 +61,19 @@ All state is React `useState` + `localStorage`. No external state library. Keys:
 - **`contract-caller/page.js` is a thin orchestrator** (~400 lines) that composes hooks and components. Logic lives in `hooks/`, presentational rendering in `components/`. Don't inline state or effects into `page.js`.
 - **`contract-caller` layout** uses `main > div.container` (card, max-width 1200px) with `h1 "Contract Caller"` and a `div.form` flex column. First row is `div.row` with `div.networkField` (Network label + selector) and `ContractAddressInput` side by side. Match this pattern for new top-level sections.
 - **`ResultPanel`** (`components/ResultPanel.js`, ~1200 lines) handles all simulation result rendering. Don't split without explicit instruction.
+
+## Git Worktrees
+
+Create a worktree on a new branch from `main`:
+
+```bash
+git worktree add -b <branch-name> .worktrees/<branch-name> main
+```
+
+This creates the branch and worktree at `.worktrees/<branch-name>`. Work inside that directory, then remove it when done:
+
+```bash
+git worktree remove .worktrees/<branch-name>
+```
+
+The worktree shares `.git` and `node_modules` with the parent repo, so `npm` commands work directly inside it.
