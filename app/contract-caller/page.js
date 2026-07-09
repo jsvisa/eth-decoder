@@ -306,6 +306,8 @@ export default function ContractCallerPage() {
 
   useEffect(() => {
     if (!exec.result?.simulated) return;
+    // Server-side enrichment already populated _tokenMeta — no need to re-fetch
+    if (exec.result._tokenMeta) return;
 
     const chainId = getChainId(chain);
     tokens.fetchTokenSymbolsForLogs(exec.result.logs, chainId);
