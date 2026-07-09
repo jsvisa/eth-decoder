@@ -301,7 +301,10 @@ export async function POST(request) {
                 rpcUrl: chain.rpcUrl,
                 detectProxy: true,
               });
-              if (fetched?.abi) extraAbis.set(addr, fetched.abi);
+              if (fetched?.abi) {
+                extraAbis.set(addr, fetched.abi);
+                setAbiInCache(numericChainId, addr, { ...fetched, fetchedAt: Date.now() }).catch(() => {});
+              }
             } catch {
               // ABI fetch failed
             }

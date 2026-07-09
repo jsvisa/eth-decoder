@@ -30,14 +30,16 @@ const MOCK_ABI = [
   { type: "function", name: "transfer", inputs: [{ type: "address" }, { type: "uint256" }], outputs: [] },
 ];
 
-const MOCK_ABI_ENTRY = {
-  abi: MOCK_ABI,
-  contractName: "TestToken",
-  isProxy: false,
-  implAddress: null,
-  implContractName: null,
-  fetchedAt: Date.now(),
-};
+function makeAbiEntry() {
+  return {
+    abi: MOCK_ABI,
+    contractName: "TestToken",
+    isProxy: false,
+    implAddress: null,
+    implContractName: null,
+    fetchedAt: Date.now(),
+  };
+}
 
 describe("serverAbiBlobCache", () => {
   beforeEach(async () => {
@@ -71,8 +73,9 @@ describe("serverAbiBlobCache", () => {
     it("reads from blob when on Vercel with credentials", async () => {
       process.env.VERCEL = "1";
       process.env.BLOB_READ_WRITE_TOKEN = "token";
+      const abiEntry = makeAbiEntry();
       const now = Date.now();
-      const entry = { data: MOCK_ABI_ENTRY, createdAt: now, expiresAt: now + 60_000 };
+      const entry = { data: abiEntry, createdAt: now, expiresAt: now + 60_000 };
       getBlob.mockResolvedValue({
         stream: new Response(JSON.stringify(entry)).body,
       });
@@ -80,7 +83,7 @@ describe("serverAbiBlobCache", () => {
       const { getAbiFromCache } = await import("../../app/utils/serverAbiBlobCache.js");
       const result = await getAbiFromCache(1, "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
 
-      expect(result).toEqual(MOCK_ABI_ENTRY);
+      expect(result).toEqual(abiEntry);
       expect(getBlob).toHaveBeenCalledWith(
         "abis/1/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.json",
         { access: "private" },
@@ -93,14 +96,15 @@ describe("serverAbiBlobCache", () => {
       process.env.CACHE_DIR = TEST_CACHE_DIR;
       putBlob.mockResolvedValue({});
 
+      const abiEntry = makeAbiEntry();
       const { setAbiInCache } = await import("../../app/utils/serverAbiBlobCache.js");
-      await setAbiInCache(1, "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", MOCK_ABI_ENTRY);
+      await setAbiInCache(1, "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", abiEntry);
 
       expect(putBlob).toHaveBeenCalledTimes(1);
       const [blobPath, data, opts] = putBlob.mock.calls[0];
       expect(blobPath).toBe("abis/1/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.json");
       const parsed = JSON.parse(data);
-      expect(parsed.data).toEqual(MOCK_ABI_ENTRY);
+      expect(parsed.data).toEqual(abiEntry);
       expect(parsed.createdAt).toBeGreaterThan(0);
       expect(parsed.expiresAt).toBeGreaterThan(parsed.createdAt);
 
@@ -114,11 +118,12 @@ describe("serverAbiBlobCache", () => {
       process.env.BLOB_READ_WRITE_TOKEN = "token";
       getBlob.mockRejectedValue(new Error("Not found"));
 
+      const abiEntry = makeAbiEntry();
       const { getAbiFromCache, setAbiInCache } = await import("../../app/utils/serverAbiBlobCache.js");
-      await setAbiInCache(1, "0xdead", MOCK_ABI_ENTRY);
+      await setAbiInCache(1, "0xdead", abiEntry);
 
       const result = await getAbiFromCache(1, "0xdead");
-      expect(result).toEqual(MOCK_ABI_ENTRY);
+      expect(result).toEqual(abiEntry);
     });
 
     it("skips blob when not on Vercel", async () => {
@@ -132,7 +137,7 @@ describe("serverAbiBlobCache", () => {
     it("returns null for expired blob entries", async () => {
       process.env.VERCEL = "1";
       process.env.BLOB_READ_WRITE_TOKEN = "token";
-      const entry = { data: MOCK_ABI_ENTRY, createdAt: 1, expiresAt: 2 };
+      const entry = { data: makeAbiEntry(), createdAt: 1, expiresAt: 2 };
       getBlob.mockResolvedValue({
         stream: new Response(JSON.stringify(entry)).body,
       });
