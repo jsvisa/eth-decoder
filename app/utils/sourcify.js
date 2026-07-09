@@ -1,25 +1,40 @@
+import {
+  getSignaturesFromBlobCache,
+  setSignaturesInBlobCache,
+} from "./serverAbiBlobCache";
+
 const SOURCIFY_LOOKUP_URL =
   "https://api.4byte.sourcify.dev/signature-database/v1/lookup";
 
 export async function lookupFunctionSignatures(selector) {
+  const cached = await getSignaturesFromBlobCache(selector);
+  if (cached) return cached;
+
   try {
     const res = await fetch(`${SOURCIFY_LOOKUP_URL}?function=${selector}`);
     if (!res.ok) return [];
     const json = await res.json();
     if (!json.ok) return [];
-    return (json.result?.function?.[selector] ?? []).map((e) => e.name);
+    const sigs = (json.result?.function?.[selector] ?? []).map((e) => e.name);
+    setSignaturesInBlobCache(selector, sigs).catch(() => {});
+    return sigs;
   } catch {
     return [];
   }
 }
 
 export async function lookupEventSignatures(topic0) {
+  const cached = await getSignaturesFromBlobCache(topic0);
+  if (cached) return cached;
+
   try {
     const res = await fetch(`${SOURCIFY_LOOKUP_URL}?event=${topic0}`);
     if (!res.ok) return [];
     const json = await res.json();
     if (!json.ok) return [];
-    return (json.result?.event?.[topic0] ?? []).map((e) => e.name);
+    const sigs = (json.result?.event?.[topic0] ?? []).map((e) => e.name);
+    setSignaturesInBlobCache(topic0, sigs).catch(() => {});
+    return sigs;
   } catch {
     return [];
   }

@@ -11,7 +11,7 @@ import {
   ETH_NATIVE_CHAIN_IDS,
 } from "../../utils/chains";
 import { fetchAbi } from "../fetch-abi/route";
-import { getAbiFromCache, setAbiInCache } from "../../utils/serverAbiCache";
+import { getAbiFromCache, setAbiInCache } from "../../utils/serverAbiBlobCache";
 import {
   simulateWithTevm,
   redecodeLogs,
@@ -301,7 +301,13 @@ export async function POST(request) {
                 rpcUrl: chain.rpcUrl,
                 detectProxy: true,
               });
-              if (fetched?.abi) extraAbis.set(addr, fetched.abi);
+              if (fetched?.abi) {
+                extraAbis.set(addr, fetched.abi);
+                setAbiInCache(numericChainId, addr, {
+                  ...fetched,
+                  fetchedAt: Date.now(),
+                }).catch(() => {});
+              }
             } catch {
               // ABI fetch failed
             }
