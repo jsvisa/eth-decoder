@@ -50,6 +50,15 @@ const SYMBOL_ABI = [
     stateMutability: "view",
   },
 ];
+const NAME_ABI = [
+  {
+    type: "function",
+    name: "name",
+    inputs: [],
+    outputs: [{ type: "string" }],
+    stateMutability: "view",
+  },
+];
 const DECIMALS_ABI = [
   {
     type: "function",
@@ -282,18 +291,28 @@ export async function POST(request) {
         const tokenPrices = {};
         const chainSlug = CGC_CHAIN_SLUGS[numericChainId];
 
-        for (const addr of [...tokenAddresses, NATIVE_TOKEN]) {
+        const fetchTokenMeta = async (addr) => {
           if (addr !== NATIVE_TOKEN && client) {
+            let symbol;
             try {
-              const symbol = await client.readContract({
+              symbol = await client.readContract({
                 address: addr,
                 abi: SYMBOL_ABI,
                 functionName: "symbol",
               });
-              tokenSymbols[addr] = symbol;
             } catch {
-              // Symbol fetch failed, skip
+              try {
+                symbol = await client.readContract({
+                  address: addr,
+                  abi: NAME_ABI,
+                  functionName: "name",
+                });
+              } catch {
+                // Both symbol and name failed
+              }
             }
+            if (symbol !== undefined) tokenSymbols[addr] = symbol;
+
             try {
               const decimals = await client.readContract({
                 address: addr,
@@ -306,14 +325,14 @@ export async function POST(request) {
             }
           }
 
-          try {
-            let priceUrl;
-            if (addr === NATIVE_TOKEN) {
-              const cgcId = ETH_NATIVE_CHAIN_IDS.has(numericChainId)
-                ? "ethereum"
-                : NATIVE_COIN_IDS[numericChainId];
-              if (cgcId) {
-                priceUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${cgcId}&vs_currencies=usd`;
+          let priceUrl;
+          if (addr === NATIVE_TOKEN) {
+            const cgcId = ETH_NATIVE_CHAIN_IDS.has(numericChainId)
+              ? "ethereum"
+              : NATIVE_COIN_IDS[numericChainId];
+            if (cgcId) {
+              priceUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${cgcId}&vs_currencies=usd`;
+              try {
                 const res = await fetch(priceUrl, {
                   signal: AbortSignal.timeout(5000),
                 });
@@ -321,9 +340,13 @@ export async function POST(request) {
                   const data = await res.json();
                   tokenPrices[addr] = data[cgcId]?.usd ?? null;
                 }
+              } catch {
+                // Price fetch failed, skip
               }
-            } else if (chainSlug) {
-              priceUrl = `https://api.coingecko.com/api/v3/simple/token_price/${chainSlug}?contract_addresses=${addr}&vs_currencies=usd`;
+            }
+          } else if (chainSlug) {
+            priceUrl = `https://api.coingecko.com/api/v3/simple/token_price/${chainSlug}?contract_addresses=${addr}&vs_currencies=usd`;
+            try {
               const res = await fetch(priceUrl, {
                 signal: AbortSignal.timeout(5000),
               });
@@ -331,11 +354,15 @@ export async function POST(request) {
                 const data = await res.json();
                 tokenPrices[addr] = data[addr]?.usd ?? null;
               }
+            } catch {
+              // Price fetch failed, skip
             }
-          } catch {
-            // Price fetch failed, skip
           }
-        }
+        };
+
+        await Promise.all(
+          [...tokenAddresses, NATIVE_TOKEN].map(fetchTokenMeta),
+        );
 
         const enriched = enrichBalanceChanges({
           logs: result.logs,
