@@ -268,13 +268,34 @@ export async function POST(request) {
       cheatcodes,
     });
 
-    // Re-decode undecoded events using server-cached ABIs (fast, no explorer calls)
+    // Fetch ABIs for undecoded addresses (parallel) and re-decode logs + call trace
     if (result.undecodedAddresses?.length > 0) {
       const extraAbis = new Map();
-      for (const addr of result.undecodedAddresses) {
-        const entry = await getAbiFromCache(numericChainId, addr);
-        if (entry?.abi) extraAbis.set(addr.toLowerCase(), entry.abi);
-      }
+      await Promise.all(
+        result.undecodedAddresses.map(async (addr) => {
+          // Check server disk cache first
+          let fetched = await getAbiFromCache(numericChainId, addr);
+          if (fetched?.abi) {
+            extraAbis.set(addr.toLowerCase(), fetched.abi);
+            return;
+          }
+          // Not cached — fetch via explorers
+          try {
+            fetched = await fetchAbi(addr, numericChainId, {
+              etherscanKey,
+              routescanKey,
+              viemChain: chain.viemChain,
+              rpcUrl: chain.rpcUrl,
+              detectProxy: true,
+            });
+            if (fetched?.abi) {
+              extraAbis.set(addr.toLowerCase(), fetched.abi);
+            }
+          } catch {
+            // ABI fetch failed, event stays undecoded
+          }
+        }),
+      );
       if (extraAbis.size > 0) {
         for (const [addr, abi] of extraAbis) {
           abiCacheMap.set(addr, abi);
