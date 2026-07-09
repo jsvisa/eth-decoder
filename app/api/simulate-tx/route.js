@@ -12,7 +12,11 @@ import {
 } from "../../utils/chains";
 import { fetchAbi } from "../fetch-abi/route";
 import { getAbiFromCache, setAbiInCache } from "../../utils/serverAbiCache";
-import { simulateWithTevm } from "../../utils/tevmSimulator";
+import {
+  simulateWithTevm,
+  redecodeLogs,
+  redecodeCallTrace,
+} from "../../utils/tevmSimulator";
 import { isValidEthAddress } from "../../utils/validation";
 import {
   saveSimulationResult,
@@ -263,6 +267,24 @@ export async function POST(request) {
       storageOverrides,
       cheatcodes,
     });
+
+    // Re-decode undecoded events using server-cached ABIs (fast, no explorer calls)
+    if (result.undecodedAddresses?.length > 0) {
+      const extraAbis = new Map();
+      for (const addr of result.undecodedAddresses) {
+        const entry = await getAbiFromCache(numericChainId, addr);
+        if (entry?.abi) extraAbis.set(addr.toLowerCase(), entry.abi);
+      }
+      if (extraAbis.size > 0) {
+        for (const [addr, abi] of extraAbis) {
+          abiCacheMap.set(addr, abi);
+        }
+        result.logs = redecodeLogs(result.logs || [], abiCacheMap);
+        if (result.callTrace) {
+          result.callTrace = redecodeCallTrace(result.callTrace, abiCacheMap);
+        }
+      }
+    }
 
     let enrichedResult = result;
     if (price && price !== "false" && result.balanceChanges?.length) {
