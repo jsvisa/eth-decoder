@@ -11,7 +11,7 @@ import {
   ETH_NATIVE_CHAIN_IDS,
 } from "../../utils/chains";
 import { fetchAbi } from "../fetch-abi/route";
-import { getAbiFromCache, setAbiInCache } from "../../utils/serverAbiCache";
+import { getAbiFromCache, setAbiInCache } from "../../utils/serverAbiBlobCache";
 import {
   simulateWithTevm,
   redecodeLogs,
