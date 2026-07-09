@@ -27,7 +27,12 @@ function restoreEnv() {
 }
 
 const MOCK_ABI = [
-  { type: "function", name: "transfer", inputs: [{ type: "address" }, { type: "uint256" }], outputs: [] },
+  {
+    type: "function",
+    name: "transfer",
+    inputs: [{ type: "address" }, { type: "uint256" }],
+    outputs: [],
+  },
 ];
 
 function makeAbiEntry() {
@@ -64,7 +69,8 @@ describe("serverAbiBlobCache", () => {
     it("returns null when blob has no data and local cache is empty", async () => {
       getBlob.mockRejectedValue(new Error("Not found"));
 
-      const { getAbiFromCache } = await import("../../app/utils/serverAbiBlobCache.js");
+      const { getAbiFromCache } =
+        await import("../../app/utils/serverAbiBlobCache.js");
       const result = await getAbiFromCache(1, "0x1234");
 
       expect(result).toBeNull();
@@ -80,8 +86,12 @@ describe("serverAbiBlobCache", () => {
         stream: new Response(JSON.stringify(entry)).body,
       });
 
-      const { getAbiFromCache } = await import("../../app/utils/serverAbiBlobCache.js");
-      const result = await getAbiFromCache(1, "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+      const { getAbiFromCache } =
+        await import("../../app/utils/serverAbiBlobCache.js");
+      const result = await getAbiFromCache(
+        1,
+        "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      );
 
       expect(result).toEqual(abiEntry);
       expect(getBlob).toHaveBeenCalledWith(
@@ -97,19 +107,32 @@ describe("serverAbiBlobCache", () => {
       putBlob.mockResolvedValue({});
 
       const abiEntry = makeAbiEntry();
-      const { setAbiInCache } = await import("../../app/utils/serverAbiBlobCache.js");
-      await setAbiInCache(1, "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", abiEntry);
+      const { setAbiInCache } =
+        await import("../../app/utils/serverAbiBlobCache.js");
+      await setAbiInCache(
+        1,
+        "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        abiEntry,
+      );
 
       expect(putBlob).toHaveBeenCalledTimes(1);
-      const [blobPath, data, opts] = putBlob.mock.calls[0];
-      expect(blobPath).toBe("abis/1/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.json");
+      const [blobPath, data] = putBlob.mock.calls[0];
+      expect(blobPath).toBe(
+        "abis/1/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.json",
+      );
       const parsed = JSON.parse(data);
       expect(parsed.data).toEqual(abiEntry);
       expect(parsed.createdAt).toBeGreaterThan(0);
       expect(parsed.expiresAt).toBeGreaterThan(parsed.createdAt);
 
       await expect(
-        fs.access(join(TEST_CACHE_DIR, "1", "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.json")),
+        fs.access(
+          join(
+            TEST_CACHE_DIR,
+            "1",
+            "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.json",
+          ),
+        ),
       ).resolves.toBeUndefined();
     });
 
@@ -119,7 +142,8 @@ describe("serverAbiBlobCache", () => {
       getBlob.mockRejectedValue(new Error("Not found"));
 
       const abiEntry = makeAbiEntry();
-      const { getAbiFromCache, setAbiInCache } = await import("../../app/utils/serverAbiBlobCache.js");
+      const { getAbiFromCache, setAbiInCache } =
+        await import("../../app/utils/serverAbiBlobCache.js");
       await setAbiInCache(1, "0xdead", abiEntry);
 
       const result = await getAbiFromCache(1, "0xdead");
@@ -127,7 +151,8 @@ describe("serverAbiBlobCache", () => {
     });
 
     it("skips blob when not on Vercel", async () => {
-      const { getAbiFromCache } = await import("../../app/utils/serverAbiBlobCache.js");
+      const { getAbiFromCache } =
+        await import("../../app/utils/serverAbiBlobCache.js");
       const result = await getAbiFromCache(1, "0x1234");
 
       expect(getBlob).not.toHaveBeenCalled();
@@ -142,7 +167,8 @@ describe("serverAbiBlobCache", () => {
         stream: new Response(JSON.stringify(entry)).body,
       });
 
-      const { getAbiFromCache } = await import("../../app/utils/serverAbiBlobCache.js");
+      const { getAbiFromCache } =
+        await import("../../app/utils/serverAbiBlobCache.js");
       const result = await getAbiFromCache(1, "0x1234");
 
       expect(result).toBeNull();
@@ -151,7 +177,8 @@ describe("serverAbiBlobCache", () => {
 
   describe("getSignaturesFromBlobCache / setSignaturesInBlobCache", () => {
     it("returns null when blob cache is disabled", async () => {
-      const { getSignaturesFromBlobCache } = await import("../../app/utils/serverAbiBlobCache.js");
+      const { getSignaturesFromBlobCache } =
+        await import("../../app/utils/serverAbiBlobCache.js");
       const result = await getSignaturesFromBlobCache("0xa9059cbb");
       expect(result).toBeNull();
       expect(getBlob).not.toHaveBeenCalled();
@@ -167,14 +194,14 @@ describe("serverAbiBlobCache", () => {
         stream: new Response(JSON.stringify(entry)).body,
       });
 
-      const { getSignaturesFromBlobCache } = await import("../../app/utils/serverAbiBlobCache.js");
+      const { getSignaturesFromBlobCache } =
+        await import("../../app/utils/serverAbiBlobCache.js");
       const result = await getSignaturesFromBlobCache("0xa9059cbb");
 
       expect(result).toEqual(sigs);
-      expect(getBlob).toHaveBeenCalledWith(
-        "signatures/0xa9059cbb.json",
-        { access: "private" },
-      );
+      expect(getBlob).toHaveBeenCalledWith("signatures/0xa9059cbb.json", {
+        access: "private",
+      });
     });
 
     it("writes signatures to blob", async () => {
@@ -182,8 +209,12 @@ describe("serverAbiBlobCache", () => {
       process.env.BLOB_READ_WRITE_TOKEN = "token";
       putBlob.mockResolvedValue({});
 
-      const { setSignaturesInBlobCache } = await import("../../app/utils/serverAbiBlobCache.js");
-      const sigs = ["transfer(address,uint256)", "transferFrom(address,address,uint256)"];
+      const { setSignaturesInBlobCache } =
+        await import("../../app/utils/serverAbiBlobCache.js");
+      const sigs = [
+        "transfer(address,uint256)",
+        "transferFrom(address,address,uint256)",
+      ];
       await setSignaturesInBlobCache("0x23b872dd", sigs);
 
       expect(putBlob).toHaveBeenCalledTimes(1);
@@ -196,12 +227,17 @@ describe("serverAbiBlobCache", () => {
     it("returns null for expired signature entries", async () => {
       process.env.VERCEL = "1";
       process.env.BLOB_READ_WRITE_TOKEN = "token";
-      const entry = { data: ["some(old)sig(uint256)"], createdAt: 1, expiresAt: 2 };
+      const entry = {
+        data: ["some(old)sig(uint256)"],
+        createdAt: 1,
+        expiresAt: 2,
+      };
       getBlob.mockResolvedValue({
         stream: new Response(JSON.stringify(entry)).body,
       });
 
-      const { getSignaturesFromBlobCache } = await import("../../app/utils/serverAbiBlobCache.js");
+      const { getSignaturesFromBlobCache } =
+        await import("../../app/utils/serverAbiBlobCache.js");
       const result = await getSignaturesFromBlobCache("0x12345678");
 
       expect(result).toBeNull();
