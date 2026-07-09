@@ -1,15 +1,78 @@
 import { NextResponse } from "next/server";
-import { decodeFunctionData, defineChain } from "viem";
-import { getChainConfigByChainId } from "../../utils/chains";
+import {
+  decodeFunctionData,
+  defineChain,
+  createPublicClient,
+  http,
+} from "viem";
+import {
+  getChainConfigByChainId,
+  CGC_CHAIN_SLUGS,
+  ETH_NATIVE_CHAIN_IDS,
+} from "../../utils/chains";
 import { fetchAbi } from "../fetch-abi/route";
 import { getAbiFromCache, setAbiInCache } from "../../utils/serverAbiCache";
-import { simulateWithTevm } from "../../utils/tevmSimulator";
+import {
+  simulateWithTevm,
+  redecodeLogs,
+  redecodeCallTrace,
+  collectAllCallAddresses,
+} from "../../utils/tevmSimulator";
 import { isValidEthAddress } from "../../utils/validation";
 import {
   saveSimulationResult,
   pruneExpiredResults,
 } from "../../utils/simulationCache";
 import { buildSimulationLink } from "../../utils/simulationLinks";
+import { enrichBalanceChanges } from "../../utils/balanceChanges";
+import {
+  TRANSFER_TOPIC,
+  ERC20_TRANSFER_TOPIC,
+  DEPOSIT_TOPIC,
+  WITHDRAWAL_TOPIC,
+} from "../../utils/tokenTransfers";
+
+const NATIVE_TOKEN = "0x0000000000000000000000000000000000000000";
+
+const TOKEN_TRANSFER_TOPICS = new Set([
+  TRANSFER_TOPIC,
+  ERC20_TRANSFER_TOPIC,
+  DEPOSIT_TOPIC,
+  WITHDRAWAL_TOPIC,
+]);
+
+const NATIVE_COIN_IDS = {
+  56: "binancecoin",
+  137: "matic-network",
+};
+
+const SYMBOL_ABI = [
+  {
+    type: "function",
+    name: "symbol",
+    inputs: [],
+    outputs: [{ type: "string" }],
+    stateMutability: "view",
+  },
+];
+const NAME_ABI = [
+  {
+    type: "function",
+    name: "name",
+    inputs: [],
+    outputs: [{ type: "string" }],
+    stateMutability: "view",
+  },
+];
+const DECIMALS_ABI = [
+  {
+    type: "function",
+    name: "decimals",
+    inputs: [],
+    outputs: [{ type: "uint8" }],
+    stateMutability: "view",
+  },
+];
 
 function buildChainConfig(numericChainId, rpcUrl) {
   return {
@@ -46,6 +109,7 @@ export async function POST(request) {
     balanceOverrides = [],
     storageOverrides = [],
     cheatcodes = {},
+    price = true,
   } = body;
 
   if (!chainId) {
@@ -205,10 +269,179 @@ export async function POST(request) {
       cheatcodes,
     });
 
-    const resultWithRequest = { ...result, requestBody };
+    // Collect all addresses needing ABIs, fetch uncached ones in parallel, re-decode
+    const neededAddrs = new Set(
+      result.undecodedAddresses?.map((a) => a.toLowerCase()),
+    );
+    if (result.callTrace) {
+      for (const addr of collectAllCallAddresses(result.callTrace)) {
+        neededAddrs.add(addr.toLowerCase());
+      }
+    }
+    if (neededAddrs.size > 0) {
+      const extraAbis = new Map();
+      const toFetch = [];
+      for (const addr of neededAddrs) {
+        if (abiCacheMap.has(addr)) continue;
+        const cached = await getAbiFromCache(numericChainId, addr);
+        if (cached?.abi) {
+          extraAbis.set(addr, cached.abi);
+        } else {
+          toFetch.push(addr);
+        }
+      }
+      if (toFetch.length > 0) {
+        await Promise.all(
+          toFetch.map(async (addr) => {
+            try {
+              const fetched = await fetchAbi(addr, numericChainId, {
+                etherscanKey,
+                routescanKey,
+                viemChain: chain.viemChain,
+                rpcUrl: chain.rpcUrl,
+                detectProxy: true,
+              });
+              if (fetched?.abi) extraAbis.set(addr, fetched.abi);
+            } catch {
+              // ABI fetch failed
+            }
+          }),
+        );
+      }
+      if (extraAbis.size > 0) {
+        for (const [addr, abi] of extraAbis) {
+          abiCacheMap.set(addr, abi);
+        }
+        result.logs = redecodeLogs(result.logs || [], abiCacheMap);
+        if (result.callTrace) {
+          result.callTrace = redecodeCallTrace(result.callTrace, abiCacheMap);
+        }
+      }
+    }
+
+    let enrichedResult = result;
+    if (price && price !== "false" && result.balanceChanges?.length) {
+      try {
+        const client = chain.rpcUrl
+          ? createPublicClient({
+              chain: chain.viemChain,
+              transport: http(chain.rpcUrl),
+            })
+          : null;
+
+        const tokenAddresses = new Set();
+        for (const log of result.logs || []) {
+          if (
+            log.address &&
+            log.topics?.[0] &&
+            TOKEN_TRANSFER_TOPICS.has(log.topics[0]) &&
+            isValidEthAddress(log.address)
+          ) {
+            tokenAddresses.add(log.address.toLowerCase());
+          }
+        }
+
+        const tokenSymbols = {};
+        const tokenDecimals = {};
+        const tokenPrices = {};
+        const chainSlug = CGC_CHAIN_SLUGS[numericChainId];
+
+        const fetchTokenMeta = async (addr) => {
+          if (addr !== NATIVE_TOKEN && client) {
+            let symbol;
+            try {
+              symbol = await client.readContract({
+                address: addr,
+                abi: SYMBOL_ABI,
+                functionName: "symbol",
+              });
+            } catch {
+              try {
+                symbol = await client.readContract({
+                  address: addr,
+                  abi: NAME_ABI,
+                  functionName: "name",
+                });
+              } catch {
+                // Both symbol and name failed
+              }
+            }
+            if (symbol !== undefined) tokenSymbols[addr] = symbol;
+
+            try {
+              const decimals = await client.readContract({
+                address: addr,
+                abi: DECIMALS_ABI,
+                functionName: "decimals",
+              });
+              tokenDecimals[addr] = Number(decimals);
+            } catch {
+              // Decimals fetch failed, skip
+            }
+          }
+
+          let priceUrl;
+          if (addr === NATIVE_TOKEN) {
+            const cgcId = ETH_NATIVE_CHAIN_IDS.has(numericChainId)
+              ? "ethereum"
+              : NATIVE_COIN_IDS[numericChainId];
+            if (cgcId) {
+              priceUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${cgcId}&vs_currencies=usd`;
+              try {
+                const res = await fetch(priceUrl, {
+                  signal: AbortSignal.timeout(5000),
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  tokenPrices[addr] = data[cgcId]?.usd ?? null;
+                }
+              } catch {
+                // Price fetch failed, skip
+              }
+            }
+          } else if (chainSlug) {
+            priceUrl = `https://api.coingecko.com/api/v3/simple/token_price/${chainSlug}?contract_addresses=${addr}&vs_currencies=usd`;
+            try {
+              const res = await fetch(priceUrl, {
+                signal: AbortSignal.timeout(5000),
+              });
+              if (res.ok) {
+                const data = await res.json();
+                tokenPrices[addr] = data[addr]?.usd ?? null;
+              }
+            } catch {
+              // Price fetch failed, skip
+            }
+          }
+        };
+
+        await Promise.all(
+          [...tokenAddresses, NATIVE_TOKEN].map(fetchTokenMeta),
+        );
+
+        const enriched = enrichBalanceChanges({
+          logs: result.logs,
+          balanceChanges: result.balanceChanges,
+          tokenSymbols,
+          tokenDecimals,
+          tokenPrices,
+          nativeTokenSymbol: chain.viemChain?.nativeCurrency?.symbol || "ETH",
+        });
+
+        enrichedResult = {
+          ...result,
+          balanceChanges: enriched,
+          _tokenMeta: { tokenSymbols, tokenDecimals, tokenPrices },
+        };
+      } catch {
+        // Enrichment failed — return raw result
+      }
+    }
+
+    const resultWithRequest = { ...enrichedResult, requestBody };
     const simulationId = await saveSimulationResult(resultWithRequest);
     return NextResponse.json({
-      ...result,
+      ...enrichedResult,
       simulationId,
       simulationLink: buildSimulationLink(request, simulationId),
       requestBody,

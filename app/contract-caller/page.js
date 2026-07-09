@@ -19,6 +19,10 @@ import {
   NATIVE_TOKEN_SYMBOLS,
   enrichBalanceChanges,
 } from "../utils/balanceChanges";
+import {
+  decodeLogsViaServer,
+  decodeCallTraceLogsViaServer,
+} from "../utils/tevmSimulator";
 
 import NetworkSelector from "./components/NetworkSelector";
 import ContractAddressInput from "./components/ContractAddressInput";
@@ -302,12 +306,13 @@ export default function ContractCallerPage() {
 
   useEffect(() => {
     if (!exec.result?.simulated) return;
+    // Server-side enrichment already populated _tokenMeta — no need to re-fetch
+    if (exec.result._tokenMeta) return;
 
     const chainId = getChainId(chain);
     tokens.fetchTokenSymbolsForLogs(exec.result.logs, chainId);
     tokens.fetchTokenDataForSimulation(
       exec.result.logs,
-      exec.result.assetChanges,
       exec.result.balanceChanges,
       chainId,
     );
@@ -370,9 +375,8 @@ export default function ContractCallerPage() {
         if (!res.ok) throw new Error("Simulation result not found or expired");
         return res.json();
       })
-      .then((data) => {
+      .then(async (data) => {
         if (controller.signal.aborted) return;
-        exec.setResult(data);
         if (data.requestBody) {
           const {
             chainId,
@@ -387,7 +391,14 @@ export default function ContractCallerPage() {
             const builtInSlug = Object.keys(BUILT_IN_CHAIN_IDS).find(
               (s) => BUILT_IN_CHAIN_IDS[s] === Number(chainId),
             );
-            if (builtInSlug) setChain(builtInSlug);
+            if (builtInSlug) {
+              setChain(builtInSlug);
+              // Decode any remaining undecoded events via signature lookup
+              await decodeLogsViaServer(data.logs);
+              if (data.callTrace) {
+                await decodeCallTraceLogsViaServer(data.callTrace);
+              }
+            }
           }
           if (to) setAddress(to);
           if (from) simOpts.setFromAddress(from);
@@ -414,6 +425,7 @@ export default function ContractCallerPage() {
           if (dec) tokens.setTokenDecimals(dec);
           if (prices) tokens.setTokenPrices(prices);
         }
+        exec.setResult(data);
       })
       .catch((err) => {
         if (controller.signal.aborted) return;

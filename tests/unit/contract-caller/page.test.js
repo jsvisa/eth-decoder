@@ -512,7 +512,7 @@ describe("ContractCallerPage wiring", () => {
           address: FROM_ADDRESS,
           before: "10000000000000000000",
           after: "9000000000000000000",
-          diff: "-1000000000000000000",
+          value: "-1000000000000000000",
         },
       ],
     };
@@ -532,6 +532,7 @@ describe("ContractCallerPage wiring", () => {
             expect.objectContaining({
               address: FROM_ADDRESS,
               tokenAddress: NATIVE_TOKEN_ADDRESS,
+              value: "-1000000000000000000",
               amount: "-1",
               name: "ETH",
               price: 2500,

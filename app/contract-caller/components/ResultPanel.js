@@ -427,7 +427,7 @@ export default function ResultPanel({
     return (
       change.before != null &&
       change.after != null &&
-      change.diff != null &&
+      change.value != null &&
       (!tokenAddress || tokenAddress === NATIVE_TOKEN_ADDRESS)
     );
   });
@@ -612,118 +612,6 @@ export default function ResultPanel({
                 </div>
               )}
 
-              {/* Asset Changes (simulation only) */}
-              {result.simulated &&
-                result.assetChanges &&
-                result.assetChanges.length > 0 && (
-                  <div className={styles.assetSection}>
-                    <h3 className={styles.assetTitle}>
-                      Asset Changes ({result.assetChanges.length})
-                    </h3>
-                    <div className={styles.assetList}>
-                      {result.assetChanges.map((change, index) => (
-                        <div key={index} className={styles.assetItem}>
-                          <div className={styles.assetHeader}>
-                            <span className={styles.assetType}>
-                              {change.type || "TRANSFER"}
-                            </span>
-                            <span className={styles.assetToken}>
-                              {change.token_info?.symbol ||
-                                change.token_info?.name ||
-                                "Unknown Token"}
-                              {change.token_info?.contract_address && (
-                                <span className={styles.assetTokenAddress}>
-                                  (
-                                  {(() => {
-                                    const url = getExplorerAddressUrl(
-                                      change.token_info.contract_address,
-                                    );
-                                    return url ? (
-                                      <a
-                                        href={url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className={styles.assetAddressLink}
-                                      >
-                                        {change.token_info.contract_address}
-                                      </a>
-                                    ) : (
-                                      change.token_info.contract_address
-                                    );
-                                  })()}
-                                  )
-                                </span>
-                              )}
-                            </span>
-                          </div>
-                          <div className={styles.assetDetails}>
-                            {change.from && (
-                              <span className={styles.assetFrom}>
-                                {(() => {
-                                  const url = getExplorerAddressUrl(
-                                    change.from,
-                                  );
-                                  return url ? (
-                                    <a
-                                      href={url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className={styles.assetAddressLink}
-                                    >
-                                      {change.from}
-                                    </a>
-                                  ) : (
-                                    change.from
-                                  );
-                                })()}
-                              </span>
-                            )}
-                            {change.from && change.to && (
-                              <span className={styles.assetArrow}>→</span>
-                            )}
-                            {change.to && (
-                              <span className={styles.assetTo}>
-                                {(() => {
-                                  const url = getExplorerAddressUrl(change.to);
-                                  return url ? (
-                                    <a
-                                      href={url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className={styles.assetAddressLink}
-                                    >
-                                      {change.to}
-                                    </a>
-                                  ) : (
-                                    change.to
-                                  );
-                                })()}
-                              </span>
-                            )}
-                            <span className={styles.assetAmount}>
-                              {change.amount || change.raw_amount}
-                              {change.dollar_value && (
-                                <span className={styles.assetUsd}>
-                                  {" "}
-                                  ($
-                                  {Number(change.dollar_value).toLocaleString(
-                                    undefined,
-                                    {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    },
-                                  )}
-                                  )
-                                </span>
-                              )}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
               {/* Balance Changes (legacy ETH before/after — simulation only) */}
               {result.simulated && legacyNativeBalanceChanges.length > 0 && (
                 <div className={styles.balanceSection}>
@@ -744,13 +632,13 @@ export default function ResultPanel({
                         <span className={styles.balanceAfter}>
                           {formatNativeWhole(change.after)} {nativeTokenSymbol}
                         </span>
-                        {parseBigIntOrNull(change.diff) !== null && (
+                        {parseBigIntOrNull(change.value) !== null && (
                           <span
-                            className={`${styles.balanceDiff} ${isNonNegativeBigInt(change.diff) ? styles.balanceDiffPositive : styles.balanceDiffNegative}`}
+                            className={`${styles.balanceDiff} ${isNonNegativeBigInt(change.value) ? styles.balanceDiffPositive : styles.balanceDiffNegative}`}
                           >
-                            ({isNonNegativeBigInt(change.diff) ? "+" : ""}
-                            {formatNativeWhole(change.diff)} {nativeTokenSymbol}
-                            )
+                            ({isNonNegativeBigInt(change.value) ? "+" : ""}
+                            {formatNativeWhole(change.value)}{" "}
+                            {nativeTokenSymbol})
                           </span>
                         )}
                       </div>
@@ -777,7 +665,7 @@ export default function ResultPanel({
                     .map((change) => {
                       let diff;
                       try {
-                        diff = BigInt(String(change.rawAmount ?? change.diff));
+                        diff = BigInt(String(change.value));
                       } catch {
                         return null;
                       }

@@ -21,10 +21,10 @@ const SIM_RESULT = {
       address: "0xb826224b742ead5cf91ea432340e3763fac09cdd",
       tokenAddress: "0x0000000000000000000000000000000000000000",
       name: "ETH",
+      value: "-1000000000000000000",
       amount: "-1",
       price: 2500,
       valueUsd: -2500,
-      diff: "-1000000000000000000",
     },
   ],
   _tokenMeta: {

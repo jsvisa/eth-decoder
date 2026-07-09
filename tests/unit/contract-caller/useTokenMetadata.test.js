@@ -129,12 +129,7 @@ describe("useTokenMetadata — fetchTokenDataForSimulation happy path", () => {
     ];
 
     await act(async () => {
-      await result.current.fetchTokenDataForSimulation(
-        logs,
-        null,
-        null,
-        CHAIN_ID,
-      );
+      await result.current.fetchTokenDataForSimulation(logs, null, CHAIN_ID);
     });
 
     const addr = TOKEN_ADDRESS.toLowerCase();
@@ -190,8 +185,7 @@ describe("useTokenMetadata — error handling", () => {
     await act(async () => {
       await result.current.fetchTokenDataForSimulation(
         null,
-        null,
-        [{ address: "0xabc", diff: "1000000000000000000" }],
+        [{ address: "0xabc", value: "1000000000000000000" }],
         CHAIN_ID,
       );
     });

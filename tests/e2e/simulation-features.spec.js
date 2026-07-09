@@ -57,27 +57,26 @@ const MOCK_SIMULATE_OUTPUT = {
       ],
     },
   ],
-  assetChanges: [],
   balanceChanges: [
     {
       address: FROM_ADDR,
       before: "10000000000000000000", // 10 ETH
       after: "9000000000000000000", //  9 ETH
-      diff: "-1000000000000000000", // -1 ETH
+      value: "-1000000000000000000", // -1 ETH
     },
     // USDC balance change for FROM_ADDR (loses 1,000 USDC)
     {
       address: TOKEN_ADDR,
       before: "1000000000", // 1,000 USDC (with 6 decimals)
       after: "0",
-      diff: "-1000000000",
+      value: "-1000000000",
     },
     // USDC balance change for TO_ADDR (gains 1,000 USDC)
     {
       address: TO_ADDR,
       before: "0",
       after: "1000000000", // 1,000 USDC (with 6 decimals)
-      diff: "1000000000",
+      value: "1000000000",
     },
   ],
   stateChanges: [],
@@ -361,14 +360,14 @@ test.describe("Balance Changes role badges", () => {
         address: FROM_ADDR,
         before: "10000000000000000000",
         after: "9000000000000000000",
-        diff: "-1000000000000000000",
+        value: "-1000000000000000000",
       },
       // The contract itself also loses ETH (e.g. gas refund scenario)
       {
         address: CONTRACT_ADDR,
         before: "5000000000000000000",
         after: "4900000000000000000",
-        diff: "-100000000000000000",
+        value: "-100000000000000000",
       },
     ],
   };
