@@ -863,7 +863,6 @@ function extractNativeChangesFromTrace(trace) {
     const type = node.type;
     if (
       (type === "CALL" || type === "CREATE" || type === "CREATE2") &&
-      node.value &&
       !node.error
     ) {
       const value = BigInt(node.value);

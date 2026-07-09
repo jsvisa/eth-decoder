@@ -20,10 +20,26 @@ import {
 } from "../../utils/simulationCache";
 import { buildSimulationLink } from "../../utils/simulationLinks";
 import { enrichBalanceChanges } from "../../utils/balanceChanges";
+import {
+  TRANSFER_TOPIC,
+  ERC20_TRANSFER_TOPIC,
+  DEPOSIT_TOPIC,
+  WITHDRAWAL_TOPIC,
+} from "../../utils/tokenTransfers";
 
 const NATIVE_TOKEN = "0x0000000000000000000000000000000000000000";
-const TRANSFER_TOPIC =
-  "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+
+const TOKEN_TRANSFER_TOPICS = new Set([
+  TRANSFER_TOPIC,
+  ERC20_TRANSFER_TOPIC,
+  DEPOSIT_TOPIC,
+  WITHDRAWAL_TOPIC,
+]);
+
+const NATIVE_COIN_IDS = {
+  56: "binancecoin",
+  137: "matic-network",
+};
 
 const SYMBOL_ABI = [
   {
@@ -240,7 +256,7 @@ export async function POST(request) {
     });
 
     let enrichedResult = result;
-    if (price && result.balanceChanges?.length) {
+    if (price && price !== "false" && result.balanceChanges?.length) {
       try {
         const client = chain.rpcUrl
           ? createPublicClient({
@@ -253,7 +269,8 @@ export async function POST(request) {
         for (const log of result.logs || []) {
           if (
             log.address &&
-            log.topics?.[0] === TRANSFER_TOPIC &&
+            log.topics?.[0] &&
+            TOKEN_TRANSFER_TOPICS.has(log.topics[0]) &&
             isValidEthAddress(log.address)
           ) {
             tokenAddresses.add(log.address.toLowerCase());
@@ -294,7 +311,7 @@ export async function POST(request) {
             if (addr === NATIVE_TOKEN) {
               const cgcId = ETH_NATIVE_CHAIN_IDS.has(numericChainId)
                 ? "ethereum"
-                : chainSlug;
+                : NATIVE_COIN_IDS[numericChainId];
               if (cgcId) {
                 priceUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${cgcId}&vs_currencies=usd`;
                 const res = await fetch(priceUrl, {
