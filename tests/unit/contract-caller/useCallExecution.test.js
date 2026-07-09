@@ -178,7 +178,12 @@ describe("useCallExecution – handleCall validation", () => {
   });
 
   it("sets error when parsedAbi is null and no raw calldata", async () => {
-    const params = { ...baseParams, parsedAbi: null, selectedFunction: null, rawCalldata: "" };
+    const params = {
+      ...baseParams,
+      parsedAbi: null,
+      selectedFunction: null,
+      rawCalldata: "",
+    };
     const { result } = renderHook(() => useCallExecution(params));
 
     await act(async () => {
