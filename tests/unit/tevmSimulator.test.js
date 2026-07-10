@@ -267,6 +267,24 @@ describe("sanitizeForkRpcResult", () => {
     });
   });
 
+  it("filters EIP-7702, Optimism and Arbitrum deposit transactions", () => {
+    const block = {
+      number: "0x1",
+      transactions: [
+        { hash: "0x001", type: "0x0" },
+        { hash: "0x002", type: "0x4" }, // EIP-7702
+        { hash: "0x003", type: "0x7e" }, // Optimism deposit
+        { hash: "0x004", type: "0x6b" }, // Arbitrum deposit
+        { hash: "0x005", type: 4 }, // numeric EIP-7702
+      ],
+    };
+
+    expect(sanitizeForkRpcResult("eth_getBlockByNumber", block)).toEqual({
+      number: "0x1",
+      transactions: [{ hash: "0x001", type: "0x0" }],
+    });
+  });
+
   it("leaves non-block RPC results unchanged", () => {
     const proof = { address: "0x1234" };
     expect(sanitizeForkRpcResult("eth_getProof", proof)).toBe(proof);
