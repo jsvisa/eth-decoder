@@ -29,9 +29,27 @@ function makeHttp(url, batchSize = 1) {
     : http(url);
 }
 
-function isBlobTransaction(tx) {
+function isUnsupportedTransaction(tx) {
   if (!tx || typeof tx !== "object" || Array.isArray(tx)) return false;
-  return tx.type === "0x3" || tx.type === "0x03" || tx.type === 3;
+  const rawType = tx.type;
+  let typeNum;
+  if (typeof rawType === "number") {
+    typeNum = rawType;
+  } else if (typeof rawType === "string") {
+    typeNum = parseInt(rawType, 16);
+  } else {
+    return false;
+  }
+  // 0x3  – blob txs (EIP-4844)
+  // 0x4  – EIP-7702 set-code txs
+  // 0x7e – Optimism deposit txs
+  // 0x6a-0x6f – Arbitrum deposit txs
+  return (
+    typeNum === 0x3 ||
+    typeNum === 0x4 ||
+    typeNum === 0x7e ||
+    (typeNum >= 0x6a && typeNum <= 0x6f)
+  );
 }
 
 export function sanitizeForkRpcResult(method, result) {
@@ -45,7 +63,9 @@ export function sanitizeForkRpcResult(method, result) {
 
   return {
     ...result,
-    transactions: result.transactions.filter((tx) => !isBlobTransaction(tx)),
+    transactions: result.transactions.filter(
+      (tx) => !isUnsupportedTransaction(tx),
+    ),
   };
 }
 
