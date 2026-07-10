@@ -110,6 +110,7 @@ export async function POST(request) {
     storageOverrides = [],
     cheatcodes = {},
     price = true,
+    rpcBatchSize = 20,
   } = body;
 
   if (!chainId) {
@@ -263,6 +264,7 @@ export async function POST(request) {
       balanceOverrides,
       storageOverrides,
       cheatcodes,
+      rpcBatchSize: Math.max(1, Math.min(100, Number(rpcBatchSize) || 20)),
     });
 
     // Collect all addresses needing ABIs, fetch uncached ones in parallel, re-decode
