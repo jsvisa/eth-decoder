@@ -21,6 +21,7 @@ export default defineConfig({
   test: {
     globals: true,
     passWithNoTests: true,
+    include: [],
     exclude: ["tests/e2e/**", "node_modules/**"],
     coverage: {
       provider: "v8",
@@ -29,19 +30,21 @@ export default defineConfig({
     },
     projects: [
       {
+        name: "unit",
         plugins: [jsxInJsPlugin],
         test: {
           include: ["tests/unit/**"],
+          exclude: ["tests/unit/setup.js"],
           environment: "jsdom",
+          setupFiles: ["tests/unit/setup.js"],
         },
       },
       {
+        name: "api",
         test: {
           include: ["tests/api/**"],
           exclude: [
             "tests/api/__fixtures__/**",
-            "tests/e2e/**",
-            "node_modules/**",
           ],
           environment: "node",
         },
