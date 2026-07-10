@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useHistory } from "../../../app/contract-caller/hooks/useHistory.js";
 
@@ -9,6 +9,10 @@ beforeEach(() => {
   window.history.replaceState(null, "", "/");
   // Restore mocked window.confirm
   vi.restoreAllMocks();
+});
+
+afterEach(() => {
+  vi.clearAllTimers();
 });
 
 // Helper: build the minimal set of params the hook needs.
