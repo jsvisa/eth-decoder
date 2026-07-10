@@ -94,7 +94,10 @@ def get_abi_by_sign(sign, count=1):
 
 
 def extract_output_sign(abi: Dict) -> str:
-    return "({})".format(",".join([collapse_if_tuple(e) for e in abi["outputs"]]))
+    outputs = abi.get("outputs") or []
+    if len(outputs) == 0:
+        return ""
+    return "({})".format(",".join([collapse_if_tuple(e) for e in outputs]))
 
 
 @app.get("/api/v1/query")
