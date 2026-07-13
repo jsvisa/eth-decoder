@@ -24,6 +24,7 @@ import {
 } from "../../utils/validation";
 import { DEFAULT_RPC_URLS, FORK_RPC_URLS } from "../../utils/chains";
 import { autoFillWarpTimestamp } from "../../utils/cheatcodes";
+import { getFunctionSig, isReadOnly, isPayable } from "../utils/functionArgs";
 
 /**
  * Manages execution of contract calls (read via /api/call-contract,
@@ -108,22 +109,12 @@ export function useCallExecution({
 
   // ── helpers ────────────────────────────────────────────────────────────────
 
-  const isReadOnly = (func) =>
-    func?.stateMutability === "view" || func?.stateMutability === "pure";
-
-  const isPayable = (func) => func?.stateMutability === "payable";
-
   const getSelectedFunction = () => {
     if (!selectedFunction || !parsedAbi) return null;
     return parsedAbi.find(
       (item) =>
         item.type === "function" && getFunctionSig(item) === selectedFunction,
     );
-  };
-
-  const getFunctionSig = (func) => {
-    const types = func.inputs?.map((i) => i.type).join(",") || "";
-    return `${func.name}(${types})`;
   };
 
   const getEthValueWithUnit = () => {

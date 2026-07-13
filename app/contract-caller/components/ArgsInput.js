@@ -3,10 +3,7 @@
 import React from "react";
 import styles from "./ArgsInput.module.css";
 import TupleArgInput from "./TupleArgInput";
-
-const isPayable = (func) => func && func.stateMutability === "payable";
-const isReadOnly = (func) =>
-  func && (func.stateMutability === "view" || func.stateMutability === "pure");
+import { isReadOnly, isPayable } from "../utils/functionArgs";
 
 /**
  * ArgsInput — renders per-argument inputs for a selected ABI function,

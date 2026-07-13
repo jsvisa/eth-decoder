@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { isValidEthAddress } from "../../utils/validation";
 import { getCachedAbi, setCachedAbi } from "../../utils/abiCache";
+import { isReadOnly } from "../utils/functionArgs";
 
 const ABI_CACHE_PREFIX = "abi-";
 
@@ -176,10 +177,8 @@ export function useAbi({
 
       // Sort: view/pure first, then others
       allFunctions.sort((a, b) => {
-        const aIsRead =
-          a.stateMutability === "view" || a.stateMutability === "pure";
-        const bIsRead =
-          b.stateMutability === "view" || b.stateMutability === "pure";
+        const aIsRead = isReadOnly(a);
+        const bIsRead = isReadOnly(b);
         if (aIsRead && !bIsRead) return -1;
         if (!aIsRead && bIsRead) return 1;
         return a.name.localeCompare(b.name);

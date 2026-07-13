@@ -9,13 +9,17 @@ import {
   decodeEventLog,
   keccak256,
   bytesToHex,
-  toFunctionSelector,
 } from "viem";
 import { isValidEthAddress } from "./validation";
 import { CHAIN_META, FORK_RPC_URLS } from "./chains";
 import { createMetricsCollector } from "./rpcMetrics";
 import { NATIVE_TOKEN_ADDRESS, buildTokenAccountMap } from "./tokenTransfers";
 import { normalizeArg } from "./normalizeArg";
+import {
+  findFunctionInAbi,
+  serializeBigInts,
+  getFunctionSelector,
+} from "../contract-caller/utils/functionArgs";
 
 // Create an http transport with or without JSON-RPC batching.
 // batchSize=1 → http(url) with NO batch option — guarantees single {…} request
@@ -169,20 +173,6 @@ function createProofFreeTransport(rpcUrl, batchSize = 1, collector = null) {
   };
 }
 
-// Helper to serialize BigInt values for JSON
-const serializeValue = (value) => {
-  if (typeof value === "bigint") return value.toString();
-  if (Array.isArray(value)) return value.map(serializeValue);
-  if (value && typeof value === "object") {
-    const serialized = {};
-    for (const key in value) {
-      serialized[key] = serializeValue(value[key]);
-    }
-    return serialized;
-  }
-  return value;
-};
-
 // Batch-decode undecoded logs using the /api/decode-event server endpoint.
 // Mutates log objects in-place and returns the updated array.
 export async function decodeLogsViaServer(logs) {
@@ -291,7 +281,7 @@ function decodeRevertData(hexData, abi = []) {
     if (!args?.length) return errorName;
     const formatted = args
       .map((a) => {
-        const s = serializeValue(a);
+        const s = serializeBigInts(a);
         return typeof s === "object" ? JSON.stringify(s) : String(s);
       })
       .join(", ");
@@ -328,7 +318,7 @@ function tryDecodeLog(log, eventAbisByAddress) {
         inputs: eventAbi.inputs.map((inp, i) => ({
           name: inp.name || `arg${i}`,
           type: inp.type,
-          value: serializeValue(decoded.args[inp.name] ?? decoded.args[i]),
+          value: serializeBigInts(decoded.args[inp.name] ?? decoded.args[i]),
           indexed: inp.indexed || false,
         })),
       };
@@ -436,12 +426,8 @@ function buildSelectorMap(abi, abiCache) {
   const map = new Map();
   const add = (abiFrag) => {
     if (!abiFrag || abiFrag.type !== "function") return;
-    try {
-      const selector = toFunctionSelector(abiFrag);
-      if (!map.has(selector)) map.set(selector, abiFrag);
-    } catch {
-      /* skip malformed entries */
-    }
+    const selector = getFunctionSelector(abiFrag);
+    if (selector && !map.has(selector)) map.set(selector, abiFrag);
   };
   (abi || []).forEach(add);
   for (const [, cachedAbi] of abiCache || new Map()) {
@@ -478,7 +464,7 @@ function _decodeCallNode(node, selectorMap) {
         node.decodedInputs = funcAbi.inputs.map((inp, i) => ({
           name: inp.name || `input${i}`,
           type: inp.type,
-          value: serializeValue(Array.isArray(args) ? args[i] : args),
+          value: serializeBigInts(Array.isArray(args) ? args[i] : args),
         }));
       } catch {
         /* leave undecoded */
@@ -503,13 +489,13 @@ function _decodeCallNode(node, selectorMap) {
                   {
                     name: funcAbi.outputs[0].name || "result",
                     type: funcAbi.outputs[0].type,
-                    value: serializeValue(decoded),
+                    value: serializeBigInts(decoded),
                   },
                 ]
               : funcAbi.outputs.map((out, i) => ({
                   name: out.name || `output${i}`,
                   type: out.type,
-                  value: serializeValue(
+                  value: serializeBigInts(
                     Array.isArray(decoded) ? decoded[i] : decoded[out.name],
                   ),
                 }));
@@ -859,15 +845,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     let functionAbi = null;
     let parsedArgs = args || [];
     if (functionName && abi) {
-      // Find the function in ABI — supports both plain name and full signature (e.g. "transfer(address,uint256)")
-      functionAbi = abi.find((item) => {
-        if (item.type !== "function") return false;
-        if (functionName.includes("(")) {
-          const types = item.inputs?.map((i) => i.type).join(",") || "";
-          return `${item.name}(${types})` === functionName;
-        }
-        return item.name === functionName;
-      });
+      functionAbi = findFunctionInAbi(abi, functionName);
 
       if (functionAbi) {
         // Parse args based on types
@@ -1187,14 +1165,14 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
             {
               name: functionAbi.outputs[0].name || "result",
               type: functionAbi.outputs[0].type,
-              value: serializeValue(decoded),
+              value: serializeBigInts(decoded),
             },
           ];
         } else {
           decodedOutputs = functionAbi.outputs.map((output, index) => ({
             name: output.name || `output${index}`,
             type: output.type,
-            value: serializeValue(
+            value: serializeBigInts(
               Array.isArray(decoded) ? decoded[index] : decoded[output.name],
             ),
           }));
@@ -1236,7 +1214,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
           (input, index) => ({
             name: input.name || `input${index}`,
             type: input.type,
-            value: serializeValue(parsedArgs[index]),
+            value: serializeBigInts(parsedArgs[index]),
           }),
         );
         callTraceRoot.decodedOutputs = decodedOutputs;
