@@ -23,6 +23,8 @@ import {
   isValidNumber,
   isValidPositiveInteger,
 } from "../../utils/validation";
+import { DEFAULT_RPC_URLS, FORK_RPC_URLS } from "../../utils/chains";
+import { createPublicClient, http } from "viem";
 
 /**
  * Manages execution of contract calls (read via /api/call-contract,
@@ -289,6 +291,36 @@ export function useCallExecution({
           activeCheatcodes.warp = {
             timestamp: parseInt(cheatcodes.warp.timestamp),
           };
+        }
+
+        // Auto-populate warp timestamp from fork block number if not explicitly set
+        if (
+          isWrite &&
+          forkBlockNumber &&
+          forkBlockNumber !== "latest" &&
+          !activeCheatcodes.warp?.timestamp
+        ) {
+          try {
+            const autoWarpRpc =
+              rpcSettings?.[chain] ||
+              FORK_RPC_URLS[chain] ||
+              DEFAULT_RPC_URLS[chain];
+            if (autoWarpRpc) {
+              const publicClient = createPublicClient({
+                transport: http(autoWarpRpc),
+              });
+              const block = await publicClient.getBlock({
+                blockNumber: BigInt(forkBlockNumber),
+              });
+              if (block.timestamp) {
+                activeCheatcodes.warp = {
+                  timestamp: Number(block.timestamp),
+                };
+              }
+            }
+          } catch {
+            // Auto-warp failed — simulate without timestamp warp
+          }
         }
 
         const ethValueInfo = getEthValueWithUnit();

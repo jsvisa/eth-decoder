@@ -231,6 +231,30 @@ export async function POST(request) {
     );
   }
 
+  // Auto-populate warp timestamp from block number if not provided
+  let resolvedCheatcodes = cheatcodes;
+  if (blockNumber !== "latest" && !cheatcodes?.warp?.timestamp) {
+    try {
+      const blockNum = BigInt(blockNumber);
+      const getBlockClient = createPublicClient({
+        chain: chain.viemChain,
+        transport: http(chain.rpcUrl),
+      });
+      const block = await getBlockClient.getBlock({ blockNumber: blockNum });
+      if (block.timestamp) {
+        resolvedCheatcodes = {
+          ...cheatcodes,
+          warp: {
+            ...(cheatcodes.warp || {}),
+            timestamp: Number(block.timestamp),
+          },
+        };
+      }
+    } catch {
+      // Block fetch failed — simulate without warp
+    }
+  }
+
   pruneExpiredResults().catch(() => {});
 
   const requestBody = {
@@ -263,7 +287,7 @@ export async function POST(request) {
       abiCache: abiCacheMap,
       balanceOverrides,
       storageOverrides,
-      cheatcodes,
+      cheatcodes: resolvedCheatcodes,
       rpcBatchSize: Math.max(1, Math.min(100, Number(rpcBatchSize) || 20)),
     });
 
