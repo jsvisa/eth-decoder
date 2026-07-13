@@ -1,8 +1,6 @@
 import { formatTokenAmount } from "./tokenFormatting";
-import { buildTokenAccountMap } from "./tokenTransfers";
-
-export const NATIVE_TOKEN_ADDRESS =
-  "0x0000000000000000000000000000000000000000";
+import { NATIVE_TOKEN_ADDRESS, buildTokenAccountMap } from "./tokenTransfers";
+export { NATIVE_TOKEN_ADDRESS };
 
 export const NATIVE_TOKEN_SYMBOLS = {
   ethereum: "ETH",

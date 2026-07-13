@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
-import {
-  decodeFunctionData,
-  defineChain,
-  createPublicClient,
-  http,
-} from "viem";
+import { decodeFunctionData, createPublicClient, http } from "viem";
 import {
   getChainConfigByChainId,
+  buildCustomChainConfig,
   CGC_CHAIN_SLUGS,
   ETH_NATIVE_CHAIN_IDS,
+  NATIVE_COIN_IDS,
 } from "../../utils/chains";
 import { fetchAbi } from "../fetch-abi/route";
 import { getAbiFromCache, setAbiInCache } from "../../utils/serverAbiBlobCache";
@@ -25,68 +22,14 @@ import {
 } from "../../utils/simulationCache";
 import { buildSimulationLink } from "../../utils/simulationLinks";
 import { enrichBalanceChanges } from "../../utils/balanceChanges";
+import { autoFillWarpTimestamp } from "../../utils/cheatcodes";
 import {
-  TRANSFER_TOPIC,
-  ERC20_TRANSFER_TOPIC,
-  DEPOSIT_TOPIC,
-  WITHDRAWAL_TOPIC,
+  NATIVE_TOKEN_ADDRESS,
+  TOKEN_TRANSFER_TOPICS,
+  SYMBOL_ABI,
+  NAME_ABI,
+  DECIMALS_ABI,
 } from "../../utils/tokenTransfers";
-
-const NATIVE_TOKEN = "0x0000000000000000000000000000000000000000";
-
-const TOKEN_TRANSFER_TOPICS = new Set([
-  TRANSFER_TOPIC,
-  ERC20_TRANSFER_TOPIC,
-  DEPOSIT_TOPIC,
-  WITHDRAWAL_TOPIC,
-]);
-
-const NATIVE_COIN_IDS = {
-  56: "binancecoin",
-  137: "matic-network",
-};
-
-const SYMBOL_ABI = [
-  {
-    type: "function",
-    name: "symbol",
-    inputs: [],
-    outputs: [{ type: "string" }],
-    stateMutability: "view",
-  },
-];
-const NAME_ABI = [
-  {
-    type: "function",
-    name: "name",
-    inputs: [],
-    outputs: [{ type: "string" }],
-    stateMutability: "view",
-  },
-];
-const DECIMALS_ABI = [
-  {
-    type: "function",
-    name: "decimals",
-    inputs: [],
-    outputs: [{ type: "uint8" }],
-    stateMutability: "view",
-  },
-];
-
-function buildChainConfig(numericChainId, rpcUrl) {
-  return {
-    id: `chain-${numericChainId}`,
-    rpcUrl,
-    forkRpcUrl: rpcUrl,
-    viemChain: defineChain({
-      id: numericChainId,
-      name: `chain-${numericChainId}`,
-      nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-      rpcUrls: { default: { http: [rpcUrl] } },
-    }),
-  };
-}
 
 export async function POST(request) {
   let body;
@@ -177,7 +120,7 @@ export async function POST(request) {
 
   const numericChainId = Number(chainId);
   const chain = rpcUrl
-    ? buildChainConfig(numericChainId, rpcUrl)
+    ? buildCustomChainConfig(numericChainId, rpcUrl)
     : getChainConfigByChainId(numericChainId);
   if (!chain) {
     return NextResponse.json(
@@ -231,29 +174,12 @@ export async function POST(request) {
     );
   }
 
-  // Auto-populate warp timestamp from block number if not provided
-  let resolvedCheatcodes = cheatcodes;
-  if (blockNumber !== "latest" && !cheatcodes?.warp?.timestamp) {
-    try {
-      const blockNum = BigInt(blockNumber);
-      const getBlockClient = createPublicClient({
-        chain: chain.viemChain,
-        transport: http(chain.rpcUrl),
-      });
-      const block = await getBlockClient.getBlock({ blockNumber: blockNum });
-      if (block.timestamp) {
-        resolvedCheatcodes = {
-          ...cheatcodes,
-          warp: {
-            ...(cheatcodes.warp || {}),
-            timestamp: Number(block.timestamp),
-          },
-        };
-      }
-    } catch {
-      // Block fetch failed — simulate without warp
-    }
-  }
+  const resolvedCheatcodes = await autoFillWarpTimestamp(
+    blockNumber,
+    cheatcodes,
+    chain.rpcUrl,
+    chain.viemChain,
+  );
 
   pruneExpiredResults().catch(() => {});
 
@@ -375,7 +301,7 @@ export async function POST(request) {
         const chainSlug = CGC_CHAIN_SLUGS[numericChainId];
 
         const fetchTokenMeta = async (addr) => {
-          if (addr !== NATIVE_TOKEN && client) {
+          if (addr !== NATIVE_TOKEN_ADDRESS && client) {
             let symbol;
             try {
               symbol = await client.readContract({
@@ -409,7 +335,7 @@ export async function POST(request) {
           }
 
           let priceUrl;
-          if (addr === NATIVE_TOKEN) {
+          if (addr === NATIVE_TOKEN_ADDRESS) {
             const cgcId = ETH_NATIVE_CHAIN_IDS.has(numericChainId)
               ? "ethereum"
               : NATIVE_COIN_IDS[numericChainId];
@@ -444,7 +370,7 @@ export async function POST(request) {
         };
 
         await Promise.all(
-          [...tokenAddresses, NATIVE_TOKEN].map(fetchTokenMeta),
+          [...tokenAddresses, NATIVE_TOKEN_ADDRESS].map(fetchTokenMeta),
         );
 
         const enriched = enrichBalanceChanges({

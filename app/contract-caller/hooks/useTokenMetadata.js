@@ -2,43 +2,14 @@
 
 import { useState } from "react";
 import {
-  TRANSFER_TOPIC,
-  ERC20_TRANSFER_TOPIC,
-  DEPOSIT_TOPIC,
-  WITHDRAWAL_TOPIC,
+  NATIVE_TOKEN_ADDRESS,
+  TOKEN_TRANSFER_TOPICS,
+  SYMBOL_ABI,
+  DECIMALS_ABI,
 } from "../../utils/tokenTransfers";
 
 const TOKEN_SYMBOL_CACHE_PREFIX = "token-symbol-";
 const TOKEN_DECIMALS_CACHE_PREFIX = "token-decimals-";
-
-const NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000";
-
-const TOKEN_TRANSFER_TOPICS = new Set([
-  TRANSFER_TOPIC,
-  ERC20_TRANSFER_TOPIC,
-  DEPOSIT_TOPIC,
-  WITHDRAWAL_TOPIC,
-]);
-
-const ERC20_SYMBOL_ABI = [
-  {
-    type: "function",
-    name: "symbol",
-    inputs: [],
-    outputs: [{ type: "string" }],
-    stateMutability: "view",
-  },
-];
-
-const ERC20_DECIMALS_ABI = [
-  {
-    type: "function",
-    name: "decimals",
-    inputs: [],
-    outputs: [{ type: "uint8" }],
-    stateMutability: "view",
-  },
-];
 
 // localStorage helpers for token symbol cache
 const getCachedTokenSymbol = (chain, address) => {
@@ -139,7 +110,7 @@ export function useTokenMetadata(chain, rpcSettings = {}) {
             address: addr,
             functionName: "symbol",
             args: [],
-            abi: ERC20_SYMBOL_ABI,
+            abi: SYMBOL_ABI,
             rpcUrl: rpcSettings[chain] || undefined,
             chainId,
           }),
@@ -206,7 +177,7 @@ export function useTokenMetadata(chain, rpcSettings = {}) {
               address: addr,
               functionName: "decimals",
               args: [],
-              abi: ERC20_DECIMALS_ABI,
+              abi: DECIMALS_ABI,
               rpcUrl: rpcSettings[chain] || undefined,
               chainId: chainNumericId,
             }),

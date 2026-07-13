@@ -14,9 +14,7 @@ import {
 import { isValidEthAddress } from "./validation";
 import { CHAIN_META, FORK_RPC_URLS } from "./chains";
 import { createMetricsCollector } from "./rpcMetrics";
-import { buildTokenAccountMap } from "./tokenTransfers";
-
-const NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000";
+import { NATIVE_TOKEN_ADDRESS, buildTokenAccountMap } from "./tokenTransfers";
 
 // Create an http transport with or without JSON-RPC batching.
 // batchSize=1 → http(url) with NO batch option — guarantees single {…} request

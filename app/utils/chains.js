@@ -1,3 +1,4 @@
+import { defineChain } from "viem";
 import { mainnet, arbitrum, base, polygon, bsc } from "viem/chains";
 
 // Canonical ordered list for UI dropdowns: { id, name, icon }
@@ -158,3 +159,28 @@ export const CGC_CHAIN_SLUGS = {
 export const ETH_NATIVE_CHAIN_IDS = new Set([
   1, 10, 42161, 8453, 324, 59144, 534352, 81457, 34443, 1088,
 ]);
+
+// CoinGecko native-coin slugs for chains whose native token is not ETH.
+export const NATIVE_COIN_IDS = {
+  56: "binancecoin",
+  137: "matic-network",
+};
+
+/**
+ * Build a chain config object for a non-built-in chain when a custom RPC URL
+ * is provided. Shape: { id, rpcUrl, forkRpcUrl, viemChain }.
+ * For built-in chains use getChainConfig() or getChainConfigByChainId().
+ */
+export function buildCustomChainConfig(numericChainId, rpcUrl) {
+  return {
+    id: `chain-${numericChainId}`,
+    rpcUrl,
+    forkRpcUrl: rpcUrl,
+    viemChain: defineChain({
+      id: numericChainId,
+      name: `chain-${numericChainId}`,
+      nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+      rpcUrls: { default: { http: [rpcUrl] } },
+    }),
+  };
+}

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { CGC_CHAIN_SLUGS, ETH_NATIVE_CHAIN_IDS } from "../../utils/chains";
-
-const NATIVE_TOKEN = "0x0000000000000000000000000000000000000000";
+import { NATIVE_TOKEN_ADDRESS } from "../../utils/tokenTransfers";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -22,7 +21,7 @@ export async function GET(request) {
 
   try {
     let url;
-    if (tokenAddress.toLowerCase() === NATIVE_TOKEN) {
+    if (tokenAddress.toLowerCase() === NATIVE_TOKEN_ADDRESS) {
       const cgcId = ETH_NATIVE_CHAIN_IDS.has(chainId) ? "ethereum" : chain;
       url = `https://api.coingecko.com/api/v3/simple/price?ids=${cgcId}&vs_currencies=usd`;
       const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
