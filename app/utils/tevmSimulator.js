@@ -15,6 +15,7 @@ import { isValidEthAddress } from "./validation";
 import { CHAIN_META, FORK_RPC_URLS } from "./chains";
 import { createMetricsCollector } from "./rpcMetrics";
 import { NATIVE_TOKEN_ADDRESS, buildTokenAccountMap } from "./tokenTransfers";
+import { normalizeArg } from "./normalizeArg";
 
 // Create an http transport with or without JSON-RPC batching.
 // batchSize=1 → http(url) with NO batch option — guarantees single {…} request
@@ -167,109 +168,6 @@ function createProofFreeTransport(rpcUrl, batchSize = 1, collector = null) {
     };
   };
 }
-
-// Helper to parse an argument value based on ABI type
-const parseArgValue = (arg, input) => {
-  if (arg === undefined || arg === null || arg === "") {
-    return arg;
-  }
-
-  const type = input.type;
-
-  // Handle integer types
-  if (type.startsWith("uint") || type.startsWith("int")) {
-    try {
-      return BigInt(arg);
-    } catch {
-      return arg;
-    }
-  }
-
-  // Handle boolean
-  if (type === "bool") {
-    return arg === "true" || arg === true;
-  }
-
-  // Handle tuple types
-  if (type === "tuple" || type.startsWith("tuple")) {
-    // If it's already an object/array, recursively parse components
-    let tupleValue = arg;
-    if (typeof arg === "string") {
-      try {
-        // Try to parse as JSON first
-        tupleValue = JSON.parse(arg);
-      } catch {
-        // If not valid JSON, try to parse as comma-separated values
-        // This handles cases like "value1,value2,value3"
-        const parts = arg.split(",").map((s) => s.trim());
-        tupleValue = parts;
-      }
-    }
-
-    // If it's a tuple array (tuple[])
-    if (type === "tuple[]") {
-      if (!Array.isArray(tupleValue)) {
-        return arg;
-      }
-      return tupleValue.map((item) =>
-        parseArgValue(item, { ...input, type: "tuple" }),
-      );
-    }
-
-    // For single tuple, parse each component
-    if (input.components && Array.isArray(tupleValue)) {
-      const parsed = tupleValue.map((val, idx) => {
-        const component = input.components[idx];
-        if (!component) return val;
-        return parseArgValue(val, component);
-      });
-      return parsed;
-    }
-
-    return tupleValue;
-  }
-
-  // Handle bytes / bytesN - require 0x-prefixed hex.
-  // The regex /^bytes\d+$/ matches bytes32, bytes16 etc. but NOT bytes32[] or
-  // bytes32[N] because $ anchors before the brackets, so array types fall
-  // through to the branch below correctly.
-  if (type === "bytes" || /^bytes\d+$/.test(type)) {
-    if (typeof arg === "string" && arg !== "" && !arg.startsWith("0x")) {
-      const isHexChars = /^[0-9a-fA-F]+$/.test(arg);
-      if (isHexChars) {
-        throw new Error(
-          `Invalid ${type}: value looks like a hex string missing the "0x" prefix. Try "0x${arg}".`,
-        );
-      }
-      throw new Error(`Invalid ${type}: expected a "0x"-prefixed hex string.`);
-    }
-    return arg;
-  }
-
-  // Handle dynamic arrays (type[]) and fixed-size arrays (type[N]).
-  // Strips the outermost bracket pair and recurses, so bytes32[6] is treated
-  // the same as bytes32[].
-  const arrayMatch = type.match(/^(.+)\[(\d*)\]$/);
-  if (arrayMatch) {
-    const baseType = arrayMatch[1];
-    let arrayValue = arg;
-    if (typeof arg === "string") {
-      try {
-        arrayValue = JSON.parse(arg);
-      } catch {
-        return arg;
-      }
-    }
-    if (!Array.isArray(arrayValue)) {
-      return arg;
-    }
-    return arrayValue.map((item) =>
-      parseArgValue(item, { ...input, type: baseType }),
-    );
-  }
-
-  return arg;
-};
 
 // Helper to serialize BigInt values for JSON
 const serializeValue = (value) => {
@@ -976,7 +874,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
         parsedArgs = (args || []).map((arg, index) => {
           const input = functionAbi.inputs[index];
           if (!input) return arg;
-          return parseArgValue(arg, input);
+          return normalizeArg(arg, input.type, input.components);
         });
       }
     }

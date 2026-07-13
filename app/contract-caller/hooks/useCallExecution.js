@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef } from "react";
-import yaml from "js-yaml";
 import {
   simulateWithTevm,
   simulateWithClient,
@@ -101,13 +100,6 @@ export function useCallExecution({
   const [savingSimulation, setSavingSimulation] = useState(false);
 
   // ── result-display toggles ─────────────────────────────────────────────────
-  const [isYaml, setIsYaml] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [showFullResponse, setShowFullResponse] = useState(false);
-  const [resultCollapsed, setResultCollapsed] = useState(false);
-  const [simLogsExpanded, setSimLogsExpanded] = useState(true);
-  const [bdExpandedAddrs, setBdExpandedAddrs] = useState(new Set());
-  const [bdExpandedTokens, setBdExpandedTokens] = useState(new Set());
   const [hideTooltip, setHideTooltip] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
 
@@ -510,8 +502,6 @@ export function useCallExecution({
         setResult(data);
       }
 
-      setSimLogsExpanded(!data.logs || data.logs.length <= 10);
-
       if (typeof saveToHistory === "function") {
         saveToHistory(
           {
@@ -541,22 +531,6 @@ export function useCallExecution({
 
   const handleCancel = () => {
     simAbortRef.current?.abort();
-  };
-
-  // ── handleCopy ─────────────────────────────────────────────────────────────
-
-  const handleCopy = async () => {
-    try {
-      const text = isYaml
-        ? yaml.dump(result, { indent: 2, lineWidth: -1, noRefs: true })
-        : JSON.stringify(result, null, 2);
-
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
   };
 
   // ── handleSaveSimulation ──────────────────────────────────────────────────
@@ -666,25 +640,11 @@ export function useCallExecution({
     simProgress,
     simulationId,
     savingSimulation,
-    isYaml,
-    setIsYaml,
-    copied,
-    showFullResponse,
-    setShowFullResponse,
-    resultCollapsed,
-    setResultCollapsed,
-    simLogsExpanded,
-    setSimLogsExpanded,
-    bdExpandedAddrs,
-    setBdExpandedAddrs,
-    bdExpandedTokens,
-    setBdExpandedTokens,
     hideTooltip,
     setHideTooltip,
     urlCopied,
     handleCall,
     handleCancel,
-    handleCopy,
     handleShareUrl,
     handleSaveSimulation,
     setSaveExtra,
