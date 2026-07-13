@@ -3,9 +3,6 @@ import { decodeFunctionData, createPublicClient, http } from "viem";
 import {
   getChainConfigByChainId,
   buildCustomChainConfig,
-  CGC_CHAIN_SLUGS,
-  ETH_NATIVE_CHAIN_IDS,
-  NATIVE_COIN_IDS,
 } from "../../utils/chains";
 import { fetchAbi } from "../fetch-abi/route";
 import { getAbiFromCache, setAbiInCache } from "../../utils/serverAbiBlobCache";
@@ -23,6 +20,7 @@ import {
 import { buildSimulationLink } from "../../utils/simulationLinks";
 import { enrichBalanceChanges } from "../../utils/balanceChanges";
 import { autoFillWarpTimestamp } from "../../utils/cheatcodes";
+import { fetchCoinGeckoPrice } from "../../utils/coingecko";
 import {
   NATIVE_TOKEN_ADDRESS,
   TOKEN_TRANSFER_TOPICS,
@@ -298,7 +296,6 @@ export async function POST(request) {
         const tokenSymbols = {};
         const tokenDecimals = {};
         const tokenPrices = {};
-        const chainSlug = CGC_CHAIN_SLUGS[numericChainId];
 
         const fetchTokenMeta = async (addr) => {
           if (addr !== NATIVE_TOKEN_ADDRESS && client) {
@@ -334,39 +331,7 @@ export async function POST(request) {
             }
           }
 
-          let priceUrl;
-          if (addr === NATIVE_TOKEN_ADDRESS) {
-            const cgcId = ETH_NATIVE_CHAIN_IDS.has(numericChainId)
-              ? "ethereum"
-              : NATIVE_COIN_IDS[numericChainId];
-            if (cgcId) {
-              priceUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${cgcId}&vs_currencies=usd`;
-              try {
-                const res = await fetch(priceUrl, {
-                  signal: AbortSignal.timeout(5000),
-                });
-                if (res.ok) {
-                  const data = await res.json();
-                  tokenPrices[addr] = data[cgcId]?.usd ?? null;
-                }
-              } catch {
-                // Price fetch failed, skip
-              }
-            }
-          } else if (chainSlug) {
-            priceUrl = `https://api.coingecko.com/api/v3/simple/token_price/${chainSlug}?contract_addresses=${addr}&vs_currencies=usd`;
-            try {
-              const res = await fetch(priceUrl, {
-                signal: AbortSignal.timeout(5000),
-              });
-              if (res.ok) {
-                const data = await res.json();
-                tokenPrices[addr] = data[addr]?.usd ?? null;
-              }
-            } catch {
-              // Price fetch failed, skip
-            }
-          }
+          tokenPrices[addr] = await fetchCoinGeckoPrice(addr, numericChainId);
         };
 
         await Promise.all(

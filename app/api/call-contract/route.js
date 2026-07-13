@@ -4,11 +4,14 @@ import {
   http,
   decodeFunctionResult,
   encodeFunctionData,
-  defineChain,
 } from "viem";
 import { isValidEthAddress } from "../../utils/validation";
 import { normalizeArg, ArgValidationError } from "../../utils/normalizeArg";
-import { VIEM_CHAINS, DEFAULT_RPC_URLS } from "../../utils/chains";
+import {
+  VIEM_CHAINS,
+  DEFAULT_RPC_URLS,
+  buildCustomChainConfig,
+} from "../../utils/chains";
 
 export async function POST(request) {
   try {
@@ -56,16 +59,9 @@ export async function POST(request) {
 
     // Handle custom chains (chain IDs starting with "chain-")
     if (!chainConfig && customChainId && customRpcUrl) {
-      // Create a custom chain config for non-built-in chains
-      chainConfig = defineChain({
-        id: customChainId,
-        name: chain,
-        nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-        rpcUrls: {
-          default: { http: [customRpcUrl] },
-        },
-      });
-      rpcUrl = customRpcUrl;
+      const custom = buildCustomChainConfig(customChainId, customRpcUrl);
+      chainConfig = custom.viemChain;
+      rpcUrl = custom.rpcUrl;
     }
 
     if (!chainConfig || !rpcUrl) {
