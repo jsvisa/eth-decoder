@@ -9,14 +9,17 @@ import {
   decodeEventLog,
   keccak256,
   bytesToHex,
-  toFunctionSelector,
 } from "viem";
 import { isValidEthAddress } from "./validation";
 import { CHAIN_META, FORK_RPC_URLS } from "./chains";
 import { createMetricsCollector } from "./rpcMetrics";
-import { buildTokenAccountMap } from "./tokenTransfers";
-
-const NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000";
+import { NATIVE_TOKEN_ADDRESS, buildTokenAccountMap } from "./tokenTransfers";
+import { normalizeArg } from "./normalizeArg";
+import {
+  findFunctionInAbi,
+  serializeBigInts,
+  getFunctionSelector,
+} from "../contract-caller/utils/functionArgs";
 
 // Create an http transport with or without JSON-RPC batching.
 // batchSize=1 → http(url) with NO batch option — guarantees single {…} request
@@ -170,123 +173,6 @@ function createProofFreeTransport(rpcUrl, batchSize = 1, collector = null) {
   };
 }
 
-// Helper to parse an argument value based on ABI type
-const parseArgValue = (arg, input) => {
-  if (arg === undefined || arg === null || arg === "") {
-    return arg;
-  }
-
-  const type = input.type;
-
-  // Handle integer types
-  if (type.startsWith("uint") || type.startsWith("int")) {
-    try {
-      return BigInt(arg);
-    } catch {
-      return arg;
-    }
-  }
-
-  // Handle boolean
-  if (type === "bool") {
-    return arg === "true" || arg === true;
-  }
-
-  // Handle tuple types
-  if (type === "tuple" || type.startsWith("tuple")) {
-    // If it's already an object/array, recursively parse components
-    let tupleValue = arg;
-    if (typeof arg === "string") {
-      try {
-        // Try to parse as JSON first
-        tupleValue = JSON.parse(arg);
-      } catch {
-        // If not valid JSON, try to parse as comma-separated values
-        // This handles cases like "value1,value2,value3"
-        const parts = arg.split(",").map((s) => s.trim());
-        tupleValue = parts;
-      }
-    }
-
-    // If it's a tuple array (tuple[])
-    if (type === "tuple[]") {
-      if (!Array.isArray(tupleValue)) {
-        return arg;
-      }
-      return tupleValue.map((item) =>
-        parseArgValue(item, { ...input, type: "tuple" }),
-      );
-    }
-
-    // For single tuple, parse each component
-    if (input.components && Array.isArray(tupleValue)) {
-      const parsed = tupleValue.map((val, idx) => {
-        const component = input.components[idx];
-        if (!component) return val;
-        return parseArgValue(val, component);
-      });
-      return parsed;
-    }
-
-    return tupleValue;
-  }
-
-  // Handle bytes / bytesN - require 0x-prefixed hex.
-  // The regex /^bytes\d+$/ matches bytes32, bytes16 etc. but NOT bytes32[] or
-  // bytes32[N] because $ anchors before the brackets, so array types fall
-  // through to the branch below correctly.
-  if (type === "bytes" || /^bytes\d+$/.test(type)) {
-    if (typeof arg === "string" && arg !== "" && !arg.startsWith("0x")) {
-      const isHexChars = /^[0-9a-fA-F]+$/.test(arg);
-      if (isHexChars) {
-        throw new Error(
-          `Invalid ${type}: value looks like a hex string missing the "0x" prefix. Try "0x${arg}".`,
-        );
-      }
-      throw new Error(`Invalid ${type}: expected a "0x"-prefixed hex string.`);
-    }
-    return arg;
-  }
-
-  // Handle dynamic arrays (type[]) and fixed-size arrays (type[N]).
-  // Strips the outermost bracket pair and recurses, so bytes32[6] is treated
-  // the same as bytes32[].
-  const arrayMatch = type.match(/^(.+)\[(\d*)\]$/);
-  if (arrayMatch) {
-    const baseType = arrayMatch[1];
-    let arrayValue = arg;
-    if (typeof arg === "string") {
-      try {
-        arrayValue = JSON.parse(arg);
-      } catch {
-        return arg;
-      }
-    }
-    if (!Array.isArray(arrayValue)) {
-      return arg;
-    }
-    return arrayValue.map((item) =>
-      parseArgValue(item, { ...input, type: baseType }),
-    );
-  }
-
-  return arg;
-};
-
-// Helper to serialize BigInt values for JSON
-const serializeValue = (value) => {
-  if (typeof value === "bigint") return value.toString();
-  if (Array.isArray(value)) return value.map(serializeValue);
-  if (value && typeof value === "object") {
-    const serialized = {};
-    for (const key in value) {
-      serialized[key] = serializeValue(value[key]);
-    }
-    return serialized;
-  }
-  return value;
-};
-
 // Batch-decode undecoded logs using the /api/decode-event server endpoint.
 // Mutates log objects in-place and returns the updated array.
 export async function decodeLogsViaServer(logs) {
@@ -395,7 +281,7 @@ function decodeRevertData(hexData, abi = []) {
     if (!args?.length) return errorName;
     const formatted = args
       .map((a) => {
-        const s = serializeValue(a);
+        const s = serializeBigInts(a);
         return typeof s === "object" ? JSON.stringify(s) : String(s);
       })
       .join(", ");
@@ -432,7 +318,7 @@ function tryDecodeLog(log, eventAbisByAddress) {
         inputs: eventAbi.inputs.map((inp, i) => ({
           name: inp.name || `arg${i}`,
           type: inp.type,
-          value: serializeValue(decoded.args[inp.name] ?? decoded.args[i]),
+          value: serializeBigInts(decoded.args[inp.name] ?? decoded.args[i]),
           indexed: inp.indexed || false,
         })),
       };
@@ -540,12 +426,8 @@ function buildSelectorMap(abi, abiCache) {
   const map = new Map();
   const add = (abiFrag) => {
     if (!abiFrag || abiFrag.type !== "function") return;
-    try {
-      const selector = toFunctionSelector(abiFrag);
-      if (!map.has(selector)) map.set(selector, abiFrag);
-    } catch {
-      /* skip malformed entries */
-    }
+    const selector = getFunctionSelector(abiFrag);
+    if (selector && !map.has(selector)) map.set(selector, abiFrag);
   };
   (abi || []).forEach(add);
   for (const [, cachedAbi] of abiCache || new Map()) {
@@ -582,7 +464,7 @@ function _decodeCallNode(node, selectorMap) {
         node.decodedInputs = funcAbi.inputs.map((inp, i) => ({
           name: inp.name || `input${i}`,
           type: inp.type,
-          value: serializeValue(Array.isArray(args) ? args[i] : args),
+          value: serializeBigInts(Array.isArray(args) ? args[i] : args),
         }));
       } catch {
         /* leave undecoded */
@@ -607,13 +489,13 @@ function _decodeCallNode(node, selectorMap) {
                   {
                     name: funcAbi.outputs[0].name || "result",
                     type: funcAbi.outputs[0].type,
-                    value: serializeValue(decoded),
+                    value: serializeBigInts(decoded),
                   },
                 ]
               : funcAbi.outputs.map((out, i) => ({
                   name: out.name || `output${i}`,
                   type: out.type,
-                  value: serializeValue(
+                  value: serializeBigInts(
                     Array.isArray(decoded) ? decoded[i] : decoded[out.name],
                   ),
                 }));
@@ -963,22 +845,14 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     let functionAbi = null;
     let parsedArgs = args || [];
     if (functionName && abi) {
-      // Find the function in ABI — supports both plain name and full signature (e.g. "transfer(address,uint256)")
-      functionAbi = abi.find((item) => {
-        if (item.type !== "function") return false;
-        if (functionName.includes("(")) {
-          const types = item.inputs?.map((i) => i.type).join(",") || "";
-          return `${item.name}(${types})` === functionName;
-        }
-        return item.name === functionName;
-      });
+      functionAbi = findFunctionInAbi(abi, functionName);
 
       if (functionAbi) {
         // Parse args based on types
         parsedArgs = (args || []).map((arg, index) => {
           const input = functionAbi.inputs[index];
           if (!input) return arg;
-          return parseArgValue(arg, input);
+          return normalizeArg(arg, input.type, input.components);
         });
       }
     }
@@ -1291,14 +1165,14 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
             {
               name: functionAbi.outputs[0].name || "result",
               type: functionAbi.outputs[0].type,
-              value: serializeValue(decoded),
+              value: serializeBigInts(decoded),
             },
           ];
         } else {
           decodedOutputs = functionAbi.outputs.map((output, index) => ({
             name: output.name || `output${index}`,
             type: output.type,
-            value: serializeValue(
+            value: serializeBigInts(
               Array.isArray(decoded) ? decoded[index] : decoded[output.name],
             ),
           }));
@@ -1340,7 +1214,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
           (input, index) => ({
             name: input.name || `input${index}`,
             type: input.type,
-            value: serializeValue(parsedArgs[index]),
+            value: serializeBigInts(parsedArgs[index]),
           }),
         );
         callTraceRoot.decodedOutputs = decodedOutputs;

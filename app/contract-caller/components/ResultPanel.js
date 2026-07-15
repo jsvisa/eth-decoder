@@ -14,12 +14,12 @@ import styles from "./ResultPanel.module.css";
 import MetricsPanel from "./MetricsPanel";
 import SimulatedEventLogs from "./SimulatedEventLogs";
 import { getBookmarkedAddress } from "../../utils/addressBook";
+import { getCachedAbi } from "../../utils/abiCache";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const ABI_CACHE_PREFIX = "abi-";
 const TOKEN_SYMBOL_CACHE_PREFIX = "token-symbol-";
 const TOKEN_DECIMALS_CACHE_PREFIX = "token-decimals-";
 
@@ -35,17 +35,6 @@ const BUILT_IN_EXPLORER_URLS = {
 // Local helpers (localStorage-backed, safe to call server-side — they guard
 // with try/catch and return null when localStorage is unavailable).
 // ---------------------------------------------------------------------------
-
-function getCachedAbi(chain, address) {
-  if (!chain || !address) return null;
-  try {
-    const key = `${ABI_CACHE_PREFIX}${chain}-${address.toLowerCase()}`;
-    const cached = localStorage.getItem(key);
-    return cached ? JSON.parse(cached) : null;
-  } catch {
-    return null;
-  }
-}
 
 function getContractNameFromCache(chain, address) {
   if (!address) return null;

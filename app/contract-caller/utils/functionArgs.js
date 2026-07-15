@@ -75,3 +75,42 @@ export const normalizeInputValue = (value, input) => {
   }
   return normalizeArg(nextValue, input.type, input.components);
 };
+
+export const isReadOnly = (func) =>
+  func?.stateMutability === "view" || func?.stateMutability === "pure";
+
+export const isPayable = (func) => func?.stateMutability === "payable";
+
+/**
+ * Find a function in an ABI by name or canonical signature (e.g. "transfer(address,uint256)").
+ * @param {Array} abi
+ * @param {string} functionName
+ * @returns {object|null}
+ */
+export function findFunctionInAbi(abi, functionName) {
+  return (
+    abi.find((item) => {
+      if (item.type !== "function") return false;
+      if (functionName.includes("(")) {
+        return getFunctionSig(item) === functionName;
+      }
+      return item.name === functionName;
+    }) || null
+  );
+}
+
+/**
+ * Recursively convert BigInt values to strings for JSON serialization.
+ */
+export function serializeBigInts(value) {
+  if (typeof value === "bigint") return value.toString();
+  if (Array.isArray(value)) return value.map(serializeBigInts);
+  if (value && typeof value === "object") {
+    const serialized = {};
+    for (const key in value) {
+      serialized[key] = serializeBigInts(value[key]);
+    }
+    return serialized;
+  }
+  return value;
+}

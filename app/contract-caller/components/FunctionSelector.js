@@ -1,29 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { toFunctionSelector } from "viem";
 import styles from "./FunctionSelector.module.css";
-
-/** @param {object} func */
-function isReadOnly(func) {
-  return func?.stateMutability === "view" || func?.stateMutability === "pure";
-}
-
-/** Canonical signature, e.g. "transfer(address,uint256)" */
-function getFunctionSig(func) {
-  const types = func.inputs?.map((i) => i.type).join(",") || "";
-  return `${func.name}(${types})`;
-}
-
-/** 4-byte selector string, or null on failure */
-function getFunctionSelector(func) {
-  if (!func) return null;
-  try {
-    return toFunctionSelector(func);
-  } catch {
-    return null;
-  }
-}
+import {
+  isReadOnly,
+  getFunctionSig,
+  getFunctionSelector,
+} from "../utils/functionArgs";
 
 /** Human-readable signature with output types */
 function buildDisplaySig(func) {

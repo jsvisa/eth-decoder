@@ -15,6 +15,7 @@ import { useHistory } from "./hooks/useHistory";
 import { useBookmarkModal } from "./hooks/useBookmarkModal";
 import { useAddChainModal } from "./hooks/useAddChainModal";
 import { useTokenMetadata } from "./hooks/useTokenMetadata";
+import { getFunctionSig, isReadOnly } from "./utils/functionArgs";
 import {
   NATIVE_TOKEN_SYMBOLS,
   enrichBalanceChanges,
@@ -42,11 +43,6 @@ import BookmarkModal from "./components/BookmarkModal";
 import AddChainModal from "./components/AddChainModal";
 
 import styles from "./page.module.css";
-
-const getFunctionSig = (func) => {
-  const types = func.inputs?.map((input) => input.type).join(",") || "";
-  return `${func.name}(${types})`;
-};
 
 const validateAddressesInArg = (
   argValue,
@@ -446,9 +442,7 @@ export default function ContractCallerPage() {
     (item) =>
       item.type === "function" && getFunctionSig(item) === fn.selectedFunction,
   );
-  const isWrite =
-    selectedFn?.stateMutability !== "view" &&
-    selectedFn?.stateMutability !== "pure";
+  const isWrite = selectedFn ? !isReadOnly(selectedFn) : false;
 
   // --- Layout ---
   return (

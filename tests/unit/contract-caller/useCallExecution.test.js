@@ -104,14 +104,6 @@ describe("useCallExecution – initial state", () => {
     expect(result.current.error).toBeNull();
     expect(result.current.loading).toBe(false);
     expect(result.current.simProgress).toBeNull();
-    expect(result.current.isYaml).toBe(false);
-    expect(result.current.copied).toBe(false);
-    expect(result.current.showFullResponse).toBe(false);
-    expect(result.current.resultCollapsed).toBe(false);
-    expect(result.current.simLogsExpanded).toBe(true);
-    expect(result.current.bdExpandedAddrs).toBeInstanceOf(Set);
-    expect(result.current.bdExpandedAddrs.size).toBe(0);
-    expect(result.current.bdExpandedTokens).toBeInstanceOf(Set);
     expect(result.current.hideTooltip).toBe(false);
     expect(result.current.urlCopied).toBe(false);
   });
@@ -120,7 +112,6 @@ describe("useCallExecution – initial state", () => {
     const { result } = renderHook(() => useCallExecution(baseParams));
     expect(typeof result.current.handleCall).toBe("function");
     expect(typeof result.current.handleCancel).toBe("function");
-    expect(typeof result.current.handleCopy).toBe("function");
     expect(typeof result.current.handleShareUrl).toBe("function");
   });
 });
@@ -213,26 +204,6 @@ describe("useCallExecution – handleCall API error", () => {
   });
 });
 
-describe("useCallExecution – handleCopy", () => {
-  it("copies JSON when isYaml is false", async () => {
-    const { result } = renderHook(() => useCallExecution(baseParams));
-
-    // set a result first
-    await act(async () => {
-      result.current.setResult({ foo: "bar" });
-    });
-
-    await act(async () => {
-      await result.current.handleCopy();
-    });
-
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      JSON.stringify({ foo: "bar" }, null, 2),
-    );
-    expect(result.current.copied).toBe(true);
-  });
-});
-
 describe("useCallExecution – handleShareUrl", () => {
   it("stores enriched balanceChanges outside token metadata when saving a simulation", async () => {
     const enrichedBalanceChanges = [
@@ -295,29 +266,6 @@ describe("useCallExecution – handleShareUrl", () => {
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
       "http://localhost:3000/?simulationId=vb1_saved",
     );
-  });
-});
-
-describe("useCallExecution – toggle state setters", () => {
-  it("setIsYaml toggles isYaml", async () => {
-    const { result } = renderHook(() => useCallExecution(baseParams));
-    expect(result.current.isYaml).toBe(false);
-
-    await act(async () => {
-      result.current.setIsYaml(true);
-    });
-
-    expect(result.current.isYaml).toBe(true);
-  });
-
-  it("setResultCollapsed toggles resultCollapsed", async () => {
-    const { result } = renderHook(() => useCallExecution(baseParams));
-
-    await act(async () => {
-      result.current.setResultCollapsed(true);
-    });
-
-    expect(result.current.resultCollapsed).toBe(true);
   });
 });
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef } from "react";
-import yaml from "js-yaml";
 import {
   simulateWithTevm,
   simulateWithClient,
@@ -24,7 +23,8 @@ import {
   isValidPositiveInteger,
 } from "../../utils/validation";
 import { DEFAULT_RPC_URLS, FORK_RPC_URLS } from "../../utils/chains";
-import { createPublicClient, http } from "viem";
+import { autoFillWarpTimestamp } from "../../utils/cheatcodes";
+import { getFunctionSig, isReadOnly, isPayable } from "../utils/functionArgs";
 
 /**
  * Manages execution of contract calls (read via /api/call-contract,
@@ -101,13 +101,6 @@ export function useCallExecution({
   const [savingSimulation, setSavingSimulation] = useState(false);
 
   // ── result-display toggles ─────────────────────────────────────────────────
-  const [isYaml, setIsYaml] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [showFullResponse, setShowFullResponse] = useState(false);
-  const [resultCollapsed, setResultCollapsed] = useState(false);
-  const [simLogsExpanded, setSimLogsExpanded] = useState(true);
-  const [bdExpandedAddrs, setBdExpandedAddrs] = useState(new Set());
-  const [bdExpandedTokens, setBdExpandedTokens] = useState(new Set());
   const [hideTooltip, setHideTooltip] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
 
@@ -116,22 +109,12 @@ export function useCallExecution({
 
   // ── helpers ────────────────────────────────────────────────────────────────
 
-  const isReadOnly = (func) =>
-    func?.stateMutability === "view" || func?.stateMutability === "pure";
-
-  const isPayable = (func) => func?.stateMutability === "payable";
-
   const getSelectedFunction = () => {
     if (!selectedFunction || !parsedAbi) return null;
     return parsedAbi.find(
       (item) =>
         item.type === "function" && getFunctionSig(item) === selectedFunction,
     );
-  };
-
-  const getFunctionSig = (func) => {
-    const types = func.inputs?.map((i) => i.type).join(",") || "";
-    return `${func.name}(${types})`;
   };
 
   const getEthValueWithUnit = () => {
@@ -294,32 +277,20 @@ export function useCallExecution({
         }
 
         // Auto-populate warp timestamp from fork block number if not explicitly set
-        if (
-          isWrite &&
-          forkBlockNumber &&
-          forkBlockNumber !== "latest" &&
-          !activeCheatcodes.warp?.timestamp
-        ) {
-          try {
-            const autoWarpRpc =
-              rpcSettings?.[chain] ||
-              FORK_RPC_URLS[chain] ||
-              DEFAULT_RPC_URLS[chain];
-            if (autoWarpRpc) {
-              const publicClient = createPublicClient({
-                transport: http(autoWarpRpc),
-              });
-              const block = await publicClient.getBlock({
-                blockNumber: BigInt(forkBlockNumber),
-              });
-              if (block.timestamp) {
-                activeCheatcodes.warp = {
-                  timestamp: Number(block.timestamp),
-                };
-              }
+        if (isWrite && forkBlockNumber && forkBlockNumber !== "latest") {
+          const autoWarpRpc =
+            rpcSettings?.[chain] ||
+            FORK_RPC_URLS[chain] ||
+            DEFAULT_RPC_URLS[chain];
+          if (autoWarpRpc) {
+            const updated = await autoFillWarpTimestamp(
+              forkBlockNumber,
+              activeCheatcodes,
+              autoWarpRpc,
+            );
+            if (updated?.warp?.timestamp && !activeCheatcodes.warp?.timestamp) {
+              activeCheatcodes.warp = updated.warp;
             }
-          } catch {
-            // Auto-warp failed — simulate without timestamp warp
           }
         }
 
@@ -522,8 +493,6 @@ export function useCallExecution({
         setResult(data);
       }
 
-      setSimLogsExpanded(!data.logs || data.logs.length <= 10);
-
       if (typeof saveToHistory === "function") {
         saveToHistory(
           {
@@ -553,22 +522,6 @@ export function useCallExecution({
 
   const handleCancel = () => {
     simAbortRef.current?.abort();
-  };
-
-  // ── handleCopy ─────────────────────────────────────────────────────────────
-
-  const handleCopy = async () => {
-    try {
-      const text = isYaml
-        ? yaml.dump(result, { indent: 2, lineWidth: -1, noRefs: true })
-        : JSON.stringify(result, null, 2);
-
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
   };
 
   // ── handleSaveSimulation ──────────────────────────────────────────────────
@@ -678,25 +631,11 @@ export function useCallExecution({
     simProgress,
     simulationId,
     savingSimulation,
-    isYaml,
-    setIsYaml,
-    copied,
-    showFullResponse,
-    setShowFullResponse,
-    resultCollapsed,
-    setResultCollapsed,
-    simLogsExpanded,
-    setSimLogsExpanded,
-    bdExpandedAddrs,
-    setBdExpandedAddrs,
-    bdExpandedTokens,
-    setBdExpandedTokens,
     hideTooltip,
     setHideTooltip,
     urlCopied,
     handleCall,
     handleCancel,
-    handleCopy,
     handleShareUrl,
     handleSaveSimulation,
     setSaveExtra,

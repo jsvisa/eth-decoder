@@ -54,10 +54,30 @@ export function normalizeArg(value, type, components) {
     return arr.map((v) => normalizeArg(v, baseType, components));
   }
 
-  if (type === "tuple" && components && Array.isArray(value)) {
-    return value.map((v, i) =>
-      normalizeArg(v, components[i]?.type, components[i]?.components),
-    );
+  if (type === "tuple" || type.startsWith("tuple")) {
+    let tupleValue = value;
+    if (typeof value === "string") {
+      try {
+        tupleValue = JSON.parse(value);
+      } catch {
+        tupleValue = value.split(",").map((s) => s.trim());
+      }
+    }
+
+    // tuple[]
+    if (type === "tuple[]") {
+      if (!Array.isArray(tupleValue)) return value;
+      return tupleValue.map((item) => normalizeArg(item, "tuple", components));
+    }
+
+    // single tuple
+    if (components && Array.isArray(tupleValue)) {
+      return tupleValue.map((v, i) =>
+        normalizeArg(v, components[i]?.type, components[i]?.components),
+      );
+    }
+
+    return tupleValue;
   }
 
   return value;

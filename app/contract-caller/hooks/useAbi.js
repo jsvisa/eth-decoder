@@ -2,55 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { isValidEthAddress } from "../../utils/validation";
-
-// ---------------------------------------------------------------------------
-// Local helpers (mirrors of the private helpers in page.js)
-// ---------------------------------------------------------------------------
+import { getCachedAbi, setCachedAbi } from "../../utils/abiCache";
+import { isReadOnly } from "../utils/functionArgs";
 
 const ABI_CACHE_PREFIX = "abi-";
-
-const getAbiCacheKey = (chain, address) =>
-  `${ABI_CACHE_PREFIX}${chain}-${address.toLowerCase()}`;
-
-const getCachedAbi = (chain, address) => {
-  try {
-    const key = getAbiCacheKey(chain, address);
-    const cached = localStorage.getItem(key);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-  } catch (err) {
-    console.error("Failed to load cached ABI:", err);
-  }
-  return null;
-};
-
-const setCachedAbi = (
-  chain,
-  address,
-  abi,
-  isProxy = false,
-  implAddress = null,
-  contractName = null,
-  implContractName = null,
-) => {
-  try {
-    const key = getAbiCacheKey(chain, address);
-    localStorage.setItem(
-      key,
-      JSON.stringify({
-        abi,
-        isProxy,
-        implAddress,
-        contractName,
-        implContractName,
-        timestamp: Date.now(),
-      }),
-    );
-  } catch (err) {
-    console.error("Failed to cache ABI:", err);
-  }
-};
 
 const formatAbiCompact = (abi) => {
   const hasNestedComponents = (params) => {
@@ -222,10 +177,8 @@ export function useAbi({
 
       // Sort: view/pure first, then others
       allFunctions.sort((a, b) => {
-        const aIsRead =
-          a.stateMutability === "view" || a.stateMutability === "pure";
-        const bIsRead =
-          b.stateMutability === "view" || b.stateMutability === "pure";
+        const aIsRead = isReadOnly(a);
+        const bIsRead = isReadOnly(b);
         if (aIsRead && !bIsRead) return -1;
         if (!aIsRead && bIsRead) return 1;
         return a.name.localeCompare(b.name);

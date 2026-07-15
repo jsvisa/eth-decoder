@@ -4,11 +4,18 @@ import {
   http,
   decodeFunctionResult,
   encodeFunctionData,
-  defineChain,
 } from "viem";
 import { isValidEthAddress } from "../../utils/validation";
 import { normalizeArg, ArgValidationError } from "../../utils/normalizeArg";
-import { VIEM_CHAINS, DEFAULT_RPC_URLS } from "../../utils/chains";
+import {
+  VIEM_CHAINS,
+  DEFAULT_RPC_URLS,
+  buildCustomChainConfig,
+} from "../../utils/chains";
+import {
+  findFunctionInAbi,
+  serializeBigInts,
+} from "../../contract-caller/utils/functionArgs";
 
 export async function POST(request) {
   try {
@@ -56,16 +63,9 @@ export async function POST(request) {
 
     // Handle custom chains (chain IDs starting with "chain-")
     if (!chainConfig && customChainId && customRpcUrl) {
-      // Create a custom chain config for non-built-in chains
-      chainConfig = defineChain({
-        id: customChainId,
-        name: chain,
-        nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-        rpcUrls: {
-          default: { http: [customRpcUrl] },
-        },
-      });
-      rpcUrl = customRpcUrl;
+      const custom = buildCustomChainConfig(customChainId, customRpcUrl);
+      chainConfig = custom.viemChain;
+      rpcUrl = custom.rpcUrl;
     }
 
     if (!chainConfig || !rpcUrl) {
@@ -77,16 +77,7 @@ export async function POST(request) {
       );
     }
 
-    // Find the function in ABI — supports both plain name and full signature (e.g. "transfer(address,uint256)")
-    const functionAbi = abi.find((item) => {
-      if (item.type !== "function") return false;
-      if (functionName.includes("(")) {
-        const types = item.inputs?.map((i) => i.type).join(",") || "";
-        return `${item.name}(${types})` === functionName;
-      }
-      return item.name === functionName;
-    });
-
+    const functionAbi = findFunctionInAbi(abi, functionName);
     if (!functionAbi) {
       return NextResponse.json(
         { error: `Function ${functionName} not found in ABI` },
@@ -142,43 +133,23 @@ export async function POST(request) {
       data: result.data,
     });
 
-    // Convert BigInt to string for JSON serialization
-    const serializeResult = (value) => {
-      if (typeof value === "bigint") {
-        return value.toString();
-      }
-      if (Array.isArray(value)) {
-        return value.map(serializeResult);
-      }
-      if (value && typeof value === "object") {
-        const serialized = {};
-        for (const key in value) {
-          serialized[key] = serializeResult(value[key]);
-        }
-        return serialized;
-      }
-      return value;
-    };
-
     // Build decoded output with names and types
     const outputs = functionAbi.outputs || [];
     let decodedOutputs = [];
 
     if (outputs.length === 1) {
-      // Single return value
       decodedOutputs = [
         {
           name: outputs[0].name || "result",
           type: outputs[0].type,
-          value: serializeResult(decoded),
+          value: serializeBigInts(decoded),
         },
       ];
     } else if (outputs.length > 1) {
-      // Multiple return values (tuple)
       decodedOutputs = outputs.map((output, index) => ({
         name: output.name || `output${index}`,
         type: output.type,
-        value: serializeResult(
+        value: serializeBigInts(
           Array.isArray(decoded) ? decoded[index] : decoded[output.name],
         ),
       }));
@@ -187,7 +158,7 @@ export async function POST(request) {
     return NextResponse.json({
       rawData: result.data,
       decoded: decodedOutputs,
-      result: serializeResult(decoded),
+      result: serializeBigInts(decoded),
       simulated: simulate || false,
     });
   } catch (error) {

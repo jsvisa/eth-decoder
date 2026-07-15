@@ -1,10 +1,6 @@
 import React, { useState } from "react";
 import styles from "./AbiPanel.module.css";
-
-// Determine if a function ABI item is read-only (view/pure)
-function isReadOnly(func) {
-  return func?.stateMutability === "view" || func?.stateMutability === "pure";
-}
+import { isReadOnly } from "../utils/functionArgs";
 
 // Format an ABI entry for display: "name(type arg, ...) → outType"
 function formatAbiSignature(item) {

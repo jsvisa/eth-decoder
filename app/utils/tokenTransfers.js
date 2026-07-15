@@ -13,6 +13,43 @@ export const WITHDRAWAL_TOPIC =
 
 export const ZERO_ADDR = "0x" + "0".repeat(40);
 
+export const NATIVE_TOKEN_ADDRESS = ZERO_ADDR;
+
+export const TOKEN_TRANSFER_TOPICS = new Set([
+  TRANSFER_TOPIC,
+  ERC20_TRANSFER_TOPIC,
+  DEPOSIT_TOPIC,
+  WITHDRAWAL_TOPIC,
+]);
+
+export const SYMBOL_ABI = [
+  {
+    type: "function",
+    name: "symbol",
+    inputs: [],
+    outputs: [{ type: "string" }],
+    stateMutability: "view",
+  },
+];
+export const NAME_ABI = [
+  {
+    type: "function",
+    name: "name",
+    inputs: [],
+    outputs: [{ type: "string" }],
+    stateMutability: "view",
+  },
+];
+export const DECIMALS_ABI = [
+  {
+    type: "function",
+    name: "decimals",
+    inputs: [],
+    outputs: [{ type: "uint8" }],
+    stateMutability: "view",
+  },
+];
+
 /**
  * Parse a single log into a token transfer {tokenAddr, from, to, value} or null.
  * Recognises ERC-20 Transfer, ERC20Transfer, WETH Deposit, and WETH Withdrawal
