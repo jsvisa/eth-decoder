@@ -127,31 +127,8 @@ function PrimitiveArrayInput(props) {
     ),
   );
 
-  items.forEach((item, index) => {
-    if (collapsed) {
-      children.push(
-        React.createElement(
-          "div",
-          { key: `item-${index}`, className: styles.tupleArrayItem },
-          React.createElement(
-            "div",
-            { className: styles.tupleArrayItemHeader },
-            React.createElement(
-              "span",
-              { className: styles.tupleArrayIndex },
-              `#${index}`,
-            ),
-          ),
-          React.createElement(
-            "div",
-            { className: styles.input },
-            typeof item === "object"
-              ? JSON.stringify(item)
-              : String(item || ""),
-          ),
-        ),
-      );
-    } else {
+  if (!collapsed) {
+    items.forEach((item, index) => {
       children.push(
         React.createElement(
           "div",
@@ -194,23 +171,23 @@ function PrimitiveArrayInput(props) {
           }),
         ),
       );
-    }
-  });
+    });
 
-  if (!collapsed && fixedLength === null) {
-    children.push(
-      React.createElement(
-        "button",
-        {
-          key: "add",
-          type: "button",
-          className: styles.tupleButton,
-          onClick: () => onChange([...items, ""]),
-          disabled,
-        },
-        "Add item",
-      ),
-    );
+    if (fixedLength === null) {
+      children.push(
+        React.createElement(
+          "button",
+          {
+            key: "add",
+            type: "button",
+            className: styles.tupleButton,
+            onClick: () => onChange([...items, ""]),
+            disabled,
+          },
+          "Add item",
+        ),
+      );
+    }
   }
 
   return React.createElement(
