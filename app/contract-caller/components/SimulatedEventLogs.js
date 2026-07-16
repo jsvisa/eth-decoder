@@ -253,16 +253,6 @@ function LogInputValue({ input, getExplorerAddressUrl }) {
       input.value
     );
   }
-  if (Array.isArray(input.value)) {
-    return input.value.map((item, i) => (
-      <div key={i}>
-        {LogInputValue({
-          input: { ...input, value: item },
-          getExplorerAddressUrl,
-        })}
-      </div>
-    ));
-  }
   return typeof input.value === "object"
     ? JSON.stringify(input.value)
     : String(input.value);

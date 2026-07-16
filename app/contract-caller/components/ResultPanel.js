@@ -239,15 +239,6 @@ function CallTraceNode({ trace, depth, chain }) {
 
   const formatValue = (value) => {
     if (value === null || value === undefined) return "null";
-    if (Array.isArray(value)) {
-      return value
-        .map((item) =>
-          item !== null && typeof item === "object"
-            ? JSON.stringify(item)
-            : String(item),
-        )
-        .join(",\n");
-    }
     if (typeof value === "object") {
       const str = JSON.stringify(value);
       return str.length > 60 ? str.slice(0, 60) + "..." : str;
@@ -358,16 +349,6 @@ function CallTraceNode({ trace, depth, chain }) {
                   ?.map((p) => {
                     const v = p.value;
                     if (v === null || v === undefined) return `${p.name}=null`;
-                    if (Array.isArray(v)) {
-                      const items = v
-                        .map((item) =>
-                          item !== null && typeof item === "object"
-                            ? JSON.stringify(item)
-                            : String(item),
-                        )
-                        .join(",\n");
-                      return `${p.name}=${items}`;
-                    }
                     if (typeof v === "object") {
                       const s = JSON.stringify(v);
                       return `${p.name}=${s.length > 60 ? s.slice(0, 60) + "..." : s}`;

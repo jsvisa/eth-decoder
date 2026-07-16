@@ -644,7 +644,6 @@
 
 .traceParams {
   color: #ce9178;
-  white-space: pre-wrap;
 }
 
 .traceArrow {
@@ -697,7 +696,6 @@
 
 .traceLogParams {
   color: #9cdcfe;
-  white-space: pre-wrap;
 }
 
 .traceChildren {
