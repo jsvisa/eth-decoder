@@ -331,9 +331,11 @@ describe("useCallExecution – local sim populates trace toName labels", () => {
       params.chain,
       expect.arrayContaining([INNER_ADDR]),
       undefined,
-      undefined,
       1,
-      undefined,
+      expect.objectContaining({
+        etherscanApiKey: undefined,
+        routescanApiKey: undefined,
+      }),
     );
 
     expect(tevm.collectAllCallAddresses).toHaveBeenCalledWith(

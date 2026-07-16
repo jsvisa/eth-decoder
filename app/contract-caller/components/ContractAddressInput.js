@@ -8,7 +8,7 @@ const h = React.createElement;
 
 /**
  * ContractAddressInput — address field with autocomplete, bookmark star,
- * detect-proxy checkbox, and Fetch ABI button.
+ * and Fetch ABI button.
  *
  * Props:
  *   address             {string}
@@ -16,8 +16,6 @@ const h = React.createElement;
  *   addressBook         {Array<{address, label}>}
  *   cachedAddresses     {Array<{chain, address, contractName, implContractName, isProxy}>}
  *   contractName        {string|null}
- *   detectProxy         {boolean}
- *   onDetectProxyChange {(b: boolean) => void}
  *   onFetchAbi          {(opts?) => void}
  *   fetchingAbi         {boolean}
  *   fieldError          {string|null}
@@ -30,8 +28,6 @@ export default function ContractAddressInput({
   addressBook,
   cachedAddresses,
   contractName,
-  detectProxy,
-  onDetectProxyChange,
   onFetchAbi,
   fetchingAbi,
   fieldError,
@@ -173,22 +169,6 @@ export default function ContractAddressInput({
           title: isBookmarked ? "Edit bookmark" : "Add to address book",
         },
         isBookmarked ? "★" : "☆",
-      ),
-
-      // Detect proxy checkbox
-      h(
-        "label",
-        {
-          className: styles.detectProxyLabel,
-          title:
-            "Use on-chain detection for proxy contracts not recognized by Etherscan (e.g. Safe, EIP-1167 clones)",
-        },
-        h("input", {
-          type: "checkbox",
-          checked: detectProxy,
-          onChange: (e) => onDetectProxyChange(e.target.checked),
-        }),
-        "Detect proxy",
       ),
 
       // Fetch ABI button

@@ -87,9 +87,6 @@ const getCachedAddresses = () => {
 //   apiKeys     {object}   - { etherscan, routescan } API keys
 //   rpcSettings {object}   - map of chain -> custom RPC URL
 //   getChainId  {function} - (chain) => numeric chain id (from SettingsContext)
-//   detectProxy {boolean}  - controlled from parent (passed in so the hook
-//                            can also manage the toggle state internally;
-//                            undefined = uncontrolled / hook owns the state)
 //   onAbiParsed {function} - optional callback(parsedAbi, functions) for cross-
 //                            cutting effects (e.g. resetting selectedFunction)
 //   onAbiError  {function} - optional callback(errorMsg) for cross-cutting error
@@ -110,7 +107,6 @@ export function useAbi({
   const [parsedAbi, setParsedAbi] = useState(null);
   const [functions, setFunctions] = useState([]);
   const [fetchingAbi, setFetchingAbi] = useState(false);
-  const [detectProxy, setDetectProxy] = useState(false);
   const [abiSource, setAbiSource] = useState(null);
   const [contractName, setContractName] = useState(null);
   const [abiSaved, setAbiSaved] = useState(false);
@@ -240,9 +236,7 @@ export function useAbi({
       if (chainIdForApi) {
         params.set("chainId", chainIdForApi.toString());
       }
-      if (detectProxy) {
-        params.set("detectProxy", "true");
-      }
+      params.set("detectProxy", "true");
 
       const response = await fetch(`/api/fetch-abi?${params}`);
       const data = await response.json();
@@ -323,8 +317,6 @@ export function useAbi({
     parsedAbi,
     functions,
     fetchingAbi,
-    detectProxy,
-    setDetectProxy,
     abiSource,
     contractName,
     abiSaved,

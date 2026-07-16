@@ -468,8 +468,6 @@ export default function ContractCallerPage() {
               addressBook={bookmark.addressBook}
               cachedAddresses={abi.cachedAddresses}
               contractName={abi.contractName}
-              detectProxy={abi.detectProxy}
-              onDetectProxyChange={abi.setDetectProxy}
               onFetchAbi={abi.fetchAbi}
               fetchingAbi={abi.fetchingAbi}
               fieldError={fn.fieldErrors.address}

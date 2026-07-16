@@ -98,7 +98,6 @@ describe("useAbi — initial state", () => {
     expect(result.current.parsedAbi).toBeNull();
     expect(result.current.functions).toEqual([]);
     expect(result.current.fetchingAbi).toBe(false);
-    expect(result.current.detectProxy).toBe(false);
     expect(result.current.abiSource).toBeNull();
     expect(result.current.contractName).toBeNull();
     expect(result.current.abiSaved).toBe(false);
@@ -117,7 +116,6 @@ describe("useAbi — initial state", () => {
     });
 
     expect(typeof result.current.setAbi).toBe("function");
-    expect(typeof result.current.setDetectProxy).toBe("function");
     expect(typeof result.current.setAbiCollapsed).toBe("function");
     expect(typeof result.current.setAbiViewMode).toBe("function");
     expect(typeof result.current.setAbiFilter).toBe("function");
