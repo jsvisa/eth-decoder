@@ -118,21 +118,20 @@ export const buildAbiCacheFromStorage = (chain) => {
  * Fetch ABI from API and cache it
  * @param {string} chain - Chain identifier
  * @param {string} address - Contract address
- * @param {string} apiKey - Etherscan API key
  * @param {string} rpcUrl - Optional custom RPC URL
  * @param {number|string} chainId - Optional chain ID for custom chains
  * @param {Object} opts
  * @param {boolean} opts.detectProxy
+ * @param {string} opts.etherscanApiKey - Etherscan API key
  * @param {string} opts.routescanApiKey - RouteScan API key (fallback)
  * @returns {Promise<Array|null>} The ABI array or null if fetch failed
  */
 export const fetchAndCacheAbi = async (
   chain,
   address,
-  apiKey,
   rpcUrl,
   chainId,
-  { detectProxy = false, routescanApiKey = "" } = {},
+  { detectProxy = false, etherscanApiKey = "", routescanApiKey = "" } = {},
 ) => {
   try {
     // Check cache first
@@ -143,8 +142,8 @@ export const fetchAndCacheAbi = async (
 
     // Build API params
     const params = new URLSearchParams({ address, chain });
-    if (apiKey) {
-      params.set("etherscanApiKey", apiKey);
+    if (etherscanApiKey) {
+      params.set("etherscanApiKey", etherscanApiKey);
     }
     if (routescanApiKey) {
       params.set("routescanApiKey", routescanApiKey);
@@ -188,34 +187,31 @@ export const fetchAndCacheAbi = async (
  * Fetch ABIs for multiple addresses in parallel
  * @param {string} chain - Chain identifier
  * @param {string[]} addresses - Array of contract addresses
- * @param {string} apiKey - Etherscan API key
  * @param {string} rpcUrl - Optional custom RPC URL
  * @param {number|string} chainId - Optional chain ID for custom chains
- * @param {string} routescanApiKey - RouteScan API key (fallback)
+ * @param {Object} opts
+ * @param {boolean} opts.detectProxy
+ * @param {string} opts.etherscanApiKey - Etherscan API key
+ * @param {string} opts.routescanApiKey - RouteScan API key (fallback)
  * @returns {Promise<Map<string, Array>>} Map of lowercase address -> ABI array
  */
 export const fetchAbisForAddresses = async (
   chain,
   addresses,
-  apiKey,
   rpcUrl,
   chainId,
-  routescanApiKey = "",
-  detectProxy = true,
+  { detectProxy = true, etherscanApiKey = "", routescanApiKey = "" } = {},
 ) => {
   const results = new Map();
 
   // Fetch all ABIs in parallel
   const fetchPromises = addresses.map(async (address) => {
     const normalizedAddress = address.toLowerCase();
-    const abi = await fetchAndCacheAbi(
-      chain,
-      address,
-      apiKey,
-      rpcUrl,
-      chainId,
-      { detectProxy, routescanApiKey },
-    );
+    const abi = await fetchAndCacheAbi(chain, address, rpcUrl, chainId, {
+      detectProxy,
+      etherscanApiKey,
+      routescanApiKey,
+    });
     if (abi) {
       results.set(normalizedAddress, abi);
     }

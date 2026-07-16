@@ -370,11 +370,12 @@ export function useCallExecution({
             const newAbis = await fetchAbisForAddresses(
               chain,
               addressesToFetch,
-              apiKeys?.etherscan,
               rpcSettings?.[chain],
               chainIdForSimulation,
-              apiKeys?.routescan,
-              true,
+              {
+                etherscanApiKey: apiKeys?.etherscan,
+                routescanApiKey: apiKeys?.routescan,
+              },
             );
 
             for (const [addr, abi] of newAbis) {
@@ -405,11 +406,12 @@ export function useCallExecution({
             const newAbis = await fetchAbisForAddresses(
               chain,
               uncachedAddrs,
-              apiKeys?.etherscan,
               rpcSettings?.[chain],
               chainIdForSimulation,
-              apiKeys?.routescan,
-              true,
+              {
+                etherscanApiKey: apiKeys?.etherscan,
+                routescanApiKey: apiKeys?.routescan,
+              },
             );
             for (const [addr, abi] of newAbis) {
               initialAbiCache.set(addr, abi);
