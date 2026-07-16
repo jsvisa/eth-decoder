@@ -221,7 +221,7 @@ function TupleInput(props) {
           { className: styles.tupleLabel },
           `${component.name || `arg${componentIndex}`} (${component.type})`,
         ),
-        React.createElement(TupleArgInput, {
+        React.createElement(ArgInputRouter, {
           ...props,
           input: component,
           value: tupleValues[componentIndex],
@@ -304,7 +304,7 @@ function TupleArrayInput(props) {
   );
 }
 
-export default function TupleArgInput(props) {
+export default function ArgInputRouter(props) {
   const { input } = props;
   if (input.type === "tuple" && input.components) {
     return React.createElement(TupleInput, props);

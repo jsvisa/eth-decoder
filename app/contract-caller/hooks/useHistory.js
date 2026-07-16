@@ -161,11 +161,9 @@ export function useHistory({
 
       // Auto-fetch ABI after a short delay
       const timer = setTimeout(() => {
-        if (typeof document !== "undefined") {
-          const fetchButton = document.querySelector("[data-fetch-abi]");
-          if (fetchButton) {
-            fetchButton.click();
-          }
+        const fetchButton = document.querySelector("[data-fetch-abi]");
+        if (fetchButton) {
+          fetchButton.click();
         }
       }, 200);
       return () => clearTimeout(timer);
