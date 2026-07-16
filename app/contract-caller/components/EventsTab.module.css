@@ -126,12 +126,6 @@
   background-color: var(--bg-secondary);
 }
 
-.eventSelectionToggle {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  width: 1rem;
-}
-
 .eventSelectionTitle {
   font-weight: 600;
   font-size: 0.9rem;

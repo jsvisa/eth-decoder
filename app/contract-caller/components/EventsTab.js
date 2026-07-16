@@ -85,9 +85,7 @@ export default function EventsTab({
           className={styles.eventSelectionHeader}
           onClick={onToggleEventList}
         >
-          <span className={styles.eventSelectionToggle}>
-            {eventListCollapsed ? "&#9654;" : "&#9660;"}
-          </span>
+          {eventListCollapsed ? "\u25B6" : "\u25BC"}
           <span className={styles.eventSelectionTitle}>
             Select Events ({selectedEvents.length} of {events.length} selected)
           </span>
