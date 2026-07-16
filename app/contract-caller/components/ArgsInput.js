@@ -2,7 +2,7 @@
 
 import React from "react";
 import styles from "./ArgsInput.module.css";
-import TupleArgInput from "./TupleArgInput";
+import ArgInputRouter from "./ArgInputRouter";
 import { isReadOnly, isPayable } from "../utils/functionArgs";
 
 /**
@@ -119,7 +119,7 @@ export default function ArgsInput({
   if (hasArgs) {
     const argFields = inputs.map((input, index) => {
       const argError = fieldErrors[`arg_${index}`];
-      const argInput = React.createElement(TupleArgInput, {
+      const argInput = React.createElement(ArgInputRouter, {
         input,
         value: args[index],
         onChange: (value) => handleArgChange(index, value),
