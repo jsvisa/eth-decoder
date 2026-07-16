@@ -266,7 +266,10 @@ function mergeAbis(proxyAbi, implAbi) {
   // Helper to create a unique key for ABI items
   const getKey = (item) => {
     if (item.type === "function") {
-      return `function:${item.name}`;
+      // Functions can be overloaded (same name, different params) in Solidity.
+      // Include input types in the key so overloads aren't collapsed.
+      const inputs = item.inputs?.map((i) => i.type).join(",") ?? "";
+      return `${item.name}(${inputs})`;
     }
     if (item.type === "event") {
       return `event:${item.name}`;
@@ -276,7 +279,6 @@ function mergeAbis(proxyAbi, implAbi) {
     }
     return `${item.type}:${item.name || ""}`;
   };
-
   // Add implementation ABI items first (they take priority)
   for (const item of implAbi) {
     const key = getKey(item);
