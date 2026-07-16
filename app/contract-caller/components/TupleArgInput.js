@@ -81,6 +81,89 @@ function PrimitiveArgInput({
   });
 }
 
+function getArrayLength(type) {
+  const match = type.match(/\[(\d*)\]$/);
+  if (!match || match[1] === "") return null;
+  return Number(match[1]);
+}
+
+function PrimitiveArrayInput(props) {
+  const {
+    input,
+    value,
+    onChange,
+    error,
+    disabled,
+    ArgInputComponent,
+    addressBook,
+    onOpenBookmarkModal,
+  } = props;
+  const items = Array.isArray(value) ? value : [];
+  const fixedLength = getArrayLength(input.type);
+  const baseInput = { ...input, type: input.type.replace(/\[\d*\]$/, "") };
+
+  return React.createElement(
+    "div",
+    {
+      className:
+        styles.tupleArrayGroup + (error ? " " + styles.tupleGroupError : ""),
+    },
+    ...items.map((item, index) =>
+      React.createElement(
+        "div",
+        { key: index, className: styles.tupleArrayItem },
+        React.createElement(
+          "div",
+          { className: styles.tupleArrayItemHeader },
+          React.createElement(
+            "span",
+            { className: styles.tupleArrayIndex },
+            `#${index}`,
+          ),
+          fixedLength === null
+            ? React.createElement(
+                "button",
+                {
+                  type: "button",
+                  className: styles.tupleButton,
+                  onClick: () => onChange(items.filter((_, i) => i !== index)),
+                  disabled,
+                },
+                "Remove",
+              )
+            : null,
+        ),
+        React.createElement(PrimitiveArgInput, {
+          input: baseInput,
+          value: item,
+          onChange: (nextValue) => {
+            const next = [...items];
+            next[index] = nextValue;
+            onChange(next);
+          },
+          error: null,
+          ArgInputComponent,
+          addressBook,
+          disabled,
+          onOpenBookmarkModal,
+        }),
+      ),
+    ),
+    fixedLength === null
+      ? React.createElement(
+          "button",
+          {
+            type: "button",
+            className: styles.tupleButton,
+            onClick: () => onChange([...items, ""]),
+            disabled,
+          },
+          "Add item",
+        )
+      : null,
+  );
+}
+
 function TupleInput(props) {
   const { input, value, onChange, error, title } = props;
   const tupleValues = toTupleValues(value, input);
@@ -192,6 +275,9 @@ export default function TupleArgInput(props) {
   }
   if (/^tuple\[(\d*)\]$/.test(input.type) && input.components) {
     return React.createElement(TupleArrayInput, props);
+  }
+  if (/\[\d*\]$/.test(input.type)) {
+    return React.createElement(PrimitiveArrayInput, props);
   }
   return React.createElement(PrimitiveArgInput, props);
 }
