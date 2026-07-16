@@ -247,6 +247,27 @@ export async function decodeCallTraceLogsViaServer(node) {
   );
 }
 
+// Walk the call trace tree to find the origin of a revert reason.
+// Bottom-up: if a parent's errorReason differs from its child's, the parent
+// caught the child's error and reverted with its own — so the parent's error
+// is the authoritative one. If they're the same (or parent has none), the
+// error propagated from the child and either is fine.
+function findRootCause(node) {
+  if (!node) return null;
+  let deepest = null;
+  for (const child of node.calls || []) {
+    const childError = findRootCause(child);
+    if (childError) deepest = childError;
+  }
+  if (deepest) {
+    if (node.errorReason && node.errorReason !== deepest) {
+      return node.errorReason;
+    }
+    return deepest;
+  }
+  return node.errorReason || null;
+}
+
 // Decode revert data into a human-readable string.
 // Handles Error(string), Panic(uint256), and custom ABI errors via viem's decodeErrorResult.
 // Uses viem throughout — avoids Buffer.from which is unreliable in browser bundles.
@@ -1273,10 +1294,11 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       error: success
         ? null
         : (() => {
-            // callTraceRoot.errorReason is set by onAfterMessage via decodeRevertData.
-            // Fall back to decoding rawOutput directly in case the hook path was skipped.
+            // Walk the call trace to find the error's origin (deepest frame that
+            // introduced it, respecting try/catch). Fall back to decoding rawOutput
+            // directly if the tree has no decoded error.
             const reason =
-              callTraceRoot?.errorReason || decodeRevertData(rawOutput, abi);
+              findRootCause(callTraceRoot) || decodeRevertData(rawOutput, abi);
             return reason ? `Revert: ${reason}` : "Transaction reverted";
           })(),
       undecodedAddresses: Array.from(undecodedAddresses),
