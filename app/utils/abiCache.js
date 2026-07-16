@@ -201,6 +201,7 @@ export const fetchAbisForAddresses = async (
   rpcUrl,
   chainId,
   routescanApiKey = "",
+  detectProxy = true,
 ) => {
   const results = new Map();
 
@@ -213,7 +214,7 @@ export const fetchAbisForAddresses = async (
       apiKey,
       rpcUrl,
       chainId,
-      { routescanApiKey },
+      { detectProxy, routescanApiKey },
     );
     if (abi) {
       results.set(normalizedAddress, abi);

@@ -374,6 +374,7 @@ export function useCallExecution({
               rpcSettings?.[chain],
               chainIdForSimulation,
               apiKeys?.routescan,
+              true,
             );
 
             for (const [addr, abi] of newAbis) {
@@ -408,6 +409,7 @@ export function useCallExecution({
               rpcSettings?.[chain],
               chainIdForSimulation,
               apiKeys?.routescan,
+              true,
             );
             for (const [addr, abi] of newAbis) {
               initialAbiCache.set(addr, abi);

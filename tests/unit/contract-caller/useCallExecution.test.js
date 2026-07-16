@@ -334,6 +334,7 @@ describe("useCallExecution – local sim populates trace toName labels", () => {
       undefined,
       1,
       undefined,
+      true,
     );
 
     expect(tevm.collectAllCallAddresses).toHaveBeenCalledWith(

@@ -173,16 +173,6 @@
   font-size: 0.9rem;
 }
 
-.detectProxyLabel {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.85rem;
-  color: #666;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
 .fetchButton {
   flex: 0 0 auto;
   padding: 0.875rem 1.5rem;
@@ -230,11 +220,6 @@
 
   .bookmarkButton {
     flex: 0 0 3.5rem;
-  }
-
-  .detectProxyLabel {
-    flex: 1 1 auto;
-    min-height: 3.25rem;
   }
 
   .fetchButton {

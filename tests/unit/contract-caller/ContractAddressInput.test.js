@@ -36,8 +36,6 @@ const BASE_PROPS = {
   addressBook: [],
   cachedAddresses: [],
   contractName: null,
-  detectProxy: false,
-  onDetectProxyChange: vi.fn(),
   onFetchAbi: vi.fn(),
   fetchingAbi: false,
   fieldError: null,
@@ -55,7 +53,7 @@ describe("ContractAddressInput", () => {
     }
   });
 
-  it("renders the label, address input, detect-proxy label, and Fetch ABI button", () => {
+  it("renders the label, address input, and Fetch ABI button", () => {
     const { container, unmount } = renderComponent(BASE_PROPS);
     cleanup = unmount;
 
@@ -63,7 +61,6 @@ describe("ContractAddressInput", () => {
     expect(
       container.querySelector("input[placeholder='0x...']"),
     ).not.toBeNull();
-    expect(container.textContent).toContain("Detect proxy");
     expect(container.textContent).toContain("Fetch ABI");
   });
 
@@ -144,19 +141,6 @@ describe("ContractAddressInput", () => {
     });
     cleanup = unmount;
     expect(container.textContent).toContain("Invalid address");
-  });
-
-  it("calls onDetectProxyChange when detect-proxy checkbox is toggled", () => {
-    const onDetectProxyChange = vi.fn();
-    const { container, unmount } = renderComponent({
-      ...BASE_PROPS,
-      onDetectProxyChange,
-    });
-    cleanup = unmount;
-
-    const checkbox = container.querySelector("input[type='checkbox']");
-    act(() => checkbox.click());
-    expect(onDetectProxyChange).toHaveBeenCalledTimes(1);
   });
 
   it("shows bookmark label when the current address is in the addressBook", () => {
