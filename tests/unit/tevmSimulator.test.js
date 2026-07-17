@@ -1,7 +1,9 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
+import { bytesToHex, hexToBytes } from "viem";
 import {
   createTevmClient,
+  createArbSysPrecompile,
   decodeRevertData,
   ensureTevmNodeCompat,
   sanitizeForkRpcResult,
@@ -72,6 +74,7 @@ const USDT_HOLDER = "0xF977814e90dA44bFA03b6295A0616a897441aceC";
 const USDT_RECIPIENT = "0x000000000000000000000000000000000000dEaD";
 const USDT_TRANSFER_AMOUNT = "1000000";
 const MAINNET_FORK_BLOCK = "latest";
+const ARBSYS_BLOCK_NUMBER_SELECTOR = "0xa3b1b31d";
 
 async function readTokenBalance(client, blockNumber, tokenAddress, account) {
   const result = await simulateWithClient(client, blockNumber, {
@@ -248,6 +251,23 @@ describe("simulateWithClient", () => {
       recipientBalanceBefore + BigInt(USDT_TRANSFER_AMOUNT),
     );
   }, 60000);
+});
+
+describe("createArbSysPrecompile", () => {
+  it("returns the forked Arbitrum block number for arbBlockNumber()", async () => {
+    const blockNumber = 484137112n;
+    const precompile = createArbSysPrecompile(() => blockNumber).precompile();
+
+    const result = await precompile.function({
+      data: hexToBytes(ARBSYS_BLOCK_NUMBER_SELECTOR),
+      gasLimit: 1_000_000n,
+    });
+
+    expect(result.executionGasUsed).toBe(0x323n);
+    expect(bytesToHex(result.returnValue)).toBe(
+      "0x000000000000000000000000000000000000000000000000000000001cdb5898",
+    );
+  });
 });
 
 describe("sanitizeForkRpcResult", () => {

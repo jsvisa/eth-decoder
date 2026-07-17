@@ -1,4 +1,4 @@
-import { createMemoryClient, http } from "tevm";
+import { createMemoryClient, defineCall, definePrecompile, http } from "tevm";
 import { createCommon, createMockKzg } from "tevm/common";
 import {
   encodeFunctionData,
@@ -21,6 +21,18 @@ import {
   getFunctionSelector,
 } from "../contract-caller/utils/functionArgs";
 
+const ARBITRUM_ONE_CHAIN_ID = 42161;
+const ARBSYS_ADDRESS = "0x0000000000000000000000000000000000000064";
+const ARBSYS_ABI = [
+  {
+    type: "function",
+    name: "arbBlockNumber",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+    stateMutability: "view",
+  },
+];
+
 // Create an http transport with or without JSON-RPC batching.
 // batchSize=1 → http(url) with NO batch option — guarantees single {…} request
 //               format, compatible with all RPCs including those that reject arrays.
@@ -30,6 +42,18 @@ function makeHttp(url, batchSize = 1) {
   return batchSize > 1
     ? http(url, { batch: { batchSize, wait: 0 } })
     : http(url);
+}
+
+export function createArbSysPrecompile(getBlockNumber) {
+  return definePrecompile({
+    contract: { abi: ARBSYS_ABI, address: ARBSYS_ADDRESS },
+    call: defineCall(ARBSYS_ABI, {
+      arbBlockNumber: async () => ({
+        returnValue: getBlockNumber(),
+        executionGasUsed: 0x323n,
+      }),
+    }),
+  });
 }
 
 function isUnsupportedTransaction(tx) {
@@ -565,9 +589,16 @@ export async function createTevmClient(
     name: chainConfig.name || chain,
     customCrypto: { kzg: createMockKzg() },
   });
+  let forkBlockNumber =
+    typeof blockTag === "bigint" ? blockTag : BigInt(chainConfig.chainId);
+  const customPrecompiles =
+    chainConfig.chainId === ARBITRUM_ONE_CHAIN_ID
+      ? [createArbSysPrecompile(() => forkBlockNumber).precompile()]
+      : [];
 
   const client = createMemoryClient({
     common,
+    ...(customPrecompiles.length > 0 ? { customPrecompiles } : {}),
     fork: {
       transport: createProofFreeTransport(forkUrl, batchSize, collector),
       blockTag,
@@ -576,6 +607,9 @@ export async function createTevmClient(
   ensureTevmNodeCompat(client);
 
   await client.tevmReady();
+  if (blockTag === "latest") {
+    forkBlockNumber = await client.getBlockNumber();
+  }
 
   return {
     client,
