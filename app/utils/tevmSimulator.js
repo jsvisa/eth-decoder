@@ -1,6 +1,5 @@
-import { createMemoryClient, defineCall, definePrecompile, http } from "tevm";
+import { createMemoryClient, http } from "tevm";
 import { createCommon, createMockKzg } from "tevm/common";
-import { EvmError } from "tevm/evm";
 import {
   encodeFunctionData,
   decodeFunctionData,
@@ -10,10 +9,10 @@ import {
   decodeEventLog,
   keccak256,
   bytesToHex,
-  hexToBytes,
 } from "viem";
 import { isValidEthAddress } from "./validation";
 import { CHAIN_META, FORK_RPC_URLS } from "./chains";
+import { createPrecompilesForChain } from "./precompiles";
 import { createMetricsCollector } from "./rpcMetrics";
 import { NATIVE_TOKEN_ADDRESS, buildTokenAccountMap } from "./tokenTransfers";
 import { normalizeArg } from "./normalizeArg";
@@ -23,41 +22,7 @@ import {
   getFunctionSelector,
 } from "../contract-caller/utils/functionArgs";
 
-const ARBITRUM_ONE_CHAIN_ID = 42161;
-const ARBSYS_ADDRESS = "0x0000000000000000000000000000000000000064";
-const ARBITRUM_PRECOMPILE_ADDRESSES_BY_NAME = {
-  ArbSys: ARBSYS_ADDRESS,
-  ArbInfo: "0x0000000000000000000000000000000000000065",
-  ArbAddressTable: "0x0000000000000000000000000000000000000066",
-  ArbBLS: "0x0000000000000000000000000000000000000067",
-  ArbFunctionTable: "0x0000000000000000000000000000000000000068",
-  ArbosTest: "0x0000000000000000000000000000000000000069",
-  ArbOwnerPublic: "0x000000000000000000000000000000000000006b",
-  ArbGasInfo: "0x000000000000000000000000000000000000006c",
-  ArbAggregator: "0x000000000000000000000000000000000000006d",
-  ArbRetryableTx: "0x000000000000000000000000000000000000006e",
-  ArbStatistics: "0x000000000000000000000000000000000000006f",
-  ArbOwner: "0x0000000000000000000000000000000000000070",
-  ArbWasm: "0x0000000000000000000000000000000000000071",
-  ArbWasmCache: "0x0000000000000000000000000000000000000072",
-  ArbNativeTokenManager: "0x0000000000000000000000000000000000000073",
-  ArbFilteredTransactionsManager: "0x0000000000000000000000000000000000000074",
-  ArbDebug: "0x00000000000000000000000000000000000000ff",
-  ArbosActs: "0x00000000000000000000000000000000000a4b05",
-};
-const ARBITRUM_PRECOMPILE_ADDRESSES = Object.values(
-  ARBITRUM_PRECOMPILE_ADDRESSES_BY_NAME,
-);
-const ARBSYS_BLOCK_NUMBER_SELECTOR = "0xa3b1b31d";
-const ARBSYS_ABI = [
-  {
-    type: "function",
-    name: "arbBlockNumber",
-    inputs: [],
-    outputs: [{ type: "uint256" }],
-    stateMutability: "view",
-  },
-];
+export { createArbSysPrecompile } from "./precompiles";
 
 // Create an http transport with or without JSON-RPC batching.
 // batchSize=1 → http(url) with NO batch option — guarantees single {…} request
@@ -68,76 +33,6 @@ function makeHttp(url, batchSize = 1) {
   return batchSize > 1
     ? http(url, { batch: { batchSize, wait: 0 } })
     : http(url);
-}
-
-export function createArbSysPrecompile(getBlockNumber) {
-  return definePrecompile({
-    contract: { abi: ARBSYS_ABI, address: ARBSYS_ADDRESS },
-    call: defineCall(ARBSYS_ABI, {
-      arbBlockNumber: async () => ({
-        returnValue: getBlockNumber(),
-        executionGasUsed: 0x323n,
-      }),
-    }),
-  });
-}
-
-function blockTagToRpcBlock(blockTag) {
-  return typeof blockTag === "bigint" ? `0x${blockTag.toString(16)}` : blockTag;
-}
-
-function createRpcBackedArbitrumPrecompile(address, request, getBlockTag) {
-  const call = async ({ data, gasLimit }) => {
-    try {
-      const returnValue = await request({
-        method: "eth_call",
-        params: [{ to: address, data }, blockTagToRpcBlock(getBlockTag())],
-      });
-
-      return {
-        returnValue: hexToBytes(returnValue),
-        executionGasUsed: gasLimit < 0x323n ? gasLimit : 0x323n,
-      };
-    } catch (error) {
-      return {
-        returnValue: new Uint8Array(),
-        executionGasUsed: 0n,
-        exceptionError: {
-          ...new EvmError("revert"),
-          message:
-            error instanceof Error
-              ? error.message
-              : "Arbitrum precompile reverted",
-        },
-      };
-    }
-  };
-
-  return definePrecompile({
-    contract: { abi: [], address },
-    call:
-      address === ARBSYS_ADDRESS
-        ? async ({ data, gasLimit }) => {
-            if (data === ARBSYS_BLOCK_NUMBER_SELECTOR) {
-              return createArbSysPrecompile(() => getBlockTag()).call({
-                data,
-                gasLimit,
-              });
-            }
-            return call({ data, gasLimit });
-          }
-        : call,
-  });
-}
-
-export function createArbitrumPrecompiles(request, getBlockTag) {
-  return ARBITRUM_PRECOMPILE_ADDRESSES.map((address) =>
-    createRpcBackedArbitrumPrecompile(
-      address,
-      request,
-      getBlockTag,
-    ).precompile(),
-  );
 }
 
 function isUnsupportedTransaction(tx) {
@@ -677,10 +572,10 @@ export async function createTevmClient(
   const forkRequest = forkTransport({}).request;
   let forkBlockNumber =
     typeof blockTag === "bigint" ? blockTag : BigInt(chainConfig.chainId);
-  const customPrecompiles =
-    chainConfig.chainId === ARBITRUM_ONE_CHAIN_ID
-      ? createArbitrumPrecompiles(forkRequest, () => forkBlockNumber)
-      : [];
+  const customPrecompiles = createPrecompilesForChain(chainConfig.chainId, {
+    request: forkRequest,
+    getBlockTag: () => forkBlockNumber,
+  });
 
   const client = createMemoryClient({
     common,
