@@ -25,8 +25,9 @@ const MAX_HISTORY_ITEMS = 50;
  * @param {Function} params.setFromAddress    – setter for fromAddress
  * @param {Function} params.setResult         – setter for result panel
  * @param {Function} params.setError          – setter for error state
- * @param {Function} params.setEthValue       – setter for ETH value input
- * @param {Function} params.applyPendingArgs  – queue pending function/args in selection state
+ * @param {Function} params.setEthValue         – setter for ETH value input
+ * @param {Function} params.setBlockNumber  – setter for read block number
+ * @param {Function} params.applyPendingArgs    – queue pending function/args in selection state
  */
 export function useHistory({
   chain,
@@ -44,6 +45,7 @@ export function useHistory({
   setResult,
   setError,
   setEthValue,
+  setBlockNumber,
   applyPendingArgs,
 }) {
   const [history, setHistory] = useState([]);
@@ -91,6 +93,7 @@ export function useHistory({
     const urlArgs = params.get("args");
     const urlFrom = params.get("from");
     const urlValue = params.get("value");
+    const urlBlock = params.get("block");
 
     if (urlChain) {
       let resolvedChain = urlChain;
@@ -159,6 +162,10 @@ export function useHistory({
         setEthValue(urlValue);
       }
 
+      if (urlBlock) {
+        setBlockNumber?.(urlBlock);
+      }
+
       // Auto-fetch ABI after a short delay
       const timer = setTimeout(() => {
         const fetchButton = document.querySelector("[data-fetch-abi]");
@@ -169,36 +176,6 @@ export function useHistory({
       return () => clearTimeout(timer);
     }
   }, []);
-
-  // ── Effect 4 (lines 1507-1531): sync URL with current chain + address ────
-  useEffect(() => {
-    const currentParams = new URLSearchParams(window.location.search);
-    if (currentParams.has("simulationId")) {
-      return;
-    }
-
-    if (!address) {
-      if (currentParams.has("chain") || currentParams.has("address")) {
-        window.history.replaceState(null, "", window.location.pathname);
-      }
-      return;
-    }
-    const params = new URLSearchParams();
-    params.set("chain", chain);
-    params.set("address", address);
-    if (selectedFunction) {
-      params.set("function", selectedFunction);
-      params.set("args", JSON.stringify(args));
-    }
-    if (fromAddress) {
-      params.set("from", fromAddress);
-    }
-    window.history.replaceState(
-      null,
-      "",
-      `${window.location.pathname}?${params}`,
-    );
-  }, [chain, address, selectedFunction, args, fromAddress]);
 
   // ── Callback: toggleHistoryExpanded ──────────────────────────────────────
   const toggleHistoryExpanded = useCallback((id) => {

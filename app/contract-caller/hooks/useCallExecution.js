@@ -40,7 +40,7 @@ import { getFunctionSig, isReadOnly, isPayable } from "../utils/functionArgs";
  * @param {string}   params.ethValue
  * @param {string}   params.ethValueUnit       - "ETH" | "Wei"
  * @param {string}   params.forkBlockNumber
- * @param {string}   params.readBlockNumber
+ * @param {string}   params.blockNumber
  * @param {object}   params.apiKeys            - { etherscan, routescan, ... }
  * @param {object}   params.rpcSettings        - chain -> rpcUrl map
  * @param {string}   params.rawCalldata      - raw hex calldata for ABI-less simulation
@@ -72,7 +72,7 @@ export function useCallExecution({
   ethValueUnit,
   rawCalldata,
   forkBlockNumber,
-  readBlockNumber,
+  blockNumber,
   apiKeys,
   rpcSettings,
   rpcBatchSize,
@@ -464,8 +464,8 @@ export function useCallExecution({
           requestBody.rpcUrl = rpcSettings[chain];
         }
 
-        if (readBlockNumber) {
-          requestBody.blockNumber = readBlockNumber;
+        if (blockNumber) {
+          requestBody.blockNumber = blockNumber;
         }
 
         const abortController = new AbortController();
@@ -604,6 +604,10 @@ export function useCallExecution({
 
         if (ethValue) {
           params.set("value", ethValue);
+        }
+
+        if (blockNumber) {
+          params.set("block", blockNumber);
         }
 
         shareUrl = `${window.location.origin}${window.location.pathname}?${params}`;
