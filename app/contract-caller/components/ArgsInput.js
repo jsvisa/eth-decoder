@@ -16,7 +16,7 @@ import { isReadOnly, isPayable } from "../utils/functionArgs";
  *   fieldErrors            {Record<string,string>}     - per-arg validation errors
  *   addressBook            {AddressBookEntry[]}        - address book for suggestions
  *   onOpenBookmarkModal    {(addr: string) => void}    - bookmark an address arg
- *   readBlockNumber        {string}                    - block-number for read calls
+ *   blockNumber        {string}                    - block-number for read calls
  *   onReadBlockNumberChange {(s: string) => void}      - set read block
  *   ethValue               {string}                    - ETH value for payable
  *   onEthValueChange       {(s: string) => void}       - update ETH value
@@ -32,7 +32,7 @@ export default function ArgsInput({
   fieldErrors,
   addressBook,
   onOpenBookmarkModal,
-  readBlockNumber,
+  blockNumber,
   onReadBlockNumberChange,
   ethValue,
   onEthValueChange,
@@ -153,7 +153,7 @@ export default function ArgsInput({
           ),
           React.createElement("input", {
             type: "text",
-            value: readBlockNumber,
+            value: blockNumber,
             onChange: (e) =>
               onReadBlockNumberChange(e.target.value.replace(/[^0-9]/g, "")),
             placeholder: "latest",
@@ -195,7 +195,7 @@ export default function ArgsInput({
         ),
         React.createElement("input", {
           type: "text",
-          value: readBlockNumber,
+          value: blockNumber,
           onChange: (e) =>
             onReadBlockNumberChange(e.target.value.replace(/[^0-9]/g, "")),
           placeholder: "latest",

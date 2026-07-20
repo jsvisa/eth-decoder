@@ -98,7 +98,7 @@ function makeProps(overrides = {}) {
     fieldErrors: {},
     addressBook: [],
     onOpenBookmarkModal: vi.fn(),
-    readBlockNumber: "",
+    blockNumber: "",
     onReadBlockNumberChange: vi.fn(),
     ethValue: "",
     onEthValueChange: vi.fn(),

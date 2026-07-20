@@ -33,7 +33,7 @@ export function useFunctionSelection({
   const [pasteCalldataError, setPasteCalldataError] = useState(null);
   const [ethValue, setEthValue] = useState("");
   const [ethValueUnit, setEthValueUnit] = useState("ETH");
-  const [readBlockNumber, setReadBlockNumber] = useState("");
+  const [blockNumber, setBlockNumber] = useState("");
   const [copiedItem, setCopiedItem] = useState(null); // 'selector' | 'signature' | null
   const [calldataCopied, setCalldataCopied] = useState(false);
 
@@ -284,8 +284,8 @@ export function useFunctionSelection({
     setEthValue,
     ethValueUnit,
     setEthValueUnit,
-    readBlockNumber,
-    setReadBlockNumber,
+    blockNumber,
+    setBlockNumber,
     calldataCopied,
     copiedItem,
     setCopiedItem,

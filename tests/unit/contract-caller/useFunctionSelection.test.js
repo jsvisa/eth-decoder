@@ -81,7 +81,7 @@ describe("useFunctionSelection — initial state", () => {
     expect(result.current.pasteCalldataError).toBeNull();
     expect(result.current.ethValue).toBe("");
     expect(result.current.ethValueUnit).toBe("ETH");
-    expect(result.current.readBlockNumber).toBe("");
+    expect(result.current.blockNumber).toBe("");
     expect(result.current.copiedItem).toBeNull();
     expect(result.current.calldataCopied).toBe(false);
   });
@@ -110,8 +110,8 @@ describe("useFunctionSelection — initial state", () => {
       "setEthValue",
       "ethValueUnit",
       "setEthValueUnit",
-      "readBlockNumber",
-      "setReadBlockNumber",
+      "blockNumber",
+      "setBlockNumber",
       "calldataCopied",
       "copiedItem",
       "setCopiedItem",

@@ -56,7 +56,7 @@ const baseParams = {
   ethValue: "",
   ethValueUnit: "ETH",
   forkBlockNumber: "",
-  readBlockNumber: "",
+  blockNumber: "",
   apiKeys: {},
   rpcSettings: {},
   rpcBatchSize: 100,

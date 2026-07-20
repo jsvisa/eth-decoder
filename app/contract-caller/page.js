@@ -248,7 +248,7 @@ export default function ContractCallerPage() {
     ethValue: fn.ethValue,
     ethValueUnit: fn.ethValueUnit,
     forkBlockNumber: simOpts.forkBlockNumber,
-    readBlockNumber: fn.readBlockNumber,
+    blockNumber: fn.blockNumber,
     apiKeys,
     rpcSettings,
     rpcBatchSize,
@@ -293,12 +293,56 @@ export default function ContractCallerPage() {
     setResult: exec.setResult,
     setError: exec.setError,
     setEthValue: fn.setEthValue,
+    setBlockNumber: fn.setBlockNumber,
     applyPendingArgs: fn.applyPendingArgs,
   });
 
   // Wire remaining deferred refs
   saveBundleRef.current = history.saveSessionBundle;
   saveToHistoryRef.current = history.saveToHistory;
+
+  // ── URL sync: keep browser URL in sync with current state ─────────────
+  useEffect(() => {
+    const currentParams = new URLSearchParams(window.location.search);
+    if (currentParams.has("simulationId")) return;
+
+    if (!address) {
+      if (currentParams.has("chain") || currentParams.has("address")) {
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+      return;
+    }
+
+    const params = new URLSearchParams();
+    params.set("chain", chain);
+    params.set("address", address);
+    if (fn.selectedFunction) {
+      params.set("function", fn.selectedFunction);
+      params.set("args", JSON.stringify(fn.args));
+    }
+    if (simOpts.fromAddress) {
+      params.set("from", simOpts.fromAddress);
+    }
+    if (fn.ethValue) {
+      params.set("value", fn.ethValue);
+    }
+    if (fn.blockNumber) {
+      params.set("block", fn.blockNumber);
+    }
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}?${params}`,
+    );
+  }, [
+    chain,
+    address,
+    fn.selectedFunction,
+    fn.args,
+    simOpts.fromAddress,
+    fn.ethValue,
+    fn.blockNumber,
+  ]);
 
   const tokens = useTokenMetadata(chain, rpcSettings);
 
@@ -584,8 +628,8 @@ export default function ContractCallerPage() {
                   fieldErrors={fn.fieldErrors}
                   addressBook={bookmark.addressBook}
                   onOpenBookmarkModal={bookmark.openBookmarkModal}
-                  readBlockNumber={fn.readBlockNumber}
-                  onReadBlockNumberChange={fn.setReadBlockNumber}
+                  blockNumber={fn.blockNumber}
+                  onReadBlockNumberChange={fn.setBlockNumber}
                   ethValue={fn.ethValue}
                   onEthValueChange={fn.setEthValue}
                   ethValueUnit={fn.ethValueUnit}
