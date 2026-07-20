@@ -1,7 +1,17 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
+import { createMemoryClient } from "tevm";
+import { createCommon, createMockKzg } from "tevm/common";
+import { EvmError } from "tevm/evm";
+import { bytesToHex, hexToBytes } from "viem";
+import {
+  ARBITRUM_PRECOMPILE_REFERENCES,
+  createArbitrumPrecompiles,
+  createPrecompilesForChain,
+} from "../../app/utils/precompiles.js";
 import {
   createTevmClient,
+  createArbSysPrecompile,
   decodeRevertData,
   ensureTevmNodeCompat,
   sanitizeForkRpcResult,
@@ -72,6 +82,8 @@ const USDT_HOLDER = "0xF977814e90dA44bFA03b6295A0616a897441aceC";
 const USDT_RECIPIENT = "0x000000000000000000000000000000000000dEaD";
 const USDT_TRANSFER_AMOUNT = "1000000";
 const MAINNET_FORK_BLOCK = "latest";
+const ARBSYS_BLOCK_NUMBER_SELECTOR = "0xa3b1b31d";
+const ARBINFO_ADDRESS = "0x0000000000000000000000000000000000000065";
 
 async function readTokenBalance(client, blockNumber, tokenAddress, account) {
   const result = await simulateWithClient(client, blockNumber, {
@@ -248,6 +260,179 @@ describe("simulateWithClient", () => {
       recipientBalanceBefore + BigInt(USDT_TRANSFER_AMOUNT),
     );
   }, 60000);
+});
+
+describe("createArbSysPrecompile", () => {
+  it("returns the forked Arbitrum block number for arbBlockNumber()", async () => {
+    const blockNumber = 484137112n;
+    const precompile = createArbSysPrecompile(() => blockNumber).precompile();
+
+    const result = await precompile.function({
+      data: hexToBytes(ARBSYS_BLOCK_NUMBER_SELECTOR),
+      gasLimit: 1_000_000n,
+    });
+
+    expect(result.executionGasUsed).toBe(0x323n);
+    expect(bytesToHex(result.returnValue)).toBe(
+      "0x000000000000000000000000000000000000000000000000000000001cdb5898",
+    );
+  });
+});
+
+describe("createArbitrumPrecompiles", () => {
+  it("is available through the chain-id precompile registry", () => {
+    const precompiles = createPrecompilesForChain(42161, {
+      request: async () => "0x",
+      getBlockTag: () => 1n,
+    });
+
+    expect(precompiles).toHaveLength(18);
+  });
+
+  it("does not install RPC-backed precompiles for unconfigured chains", () => {
+    const precompiles = createPrecompilesForChain(1, {
+      request: async () => {
+        throw new Error("unexpected rpc call");
+      },
+      getBlockTag: () => 1n,
+    });
+
+    expect(precompiles).toEqual([]);
+  });
+
+  it("exports upstream references for the ArbOS address list", () => {
+    expect(ARBITRUM_PRECOMPILE_REFERENCES).toEqual(
+      expect.objectContaining({
+        registry:
+          "https://github.com/OffchainLabs/nitro/blob/a618155919315241665356fe60f3cd00d66d5e46/precompiles/precompile.go#L523-L693",
+        addressConfig:
+          "https://github.com/OffchainLabs/nitro/blob/a618155919315241665356fe60f3cd00d66d5e46/system_tests/eth_config_test.go#L53-L70",
+      }),
+    );
+  });
+
+  it("registers every ArbOS precompile address used by Nitro", () => {
+    const precompiles = createArbitrumPrecompiles(
+      async () => "0x",
+      () => 1n,
+    );
+
+    expect(precompiles).toHaveLength(18);
+    expect(
+      precompiles.map((precompile) => precompile.address.toString()).sort(),
+    ).toEqual([
+      "0x0000000000000000000000000000000000000064",
+      "0x0000000000000000000000000000000000000065",
+      "0x0000000000000000000000000000000000000066",
+      "0x0000000000000000000000000000000000000067",
+      "0x0000000000000000000000000000000000000068",
+      "0x0000000000000000000000000000000000000069",
+      "0x000000000000000000000000000000000000006b",
+      "0x000000000000000000000000000000000000006c",
+      "0x000000000000000000000000000000000000006d",
+      "0x000000000000000000000000000000000000006e",
+      "0x000000000000000000000000000000000000006f",
+      "0x0000000000000000000000000000000000000070",
+      "0x0000000000000000000000000000000000000071",
+      "0x0000000000000000000000000000000000000072",
+      "0x0000000000000000000000000000000000000073",
+      "0x0000000000000000000000000000000000000074",
+      "0x00000000000000000000000000000000000000ff",
+      "0x00000000000000000000000000000000000a4b05",
+    ]);
+  });
+
+  it("delegates non-local ArbOS precompile calls to the fork block", async () => {
+    const requests = [];
+    const precompile = createArbitrumPrecompiles(
+      async (request) => {
+        requests.push(request);
+        return "0x1234";
+      },
+      () => 484137112n,
+    ).find((candidate) => candidate.address.toString() === ARBINFO_ADDRESS);
+
+    const result = await precompile.function({
+      data: hexToBytes("0xabcdef01"),
+      gasLimit: 1_000_000n,
+    });
+
+    expect(bytesToHex(result.returnValue)).toBe("0x1234");
+    expect(requests).toEqual([
+      {
+        method: "eth_call",
+        params: [{ to: ARBINFO_ADDRESS, data: "0xabcdef01" }, "0x1cdb5898"],
+      },
+    ]);
+  });
+
+  it("delegates ArbOS calls through the Tevm execution path", async () => {
+    const requests = [];
+    const client = createMemoryClient({
+      common: createCommon({
+        id: 42161,
+        name: "arbitrum",
+        customCrypto: { kzg: createMockKzg() },
+      }),
+      customPrecompiles: createPrecompilesForChain(42161, {
+        request: async (request) => {
+          requests.push(request);
+          return "0x1234";
+        },
+        getBlockTag: () => 484137112n,
+      }),
+    });
+    await client.tevmReady();
+
+    const result = await client.tevmCall({
+      to: ARBINFO_ADDRESS,
+      data: "0xabcdef01",
+      gas: 1_000_000n,
+    });
+
+    expect(result.rawData).toBe("0x1234");
+    expect(requests).toEqual([
+      {
+        method: "eth_call",
+        params: [{ to: ARBINFO_ADDRESS, data: "0xabcdef01" }, "0x1cdb5898"],
+      },
+    ]);
+  });
+
+  it("handles ArbSys block number locally without an RPC round trip", async () => {
+    const precompile = createArbitrumPrecompiles(
+      async () => {
+        throw new Error("unexpected rpc call");
+      },
+      () => 484137112n,
+    )[0];
+
+    const result = await precompile.function({
+      data: hexToBytes(ARBSYS_BLOCK_NUMBER_SELECTOR),
+      gasLimit: 1_000_000n,
+    });
+
+    expect(bytesToHex(result.returnValue)).toBe(
+      "0x000000000000000000000000000000000000000000000000000000001cdb5898",
+    );
+  });
+
+  it("returns a Tevm EvmError instance when RPC-backed ArbOS calls revert", async () => {
+    const precompile = createArbitrumPrecompiles(
+      async () => {
+        throw new Error("rpc reverted");
+      },
+      () => 484137112n,
+    ).find((candidate) => candidate.address.toString() === ARBINFO_ADDRESS);
+
+    const result = await precompile.function({
+      data: hexToBytes("0xabcdef01"),
+      gasLimit: 1_000_000n,
+    });
+
+    expect(result.exceptionError).toBeInstanceOf(EvmError);
+    expect(result.exceptionError.message).toBe("rpc reverted");
+  });
 });
 
 describe("sanitizeForkRpcResult", () => {

@@ -12,6 +12,7 @@ import {
 } from "viem";
 import { isValidEthAddress } from "./validation";
 import { CHAIN_META, FORK_RPC_URLS } from "./chains";
+import { createPrecompilesForChain } from "./precompiles";
 import { createMetricsCollector } from "./rpcMetrics";
 import { NATIVE_TOKEN_ADDRESS, buildTokenAccountMap } from "./tokenTransfers";
 import { normalizeArg } from "./normalizeArg";
@@ -20,6 +21,8 @@ import {
   serializeBigInts,
   getFunctionSelector,
 } from "../contract-caller/utils/functionArgs";
+
+export { createArbSysPrecompile } from "./precompiles";
 
 // Create an http transport with or without JSON-RPC batching.
 // batchSize=1 → http(url) with NO batch option — guarantees single {…} request
@@ -565,17 +568,29 @@ export async function createTevmClient(
     name: chainConfig.name || chain,
     customCrypto: { kzg: createMockKzg() },
   });
+  const forkTransport = createProofFreeTransport(forkUrl, batchSize, collector);
+  const forkRequest = forkTransport({}).request;
+  let forkBlockNumber =
+    typeof blockTag === "bigint" ? blockTag : BigInt(chainConfig.chainId);
+  const customPrecompiles = createPrecompilesForChain(chainConfig.chainId, {
+    request: forkRequest,
+    getBlockTag: () => forkBlockNumber,
+  });
 
   const client = createMemoryClient({
     common,
+    ...(customPrecompiles.length > 0 ? { customPrecompiles } : {}),
     fork: {
-      transport: createProofFreeTransport(forkUrl, batchSize, collector),
+      transport: forkTransport,
       blockTag,
     },
   });
   ensureTevmNodeCompat(client);
 
   await client.tevmReady();
+  if (blockTag === "latest") {
+    forkBlockNumber = await client.getBlockNumber();
+  }
 
   return {
     client,
