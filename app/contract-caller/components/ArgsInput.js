@@ -16,8 +16,8 @@ import { isReadOnly, isPayable } from "../utils/functionArgs";
  *   fieldErrors            {Record<string,string>}     - per-arg validation errors
  *   addressBook            {AddressBookEntry[]}        - address book for suggestions
  *   onOpenBookmarkModal    {(addr: string) => void}    - bookmark an address arg
- *   blockNumber        {string}                    - block-number for read calls
- *   onReadBlockNumberChange {(s: string) => void}      - set read block
+ *   blockNumber            {string}                    - block-number for read state
+ *   onBlockNumberChange    {(s: string) => void}       - set historical block-number
  *   ethValue               {string}                    - ETH value for payable
  *   onEthValueChange       {(s: string) => void}       - update ETH value
  *   ethValueUnit           {'ETH'|'Wei'}               - unit toggle
@@ -33,7 +33,7 @@ export default function ArgsInput({
   addressBook,
   onOpenBookmarkModal,
   blockNumber,
-  onReadBlockNumberChange,
+  onBlockNumberChange,
   ethValue,
   onEthValueChange,
   ethValueUnit,
@@ -155,7 +155,7 @@ export default function ArgsInput({
             type: "text",
             value: blockNumber,
             onChange: (e) =>
-              onReadBlockNumberChange(e.target.value.replace(/[^0-9]/g, "")),
+              onBlockNumberChange(e.target.value.replace(/[^0-9]/g, "")),
             placeholder: "latest",
             className: styles.readBlockInput,
             disabled: disabled,
@@ -197,7 +197,7 @@ export default function ArgsInput({
           type: "text",
           value: blockNumber,
           onChange: (e) =>
-            onReadBlockNumberChange(e.target.value.replace(/[^0-9]/g, "")),
+            onBlockNumberChange(e.target.value.replace(/[^0-9]/g, "")),
           placeholder: "latest",
           className: styles.readBlockInput,
           disabled: disabled,
