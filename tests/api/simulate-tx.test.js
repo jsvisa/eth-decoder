@@ -311,8 +311,8 @@ describe("POST /api/simulate-tx — simulation", () => {
     expect(body.gasUsed).toBe(63086);
   });
 
-  it("includes simulationId and requestBody in the response", async () => {
-    const res = await POST(makeRequest(VALID_BODY));
+  it("includes simulationId and requestBody when save: true", async () => {
+    const res = await POST(makeRequest({ ...VALID_BODY, save: true }));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.simulationId).toBe(FAKE_SIMULATION_ID);
@@ -324,8 +324,21 @@ describe("POST /api/simulate-tx — simulation", () => {
     expect(body.requestBody.to).toBe(VALID_BODY.to);
   });
 
-  it("saves the full result for shared lookup", async () => {
+  it("does not include simulationId when save is not provided", async () => {
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.simulationId).toBeUndefined();
+    expect(body.simulationLink).toBeUndefined();
+  });
+
+  it("does not call saveSimulationResult when save is not provided", async () => {
     await POST(makeRequest(VALID_BODY));
+    expect(saveSimulationResult).not.toHaveBeenCalled();
+  });
+
+  it("saves the full result for shared lookup when save: true", async () => {
+    await POST(makeRequest({ ...VALID_BODY, save: true }));
     expect(saveSimulationResult).toHaveBeenCalledOnce();
     const saved = saveSimulationResult.mock.calls[0][0];
     expect(saved.success).toBe(true);
@@ -346,7 +359,19 @@ describe("POST /api/simulate-tx — simulation", () => {
     expect(body.error).toBe("Transaction reverted");
   });
 
-  it("includes simulationId even when the EVM reverts", async () => {
+  it("includes simulationId even when the EVM reverts if save: true", async () => {
+    simulateWithTevm.mockResolvedValue({
+      ...SIM_RESULT,
+      success: false,
+      error: "Transaction reverted",
+    });
+    const res = await POST(makeRequest({ ...VALID_BODY, save: true }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.simulationId).toBe(FAKE_SIMULATION_ID);
+  });
+
+  it("does not include simulationId on revert when save is not provided", async () => {
     simulateWithTevm.mockResolvedValue({
       ...SIM_RESULT,
       success: false,
@@ -355,7 +380,7 @@ describe("POST /api/simulate-tx — simulation", () => {
     const res = await POST(makeRequest(VALID_BODY));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.simulationId).toBe(FAKE_SIMULATION_ID);
+    expect(body.simulationId).toBeUndefined();
   });
 
   it("returns 500 when simulateWithTevm throws", async () => {
@@ -365,15 +390,25 @@ describe("POST /api/simulate-tx — simulation", () => {
     expect((await res.json()).error).toMatch(/tevm internal error/i);
   });
 
-  it("includes simulationId even when simulateWithTevm throws", async () => {
+  it("includes simulationId on throw if save: true", async () => {
     simulateWithTevm.mockRejectedValue(new Error("tevm internal error"));
-    const res = await POST(makeRequest(VALID_BODY));
+    const res = await POST(makeRequest({ ...VALID_BODY, save: true }));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.simulationId).toBe(FAKE_SIMULATION_ID);
     expect(body.simulationLink).toBe(
       `https://eth-decoder.vercel.app/?simulationId=${FAKE_SIMULATION_ID}`,
     );
+    expect(body.success).toBe(false);
+  });
+
+  it("does not include simulationId on throw when save is not provided", async () => {
+    simulateWithTevm.mockRejectedValue(new Error("tevm internal error"));
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.simulationId).toBeUndefined();
+    expect(body.simulationLink).toBeUndefined();
     expect(body.success).toBe(false);
   });
 

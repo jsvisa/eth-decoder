@@ -52,6 +52,7 @@ export async function POST(request) {
     cheatcodes = {},
     price = true,
     rpcBatchSize = 20,
+    save = false,
   } = body;
 
   if (!chainId) {
@@ -358,27 +359,25 @@ export async function POST(request) {
     }
 
     const resultWithRequest = { ...enrichedResult, requestBody };
-    const simulationId = await saveSimulationResult(resultWithRequest);
-    return NextResponse.json({
-      ...enrichedResult,
-      simulationId,
-      simulationLink: buildSimulationLink(request, simulationId),
-      requestBody,
-    });
+    let responseData = { ...enrichedResult, requestBody };
+    if (save) {
+      const simulationId = await saveSimulationResult(resultWithRequest);
+      responseData.simulationId = simulationId;
+      responseData.simulationLink = buildSimulationLink(request, simulationId);
+    }
+    return NextResponse.json(responseData);
   } catch (error) {
     const errorResult = {
       success: false,
       error: error.message || "Simulation failed",
       requestBody,
     };
-    const simulationId = await saveSimulationResult(errorResult);
-    return NextResponse.json(
-      {
-        ...errorResult,
-        simulationId,
-        simulationLink: buildSimulationLink(request, simulationId),
-      },
-      { status: 500 },
-    );
+    let responseData = { ...errorResult };
+    if (save) {
+      const simulationId = await saveSimulationResult(errorResult);
+      responseData.simulationId = simulationId;
+      responseData.simulationLink = buildSimulationLink(request, simulationId);
+    }
+    return NextResponse.json(responseData, { status: 500 });
   }
 }
