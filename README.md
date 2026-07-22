@@ -189,6 +189,7 @@ Simulate a raw transaction against forked chain state and return decoded results
 | `cheatcodes`       | No       | Object with `deal`, `warp`, or `prank` keys. See cheatcodes details below.                                      |
 | `price`            | No       | `true` (default) to enrich `balanceChanges` with token symbols, decimals, and USD prices. Pass `false` to skip. |
 | `rpcBatchSize`     | No       | JSON-RPC batch size for state-fetch requests during prefetch (default `20`).                                    |
+| `save`             | No       | `false` (default). Set to `true` to persist the result server-side and get back `simulationId` + `simulationLink`. |
 
 **Cheatcodes:**
 
@@ -231,7 +232,7 @@ curl -X POST http://localhost:3000/api/simulate-tx \
 | `accessList`         | `Array`        | Addresses and storage keys accessed                                                                                       |
 | `undecodedAddresses` | `Array`        | Log-emitting addresses whose ABI wasn't available                                                                         |
 | `requestBody`        | `object`       | Input params used (`chainId`, `to`, `from`, `value`, `data`, `gas`, `blockNumber`, `functionName`, `args`)                |
-| `simulationId`       | `string\|null` | UUID for retrieving a saved result via `?simulationId=`                                                                   |
+| `simulationId`       | `string\|null` | UUID for retrieving a saved result via `?simulationId=`. Only present when `save: true` was sent in the request.         |
 
 **Example with cheatcodes:**
 
