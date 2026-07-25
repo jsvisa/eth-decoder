@@ -78,7 +78,7 @@ npm install
 
 2. Configure environment variables:
    - Copy `.env.example` to `.env.local`
-   - Update `BACKEND_URL` with your backend API endpoint
+   - For full functionality, set `BACKEND_URL` to your backend API endpoint (optional — signature lookups work via Sourcify alone)
 
 3. Run the development server:
 
@@ -136,9 +136,36 @@ GET /api/v1/decode?data=0xa9059cbb000000000000000000000000...
 
 Each element of `inner_calls` contains at minimum `index`, `selector`, and `data`. For `tuple_array` variants the target address and extra fields (`value`, `skipRevert`, …) are included. For Universal Router commands, `name` (e.g. `V3_SWAP_EXACT_IN`) and decoded `args` are included instead. When the inner selector is known to OpenChain, a `decoded` object with `func` and `args` is attached.
 
+### `GET /api/v1/query`
+
+Look up a function selector or event topic0 by its hex signature. Queries **Sourcify (4byte.directory) first**, then falls back to `BACKEND_URL` if configured.
+
+| Parameter | Required | Description                                                         |
+| --------- | -------- | ------------------------------------------------------------------- |
+| `sign`    | Yes      | 4-byte function selector (e.g. `0xa9059cbb`) or 32-byte event topic |
+
+```
+GET /api/v1/query?sign=0xa9059cbb
+```
+
+**Response:**
+
+```json
+{
+  "msg": "ok",
+  "data": {
+    "text_sign": "transfer(address,uint256)",
+    "output": null,
+    "abi": null
+  }
+}
+```
+
+Unlike `/api/v1/decode` and `/api/v1/decode-event`, this endpoint does **not** require `BACKEND_URL` — Sourcify alone is sufficient. The backend is only consulted when Sourcify has no match.
+
 ### `GET /api/v1/decode-event`
 
-Decode an EVM event log. Proxies to the configured `BACKEND_URL`.
+Decode an EVM event log. Proxies to the configured `BACKEND_URL`, with a Sourcify fallback for unknown signatures.
 
 | Parameter | Required | Description                                                  |
 | --------- | -------- | ------------------------------------------------------------ |
@@ -165,7 +192,7 @@ Fetch the verified ABI for a contract. Tries Sourcify first, then Etherscan, the
 GET /api/v1/fetch-abi?address=0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48&chain=ethereum&apiKey=YOUR_KEY
 ```
 
-> `/api/v1/decode` and `/api/v1/decode-event` require `BACKEND_URL` to be set. `/api/v1/fetch-abi` is self-contained.
+> `/api/v1/decode` and `/api/v1/decode-event` require `BACKEND_URL` to be set. `/api/v1/query` and `/api/v1/fetch-abi` work without it (Sourcify-only or self-contained).
 
 ### `POST /api/simulate-tx`
 
@@ -285,13 +312,13 @@ npm install -g vercel
 vercel
 ```
 
-3. Set environment variable:
+3. (Optional) Set the backend environment variable:
 
 ```bash
 vercel env add BACKEND_URL
 ```
 
-When prompted, enter your backend API URL
+When prompted, enter your backend API URL. Without this, signature lookups still work via Sourcify (4byte.directory), but transaction decode and event decode will use the fallback path.
 
 4. Redeploy to use the environment variable:
 
@@ -305,7 +332,7 @@ vercel --prod
 
 2. Go to [vercel.com](https://vercel.com) and import your repository
 
-3. In the project settings, add the environment variable:
+3. In the project settings, add optional environment variables:
    - **Name**: `BACKEND_URL`
    - **Value**: Your backend API URL
    - **Environment**: Production (and Preview if needed)
@@ -316,7 +343,9 @@ vercel --prod
 
 | Variable      | Description                                       | Required |
 | ------------- | ------------------------------------------------- | -------- |
-| `BACKEND_URL` | Backend API endpoint URL for transaction decoding | Yes      |
+| `BACKEND_URL` | Backend API endpoint URL for transaction decoding | Yes¹     |
+
+> ¹ Required by `/api/v1/decode` and `/api/v1/decode-event`. The `/api/v1/query` endpoint (signature lookup) works without it — Sourcify is tried first, with the backend as an optional fallback.
 
 ## How It Works
 
@@ -325,8 +354,8 @@ vercel --prod
 1. User pastes calldata into the input field
 2. The 4-byte selector is checked against known multicall signatures — if matched, inner-call decoding is enabled automatically
 3. Frontend sends a request to `/api/decode`
-4. The route queries the backend; if the backend has the contract in its DB it returns the decoded outer call, otherwise OpenChain is used as a fallback
-5. For recognised multicall selectors the route decodes inner calls client-side (no extra round-trip): Universal Router commands use hardcoded command ABIs; `bytes_array` / `tuple_array` variants look up each inner selector via OpenChain
+4. The route queries the backend; if the backend has the contract in its DB it returns the decoded outer call, otherwise the route decodes client-side using Sourcify (4byte.directory) signature lookup as a fallback
+5. For recognised multicall selectors the route decodes inner calls client-side (no extra round-trip): Universal Router commands use hardcoded command ABIs; `bytes_array` / `tuple_array` variants look up each inner selector via Sourcify first, then the configured backend
 6. The fully decoded response — outer `func`/`args` plus `inner_calls` — is returned to the browser
 
 ### Contract Caller
@@ -340,9 +369,16 @@ vercel --prod
 
 This architecture keeps the backend endpoints secure and hidden from the client-side code.
 
-### ABI Resolution Order
+### Resolution Order
 
-#### Main contract ABI (`/api/fetch-abi`)
+#### Signature lookup (`/api/v1/query`)
+
+Used by the transaction decoder to resolve function selectors and event topics. Order:
+
+1. **Sourcify (4byte.directory)** — tried first, no API key required
+2. **Backend** (`BACKEND_URL`) — fallback only when Sourcify returns no match
+
+#### Main contract ABI (`/api/v1/fetch-abi`)
 
 Used when loading a contract in the Contract Caller. Tries each source in order and stops at the first hit:
 
