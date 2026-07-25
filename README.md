@@ -138,18 +138,17 @@ Each element of `inner_calls` contains at minimum `index`, `selector`, and `data
 
 ### `GET /api/v1/query`
 
-Look up a function selector or event topic0 by its hex signature. Queries **Sourcify (4byte.directory) first**, then falls back to `BACKEND_URL` if configured. Returns up to `count` matching signatures.
+Look up a function selector or event topic0 by its hex signature. Queries **Sourcify (4byte.directory) first**, then falls back to `BACKEND_URL` if configured.
 
 | Parameter | Required | Description                                                         |
 | --------- | -------- | ------------------------------------------------------------------- |
 | `sign`    | Yes      | 4-byte function selector (e.g. `0xa9059cbb`) or 32-byte event topic |
-| `count`   | No       | Max results to return (default `1`)                                 |
 
 ```
-GET /api/v1/query?sign=0xa9059cbb&count=5
+GET /api/v1/query?sign=0xa9059cbb
 ```
 
-**Response** (function — single result):
+**Response:**
 
 ```json
 {
@@ -159,18 +158,6 @@ GET /api/v1/query?sign=0xa9059cbb&count=5
     "output": null,
     "abi": null
   }
-}
-```
-
-**Response** (function — multiple with `count=2`):
-
-```json
-{
-  "msg": "ok",
-  "data": [
-    { "text_sign": "...", "output": null, "abi": null },
-    { "text_sign": "...", "output": null, "abi": null }
-  ]
 }
 ```
 

@@ -57,36 +57,6 @@ describe("GET /api/query", () => {
       expect(body.data.text_sign).toBe("transfer(address,uint256)");
     });
 
-    it("honors count param for Sourcify results", async () => {
-      global.fetch.mockResolvedValueOnce(
-        sourcifyResponse([
-          "transfer(address,uint256)",
-          "transfer(address,uint256,bytes)",
-        ]),
-      );
-
-      const res = await GET(makeRequest({ sign: "0xa9059cbb", count: "2" }));
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.data).toHaveLength(2);
-    });
-
-    it("defaults count to 1 for Sourcify results", async () => {
-      global.fetch.mockResolvedValueOnce(
-        sourcifyResponse([
-          "transfer(address,uint256)",
-          "transfer(address,uint256,bytes)",
-        ]),
-      );
-
-      const res = await GET(makeRequest({ sign: "0xa9059cbb" }));
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.data).not.toBeNull();
-      // Returned as single object (not array) because count defaults to 1
-      expect(body.data.text_sign).toBe("transfer(address,uint256)");
-    });
-
     it("does not require BACKEND_URL when Sourcify has results", async () => {
       global.fetch.mockResolvedValueOnce(
         sourcifyResponse(["transfer(address,uint256)"]),
@@ -96,7 +66,6 @@ describe("GET /api/query", () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.msg).toBe("ok");
-      // Only one fetch call (Sourcify) — no backend call
       expect(global.fetch.mock.calls).toHaveLength(1);
     });
 
@@ -162,7 +131,7 @@ describe("GET /api/query", () => {
       expect(global.fetch.mock.calls[1][0]).toContain("backend.test");
     });
 
-    it("forwards sign and count to backend in fallback", async () => {
+    it("forwards sign to backend in fallback", async () => {
       process.env.BACKEND_URL = "https://backend.test";
       global.fetch
         .mockResolvedValueOnce({
@@ -184,72 +153,13 @@ describe("GET /api/query", () => {
           }),
         });
 
-      const res = await GET(makeRequest({ sign: "0xa9059cbb", count: "1" }));
+      const res = await GET(makeRequest({ sign: "0xa9059cbb" }));
       expect(res.status).toBe(200);
 
       const calledUrl = global.fetch.mock.calls[1][0];
       expect(calledUrl).toContain("sign=0xa9059cbb");
-      expect(calledUrl).toContain("count=1");
       expect(calledUrl).not.toContain("apikey");
-    });
-
-    it("defaults count to 1 for backend fallback", async () => {
-      process.env.BACKEND_URL = "https://backend.test";
-      global.fetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            ok: true,
-            result: { function: { "0xa9059cbb": [] } },
-          }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ msg: "not found", data: null }),
-        });
-
-      await GET(makeRequest({ sign: "0xa9059cbb" }));
-
-      const backendUrl = global.fetch.mock.calls[1][0];
-      expect(backendUrl).toContain("count=1");
-    });
-
-    it("forwards count > 1 for backend fallback", async () => {
-      process.env.BACKEND_URL = "https://backend.test";
-      global.fetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            ok: true,
-            result: { function: { "0xa9059cbb": [] } },
-          }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            msg: "ok",
-            data: [
-              {
-                text_sign: "transfer(address,uint256)",
-                output: "()",
-                abi: null,
-              },
-              {
-                text_sign: "transfer(address,uint256,bytes)",
-                output: "()",
-                abi: null,
-              },
-            ],
-          }),
-        });
-
-      const res = await GET(makeRequest({ sign: "0xa9059cbb", count: "2" }));
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.data).toHaveLength(2);
-
-      const calledUrl = global.fetch.mock.calls[1][0];
-      expect(calledUrl).toContain("count=2");
+      expect(calledUrl).not.toContain("count");
     });
   });
 
