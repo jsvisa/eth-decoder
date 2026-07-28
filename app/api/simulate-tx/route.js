@@ -19,6 +19,7 @@ import {
 } from "../../utils/simulationCache";
 import { buildSimulationLink } from "../../utils/simulationLinks";
 import { enrichBalanceChanges } from "../../utils/balanceChanges";
+import { serializeBigInts } from "../../contract-caller/utils/functionArgs";
 import { autoFillWarpTimestamp } from "../../utils/cheatcodes";
 import { fetchCoinGeckoPrice } from "../../utils/coingecko";
 import {
@@ -135,6 +136,7 @@ export async function POST(request) {
 
   let abiEntry = await getAbiFromCache(numericChainId, to);
   let functionName = null;
+  let decodedArgs = null;
   if (!abiEntry) {
     const fetched = await fetchAbi(to, numericChainId, {
       etherscanKey,
@@ -153,7 +155,7 @@ export async function POST(request) {
 
   if (abiEntry?.abi) {
     try {
-      ({ functionName } = decodeFunctionData({
+      ({ functionName, args: decodedArgs } = decodeFunctionData({
         abi: abiEntry.abi,
         data,
       }));
@@ -192,6 +194,7 @@ export async function POST(request) {
     blockNumber,
     rpcUrl,
     functionName,
+    args: serializeBigInts(decodedArgs),
   };
 
   try {
@@ -201,6 +204,7 @@ export async function POST(request) {
       ...(rpcUrl ? { customChainId: numericChainId } : {}),
       address: to,
       functionName,
+      args: decodedArgs,
       callData: data,
       abi: abiEntry?.abi || null,
       fromAddress: from,
@@ -275,10 +279,11 @@ export async function POST(request) {
     let enrichedResult = result;
     if (price && price !== "false" && result.balanceChanges?.length) {
       try {
-        const client = chain.rpcUrl
+        const metadataRpcUrl = chain.forkRpcUrl || chain.rpcUrl;
+        const client = metadataRpcUrl
           ? createPublicClient({
               chain: chain.viemChain,
-              transport: http(chain.rpcUrl),
+              transport: http(metadataRpcUrl),
             })
           : null;
 
