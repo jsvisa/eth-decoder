@@ -572,6 +572,27 @@ export default function ResultPanel({
                           return null;
                         }
                       })()}
+                    {result.callTrace?.functionName && (
+                      <div className={styles.txInfoRow}>
+                        <span className={styles.txInfoLabel}>Function:</span>
+                        <span className={styles.txInfoValue}>
+                          {result.callTrace.functionName}(
+                          {(result.callTrace.decodedInputs || [])
+                            .map(
+                              (p) =>
+                                `${p.name}=${
+                                  p.value === null || p.value === undefined
+                                    ? "null"
+                                    : typeof p.value === "object"
+                                      ? JSON.stringify(p.value)
+                                      : String(p.value)
+                                }`,
+                            )
+                            .join(", ")}
+                          )
+                        </span>
+                      </div>
+                    )}
                     {result.callTrace?.input && (
                       <div className={styles.txInfoRow}>
                         <span className={styles.txInfoLabel}>Input:</span>

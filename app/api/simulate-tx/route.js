@@ -19,6 +19,7 @@ import {
 } from "../../utils/simulationCache";
 import { buildSimulationLink } from "../../utils/simulationLinks";
 import { enrichBalanceChanges } from "../../utils/balanceChanges";
+import { serializeBigInts } from "../../contract-caller/utils/functionArgs";
 import { autoFillWarpTimestamp } from "../../utils/cheatcodes";
 import { fetchCoinGeckoPrice } from "../../utils/coingecko";
 import {
@@ -134,7 +135,8 @@ export async function POST(request) {
   const routescanKey = apiKeys.routescan || process.env.ROUTESCAN_API_KEY || "";
 
   let abiEntry = await getAbiFromCache(numericChainId, to);
-  let functionName = null;
+  let functionName = null,
+    args = null;
   if (!abiEntry) {
     const fetched = await fetchAbi(to, numericChainId, {
       etherscanKey,
@@ -153,7 +155,7 @@ export async function POST(request) {
 
   if (abiEntry?.abi) {
     try {
-      ({ functionName } = decodeFunctionData({
+      ({ functionName, args } = decodeFunctionData({
         abi: abiEntry.abi,
         data,
       }));
@@ -192,6 +194,7 @@ export async function POST(request) {
     blockNumber,
     rpcUrl,
     functionName,
+    args: serializeBigInts(args),
   };
 
   try {

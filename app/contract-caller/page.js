@@ -237,6 +237,10 @@ export default function ContractCallerPage() {
     setError: (...args) => setErrorRef.current?.(...args),
   });
 
+  // Keep a ref to the latest fetchAbi so we can call it after async state updates settle
+  const fetchAbiRef = useRef(null);
+  fetchAbiRef.current = abi.fetchAbi;
+
   const exec = useCallExecution({
     chain,
     address,
@@ -442,7 +446,11 @@ export default function ContractCallerPage() {
               }
             }
           }
-          if (to) setAddress(to);
+          if (to) {
+            setAddress(to);
+            // Fetch ABI after state settles so the form can populate function args
+            setTimeout(() => fetchAbiRef.current?.(), 100);
+          }
           if (from) simOpts.setFromAddress(from);
           if (value) fn.setEthValue(value);
           if (functionName && (args || calldata)) {
