@@ -279,10 +279,11 @@ export async function POST(request) {
     let enrichedResult = result;
     if (price && price !== "false" && result.balanceChanges?.length) {
       try {
-        const client = chain.rpcUrl
+        const metadataRpcUrl = chain.forkRpcUrl || chain.rpcUrl;
+        const client = metadataRpcUrl
           ? createPublicClient({
               chain: chain.viemChain,
-              transport: http(chain.rpcUrl),
+              transport: http(metadataRpcUrl),
             })
           : null;
 

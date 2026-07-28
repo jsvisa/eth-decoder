@@ -1,5 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { POST } from "../../app/api/simulate-tx/route.js";
+
+const VIEM_MOCKS = vi.hoisted(() => {
+  const readContract = vi.fn();
+  return {
+    readContract,
+    createPublicClient: vi.fn(() => ({ readContract })),
+    http: vi.fn((url) => ({ url })),
+  };
+});
+
+vi.mock("viem", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    createPublicClient: VIEM_MOCKS.createPublicClient,
+    http: VIEM_MOCKS.http,
+  };
+});
 
 // Minimal ABI matching selector 0x5e7db13d = unlockAsset(address,uint256)
 const UNLOCK_ABI = [
@@ -51,6 +68,9 @@ const SIM_RESULT = {
 };
 
 const FAKE_SIMULATION_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+const TRANSFER_TOPIC =
+  "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
 
 vi.mock("../../app/api/fetch-abi/route.js", () => ({
   fetchAbi: vi.fn(),
@@ -64,6 +84,11 @@ vi.mock("../../app/utils/tevmSimulator.js", () => ({
   collectAllCallAddresses: vi.fn(() => []),
 }));
 vi.mock("../../app/utils/simulationCache.js");
+vi.mock("../../app/utils/coingecko.js", () => ({
+  fetchCoinGeckoPrice: vi.fn().mockResolvedValue(null),
+}));
+
+import { POST } from "../../app/api/simulate-tx/route.js";
 
 import { fetchAbi } from "../../app/api/fetch-abi/route.js";
 import {
@@ -75,6 +100,7 @@ import {
   saveSimulationResult,
   pruneExpiredResults,
 } from "../../app/utils/simulationCache.js";
+import { fetchCoinGeckoPrice } from "../../app/utils/coingecko.js";
 
 function makeRequest(body) {
   return {
@@ -90,6 +116,16 @@ beforeEach(() => {
   simulateWithTevm.mockResolvedValue(SIM_RESULT);
   saveSimulationResult.mockResolvedValue(FAKE_SIMULATION_ID);
   pruneExpiredResults.mockResolvedValue(0);
+  VIEM_MOCKS.createPublicClient.mockReturnValue({
+    readContract: VIEM_MOCKS.readContract,
+  });
+  VIEM_MOCKS.http.mockImplementation((url) => ({ url }));
+  VIEM_MOCKS.readContract.mockImplementation(async ({ functionName }) => {
+    if (functionName === "symbol") return "USDT";
+    if (functionName === "decimals") return 6;
+    return null;
+  });
+  fetchCoinGeckoPrice.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -543,6 +579,54 @@ describe("POST /api/simulate-tx — simulation", () => {
     const mixedCase = "0x99161ba892ECae335616624c84FAA418F64FF9A6";
     await POST(makeRequest({ ...VALID_BODY, to: mixedCase }));
     expect(getAbiFromCache).toHaveBeenCalledWith(1, mixedCase);
+  });
+
+  it("uses the default fork RPC for token metadata when rpcUrl is omitted", async () => {
+    const recipient = "0x1111111111111111111111111111111111111111";
+    simulateWithTevm.mockResolvedValue({
+      ...SIM_RESULT,
+      logs: [
+        {
+          address: USDT_ADDRESS,
+          topics: [
+            TRANSFER_TOPIC,
+            `0x${"0".repeat(24)}${VALID_BODY.from.slice(2).toLowerCase()}`,
+            `0x${"0".repeat(24)}${recipient.slice(2)}`,
+          ],
+          data: "0x00000000000000000000000000000000000000000000000000000000000f4240",
+        },
+      ],
+      balanceChanges: [
+        {
+          address: recipient,
+          tokenAddress: USDT_ADDRESS,
+          value: "1000000",
+        },
+      ],
+    });
+
+    const res = await POST(makeRequest(VALID_BODY));
+    const body = await res.json();
+    const tokenAddress = USDT_ADDRESS.toLowerCase();
+
+    expect(res.status).toBe(200);
+    expect(VIEM_MOCKS.http).toHaveBeenCalledWith(
+      "https://ethereum-rpc.publicnode.com",
+    );
+    expect(body._tokenMeta.tokenSymbols[tokenAddress]).toBe("USDT");
+    expect(body._tokenMeta.tokenDecimals[tokenAddress]).toBe(6);
+    expect(body.balanceChanges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          address: recipient.toLowerCase(),
+          tokenAddress,
+          symbol: "USDT",
+          name: "USDT",
+          decimals: 6,
+          amount: "1",
+        }),
+      ]),
+    );
   });
 });
 
