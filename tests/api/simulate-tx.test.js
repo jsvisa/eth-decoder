@@ -61,6 +61,7 @@ vi.mock("../../app/utils/serverAbiBlobCache.js", () => ({
 }));
 vi.mock("../../app/utils/tevmSimulator.js", () => ({
   simulateWithTevm: vi.fn(),
+  collectAllCallAddresses: vi.fn(() => []),
 }));
 vi.mock("../../app/utils/simulationCache.js");
 
@@ -344,6 +345,38 @@ describe("POST /api/simulate-tx — simulation", () => {
     expect(saved.success).toBe(true);
     expect(saved.requestBody).toBeDefined();
     expect(saved.requestBody.chainId).toBe(1);
+  });
+
+  it("preserves decoded call arguments in the response and saved result", async () => {
+    simulateWithTevm.mockImplementation(async ({ args }) => ({
+      ...SIM_RESULT,
+      callTrace: {
+        functionName: "unlockAsset",
+        decodedInputs: UNLOCK_ABI[0].inputs.map((input, index) => ({
+          name: input.name,
+          type: input.type,
+          value: args?.[index] == null ? null : String(args[index]),
+        })),
+      },
+    }));
+
+    const res = await POST(makeRequest({ ...VALID_BODY, save: true }));
+    const body = await res.json();
+    const traceArgs = body.callTrace.decodedInputs.map(({ value }) => value);
+    const savedArgs = saveSimulationResult.mock.calls[0][0].requestBody.args;
+
+    expect(traceArgs[0].toLowerCase()).toBe(
+      "0xe556aba6fe6036275ec1f87eda296be72c811bce",
+    );
+    expect(traceArgs[1]).toBe("1");
+    expect(body.requestBody.args[0].toLowerCase()).toBe(
+      "0xe556aba6fe6036275ec1f87eda296be72c811bce",
+    );
+    expect(body.requestBody.args[1]).toBe("1");
+    expect(savedArgs[0].toLowerCase()).toBe(
+      "0xe556aba6fe6036275ec1f87eda296be72c811bce",
+    );
+    expect(savedArgs[1]).toBe("1");
   });
 
   it("returns 200 with success:false when the EVM reverts", async () => {
