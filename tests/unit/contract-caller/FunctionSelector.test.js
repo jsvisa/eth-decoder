@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import FunctionSelector from "../../../app/contract-caller/components/FunctionSelector.js";
@@ -42,6 +42,10 @@ const mockFunctions = [
 ];
 
 describe("FunctionSelector", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("renders a search input when no function is selected", () => {
     const { container, cleanup } = renderComponent({
       functions: mockFunctions,
@@ -213,6 +217,54 @@ describe("FunctionSelector", () => {
     expect(input).not.toBeNull();
     expect(input.placeholder).toBe("Search or select a function...");
 
+    cleanup();
+  });
+
+  it("copies canonical tuple component types when the selected signature is clicked", async () => {
+    // Given
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      clipboard: { writeText },
+    });
+    const tupleFunction = {
+      name: "transferBridgedTokensWithSignatures",
+      type: "function",
+      stateMutability: "nonpayable",
+      inputs: [
+        { name: "signatures", type: "bytes[]" },
+        {
+          name: "message",
+          type: "tuple",
+          components: [
+            { name: "version", type: "uint8" },
+            { name: "messageType", type: "uint8" },
+            { name: "nonce", type: "uint64" },
+            { name: "chainId", type: "uint8" },
+            { name: "payload", type: "bytes" },
+          ],
+        },
+      ],
+      outputs: [],
+    };
+    const { container, cleanup } = renderComponent({
+      functions: [tupleFunction],
+      selectedFunction: "transferBridgedTokensWithSignatures(bytes[],tuple)",
+      onSelectFunction: () => {},
+      disabled: false,
+    });
+
+    // When
+    await act(async () => {
+      container
+        .querySelector('[title="Click to copy function signature"]')
+        .click();
+    });
+
+    // Then
+    expect(writeText).toHaveBeenCalledWith(
+      "transferBridgedTokensWithSignatures(bytes[],(uint8,uint8,uint64,uint8,bytes))",
+    );
     cleanup();
   });
 });
