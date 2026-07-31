@@ -1,3 +1,4 @@
+// tests/api/decode.test.js
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GET } from "../../app/api/decode/route.js";
 
@@ -7,22 +8,34 @@ const TRANSFER_CALLDATA =
   "000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" +
   "00000000000000000000000000000000000000000000000000000000000f4240";
 
-const SOURCIFY_TRANSFER_RESPONSE = {
-  ok: true,
-  result: {
-    function: {
-      "0xa9059cbb": [{ name: "transfer(address,uint256)", filtered: false }],
-    },
-    event: {},
-  },
-};
-
 function makeRequest(params) {
   const url = new URL("http://localhost/api/decode");
   for (const [k, v] of Object.entries(params)) {
     url.searchParams.set(k, String(v));
   }
   return { url: url.toString() };
+}
+
+function backendResponse(rows) {
+  return { ok: true, json: async () => ({ msg: "ok", data: rows }) };
+}
+
+function backendNotFound() {
+  return { ok: true, json: async () => ({ msg: "not found", data: null }) };
+}
+
+function sourcifyResponse(selector, names) {
+  return {
+    ok: true,
+    json: async () => ({
+      ok: true,
+      result: {
+        function: {
+          [selector]: names.map((n) => ({ name: n, filtered: false })),
+        },
+      },
+    }),
+  };
 }
 
 beforeEach(() => {
@@ -42,140 +55,121 @@ describe("GET /api/decode", () => {
     expect(body.error).toMatch(/missing data/i);
   });
 
-  it("returns 500 when BACKEND_URL env var is not set", async () => {
-    const res = await GET(makeRequest({ data: "0x12345678" }));
-    expect(res.status).toBe(500);
+  it("decodes via Sourcify when BACKEND_URL is not set", async () => {
+    global.fetch.mockResolvedValueOnce(
+      sourcifyResponse("0xa9059cbb", ["transfer(address,uint256)"]),
+    );
+
+    const res = await GET(makeRequest({ data: TRANSFER_CALLDATA }));
+    expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.error).toMatch(/backend url/i);
+    expect(body.msg).toBe("ok");
+    expect(body.data[0].func).toBe("transfer(address,uint256)");
+    expect(body.data[0].source).toBe("sourcify");
+    expect(global.fetch.mock.calls).toHaveLength(1);
   });
 
-  it("forwards data, with_abi, with_sign params to the backend (multicall not forwarded)", async () => {
+  it("prefers a DB candidate over Sourcify when both match", async () => {
     process.env.BACKEND_URL = "https://backend.test";
-    const mockResult = { function: "transfer", params: [] };
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockResult,
-    });
+    global.fetch
+      .mockResolvedValueOnce(
+        backendResponse([
+          {
+            text_sign: "transfer(address,uint256)",
+            abi: JSON.stringify({
+              type: "function",
+              name: "transfer",
+              inputs: [
+                { name: "to", type: "address" },
+                { name: "amount", type: "uint256" },
+              ],
+            }),
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        sourcifyResponse("0xa9059cbb", ["transfer(address,uint256)"]),
+      );
+
+    const res = await GET(makeRequest({ data: TRANSFER_CALLDATA }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data[0].func).toBe("transfer(address,uint256)");
+    expect(body.data[0].source).toBe("db");
+    expect(body.data[0].args.to.toLowerCase()).toBe(
+      "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    );
+  });
+
+  it("falls back to Sourcify when the DB has no candidates", async () => {
+    process.env.BACKEND_URL = "https://backend.test";
+    global.fetch
+      .mockResolvedValueOnce(backendNotFound())
+      .mockResolvedValueOnce(
+        sourcifyResponse("0xa9059cbb", ["transfer(address,uint256)"]),
+      );
+
+    const res = await GET(makeRequest({ data: TRANSFER_CALLDATA }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data[0].func).toBe("transfer(address,uint256)");
+    expect(body.data[0].source).toBe("sourcify");
+  });
+
+  it("returns not found when nothing decodes", async () => {
+    process.env.BACKEND_URL = "https://backend.test";
+    global.fetch
+      .mockResolvedValueOnce(backendNotFound())
+      .mockResolvedValueOnce(sourcifyResponse("0xa9059cbb", []));
+
+    const res = await GET(makeRequest({ data: TRANSFER_CALLDATA }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.msg).toBe("not found");
+    expect(body.data).toBeNull();
+  });
+
+  it("attaches sign and abi fields when with_sign and with_abi are true", async () => {
+    process.env.BACKEND_URL = "https://backend.test";
+    const abi = {
+      type: "function",
+      name: "transfer",
+      inputs: [
+        { name: "to", type: "address" },
+        { name: "amount", type: "uint256" },
+      ],
+    };
+    global.fetch
+      .mockResolvedValueOnce(
+        backendResponse([
+          { text_sign: "transfer(address,uint256)", abi: JSON.stringify(abi) },
+        ]),
+      )
+      .mockResolvedValueOnce(sourcifyResponse("0xa9059cbb", []));
 
     const res = await GET(
       makeRequest({
-        data: "0x12345678",
+        data: TRANSFER_CALLDATA,
+        with_sign: "true",
         with_abi: "true",
-        with_sign: "false",
       }),
     );
-
-    expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual(mockResult);
-
-    const calledUrl = global.fetch.mock.calls[0][0];
-    expect(calledUrl).toContain("data=0x12345678");
-    expect(calledUrl).not.toContain("multicall");
-    expect(calledUrl).toContain("with_abi=true");
-    expect(calledUrl).toContain("with_sign=false");
+    expect(body.data[0].sign).toBe("0xa9059cbb");
+    expect(body.data[0].abi).toEqual(abi);
   });
 
-  it("returns 500 with an error message when the backend returns a non-OK status and Sourcify has no match", async () => {
+  it("omits sign and abi fields when with_sign and with_abi are not set", async () => {
     process.env.BACKEND_URL = "https://backend.test";
-    global.fetch.mockResolvedValueOnce({
-      ok: false,
-      status: 503,
-      statusText: "Service Unavailable",
-    });
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        ok: true,
-        result: { function: { "0x12345678": [] }, event: {} },
-      }),
-    });
-
-    const res = await GET(makeRequest({ data: "0x12345678" }));
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(typeof body.error).toBe("string");
-    expect(body.error.length).toBeGreaterThan(0);
-  });
-});
-
-describe("GET /api/decode — Sourcify fallback", () => {
-  it("returns decoded result from Sourcify when backend returns non-OK", async () => {
-    process.env.BACKEND_URL = "https://backend.test";
-    global.fetch.mockResolvedValueOnce({
-      ok: false,
-      status: 503,
-      statusText: "Service Unavailable",
-    });
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => SOURCIFY_TRANSFER_RESPONSE,
-    });
+    global.fetch
+      .mockResolvedValueOnce(backendNotFound())
+      .mockResolvedValueOnce(
+        sourcifyResponse("0xa9059cbb", ["transfer(address,uint256)"]),
+      );
 
     const res = await GET(makeRequest({ data: TRANSFER_CALLDATA }));
-    expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.msg).toBe("ok");
-    expect(body.data[0].func).toBe("transfer(address,uint256)");
-    expect(body.data[0].source).toBe("sourcify");
-  });
-
-  it("returns decoded result from Sourcify when backend returns empty data array (real behavior)", async () => {
-    process.env.BACKEND_URL = "https://backend.test";
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ msg: "ok", data: [] }),
-    });
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => SOURCIFY_TRANSFER_RESPONSE,
-    });
-
-    const res = await GET(makeRequest({ data: TRANSFER_CALLDATA }));
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.msg).toBe("ok");
-    expect(body.data[0].func).toBe("transfer(address,uint256)");
-    expect(body.data[0].source).toBe("sourcify");
-  });
-
-  it("returns decoded result from Sourcify when backend returns msg !== ok", async () => {
-    process.env.BACKEND_URL = "https://backend.test";
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ msg: "not found" }),
-    });
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => SOURCIFY_TRANSFER_RESPONSE,
-    });
-
-    const res = await GET(makeRequest({ data: TRANSFER_CALLDATA }));
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.msg).toBe("ok");
-    expect(body.data[0].func).toBe("transfer(address,uint256)");
-    expect(body.data[0].source).toBe("sourcify");
-  });
-
-  it("returns the original backend response when Sourcify also has no match", async () => {
-    process.env.BACKEND_URL = "https://backend.test";
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ msg: "ok", data: [] }),
-    });
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        ok: true,
-        result: { function: { "0xa9059cbb": [] }, event: {} },
-      }),
-    });
-
-    const res = await GET(makeRequest({ data: TRANSFER_CALLDATA }));
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.msg).toBe("ok");
-    expect(body.data).toEqual([]);
+    expect(body.data[0].sign).toBeUndefined();
+    expect(body.data[0].abi).toBeUndefined();
   });
 });
