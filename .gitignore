@@ -46,4 +46,3 @@ docs/superpowers/
 .agents/*
 skills-lock.json
 playwright-report/
-abi_server/abi_server.egg-info/

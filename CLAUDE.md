@@ -14,7 +14,7 @@ npm run format        # Prettier format — run after any code changes
 npm test              # Vitest unit + API tests (vitest run)
 npm run test:watch    # Vitest in watch mode
 npm run test:coverage # Vitest with v8 coverage
-./scripts/run-e2e.sh  # Full E2E: sets up abi_server, builds, runs Playwright
+./scripts/run-e2e.sh  # Full E2E: builds and starts Next.js, runs Playwright
 ```
 
 **After any code change, always run:**
