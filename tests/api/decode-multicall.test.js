@@ -1,6 +1,13 @@
 // tests/api/decode-multicall.test.js
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GET } from "../../app/api/decode/route.js";
+import {
+  serverCacheTestDir,
+  resetServerCacheTestDir,
+  removeServerCacheTestDir,
+} from "../utils/serverCacheTestEnv.js";
+
+const CACHE_DIR = serverCacheTestDir("decode-multicall");
 
 // ---------------------------------------------------------------------------
 // Integration tests for GET /api/decode — multicall and Universal Router
@@ -70,14 +77,18 @@ function mockSourcify(signatures) {
   };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  process.env.CACHE_DIR = CACHE_DIR;
+  await resetServerCacheTestDir(CACHE_DIR);
   vi.stubGlobal("fetch", vi.fn());
   process.env.BACKEND_URL = "https://backend.test";
 });
 
-afterEach(() => {
+afterEach(async () => {
   vi.unstubAllGlobals();
   delete process.env.BACKEND_URL;
+  delete process.env.CACHE_DIR;
+  await removeServerCacheTestDir(CACHE_DIR);
 });
 
 describe("GET /api/decode — multicall augmentation", () => {

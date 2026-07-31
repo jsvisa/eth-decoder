@@ -10,10 +10,6 @@ function abiBlobPath(chainId, address) {
   return `abis/${chainId}/${address.toLowerCase()}.json`;
 }
 
-function sigBlobPath(selector) {
-  return `signatures/${selector.toLowerCase()}.json`;
-}
-
 function getTTL() {
   const ttl = process.env.ABI_CACHE_TTL || process.env.CACHE_TTL;
   if (ttl) {
@@ -67,27 +63,4 @@ export async function setAbiInCache(chainId, address, entry) {
     setAbiInBlobCache(chainId, address, entry),
     setLocalAbi(chainId, address, entry).catch(() => {}),
   ]);
-}
-
-export async function getSignaturesFromBlobCache(selector) {
-  if (!shouldUseVercelBlob()) return null;
-  try {
-    const entry = await blobGet(sigBlobPath(selector));
-    return getDataFromEntry(entry);
-  } catch {
-    return null;
-  }
-}
-
-export async function setSignaturesInBlobCache(selector, signatures) {
-  if (!shouldUseVercelBlob()) return;
-  try {
-    const entry = buildEntry(signatures, getTTL());
-    await blobPut(sigBlobPath(selector), entry);
-  } catch (e) {
-    console.warn(
-      `Failed to write signature blob for selector ${selector}:`,
-      e.message,
-    );
-  }
 }

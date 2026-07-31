@@ -4,6 +4,13 @@ import {
   decodeFunctionWithCandidates,
   decodeEventWithCandidates,
 } from "../../app/utils/decodeWithCandidates.js";
+import {
+  serverCacheTestDir,
+  resetServerCacheTestDir,
+  removeServerCacheTestDir,
+} from "../utils/serverCacheTestEnv.js";
+
+const CACHE_DIR = serverCacheTestDir("decode-with-candidates");
 
 // transfer(address,uint256) — selector 0xa9059cbb
 const TRANSFER_CALLDATA =
@@ -41,12 +48,18 @@ function sourcifyEventResponse(topic0, names) {
   };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  process.env.CACHE_DIR = CACHE_DIR;
+  await resetServerCacheTestDir(CACHE_DIR);
   vi.stubGlobal("fetch", vi.fn());
   delete process.env.BACKEND_URL;
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(async () => {
+  vi.unstubAllGlobals();
+  delete process.env.CACHE_DIR;
+  await removeServerCacheTestDir(CACHE_DIR);
+});
 
 describe("decodeFunctionWithCandidates", () => {
   it("returns null when no candidate decodes", async () => {
