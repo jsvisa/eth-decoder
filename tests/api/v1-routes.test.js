@@ -31,76 +31,70 @@ describe("GET /api/v1/decode", () => {
     expect(body.error).toMatch(/missing data/i);
   });
 
-  it("returns 500 when BACKEND_URL is not set", async () => {
-    const res = await decodeGET(
-      makeRequest("/api/v1/decode", { data: "0x12345678" }),
-    );
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body.error).toMatch(/backend url/i);
-  });
-
-  it("proxies to BACKEND_URL and returns the decoded result", async () => {
-    process.env.BACKEND_URL = "https://backend.test";
-    const mockResult = { msg: "ok", data: [{ func: "transfer", args: {} }] };
+  it("decodes via Sourcify when BACKEND_URL is not set", async () => {
     global.fetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => mockResult,
+      json: async () => ({
+        ok: true,
+        result: {
+          function: {
+            "0xa9059cbb": [
+              { name: "transfer(address,uint256)", filtered: false },
+            ],
+          },
+        },
+      }),
     });
 
     const res = await decodeGET(
-      makeRequest("/api/v1/decode", { data: "0xa9059cbb" }),
+      makeRequest("/api/v1/decode", {
+        data:
+          "0xa9059cbb000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4800000000000000000000000000000000000000000000000000000000000f4240",
+      }),
     );
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual(mockResult);
-
-    const calledUrl = global.fetch.mock.calls[0][0];
-    expect(calledUrl).toContain("data=0xa9059cbb");
+    const body = await res.json();
+    expect(body.msg).toBe("ok");
+    expect(body.data[0].func).toBe("transfer(address,uint256)");
   });
 });
 
 describe("GET /api/v1/decode-event", () => {
   it("returns 400 when sign param is missing", async () => {
-    process.env.BACKEND_URL = "https://backend.test";
     const res = await decodeEventGET(makeRequest("/api/v1/decode-event", {}));
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toMatch(/missing sign/i);
   });
 
-  it("returns 500 when BACKEND_URL is not set", async () => {
+  it("decodes via Sourcify when BACKEND_URL is not set", async () => {
     const TOPIC0 =
       "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
-    const res = await decodeEventGET(
-      makeRequest("/api/v1/decode-event", { sign: TOPIC0 }),
-    );
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body.error).toMatch(/backend/i);
-  });
-
-  it("proxies to BACKEND_URL and returns the decoded event", async () => {
-    process.env.BACKEND_URL = "https://backend.test";
-    const TOPIC0 =
-      "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
-    const mockResult = { msg: "ok", data: { event: "Transfer", args: {} } };
     global.fetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => mockResult,
+      json: async () => ({
+        ok: true,
+        result: {
+          event: {
+            [TOPIC0]: [
+              { name: "Transfer(address,address,uint256)", filtered: false },
+            ],
+          },
+        },
+      }),
     });
 
     const res = await decodeEventGET(
       makeRequest("/api/v1/decode-event", {
         sign: TOPIC0,
-        topics: `${TOPIC0},0x000...`,
-        data: "0x",
+        topics: `${TOPIC0},0x000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48,0x000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2`,
+        data: "0x00000000000000000000000000000000000000000000000000000000000f4240",
       }),
     );
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual(mockResult);
-
-    const calledUrl = global.fetch.mock.calls[0][0];
-    expect(calledUrl).toContain("sign=");
+    const body = await res.json();
+    expect(body.msg).toBe("ok");
+    expect(body.data.event).toBe("Transfer");
   });
 });
 
