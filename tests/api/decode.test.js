@@ -95,7 +95,7 @@ describe("GET /api/decode", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data[0].func).toBe("transfer(address,uint256)");
-    expect(body.data[0].source).toBe("db");
+    expect(body.data[0].source).toBe("cfd1");
     expect(body.data[0].args.to.toLowerCase()).toBe(
       "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
     );

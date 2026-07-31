@@ -31,7 +31,7 @@ export async function decodeFunctionWithCandidates(data) {
 
   const candidates = [
     ...dbRows
-      .map((row) => ({ abi: parseAbiJson(row.abi), source: "db" }))
+      .map((row) => ({ abi: parseAbiJson(row.abi), source: "cfd1" }))
       .filter((c) => c.abi),
     ...sourcifySigs.map((sig) => ({
       abi: sigToFunctionAbi(sig),
@@ -61,7 +61,7 @@ export async function decodeEventWithCandidates(sign, topics, data) {
 
   const candidates = [
     ...dbRows
-      .map((row) => ({ abi: parseAbiJson(row.abi), source: "db" }))
+      .map((row) => ({ abi: parseAbiJson(row.abi), source: "cfd1" }))
       .filter(
         (c) =>
           c.abi &&
