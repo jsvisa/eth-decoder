@@ -1,6 +1,13 @@
 // tests/api/decode-event.test.js
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GET } from "../../app/api/decode-event/route.js";
+import {
+  serverCacheTestDir,
+  resetServerCacheTestDir,
+  removeServerCacheTestDir,
+} from "../utils/serverCacheTestEnv.js";
+
+const CACHE_DIR = serverCacheTestDir("decode-event");
 
 // Transfer(address indexed from, address indexed to, uint256 value)
 const TRANSFER_TOPIC0 =
@@ -43,12 +50,18 @@ function sourcifyEventResponse(topic0, names) {
   };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  process.env.CACHE_DIR = CACHE_DIR;
+  await resetServerCacheTestDir(CACHE_DIR);
   vi.stubGlobal("fetch", vi.fn());
   delete process.env.BACKEND_URL;
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(async () => {
+  vi.unstubAllGlobals();
+  delete process.env.CACHE_DIR;
+  await removeServerCacheTestDir(CACHE_DIR);
+});
 
 describe("GET /api/decode-event", () => {
   it("returns 400 when sign param is missing", async () => {

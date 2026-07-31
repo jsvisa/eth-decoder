@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GET } from "../../app/api/query/route.js";
 import { GET as v1GET } from "../../app/api/v1/query/route.js";
+import {
+  serverCacheTestDir,
+  resetServerCacheTestDir,
+  removeServerCacheTestDir,
+} from "../utils/serverCacheTestEnv.js";
+
+const CACHE_DIR = serverCacheTestDir("query");
 
 const SOURCIFY_LOOKUP =
   "https://api.4byte.sourcify.dev/signature-database/v1/lookup";
@@ -27,13 +34,17 @@ function sourcifyResponse(sigs) {
   };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  process.env.CACHE_DIR = CACHE_DIR;
+  await resetServerCacheTestDir(CACHE_DIR);
   vi.stubGlobal("fetch", vi.fn());
   delete process.env.BACKEND_URL;
 });
 
-afterEach(() => {
+afterEach(async () => {
   vi.unstubAllGlobals();
+  delete process.env.CACHE_DIR;
+  await removeServerCacheTestDir(CACHE_DIR);
 });
 
 describe("GET /api/query", () => {

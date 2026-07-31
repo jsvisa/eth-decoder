@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, cleanup } from "@testing-library/react";
 import { useHistory } from "../../../app/contract-caller/hooks/useHistory.js";
 
 // jsdom provides localStorage; clear between tests.
@@ -12,6 +12,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
   vi.clearAllTimers();
 });
 

@@ -1,13 +1,31 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { join } from "path";
+import { promises as fs } from "fs";
 import {
   lookupFunctionSignatures,
   lookupEventSignatures,
   sigToFunctionAbi,
   sigToEventAbi,
 } from "../../app/utils/sourcify.js";
+import {
+  serverCacheTestDir,
+  resetServerCacheTestDir,
+  removeServerCacheTestDir,
+} from "../utils/serverCacheTestEnv.js";
 
-beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
-afterEach(() => vi.unstubAllGlobals());
+const CACHE_DIR = serverCacheTestDir("sourcify");
+
+beforeEach(async () => {
+  process.env.CACHE_DIR = CACHE_DIR;
+  await resetServerCacheTestDir(CACHE_DIR);
+  vi.stubGlobal("fetch", vi.fn());
+});
+
+afterEach(async () => {
+  vi.unstubAllGlobals();
+  delete process.env.CACHE_DIR;
+  await removeServerCacheTestDir(CACHE_DIR);
+});
 
 // ---------------------------------------------------------------------------
 // lookupFunctionSignatures
@@ -60,6 +78,18 @@ describe("lookupFunctionSignatures", () => {
       json: async () => ({ ok: false }),
     });
     expect(await lookupFunctionSignatures("0xdeadbeef")).toEqual([]);
+  });
+
+  it("reuses the local cache and skips the network", async () => {
+    const sigs = ["withdraw(uint256,uint32,bytes,bytes32[])"];
+    const dir = join(CACHE_DIR, "signatures");
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(join(dir, "0x8612372a.json"), JSON.stringify(sigs));
+
+    const result = await lookupFunctionSignatures("0x8612372a");
+
+    expect(result).toEqual(sigs);
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });
 

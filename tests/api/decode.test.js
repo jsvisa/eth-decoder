@@ -1,6 +1,13 @@
 // tests/api/decode.test.js
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GET } from "../../app/api/decode/route.js";
+import {
+  serverCacheTestDir,
+  resetServerCacheTestDir,
+  removeServerCacheTestDir,
+} from "../utils/serverCacheTestEnv.js";
+
+const CACHE_DIR = serverCacheTestDir("decode");
 
 // transfer(address,uint256) — selector 0xa9059cbb
 const TRANSFER_CALLDATA =
@@ -38,13 +45,17 @@ function sourcifyResponse(selector, names) {
   };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  process.env.CACHE_DIR = CACHE_DIR;
+  await resetServerCacheTestDir(CACHE_DIR);
   vi.stubGlobal("fetch", vi.fn());
   delete process.env.BACKEND_URL;
 });
 
-afterEach(() => {
+afterEach(async () => {
   vi.unstubAllGlobals();
+  delete process.env.CACHE_DIR;
+  await removeServerCacheTestDir(CACHE_DIR);
 });
 
 describe("GET /api/decode", () => {

@@ -3,6 +3,13 @@ import { GET as decodeGET } from "../../app/api/v1/decode/route.js";
 import { GET as decodeEventGET } from "../../app/api/v1/decode-event/route.js";
 import { GET as fetchAbiGET } from "../../app/api/v1/fetch-abi/route.js";
 import etherscanErc20 from "./__fixtures__/etherscan-erc20.json";
+import {
+  serverCacheTestDir,
+  resetServerCacheTestDir,
+  removeServerCacheTestDir,
+} from "../utils/serverCacheTestEnv.js";
+
+const CACHE_DIR = serverCacheTestDir("v1-routes");
 
 function makeRequest(base, params) {
   const url = new URL(`http://localhost${base}`);
@@ -12,15 +19,19 @@ function makeRequest(base, params) {
   return { url: url.toString() };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  process.env.CACHE_DIR = CACHE_DIR;
+  await resetServerCacheTestDir(CACHE_DIR);
   vi.stubGlobal("fetch", vi.fn());
   delete process.env.BACKEND_URL;
   delete process.env.ETHERSCAN_API_KEY;
   delete process.env.ROUTESCAN_API_KEY;
 });
 
-afterEach(() => {
+afterEach(async () => {
   vi.unstubAllGlobals();
+  delete process.env.CACHE_DIR;
+  await removeServerCacheTestDir(CACHE_DIR);
 });
 
 describe("GET /api/v1/decode", () => {
