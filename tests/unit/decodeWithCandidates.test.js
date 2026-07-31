@@ -124,9 +124,7 @@ describe("decodeEventWithCandidates", () => {
 
   it("returns null when no candidate decodes", async () => {
     global.fetch.mockResolvedValueOnce(sourcifyEventResponse(TOPIC0, []));
-    expect(
-      await decodeEventWithCandidates(TOPIC0, TOPICS, DATA),
-    ).toBeNull();
+    expect(await decodeEventWithCandidates(TOPIC0, TOPICS, DATA)).toBeNull();
   });
 
   it("decodes via Sourcify and includes inputs", async () => {

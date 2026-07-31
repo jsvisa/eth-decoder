@@ -21,9 +21,7 @@ export async function lookupEventCandidates(topic0) {
 
   try {
     const params = new URLSearchParams({ sign: topic0 });
-    const response = await fetch(
-      `${backendUrl}/api/v1/query-event?${params}`,
-    );
+    const response = await fetch(`${backendUrl}/api/v1/query-event?${params}`);
     if (!response.ok) return [];
     const json = await response.json();
     if (json?.msg !== "ok" || !Array.isArray(json.data)) return [];

@@ -65,8 +65,7 @@ export async function decodeEventWithCandidates(sign, topics, data) {
       .filter(
         (c) =>
           c.abi &&
-          (c.abi.inputs || []).filter((i) => i.indexed).length ===
-            numIndexed,
+          (c.abi.inputs || []).filter((i) => i.indexed).length === numIndexed,
       ),
     ...sourcifySigs.map((sig) => ({
       abi: sigToEventAbi(sig, numIndexed),
