@@ -1,3 +1,4 @@
+// tests/api/decode-event.test.js
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GET } from "../../app/api/decode-event/route.js";
 
@@ -10,22 +11,9 @@ const TRANSFER_TOPIC2 =
   "0x000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
 const TRANSFER_DATA =
   "0x00000000000000000000000000000000000000000000000000000000000f4240";
-// comma-joined topics including topic0 (as sent by the frontend)
 const ALL_TOPICS = [TRANSFER_TOPIC0, TRANSFER_TOPIC1, TRANSFER_TOPIC2].join(
   ",",
 );
-
-const SOURCIFY_TRANSFER_EVENT_RESPONSE = {
-  ok: true,
-  result: {
-    event: {
-      [TRANSFER_TOPIC0]: [
-        { name: "Transfer(address,address,uint256)", filtered: false },
-      ],
-    },
-    function: {},
-  },
-};
 
 function makeRequest(params) {
   const url = new URL("http://localhost/api/decode-event");
@@ -35,6 +23,26 @@ function makeRequest(params) {
   return { url: url.toString() };
 }
 
+function backendResponse(rows) {
+  return { ok: true, json: async () => ({ msg: "ok", data: rows }) };
+}
+
+function backendNotFound() {
+  return { ok: true, json: async () => ({ msg: "not found", data: null }) };
+}
+
+function sourcifyEventResponse(topic0, names) {
+  return {
+    ok: true,
+    json: async () => ({
+      ok: true,
+      result: {
+        event: { [topic0]: names.map((n) => ({ name: n, filtered: false })) },
+      },
+    }),
+  };
+}
+
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn());
   delete process.env.BACKEND_URL;
@@ -42,55 +50,20 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("GET /api/decode-event — basics", () => {
-  it("returns 500 when BACKEND_URL is not set", async () => {
-    const res = await GET(makeRequest({ sign: TRANSFER_TOPIC0 }));
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body.error).toMatch(/backend_url/i);
-  });
-
+describe("GET /api/decode-event", () => {
   it("returns 400 when sign param is missing", async () => {
-    process.env.BACKEND_URL = "https://backend.test";
     const res = await GET(makeRequest({}));
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/sign/i);
+    expect(body.error).toMatch(/missing sign/i);
   });
 
-  it("returns backend result when backend succeeds", async () => {
-    process.env.BACKEND_URL = "https://backend.test";
-    const mockResult = { msg: "ok", data: { event: "Transfer", args: {} } };
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockResult,
-    });
-
-    const res = await GET(
-      makeRequest({
-        sign: TRANSFER_TOPIC0,
-        topics: ALL_TOPICS,
-        data: TRANSFER_DATA,
-      }),
+  it("decodes via Sourcify when BACKEND_URL is not set", async () => {
+    global.fetch.mockResolvedValueOnce(
+      sourcifyEventResponse(TRANSFER_TOPIC0, [
+        "Transfer(address,address,uint256)",
+      ]),
     );
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body).toEqual(mockResult);
-  });
-});
-
-describe("GET /api/decode-event — Sourcify fallback", () => {
-  it("returns decoded event from Sourcify when backend returns non-OK", async () => {
-    process.env.BACKEND_URL = "https://backend.test";
-    global.fetch.mockResolvedValueOnce({
-      ok: false,
-      status: 503,
-      statusText: "Service Unavailable",
-    });
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => SOURCIFY_TRANSFER_EVENT_RESPONSE,
-    });
 
     const res = await GET(
       makeRequest({
@@ -104,18 +77,35 @@ describe("GET /api/decode-event — Sourcify fallback", () => {
     expect(body.msg).toBe("ok");
     expect(body.data.event).toBe("Transfer");
     expect(body.data.source).toBe("sourcify");
+    expect(body.data.inputs).toHaveLength(3);
   });
 
-  it("returns decoded event from Sourcify when backend returns msg !== ok", async () => {
+  it("prefers a DB candidate over Sourcify when both match", async () => {
     process.env.BACKEND_URL = "https://backend.test";
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ msg: "not found" }),
-    });
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => SOURCIFY_TRANSFER_EVENT_RESPONSE,
-    });
+    const abi = {
+      type: "event",
+      name: "Transfer",
+      anonymous: false,
+      inputs: [
+        { name: "from", type: "address", indexed: true },
+        { name: "to", type: "address", indexed: true },
+        { name: "value", type: "uint256", indexed: false },
+      ],
+    };
+    global.fetch
+      .mockResolvedValueOnce(
+        backendResponse([
+          {
+            text_sign: "Transfer(address,address,uint256)",
+            abi: JSON.stringify(abi),
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        sourcifyEventResponse(TRANSFER_TOPIC0, [
+          "Transfer(address,address,uint256)",
+        ]),
+      );
 
     const res = await GET(
       makeRequest({
@@ -124,28 +114,40 @@ describe("GET /api/decode-event — Sourcify fallback", () => {
         data: TRANSFER_DATA,
       }),
     );
-    expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.msg).toBe("ok");
-    expect(body.data.event).toBe("Transfer");
-    expect(body.data.source).toBe("sourcify");
-    // serialized as a number (safe-range int), not BigInt
-    expect(body.data.args.arg2).toBe(1000000);
+    expect(body.data.source).toBe("db");
+    expect(body.data.args.from.toLowerCase()).toBe(
+      "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    );
+    expect(body.data.inputs).toEqual(abi.inputs);
   });
 
-  it("returns original backend response when Sourcify also has no match", async () => {
+  it("skips a DB candidate whose indexed count doesn't match the topics", async () => {
     process.env.BACKEND_URL = "https://backend.test";
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ msg: "not found" }),
-    });
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        ok: true,
-        result: { event: { [TRANSFER_TOPIC0]: [] }, function: {} },
-      }),
-    });
+    const wrongAbi = {
+      type: "event",
+      name: "Transfer",
+      anonymous: false,
+      inputs: [
+        { name: "from", type: "address", indexed: false },
+        { name: "to", type: "address", indexed: false },
+        { name: "value", type: "uint256", indexed: false },
+      ],
+    };
+    global.fetch
+      .mockResolvedValueOnce(
+        backendResponse([
+          {
+            text_sign: "Transfer(address,address,uint256)",
+            abi: JSON.stringify(wrongAbi),
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        sourcifyEventResponse(TRANSFER_TOPIC0, [
+          "Transfer(address,address,uint256)",
+        ]),
+      );
 
     const res = await GET(
       makeRequest({
@@ -154,33 +156,25 @@ describe("GET /api/decode-event — Sourcify fallback", () => {
         data: TRANSFER_DATA,
       }),
     );
-    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.source).toBe("sourcify");
+  });
+
+  it("returns not found when nothing decodes", async () => {
+    process.env.BACKEND_URL = "https://backend.test";
+    global.fetch
+      .mockResolvedValueOnce(backendNotFound())
+      .mockResolvedValueOnce(sourcifyEventResponse(TRANSFER_TOPIC0, []));
+
+    const res = await GET(
+      makeRequest({
+        sign: TRANSFER_TOPIC0,
+        topics: ALL_TOPICS,
+        data: TRANSFER_DATA,
+      }),
+    );
     const body = await res.json();
     expect(body.msg).toBe("not found");
-  });
-
-  it("returns 500 when backend non-OK and Sourcify also has no match", async () => {
-    process.env.BACKEND_URL = "https://backend.test";
-    global.fetch.mockResolvedValueOnce({
-      ok: false,
-      status: 503,
-      statusText: "Service Unavailable",
-    });
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        ok: true,
-        result: { event: { [TRANSFER_TOPIC0]: [] }, function: {} },
-      }),
-    });
-
-    const res = await GET(
-      makeRequest({
-        sign: TRANSFER_TOPIC0,
-        topics: ALL_TOPICS,
-        data: TRANSFER_DATA,
-      }),
-    );
-    expect(res.status).toBe(500);
+    expect(body.data).toBeNull();
   });
 });
