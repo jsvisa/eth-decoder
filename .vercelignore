@@ -19,10 +19,6 @@ tests/
 # Documentation
 docs/
 
-# Separate Python ABI server (not part of Next.js deployment)
-abi_server/
-abi_server.tar.gz
-
 # Local data files not needed in production
 result.json
 no-decoded.json
