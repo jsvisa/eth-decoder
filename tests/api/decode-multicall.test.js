@@ -1,10 +1,11 @@
+// tests/api/decode-multicall.test.js
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GET } from "../../app/api/decode/route.js";
 
 // ---------------------------------------------------------------------------
 // Integration tests for GET /api/decode — multicall and Universal Router
-// augmentation.  Mocks the backend (outer decode) and Sourcify (inner call
-// name resolution) but runs the real client-side multicall/UR decoders.
+// augmentation. Mocks the D1 Worker (empty candidates) and Sourcify (inner
+// call name resolution) but runs the real client-side multicall/UR decoders.
 // ---------------------------------------------------------------------------
 
 // 1. multicall((address,bytes,uint256,bool,bytes32)[]) — tuple_array
@@ -27,13 +28,6 @@ const UR_WITH_DEADLINE_DATA =
 const NORMAL_DATA =
   "0x3244c12c000000000000000000000000000000000000000000000000030d98d59a960000000000000000000000000000b98c948cfa24072e58935bc004a8a7b376ae746a";
 
-const BACKEND_DECODE = {
-  msg: "ok",
-  data: [
-    { func: "multicall((address,bytes,uint256,bool,bytes32)[])", args: {} },
-  ],
-};
-
 const SOURCIFY_SIGNATURES = {
   "0x3244c12c": ["wrapNative(uint256,address)"],
   "0x6ef5eeae": ["erc4626Deposit(address,uint256,uint256,address)"],
@@ -49,6 +43,9 @@ function makeRequest(data) {
   return { url: url.toString() };
 }
 
+// Handles both the D1 Worker's /api/v1/query?sign= calls (always "no match",
+// since sign= never appears in the Sourcify-style regex below) and Sourcify's
+// ?function= calls.
 function mockSourcify(signatures) {
   return (url) => {
     const selectorMatch = url.match(/function=(0x[0-9a-fA-F]{8})/);
@@ -85,9 +82,7 @@ afterEach(() => {
 
 describe("GET /api/decode — multicall augmentation", () => {
   it("multicall((address,bytes,uint256,bool,bytes32)[]) — 3 inner calls", async () => {
-    global.fetch
-      .mockResolvedValueOnce({ ok: true, json: async () => BACKEND_DECODE })
-      .mockImplementation(mockSourcify(SOURCIFY_SIGNATURES));
+    global.fetch.mockImplementation(mockSourcify(SOURCIFY_SIGNATURES));
 
     const res = await GET(makeRequest(TUPLE_ARRAY_DATA));
     expect(res.status).toBe(200);
@@ -106,13 +101,7 @@ describe("GET /api/decode — multicall augmentation", () => {
   });
 
   it("multicall(bytes[]) — 2 inner calls", async () => {
-    const mcBackend = {
-      msg: "ok",
-      data: [{ func: "multicall(bytes[])", args: {} }],
-    };
-    global.fetch
-      .mockResolvedValueOnce({ ok: true, json: async () => mcBackend })
-      .mockImplementation(mockSourcify(SOURCIFY_SIGNATURES));
+    global.fetch.mockImplementation(mockSourcify(SOURCIFY_SIGNATURES));
 
     const res = await GET(makeRequest(BYTES_ARRAY_DATA));
     expect(res.status).toBe(200);
@@ -127,15 +116,7 @@ describe("GET /api/decode — multicall augmentation", () => {
   });
 
   it("execute(bytes,bytes[]) — Universal Router, 5 commands", async () => {
-    const urBackend = {
-      msg: "ok",
-      data: [
-        { func: "execute(bytes,bytes[])", args: { commands: "0x000d090f02" } },
-      ],
-    };
-    global.fetch
-      .mockResolvedValueOnce({ ok: true, json: async () => urBackend })
-      .mockImplementation(mockSourcify(SOURCIFY_SIGNATURES));
+    global.fetch.mockImplementation(mockSourcify(SOURCIFY_SIGNATURES));
 
     const res = await GET(makeRequest(UR_NO_DEADLINE_DATA));
     expect(res.status).toBe(200);
@@ -152,18 +133,7 @@ describe("GET /api/decode — multicall augmentation", () => {
   });
 
   it("execute(bytes,bytes[],uint256) — Universal Router with deadline, 3 commands", async () => {
-    const urBackend = {
-      msg: "ok",
-      data: [
-        {
-          func: "execute(bytes,bytes[],uint256)",
-          args: { commands: "0x0b0004", deadline: "1780000000" },
-        },
-      ],
-    };
-    global.fetch
-      .mockResolvedValueOnce({ ok: true, json: async () => urBackend })
-      .mockImplementation(mockSourcify(SOURCIFY_SIGNATURES));
+    global.fetch.mockImplementation(mockSourcify(SOURCIFY_SIGNATURES));
 
     const res = await GET(makeRequest(UR_WITH_DEADLINE_DATA));
     expect(res.status).toBe(200);
@@ -178,22 +148,7 @@ describe("GET /api/decode — multicall augmentation", () => {
   });
 
   it("regular function — no inner_calls", async () => {
-    const normalBackend = {
-      msg: "ok",
-      data: [
-        {
-          func: "wrapNative(uint256,address)",
-          args: {
-            arg0: "220000000000000000",
-            arg1: "0xb98c948cfa24072e58935bc004a8a7b376ae746a",
-          },
-        },
-      ],
-    };
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => normalBackend,
-    });
+    global.fetch.mockImplementation(mockSourcify(SOURCIFY_SIGNATURES));
 
     const res = await GET(makeRequest(NORMAL_DATA));
     expect(res.status).toBe(200);
@@ -201,6 +156,7 @@ describe("GET /api/decode — multicall augmentation", () => {
     const d0 = body.data[0];
 
     expect(d0.func).toBe("wrapNative(uint256,address)");
+    expect(d0.source).toBe("sourcify");
     expect(d0.inner_calls).toBeUndefined();
   });
 });
