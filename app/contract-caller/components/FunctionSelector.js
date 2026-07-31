@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { toFunctionSignature } from "viem";
 import styles from "./FunctionSelector.module.css";
 import {
   isReadOnly,
@@ -176,7 +177,10 @@ export default function FunctionSelector({
           {
             className: `${styles.selectedFunctionText} ${copiedItem === "signature" ? styles.copiedText : ""}`,
             onClick: () =>
-              copyToClipboard(buildDisplaySig(selectedFuncObj), "signature"),
+              copyToClipboard(
+                toFunctionSignature(selectedFuncObj),
+                "signature",
+              ),
             title: "Click to copy function signature",
           },
           copiedItem === "signature"
