@@ -87,7 +87,7 @@ describe("decodeFunctionWithCandidates", () => {
       );
 
     const result = await decodeFunctionWithCandidates(TRANSFER_CALLDATA);
-    expect(result.source).toBe("db");
+    expect(result.source).toBe("cfd1");
     expect(result.args.to.toLowerCase()).toBe(
       "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
     );
@@ -164,7 +164,7 @@ describe("decodeEventWithCandidates", () => {
       );
 
     const result = await decodeEventWithCandidates(TOPIC0, TOPICS, DATA);
-    expect(result.source).toBe("db");
+    expect(result.source).toBe("cfd1");
     expect(result.inputs).toEqual(abi.inputs);
   });
 
