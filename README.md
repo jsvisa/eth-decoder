@@ -163,6 +163,8 @@ GET /api/v1/query?sign=0xa9059cbb
 
 Unlike `/api/v1/decode` and `/api/v1/decode-event`, this endpoint does **not** require `BACKEND_URL` — Sourcify alone is sufficient. The backend is only consulted when Sourcify has no match.
 
+**Response shape:** `data` is a single object when there is exactly one match (Sourcify matches always return one; backend single-element lists are collapsed to a dict), and a list of objects when the backend returns multiple matches.
+
 ### `GET /api/v1/decode-event`
 
 Decode an EVM event log. Proxies to the configured `BACKEND_URL`, with a Sourcify fallback for unknown signatures.

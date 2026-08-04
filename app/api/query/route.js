@@ -39,7 +39,10 @@ export async function GET(request) {
       if (response.ok) {
         const data = await response.json();
         if (data?.data != null) {
-          return NextResponse.json(data);
+          const { data: raw, ...rest } = data;
+          const normalized =
+            Array.isArray(raw) && raw.length === 1 ? raw[0] : raw;
+          return NextResponse.json({ ...rest, data: normalized });
         }
       }
     } catch (error) {
