@@ -4,6 +4,27 @@ import {
   lookupEventSignatures,
 } from "../../utils/sourcify.js";
 
+// Parse an abi field into a JSON object when the backend returns it as a string.
+function parseAbi(raw) {
+  if (raw == null || typeof raw !== "string") return raw;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
+function normalizeBackendItem(item) {
+  if (!item || typeof item !== "object" || Array.isArray(item)) return item;
+  return { ...item, abi: parseAbi(item.abi) };
+}
+
+function normalizeBackendData(data) {
+  return Array.isArray(data)
+    ? data.map(normalizeBackendItem)
+    : normalizeBackendItem(data);
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const sign = searchParams.get("sign");
@@ -40,9 +61,12 @@ export async function GET(request) {
         const data = await response.json();
         if (data?.data != null) {
           const { data: raw, ...rest } = data;
-          const normalized =
-            Array.isArray(raw) && raw.length === 1 ? raw[0] : raw;
-          return NextResponse.json({ ...rest, data: normalized });
+          const normalized = normalizeBackendData(raw);
+          const collapsed =
+            Array.isArray(normalized) && normalized.length === 1
+              ? normalized[0]
+              : normalized;
+          return NextResponse.json({ ...rest, data: collapsed });
         }
       }
     } catch (error) {
