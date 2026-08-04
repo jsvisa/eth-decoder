@@ -142,6 +142,71 @@ describe("GET /api/query", () => {
       expect(global.fetch.mock.calls[1][0]).toContain("backend.test");
     });
 
+    it("collapses a single-element backend list to a dict", async () => {
+      process.env.BACKEND_URL = "https://backend.test";
+      global.fetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            ok: true,
+            result: { function: { "0x341d16d9": [] } },
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            msg: "ok",
+            data: [
+              {
+                text_sign: "claim()",
+                abi: '{"name": "claim"}',
+              },
+            ],
+          }),
+        });
+
+      const res = await GET(makeRequest({ sign: "0x341d16d9" }));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.msg).toBe("ok");
+      expect(Array.isArray(body.data)).toBe(false);
+      expect(body.data.text_sign).toBe("claim()");
+      expect(body.data.abi).toBe('{"name": "claim"}');
+    });
+
+    it("keeps multiple backend matches as a list", async () => {
+      process.env.BACKEND_URL = "https://backend.test";
+      global.fetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            ok: true,
+            result: { function: { "0x341d16d9": [] } },
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            msg: "ok",
+            data: [
+              { text_sign: "claim()", abi: null },
+              { text_sign: "claim2()", abi: null },
+            ],
+          }),
+        });
+
+      const res = await GET(makeRequest({ sign: "0x341d16d9" }));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.msg).toBe("ok");
+      expect(Array.isArray(body.data)).toBe(true);
+      expect(body.data).toHaveLength(2);
+      expect(body.data.map((d) => d.text_sign)).toEqual([
+        "claim()",
+        "claim2()",
+      ]);
+    });
+
     it("forwards sign to backend in fallback", async () => {
       process.env.BACKEND_URL = "https://backend.test";
       global.fetch
