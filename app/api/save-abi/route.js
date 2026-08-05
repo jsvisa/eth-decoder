@@ -41,7 +41,8 @@ export async function POST(request) {
         ok: false,
         saved: 0,
         total: 0,
-        error: "Backend not configured (BACKEND_URL or BACKEND_API_KEY missing)",
+        error:
+          "Backend not configured (BACKEND_URL or BACKEND_API_KEY missing)",
       },
       { status: 500 },
     );
@@ -52,7 +53,12 @@ export async function POST(request) {
     body = await request.json();
   } catch {
     return NextResponse.json(
-      { ok: false, saved: 0, total: 0, error: "Request body must be valid JSON" },
+      {
+        ok: false,
+        saved: 0,
+        total: 0,
+        error: "Request body must be valid JSON",
+      },
       { status: 400 },
     );
   }
@@ -77,7 +83,8 @@ export async function POST(request) {
         failures.push({
           text_sign: record.text_sign,
           status: response.status,
-          reason: (await response.json().catch(() => null))?.data ?? "unknown error",
+          reason:
+            (await response.json().catch(() => null))?.data ?? "unknown error",
         });
         continue;
       }

@@ -57,7 +57,11 @@ describe("POST /api/save-abi", () => {
   it("returns 400 for invalid JSON", async () => {
     process.env.BACKEND_URL = "https://backend.test";
     process.env.BACKEND_API_KEY = "secret";
-    const res = await POST({ json: async () => { throw new Error("bad json"); } });
+    const res = await POST({
+      json: async () => {
+        throw new Error("bad json");
+      },
+    });
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toMatch(/valid JSON/i);
@@ -99,7 +103,9 @@ describe("POST /api/save-abi", () => {
     process.env.BACKEND_API_KEY = "secret";
     global.fetch.mockResolvedValue(backendResponse(200, {}));
 
-    const res = await POST(makeRequest({ abi: [TRANSFER, { type: "constructor" }] }));
+    const res = await POST(
+      makeRequest({ abi: [TRANSFER, { type: "constructor" }] }),
+    );
     const body = await res.json();
     expect(body.total).toBe(1);
     expect(body.saved).toBe(1);
@@ -121,7 +127,9 @@ describe("POST /api/save-abi", () => {
     expect(body.saved).toBe(1);
     expect(body.total).toBe(2);
     expect(body.failures).toHaveLength(1);
-    expect(body.failures[0].text_sign).toBe("Transfer(address,address,uint256)");
+    expect(body.failures[0].text_sign).toBe(
+      "Transfer(address,address,uint256)",
+    );
     expect(body.error).toMatch(/Saved 1 of 2/);
   });
 });
