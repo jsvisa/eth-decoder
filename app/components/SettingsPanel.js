@@ -28,6 +28,7 @@ export default function SettingsPanel() {
     customChains,
     isEtherscanConfigured,
     isRoutescanConfigured,
+    isBackendConfigured,
     getChainId,
   } = useSettings();
 
@@ -297,6 +298,31 @@ export default function SettingsPanel() {
                     ? "✗ Invalid"
                     : "Test"}
             </button>
+          </div>
+        </div>
+
+        {/* Backend API Key */}
+        <div className={styles.settingsGroup}>
+          <h3 className={styles.settingsTitle}>
+            Backend API Key
+            {isBackendConfigured() && (
+              <span className={styles.settingsCheck}>✓</span>
+            )}
+          </h3>
+          <p className={styles.settingsDesc}>
+            Required for the Save ABI button on the contract caller page. Used
+            to authenticate writes to the backend signature database.
+          </p>
+          <div className={styles.settingsFieldWithTest}>
+            <input
+              type="password"
+              value={apiKeys.backend || ""}
+              onChange={(e) =>
+                saveApiKeys({ ...apiKeys, backend: e.target.value })
+              }
+              placeholder="Enter your backend API key..."
+              className={styles.settingsInput}
+            />
           </div>
         </div>
 

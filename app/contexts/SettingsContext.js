@@ -12,7 +12,11 @@ const SettingsContext = createContext(null);
 
 export function SettingsProvider({ children }) {
   const [showSettings, setShowSettings] = useState(false);
-  const [apiKeys, setApiKeys] = useState({ etherscan: "", routescan: "" });
+  const [apiKeys, setApiKeys] = useState({
+    etherscan: "",
+    routescan: "",
+    backend: "",
+  });
   const [rpcSettings, setRpcSettings] = useState(() =>
     CHAINS.reduce((acc, c) => ({ ...acc, [c.id]: "" }), {}),
   );
@@ -80,6 +84,8 @@ export function SettingsProvider({ children }) {
 
   const isRoutescanConfigured = () => !!apiKeys.routescan;
 
+  const isBackendConfigured = () => !!apiKeys.backend;
+
   const getChainId = (chainId) => {
     if (BUILT_IN_CHAIN_IDS[chainId]) return BUILT_IN_CHAIN_IDS[chainId];
     const custom = customChains.find((c) => c.id === chainId);
@@ -104,6 +110,7 @@ export function SettingsProvider({ children }) {
         saveCustomChains,
         isEtherscanConfigured,
         isRoutescanConfigured,
+        isBackendConfigured,
         getChainId,
       }}
     >
