@@ -78,37 +78,53 @@ export async function POST(request) {
   const records = abi.map(recordFromAbiItem).filter(Boolean);
   const total = records.length;
 
-  let saved = 0;
-  const failures = [];
-  for (const record of records) {
-    try {
-      const response = await fetch(`${backendUrl}${BACKEND_WRITE_PATH}`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(record),
-      });
-      if (!response.ok) {
-        failures.push({
-          text_sign: record.text_sign,
-          status: response.status,
-          reason:
-            (await response.json().catch(() => null))?.data ?? "unknown error",
-        });
-        continue;
-      }
-      saved += 1;
-    } catch (err) {
-      failures.push({ text_sign: record.text_sign, reason: err.message });
-    }
+  let response;
+  try {
+    response = await fetch(`${backendUrl}${BACKEND_WRITE_PATH}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(records),
+    });
+  } catch (err) {
+    return NextResponse.json({
+      ok: false,
+      saved: 0,
+      total,
+      failures: [{ reason: err.message }],
+      error: `Failed to reach backend: ${err.message}`,
+    });
   }
+
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
+
+  if (!response.ok) {
+    const reason = data?.data ?? `HTTP ${response.status}`;
+    return NextResponse.json({
+      ok: false,
+      saved: 0,
+      total,
+      failures: [{ reason }],
+      error: `Backend rejected upload: ${reason}`,
+    });
+  }
+
+  const saved = data?.data?.saved ?? 0;
+  const failures = Array.isArray(data?.data?.failures)
+    ? data.data.failures
+    : [];
 
   const error =
     failures.length > 0
       ? `Saved ${saved} of ${total}; failed: ${failures
-          .map((f) => `${f.text_sign} (${f.reason})`)
+          .map((f) => `${f.text_sign || "record"} (${f.reason})`)
           .join("; ")}`
       : null;
 
