@@ -163,6 +163,8 @@ export default function ContractCallerPage() {
   // --- Top-level shared state ---
   const [chain, setChain] = useState("ethereum");
   const [address, setAddress] = useState("");
+  const [savingAbiBackend, setSavingAbiBackend] = useState(false);
+  const [saveAbiBackendMsg, setSaveAbiBackendMsg] = useState(null);
 
   const allChains = [...CHAINS, ...customChains];
   const nativeTokenSymbol =
@@ -204,6 +206,34 @@ export default function ContractCallerPage() {
   const handleAbiError = (message) => {
     resetFunctionState();
     setErrorRef.current?.(message);
+  };
+
+  const handleSaveAbiBackend = async () => {
+    const records = (abi.parsedAbi || []).filter(
+      (item) => item.type === "function" || item.type === "event",
+    );
+    if (records.length === 0) {
+      setSaveAbiBackendMsg("No ABI loaded to save");
+      return;
+    }
+
+    setSavingAbiBackend(true);
+    setSaveAbiBackendMsg(null);
+    try {
+      const response = await fetch("/api/save-abi", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ abi: records }),
+      });
+      const data = await response.json();
+      setSaveAbiBackendMsg(
+        data.error || `Saved ${data.saved} of ${data.total} signatures`,
+      );
+    } catch (err) {
+      setSaveAbiBackendMsg(err.message || "Failed to save ABI");
+    } finally {
+      setSavingAbiBackend(false);
+    }
   };
 
   // --- Hooks (dependency order: simOpts → abi → fn → session → exec → history) ---
@@ -514,6 +544,12 @@ export default function ContractCallerPage() {
               contractName={abi.contractName}
               onFetchAbi={abi.fetchAbi}
               fetchingAbi={abi.fetchingAbi}
+              onSaveAbiBackend={handleSaveAbiBackend}
+              savingAbiBackend={savingAbiBackend}
+              canSaveAbiBackend={
+                (abi.parsedAbi || []).length > 0 && isValidEthAddress(address)
+              }
+              saveAbiBackendMsg={saveAbiBackendMsg}
               fieldError={fn.fieldErrors.address}
               onOpenBookmarkModal={bookmark.openBookmarkModal}
               disabled={exec.loading}

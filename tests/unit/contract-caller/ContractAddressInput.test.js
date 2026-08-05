@@ -38,6 +38,10 @@ const BASE_PROPS = {
   contractName: null,
   onFetchAbi: vi.fn(),
   fetchingAbi: false,
+  onSaveAbiBackend: vi.fn(),
+  savingAbiBackend: false,
+  canSaveAbiBackend: true,
+  saveAbiBackendMsg: null,
   fieldError: null,
   onOpenBookmarkModal: vi.fn(),
   disabled: false,
@@ -123,6 +127,68 @@ describe("ContractAddressInput", () => {
       b.textContent.includes("Fetch ABI"),
     );
     expect(btn.disabled).toBe(true);
+  });
+
+  it("calls onSaveAbiBackend when the Save ABI button is clicked", () => {
+    const onSaveAbiBackend = vi.fn();
+    const { container, unmount } = renderComponent({
+      ...BASE_PROPS,
+      onSaveAbiBackend,
+    });
+    cleanup = unmount;
+
+    const btn = [...container.querySelectorAll("button")].find((b) =>
+      b.textContent.includes("Save ABI"),
+    );
+    act(() => btn.click());
+    expect(onSaveAbiBackend).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables the Save ABI button when canSaveAbiBackend is false", () => {
+    const { container, unmount } = renderComponent({
+      ...BASE_PROPS,
+      onSaveAbiBackend: vi.fn(),
+      canSaveAbiBackend: false,
+    });
+    cleanup = unmount;
+
+    const btn = [...container.querySelectorAll("button")].find((b) =>
+      b.textContent.includes("Save ABI"),
+    );
+    expect(btn.disabled).toBe(true);
+  });
+
+  it("shows 'Saving...' label and disables button while savingAbiBackend is true", () => {
+    const { container, unmount } = renderComponent({
+      ...BASE_PROPS,
+      onSaveAbiBackend: vi.fn(),
+      savingAbiBackend: true,
+    });
+    cleanup = unmount;
+
+    const btn = [...container.querySelectorAll("button")].find((b) =>
+      b.textContent.includes("Saving..."),
+    );
+    expect(btn).toBeDefined();
+    expect(btn.disabled).toBe(true);
+  });
+
+  it("does not render the Save ABI button when onSaveAbiBackend is not provided", () => {
+    const { container, unmount } = renderComponent({
+      ...BASE_PROPS,
+      onSaveAbiBackend: undefined,
+    });
+    cleanup = unmount;
+    expect(container.textContent).not.toContain("Save ABI");
+  });
+
+  it("shows the save ABI backend message when provided", () => {
+    const { container, unmount } = renderComponent({
+      ...BASE_PROPS,
+      saveAbiBackendMsg: "Saved 3 of 3 signatures",
+    });
+    cleanup = unmount;
+    expect(container.textContent).toContain("Saved 3 of 3 signatures");
   });
 
   it("shows the contractName badge when provided", () => {

@@ -18,6 +18,10 @@ const h = React.createElement;
  *   contractName        {string|null}
  *   onFetchAbi          {(opts?) => void}
  *   fetchingAbi         {boolean}
+ *   onSaveAbiBackend    {(opts?) => void}
+ *   savingAbiBackend    {boolean}
+ *   canSaveAbiBackend   {boolean}
+ *   saveAbiBackendMsg   {string|null}
  *   fieldError          {string|null}
  *   onOpenBookmarkModal {(addr: string) => void}
  *   disabled            {boolean}
@@ -30,6 +34,10 @@ export default function ContractAddressInput({
   contractName,
   onFetchAbi,
   fetchingAbi,
+  onSaveAbiBackend,
+  savingAbiBackend,
+  canSaveAbiBackend,
+  saveAbiBackendMsg,
   fieldError,
   onOpenBookmarkModal,
   disabled,
@@ -183,7 +191,27 @@ export default function ContractAddressInput({
         },
         fetchingAbi ? "Fetching..." : "Fetch ABI",
       ),
+
+      // Save ABI to backend button
+      onSaveAbiBackend
+        ? h(
+            "button",
+            {
+              type: "button",
+              onClick: () => onSaveAbiBackend(),
+              className: styles.saveButton,
+              disabled: disabled || savingAbiBackend || !canSaveAbiBackend,
+              "data-save-abi": "true",
+            },
+            savingAbiBackend ? "Saving..." : "Save ABI",
+          )
+        : null,
     ),
+
+    // Save ABI backend feedback message
+    saveAbiBackendMsg
+      ? h("span", { className: styles.saveAbiBackendMsg }, saveAbiBackendMsg)
+      : null,
 
     // Field error message
     fieldError
