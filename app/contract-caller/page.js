@@ -209,9 +209,7 @@ export default function ContractCallerPage() {
   };
 
   const handleSaveAbiBackend = async () => {
-    const records = (abi.parsedAbi || []).filter(
-      (item) => item.type === "function" || item.type === "event",
-    );
+    const records = abi.parsedAbi || [];
     if (records.length === 0) {
       setSaveAbiBackendMsg("No ABI loaded to save");
       return;

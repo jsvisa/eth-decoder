@@ -16,7 +16,14 @@ function backendResponse(status, data) {
 }
 
 function backendWriteResult(data) {
-  return backendResponse(200, { saved: 0, total: 0, failures: [], ...data });
+  return backendResponse(200, {
+    saved: 0,
+    total: 0,
+    skipped: 0,
+    rows: [],
+    failures: [],
+    ...data,
+  });
 }
 
 beforeEach(() => {
@@ -79,19 +86,29 @@ describe("POST /api/save-abi", () => {
     expect(body.error).toMatch(/valid JSON/i);
   });
 
-  it("posts all records as a single array and reports saved count", async () => {
+  it("posts the ABI entries as a single array and reports saved count", async () => {
     process.env.BACKEND_URL = "https://backend.test";
     global.fetch.mockResolvedValue(
-      backendWriteResult({ saved: 2, total: 2, failures: [] }),
+      backendWriteResult({
+        saved: 2,
+        total: 3,
+        skipped: 1,
+        rows: [],
+        failures: [],
+      }),
     );
 
     const res = await POST(
-      makeRequest({ abi: [TRANSFER, TRANSFER_EVENT], apiKey: "secret" }),
+      makeRequest({
+        abi: [TRANSFER, { type: "constructor" }, TRANSFER_EVENT],
+        apiKey: "secret",
+      }),
     );
     const body = await res.json();
 
     expect(body.saved).toBe(2);
-    expect(body.total).toBe(2);
+    expect(body.total).toBe(3);
+    expect(body.skipped).toBe(1);
     expect(body.failures).toEqual([]);
     expect(body.error).toBeNull();
     expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -102,48 +119,21 @@ describe("POST /api/save-abi", () => {
     expect(call[1].headers["content-type"]).toBe("application/json");
 
     const sent = JSON.parse(call[1].body);
-    expect(sent).toHaveLength(2);
-    expect(sent[0].text_sign).toBe("transfer(address,uint256)");
-    expect(sent[0].byte_sign).toBe("0xa9059cbb");
-    expect(sent[0].abi).toEqual(TRANSFER);
-    expect(sent[1].text_sign).toBe("Transfer(address,address,uint256)");
-    expect(sent[1].byte_sign).toBe(
-      "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
-    );
+    expect(sent).toHaveLength(3);
+    expect(sent[0]).toEqual(TRANSFER);
+    expect(sent[1].type).toBe("constructor");
+    expect(sent[2]).toEqual(TRANSFER_EVENT);
   });
 
-  it("skips non function/event ABI items", async () => {
-    process.env.BACKEND_URL = "https://backend.test";
-    global.fetch.mockResolvedValue(
-      backendWriteResult({ saved: 1, total: 1, failures: [] }),
-    );
-
-    const res = await POST(
-      makeRequest({
-        abi: [TRANSFER, { type: "constructor" }],
-        apiKey: "secret",
-      }),
-    );
-    const body = await res.json();
-    expect(body.total).toBe(1);
-    expect(body.saved).toBe(1);
-    expect(global.fetch).toHaveBeenCalledTimes(1);
-    const sent = JSON.parse(global.fetch.mock.calls[0][1].body);
-    expect(sent).toHaveLength(1);
-  });
-
-  it("reports failures when the backend skips invalid records", async () => {
+  it("reports failures when the backend rejects malformed entries", async () => {
     process.env.BACKEND_URL = "https://backend.test";
     global.fetch.mockResolvedValue(
       backendWriteResult({
         saved: 1,
         total: 2,
-        failures: [
-          {
-            text_sign: "Transfer(address,address,uint256)",
-            reason: "byte_sign must equal 0xabcdef12",
-          },
-        ],
+        skipped: 0,
+        rows: [],
+        failures: [{ index: 0, reason: "abi.name must be a non-empty string" }],
       }),
     );
 
@@ -155,9 +145,7 @@ describe("POST /api/save-abi", () => {
     expect(body.saved).toBe(1);
     expect(body.total).toBe(2);
     expect(body.failures).toHaveLength(1);
-    expect(body.failures[0].text_sign).toBe(
-      "Transfer(address,address,uint256)",
-    );
+    expect(body.failures[0].index).toBe(0);
     expect(body.error).toMatch(/Saved 1 of 2/);
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
@@ -165,7 +153,7 @@ describe("POST /api/save-abi", () => {
   it("returns an error when the backend rejects the upload", async () => {
     process.env.BACKEND_URL = "https://backend.test";
     global.fetch.mockResolvedValue(
-      backendResponse(400, "byte_sign must equal 0xa9059cbb"),
+      backendResponse(400, "entries array must not be empty"),
     );
 
     const res = await POST(makeRequest({ abi: [TRANSFER], apiKey: "secret" }));

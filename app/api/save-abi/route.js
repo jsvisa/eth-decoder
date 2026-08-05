@@ -1,35 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  toEventSelector,
-  toEventSignature,
-  toFunctionSelector,
-  toFunctionSignature,
-} from "viem";
 
 const BACKEND_WRITE_PATH = "/api/v1/write";
-
-// Build the storage record (byte_sign, text_sign, abi) for a single ABI entry.
-function recordFromAbiItem(item) {
-  if (!item || typeof item !== "object") return null;
-
-  if (item.type === "function") {
-    return {
-      byte_sign: toFunctionSelector(item),
-      text_sign: toFunctionSignature(item),
-      abi: item,
-    };
-  }
-
-  if (item.type === "event") {
-    return {
-      byte_sign: toEventSelector(item),
-      text_sign: toEventSignature(item),
-      abi: item,
-    };
-  }
-
-  return null;
-}
 
 export async function POST(request) {
   const backendUrl = process.env.BACKEND_URL;
@@ -40,6 +11,7 @@ export async function POST(request) {
         ok: false,
         saved: 0,
         total: 0,
+        skipped: 0,
         error: "Backend not configured (BACKEND_URL missing)",
       },
       { status: 500 },
@@ -55,6 +27,7 @@ export async function POST(request) {
         ok: false,
         saved: 0,
         total: 0,
+        skipped: 0,
         error: "Request body must be valid JSON",
       },
       { status: 400 },
@@ -68,15 +41,14 @@ export async function POST(request) {
         ok: false,
         saved: 0,
         total: 0,
+        skipped: 0,
         error: "Backend API key is not configured",
       },
       { status: 500 },
     );
   }
 
-  const abi = Array.isArray(body?.abi) ? body.abi : [];
-  const records = abi.map(recordFromAbiItem).filter(Boolean);
-  const total = records.length;
+  const entries = Array.isArray(body?.abi) ? body.abi : [];
 
   let response;
   try {
@@ -86,14 +58,14 @@ export async function POST(request) {
         "content-type": "application/json",
         authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify(records),
+      body: JSON.stringify(entries),
     });
   } catch (err) {
     return NextResponse.json({
       ok: false,
       saved: 0,
-      total,
-      failures: [{ reason: err.message }],
+      skipped: 0,
+      total: entries.length,
       error: `Failed to reach backend: ${err.message}`,
     });
   }
@@ -110,21 +82,22 @@ export async function POST(request) {
     return NextResponse.json({
       ok: false,
       saved: 0,
-      total,
-      failures: [{ reason }],
+      skipped: 0,
+      total: entries.length,
       error: `Backend rejected upload: ${reason}`,
     });
   }
 
-  const saved = data?.data?.saved ?? 0;
-  const failures = Array.isArray(data?.data?.failures)
-    ? data.data.failures
-    : [];
+  const result = data?.data ?? {};
+  const saved = result.saved ?? 0;
+  const total = result.total ?? entries.length;
+  const skipped = result.skipped ?? 0;
+  const failures = Array.isArray(result.failures) ? result.failures : [];
 
   const error =
     failures.length > 0
-      ? `Saved ${saved} of ${total}; failed: ${failures
-          .map((f) => `${f.text_sign || "record"} (${f.reason})`)
+      ? `Saved ${saved} of ${total}${skipped ? ` (${skipped} skipped)` : ""}; failed: ${failures
+          .map((f) => `entry ${f.index} (${f.reason})`)
           .join("; ")}`
       : null;
 
@@ -132,6 +105,7 @@ export async function POST(request) {
     ok: saved > 0,
     saved,
     total,
+    skipped,
     failures,
     error,
   });
