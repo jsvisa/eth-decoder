@@ -223,7 +223,7 @@ export default function ContractCallerPage() {
       const response = await fetch("/api/save-abi", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ abi: records }),
+        body: JSON.stringify({ abi: records, apiKey: apiKeys.backend }),
       });
       const data = await response.json();
       setSaveAbiBackendMsg(
@@ -547,7 +547,9 @@ export default function ContractCallerPage() {
               onSaveAbiBackend={handleSaveAbiBackend}
               savingAbiBackend={savingAbiBackend}
               canSaveAbiBackend={
-                (abi.parsedAbi || []).length > 0 && isValidEthAddress(address)
+                (abi.parsedAbi || []).length > 0 &&
+                isValidEthAddress(address) &&
+                Boolean(apiKeys.backend)
               }
               saveAbiBackendMsg={saveAbiBackendMsg}
               fieldError={fn.fieldErrors.address}

@@ -17,7 +17,6 @@ function backendResponse(status, data) {
 
 beforeEach(() => {
   delete process.env.BACKEND_URL;
-  delete process.env.BACKEND_API_KEY;
   vi.stubGlobal("fetch", vi.fn());
 });
 
@@ -45,8 +44,8 @@ describe("POST /api/save-abi", () => {
     ],
   };
 
-  it("returns an error when BACKEND_URL or BACKEND_API_KEY is missing", async () => {
-    const res = await POST(makeRequest({ abi: [TRANSFER] }));
+  it("returns an error when BACKEND_URL is missing", async () => {
+    const res = await POST(makeRequest({ abi: [TRANSFER], apiKey: "secret" }));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.ok).toBe(false);
@@ -54,9 +53,18 @@ describe("POST /api/save-abi", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  it("returns an error when the API key is missing", async () => {
+    process.env.BACKEND_URL = "https://backend.test";
+    const res = await POST(makeRequest({ abi: [TRANSFER] }));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+    expect(body.error).toMatch(/api key/i);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it("returns 400 for invalid JSON", async () => {
     process.env.BACKEND_URL = "https://backend.test";
-    process.env.BACKEND_API_KEY = "secret";
     const res = await POST({
       json: async () => {
         throw new Error("bad json");
@@ -69,10 +77,11 @@ describe("POST /api/save-abi", () => {
 
   it("posts records for each function/event and reports saved count", async () => {
     process.env.BACKEND_URL = "https://backend.test";
-    process.env.BACKEND_API_KEY = "secret";
     global.fetch.mockResolvedValue(backendResponse(200, { pkey: "0xabc" }));
 
-    const res = await POST(makeRequest({ abi: [TRANSFER, TRANSFER_EVENT] }));
+    const res = await POST(
+      makeRequest({ abi: [TRANSFER, TRANSFER_EVENT], apiKey: "secret" }),
+    );
     const body = await res.json();
 
     expect(body.saved).toBe(2);
@@ -100,11 +109,13 @@ describe("POST /api/save-abi", () => {
 
   it("skips non function/event ABI items", async () => {
     process.env.BACKEND_URL = "https://backend.test";
-    process.env.BACKEND_API_KEY = "secret";
     global.fetch.mockResolvedValue(backendResponse(200, {}));
 
     const res = await POST(
-      makeRequest({ abi: [TRANSFER, { type: "constructor" }] }),
+      makeRequest({
+        abi: [TRANSFER, { type: "constructor" }],
+        apiKey: "secret",
+      }),
     );
     const body = await res.json();
     expect(body.total).toBe(1);
@@ -114,14 +125,15 @@ describe("POST /api/save-abi", () => {
 
   it("reports failures when the backend rejects a record", async () => {
     process.env.BACKEND_URL = "https://backend.test";
-    process.env.BACKEND_API_KEY = "secret";
     global.fetch
       .mockResolvedValueOnce(backendResponse(200, {}))
       .mockResolvedValueOnce(
         backendResponse(400, "byte_sign must equal 0xabcdef12"),
       );
 
-    const res = await POST(makeRequest({ abi: [TRANSFER, TRANSFER_EVENT] }));
+    const res = await POST(
+      makeRequest({ abi: [TRANSFER, TRANSFER_EVENT], apiKey: "secret" }),
+    );
     const body = await res.json();
 
     expect(body.saved).toBe(1);

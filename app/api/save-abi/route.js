@@ -33,16 +33,14 @@ function recordFromAbiItem(item) {
 
 export async function POST(request) {
   const backendUrl = process.env.BACKEND_URL;
-  const apiKey = process.env.BACKEND_API_KEY;
 
-  if (!backendUrl || !apiKey) {
+  if (!backendUrl) {
     return NextResponse.json(
       {
         ok: false,
         saved: 0,
         total: 0,
-        error:
-          "Backend not configured (BACKEND_URL or BACKEND_API_KEY missing)",
+        error: "Backend not configured (BACKEND_URL missing)",
       },
       { status: 500 },
     );
@@ -60,6 +58,19 @@ export async function POST(request) {
         error: "Request body must be valid JSON",
       },
       { status: 400 },
+    );
+  }
+
+  const apiKey = body?.apiKey;
+  if (typeof apiKey !== "string" || apiKey.length === 0) {
+    return NextResponse.json(
+      {
+        ok: false,
+        saved: 0,
+        total: 0,
+        error: "Backend API key is not configured",
+      },
+      { status: 500 },
     );
   }
 
