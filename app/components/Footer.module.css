@@ -14,4 +14,11 @@
 .version {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     "Liberation Mono", monospace;
+  color: var(--text-link);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.version:hover {
+  text-decoration: underline;
 }
