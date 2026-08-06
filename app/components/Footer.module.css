@@ -2,13 +2,24 @@
   margin-top: auto;
   padding: 1rem 2rem;
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
-  gap: 0.5rem;
+  gap: 1rem;
+  flex-wrap: wrap;
   color: var(--text-muted);
   font-size: 0.8rem;
   border-top: 1px solid var(--border-secondary);
   flex-shrink: 0;
+}
+
+.left {
+  color: var(--text-muted);
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .version {
@@ -21,4 +32,8 @@
 
 .version:hover {
   text-decoration: underline;
+}
+
+.buildDate {
+  white-space: nowrap;
 }

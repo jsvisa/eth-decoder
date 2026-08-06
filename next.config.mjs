@@ -24,6 +24,7 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_APP_VERSION: appVersion,
     NEXT_PUBLIC_APP_COMMIT_SHA: commitSha,
+    NEXT_PUBLIC_APP_BUILD_DATE: new Date().toISOString(),
   },
 };
 
