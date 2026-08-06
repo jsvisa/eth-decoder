@@ -107,6 +107,29 @@ describe("decodeFunctionWithCandidates", () => {
     expect(result.abi).toEqual(abi);
   });
 
+  it("prefers a DB candidate whose abi is an object (not a string)", async () => {
+    process.env.BACKEND_URL = "https://backend.test";
+    const abi = {
+      type: "function",
+      name: "transfer",
+      inputs: [
+        { name: "to", type: "address" },
+        { name: "amount", type: "uint256" },
+      ],
+    };
+    global.fetch
+      .mockResolvedValueOnce(
+        backendResponse([{ text_sign: "transfer(address,uint256)", abi }]),
+      )
+      .mockResolvedValueOnce(
+        sourcifyFunctionResponse("0xa9059cbb", ["transfer(address,uint256)"]),
+      );
+
+    const result = await decodeFunctionWithCandidates(TRANSFER_CALLDATA);
+    expect(result.source).toBe("cfd1");
+    expect(result.abi).toEqual(abi);
+  });
+
   it("skips a DB candidate with unparsable ABI JSON and falls through to Sourcify", async () => {
     process.env.BACKEND_URL = "https://backend.test";
     global.fetch
