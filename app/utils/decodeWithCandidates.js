@@ -12,6 +12,7 @@ import {
 } from "./backendAbiLookup.js";
 
 function parseAbiJson(raw) {
+  if (raw && typeof raw === "object") return raw;
   try {
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === "object" ? parsed : null;
