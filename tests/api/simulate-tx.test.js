@@ -221,6 +221,14 @@ describe("POST /api/simulate-tx — validation", () => {
     expect((await res.json()).error).toMatch(/gas/i);
   });
 
+  it("returns 400 when the custom rpcUrl is not an http(s) URL", async () => {
+    const res = await POST(
+      makeRequest({ ...VALID_BODY, rpcUrl: "file:///etc/passwd" }),
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/rpcUrl/i);
+  });
+
   it("accepts valid hex gas", async () => {
     const res = await POST(makeRequest({ ...VALID_BODY, gas: "0x5208" }));
     expect(res.status).toBe(200);

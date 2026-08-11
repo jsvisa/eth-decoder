@@ -12,7 +12,7 @@ import {
   redecodeCallTrace,
   collectAllCallAddresses,
 } from "../../utils/tevmSimulator";
-import { isValidEthAddress } from "../../utils/validation";
+import { isValidEthAddress, isValidHttpUrl } from "../../utils/validation";
 import {
   saveSimulationResult,
   pruneExpiredResults,
@@ -116,6 +116,14 @@ export async function POST(request) {
         { status: 400 },
       );
     }
+  }
+
+  // Only allow http(s) URLs for user-supplied RPC endpoints
+  if (rpcUrl && !isValidHttpUrl(rpcUrl)) {
+    return NextResponse.json(
+      { error: "Invalid rpcUrl — must be an http:// or https:// URL" },
+      { status: 400 },
+    );
   }
 
   const numericChainId = Number(chainId);

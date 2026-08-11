@@ -42,3 +42,19 @@ export const isValidPositiveInteger = (value) => {
   if (!value || value === "") return true; // empty is valid
   return /^\d+$/.test(value);
 };
+
+/**
+ * Check if a string is a valid http:// or https:// URL.
+ * Used to validate user-supplied RPC URLs before the server fetches them.
+ * @param {string} value - The URL to validate
+ * @returns {boolean} - True if valid, false otherwise
+ */
+export const isValidHttpUrl = (value) => {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
