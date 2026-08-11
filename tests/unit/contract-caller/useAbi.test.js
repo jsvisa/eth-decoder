@@ -288,6 +288,28 @@ describe("useAbi — error and edge cases", () => {
     unmount();
   });
 
+  it("clears stale ABI state when the address becomes invalid", () => {
+    const { result, rerender, unmount } = renderHook((args) => useAbi(args), {
+      initialProps: { chain: "ethereum", address: VALID_ADDRESS },
+    });
+
+    act(() => {
+      result.current.setAbi(JSON.stringify(SIMPLE_ABI));
+    });
+    expect(result.current.abi.length).toBeGreaterThan(0);
+    expect(result.current.parsedAbi).toEqual(SIMPLE_ABI);
+
+    rerender({ chain: "ethereum", address: "0x1234" });
+
+    expect(result.current.abi).toBe("");
+    expect(result.current.parsedAbi).toBeNull();
+    expect(result.current.functions).toEqual([]);
+    expect(result.current.abiSource).toBeNull();
+    expect(result.current.contractName).toBeNull();
+
+    unmount();
+  });
+
   it("fetchAbi calls onSetError when address is empty", async () => {
     const onSetError = vi.fn();
     const { result, unmount } = renderHook((args) => useAbi(args), {
