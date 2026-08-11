@@ -125,6 +125,9 @@ export function useAbi({
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!isValidEthAddress(address)) {
+      setAbi("");
+      setParsedAbi(null);
+      setAbiSource(null);
       setContractName(null);
       return;
     }
