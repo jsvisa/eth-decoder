@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createPublicClient, http, defineChain } from "viem";
-import { isValidEthAddress } from "../../utils/validation";
+import { isValidEthAddress, isValidHttpUrl } from "../../utils/validation";
 import { fetchContractInfoFromSourcify } from "../../utils/sourcify";
 import {
   BUILT_IN_CHAIN_IDS,
@@ -389,6 +389,14 @@ export async function GET(request) {
 
     const customRpcUrl = searchParams.get("rpcUrl");
     const customChainIdParam = searchParams.get("chainId");
+
+    // Only allow http(s) URLs for user-supplied RPC endpoints
+    if (customRpcUrl && !isValidHttpUrl(customRpcUrl)) {
+      return NextResponse.json(
+        { error: "Invalid rpcUrl — must be an http:// or https:// URL" },
+        { status: 400 },
+      );
+    }
 
     let chainId = BUILT_IN_CHAIN_IDS[chain];
     let chainConfig = VIEM_CHAINS[chain];

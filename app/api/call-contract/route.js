@@ -5,7 +5,7 @@ import {
   decodeFunctionResult,
   encodeFunctionData,
 } from "viem";
-import { isValidEthAddress } from "../../utils/validation";
+import { isValidEthAddress, isValidHttpUrl } from "../../utils/validation";
 import { normalizeArg, ArgValidationError } from "../../utils/normalizeArg";
 import {
   VIEM_CHAINS,
@@ -60,6 +60,14 @@ export async function POST(request) {
     // Get chain config - either from built-in chains or create a custom one
     let chainConfig = VIEM_CHAINS[chain];
     let rpcUrl = customRpcUrl || DEFAULT_RPC_URLS[chain];
+
+    // Only allow http(s) URLs for user-supplied RPC endpoints
+    if (customRpcUrl && !isValidHttpUrl(customRpcUrl)) {
+      return NextResponse.json(
+        { error: "Invalid rpcUrl — must be an http:// or https:// URL" },
+        { status: 400 },
+      );
+    }
 
     // Handle custom chains (chain IDs starting with "chain-")
     if (!chainConfig && customChainId && customRpcUrl) {

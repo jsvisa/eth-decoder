@@ -561,6 +561,24 @@ describe("POST /api/call-contract", () => {
     expect(body.decoded[0].value).toBe("1000000");
   });
 
+  it("returns 400 when the custom rpcUrl is not an http(s) URL", async () => {
+    const res = await POST(
+      makeRequest({
+        chain: "custom-gnosis",
+        chainId: 100,
+        rpcUrl: "file:///etc/passwd",
+        address: VALID_ADDRESS,
+        functionName: "balanceOf",
+        abi: BALANCE_OF_ABI,
+        args: [VALID_ADDRESS],
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/rpcUrl/i);
+  });
+
   it("uses raw callData directly when provided, bypassing arg encoding", async () => {
     // Pre-encoded balanceOf(VALID_ADDRESS) — selector 0x70a08231 + padded address
     const rawCalldata =

@@ -701,4 +701,12 @@ describe("POST /api/simulate-tx — state overrides", () => {
       expect.objectContaining({ cheatcodes: {} }),
     );
   });
+
+  it("returns 400 when the custom rpcUrl is not an http(s) URL", async () => {
+    const res = await POST(
+      makeRequest({ ...VALID_BODY, rpcUrl: "file:///etc/passwd" }),
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/rpcUrl/i);
+  });
 });

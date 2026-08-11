@@ -53,6 +53,21 @@ describe("GET /api/fetch-abi", () => {
     expect(body.error).toMatch(/invalid address/i);
   });
 
+  it("returns 400 when the custom rpcUrl is not an http(s) URL", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const res = await GET(
+      makeRequest({
+        address: VALID_ADDRESS,
+        chain: "custom-chain",
+        chainId: "100",
+        rpcUrl: "file:///etc/passwd",
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/rpcUrl/i);
+  });
+
   it("falls back to RouteScan without a key when Sourcify has no match", async () => {
     // No apiKey → Etherscan is skipped; Sourcify fails; RouteScan (keyless) succeeds
     mockFetch([

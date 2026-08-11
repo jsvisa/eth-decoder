@@ -4,6 +4,7 @@ import {
   isValidForkBlock,
   isValidNumber,
   isValidPositiveInteger,
+  isValidHttpUrl,
 } from "../../app/utils/validation.js";
 
 describe("isValidEthAddress", () => {
@@ -107,5 +108,36 @@ describe("isValidPositiveInteger", () => {
 
   it("rejects a non-numeric string", () => {
     expect(isValidPositiveInteger("abc")).toBe(false);
+  });
+});
+
+describe("isValidHttpUrl", () => {
+  it("accepts an https URL", () => {
+    expect(isValidHttpUrl("https://rpc.ankr.com/eth")).toBe(true);
+  });
+
+  it("accepts an http URL", () => {
+    expect(isValidHttpUrl("http://localhost:8545")).toBe(true);
+  });
+
+  it("rejects a file:// URL", () => {
+    expect(isValidHttpUrl("file:///etc/passwd")).toBe(false);
+  });
+
+  it("rejects a ws:// URL", () => {
+    expect(isValidHttpUrl("ws://localhost:8546")).toBe(false);
+  });
+
+  it("rejects a javascript:// URL", () => {
+    expect(isValidHttpUrl("javascript:alert(1)")).toBe(false);
+  });
+
+  it("rejects a plain non-URL string", () => {
+    expect(isValidHttpUrl("not-a-url")).toBe(false);
+  });
+
+  it("rejects an empty string and null", () => {
+    expect(isValidHttpUrl("")).toBe(false);
+    expect(isValidHttpUrl(null)).toBe(false);
   });
 });
