@@ -74,6 +74,12 @@ export async function POST(request) {
       { status: 400 },
     );
   }
+  if (!/^0x[0-9a-fA-F]*$/.test(String(data).trim())) {
+    return NextResponse.json(
+      { error: "Invalid 'data' — must be a 0x-prefixed hex string" },
+      { status: 400 },
+    );
+  }
   if (!from) {
     return NextResponse.json(
       { error: "Missing required field: from" },

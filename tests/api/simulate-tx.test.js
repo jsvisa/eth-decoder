@@ -221,6 +221,28 @@ describe("POST /api/simulate-tx — validation", () => {
     expect((await res.json()).error).toMatch(/gas/i);
   });
 
+  it("returns 400 when data is not a 0x-prefixed hex string", async () => {
+    const res = await POST(makeRequest({ ...VALID_BODY, data: "not-hex" }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/data/i);
+  });
+
+  it("returns 400 when data contains non-hex characters", async () => {
+    const res = await POST(
+      makeRequest({
+        ...VALID_BODY,
+        data: `0x${"5e7db13d".slice(0, 8)}zz`,
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/data/i);
+  });
+
+  it("accepts empty 0x calldata", async () => {
+    const res = await POST(makeRequest({ ...VALID_BODY, data: "0x" }));
+    expect(res.status).toBe(200);
+  });
+
   it("accepts valid hex gas", async () => {
     const res = await POST(makeRequest({ ...VALID_BODY, gas: "0x5208" }));
     expect(res.status).toBe(200);
