@@ -120,8 +120,17 @@ export async function POST(request) {
     }
 
     // Add block number if provided (for historical state queries)
-    if (blockNumber) {
-      callParams.blockNumber = BigInt(blockNumber);
+    if (blockNumber && blockNumber !== "latest") {
+      if (!/^(0x[0-9a-fA-F]+|\d+)$/.test(String(blockNumber).trim())) {
+        return NextResponse.json(
+          {
+            error:
+              "Invalid 'blockNumber' — must be 'latest', a decimal integer, or a hex string",
+          },
+          { status: 400 },
+        );
+      }
+      callParams.blockNumber = BigInt(blockNumber.trim());
     }
 
     const result = await client.call(callParams);

@@ -108,6 +108,90 @@ describe("POST /api/call-contract", () => {
     expect(body.error).toMatch(/not found in abi/i);
   });
 
+  describe("blockNumber validation", () => {
+    it("accepts 'latest' as blockNumber without crashing", async () => {
+      stubRpc({
+        eth_call: () =>
+          "0x00000000000000000000000000000000000000000000000000000000000f4240",
+        eth_chainId: () => "0x1",
+      });
+
+      const res = await POST(
+        makeRequest({
+          chain: "ethereum",
+          address: VALID_ADDRESS,
+          functionName: "balanceOf",
+          abi: BALANCE_OF_ABI,
+          args: [VALID_ADDRESS],
+          blockNumber: "latest",
+        }),
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.decoded[0].value).toBe("1000000");
+    });
+
+    it("accepts a decimal blockNumber", async () => {
+      stubRpc({
+        eth_call: () =>
+          "0x00000000000000000000000000000000000000000000000000000000000f4240",
+        eth_chainId: () => "0x1",
+      });
+
+      const res = await POST(
+        makeRequest({
+          chain: "ethereum",
+          address: VALID_ADDRESS,
+          functionName: "balanceOf",
+          abi: BALANCE_OF_ABI,
+          args: [VALID_ADDRESS],
+          blockNumber: "12345",
+        }),
+      );
+
+      expect(res.status).toBe(200);
+    });
+
+    it("accepts a hex blockNumber", async () => {
+      stubRpc({
+        eth_call: () =>
+          "0x00000000000000000000000000000000000000000000000000000000000f4240",
+        eth_chainId: () => "0x1",
+      });
+
+      const res = await POST(
+        makeRequest({
+          chain: "ethereum",
+          address: VALID_ADDRESS,
+          functionName: "balanceOf",
+          abi: BALANCE_OF_ABI,
+          args: [VALID_ADDRESS],
+          blockNumber: "0x1a2b",
+        }),
+      );
+
+      expect(res.status).toBe(200);
+    });
+
+    it("returns 400 for an invalid blockNumber format", async () => {
+      const res = await POST(
+        makeRequest({
+          chain: "ethereum",
+          address: VALID_ADDRESS,
+          functionName: "balanceOf",
+          abi: BALANCE_OF_ABI,
+          args: [VALID_ADDRESS],
+          blockNumber: "not-a-block",
+        }),
+      );
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toMatch(/blocknumber/i);
+    });
+  });
+
   describe("overloaded functions", () => {
     // Two overloads: getValue(uint256) → uint256, getValue(address) → bytes32
     const OVERLOADED_ABI = [
