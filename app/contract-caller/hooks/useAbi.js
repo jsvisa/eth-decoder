@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { isValidEthAddress } from "../../utils/validation";
 import { getCachedAbi, setCachedAbi } from "../../utils/abiCache";
 import { isReadOnly } from "../utils/functionArgs";
@@ -115,6 +115,7 @@ export function useAbi({
   const [abiViewMode, setAbiViewMode] = useState("list");
   const [abiFilter, setAbiFilter] = useState("");
   const [abiCopiedItem, setAbiCopiedItem] = useState(null);
+  const fetchAbiRequestId = useRef(0);
 
   useEffect(() => {
     setCachedAddresses(getCachedAddresses());
@@ -124,6 +125,7 @@ export function useAbi({
   // Effect 1: Auto-load cached ABI when address or chain changes (lines 1533–1560)
   // -------------------------------------------------------------------------
   useEffect(() => {
+    fetchAbiRequestId.current += 1;
     if (!isValidEthAddress(address)) {
       setContractName(null);
       return;
@@ -194,6 +196,7 @@ export function useAbi({
   // Callback: fetchAbi (lines 1847–1934)
   // -------------------------------------------------------------------------
   const fetchAbi = async (forceRefresh = false) => {
+    const requestId = ++fetchAbiRequestId.current;
     if (!address?.trim()) {
       if (onSetError) onSetError("Please enter a contract address");
       return;
@@ -241,6 +244,9 @@ export function useAbi({
       const response = await fetch(`/api/fetch-abi?${params}`);
       const data = await response.json();
 
+      // Ignore stale responses from a previous address/chain
+      if (requestId !== fetchAbiRequestId.current) return;
+
       if (!response.ok) {
         throw new Error(data.error || "Failed to fetch ABI");
       }
@@ -273,9 +279,12 @@ export function useAbi({
       // Expand ABI when first fetched from remote
       setAbiCollapsed(false);
     } catch (err) {
+      if (requestId !== fetchAbiRequestId.current) return;
       if (onSetError) onSetError(err.message);
     } finally {
-      setFetchingAbi(false);
+      if (requestId === fetchAbiRequestId.current) {
+        setFetchingAbi(false);
+      }
     }
   };
 
