@@ -383,3 +383,82 @@ describe("useAbi — error and edge cases", () => {
     unmount();
   });
 });
+
+// ---------------------------------------------------------------------------
+// 4. Fetch race handling
+// ---------------------------------------------------------------------------
+describe("useAbi — fetch race", () => {
+  it("ignores a stale fetchAbi response after the address changes", async () => {
+    let resolveFirst;
+    const firstResponse = new Promise((resolve) => {
+      resolveFirst = resolve;
+    });
+
+    let callCount = 0;
+    global.fetch = vi.fn().mockImplementation(() => {
+      callCount += 1;
+      if (callCount === 1) {
+        return firstResponse.then(() => ({
+          ok: true,
+          json: async () => ({
+            abi: SIMPLE_ABI,
+            isProxy: false,
+            implAddress: null,
+            contractName: "StaleToken",
+            implContractName: null,
+          }),
+        }));
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          abi: SIMPLE_ABI,
+          isProxy: false,
+          implAddress: null,
+          contractName: "FreshToken",
+          implContractName: null,
+        }),
+      });
+    });
+
+    const { result, rerender, unmount } = renderHook((args) => useAbi(args), {
+      initialProps: {
+        chain: "ethereum",
+        address: VALID_ADDRESS,
+        getChainId: () => 1,
+      },
+    });
+
+    // Kick off a fetch for the first address; its response stays pending
+    let firstFetch;
+    act(() => {
+      firstFetch = result.current.fetchAbi(true);
+    });
+
+    // Switch to a new address and fetch again (resolves immediately)
+    const OTHER_ADDRESS = "0x9876543210987654321098765432109876543210";
+    rerender({
+      chain: "ethereum",
+      address: OTHER_ADDRESS,
+      getChainId: () => 1,
+    });
+
+    let secondFetch;
+    act(() => {
+      secondFetch = result.current.fetchAbi(true);
+    });
+
+    // Resolve the stale first response after the second one is already applied
+    await act(async () => {
+      resolveFirst({});
+      await firstFetch;
+      await secondFetch;
+    });
+
+    // The stale response must not overwrite the newer one
+    expect(result.current.contractName).toBe("FreshToken");
+    expect(result.current.fetchingAbi).toBe(false);
+
+    unmount();
+  });
+});
