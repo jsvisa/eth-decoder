@@ -250,6 +250,54 @@ export async function decodeCallTraceLogsViaServer(node) {
   );
 }
 
+// Walk the call trace tree to find the origin of a revert reason.
+//
+// A reverting sub-call only reaches the caller if its raw revert bytes surface
+// unchanged up the call stack, so the origin of the failure is the deepest
+// frame whose `output` byte-matches the top-level revert data (`rawOutput`).
+// Frames above it merely bubbled the same bytes; a frame that reverted with a
+// DIFFERENT reason than its descendant re-wrapped the child's error (try/catch)
+// and is the authoritative one for that subtree — anything beneath it never
+// propagated and must not be surfaced.
+//
+// When the transaction reverts with no data (empty `rawOutput`), no frame can
+// byte-match, so fall back to the deepest decodable errorReason in the tree as
+// the best available explanation.
+export function findRootCause(node, rawOutput) {
+  if (!node) return null;
+  const rootBytes =
+    rawOutput && rawOutput !== "0x" ? rawOutput.toLowerCase() : null;
+  let onPath = null; // deepest frame carrying the tx's bytes, with a decoded reason
+  let deepestDecoded = null; // deepest decoded reason anywhere (empty-revert fallback)
+
+  const visit = (n, depth, carriedBytes) => {
+    if (!n) return;
+    const reverted = Boolean(n.error || n.errorReason);
+    const carriesTxBytes =
+      carriedBytes && reverted && n.output?.toLowerCase() === carriedBytes;
+
+    if (carriesTxBytes && n.errorReason && (!onPath || depth > onPath.depth)) {
+      onPath = { depth, reason: n.errorReason };
+    }
+    if (n.errorReason && (!deepestDecoded || depth > deepestDecoded.depth)) {
+      deepestDecoded = { depth, reason: n.errorReason };
+    }
+
+    // A frame that reverted with different bytes stopped the propagation, so
+    // its descendants can't be the origin of the tx's revert data.
+    const nextCarried = carriesTxBytes ? carriedBytes : null;
+    for (const child of n.calls || []) visit(child, depth + 1, nextCarried);
+  };
+  visit(node, 0, rootBytes);
+
+  if (onPath) return onPath.reason;
+  // Empty top-level revert (e.g. a multicall bubbling `revert(0,0)`, or a
+  // `require(success)` without a message): the tx carries no bytes to match, so
+  // surface the deepest decodable sub-call reason as a best-effort root cause.
+  if (!rootBytes && deepestDecoded) return deepestDecoded.reason;
+  return null;
+}
+
 // Decode revert data into a human-readable string.
 // Handles Error(string), Panic(uint256), and custom ABI errors via viem's decodeErrorResult.
 // Uses viem throughout — avoids Buffer.from which is unreliable in browser bundles.
@@ -1288,10 +1336,14 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       error: success
         ? null
         : (() => {
-            // callTraceRoot.errorReason is set by onAfterMessage via decodeRevertData.
-            // Fall back to decoding rawOutput directly in case the hook path was skipped.
+            // Walk the call trace to find the error's origin: the deepest frame
+            // whose raw revert bytes match the tx's own revert data (rawOutput),
+            // i.e. the frame that actually introduced them. If no frame carries
+            // those bytes (or the tx reverted empty), fall back to the deepest
+            // decodable errorReason in the tree, then to decoding rawOutput.
             const reason =
-              callTraceRoot?.errorReason || decodeRevertData(rawOutput, abi);
+              findRootCause(callTraceRoot, rawOutput) ||
+              decodeRevertData(rawOutput, abi);
             return reason ? `Revert: ${reason}` : "Transaction reverted";
           })(),
       undecodedAddresses: Array.from(undecodedAddresses),

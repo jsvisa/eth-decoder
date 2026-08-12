@@ -14,6 +14,7 @@ import {
   createArbSysPrecompile,
   decodeRevertData,
   ensureTevmNodeCompat,
+  findRootCause,
   sanitizeForkRpcResult,
   simulateWithClient,
   collectAllCallAddresses,
@@ -169,6 +170,127 @@ describe("decodeRevertData", () => {
     it("returns null for data shorter than 4 bytes", () => {
       expect(decodeRevertData("0x08c379")).toBeNull();
     });
+  });
+});
+
+describe("findRootCause", () => {
+  const node = (output, errorReason, calls = [], error = null) => ({
+    output,
+    errorReason,
+    error,
+    calls,
+  });
+
+  it("returns null for null node", () => {
+    expect(findRootCause(null, "0xdeadbeef")).toBeNull();
+  });
+
+  it("returns the deepest frame whose raw output bytes match the tx revert data", () => {
+    const root = node(
+      "0xdeadbeef",
+      null, // root ABI can't decode the bubbled custom error
+      [node("0xdeadbeef", "INSUFFICIENT_OUTPUT_AMOUNT", [], "revert")],
+      "revert",
+    );
+    expect(findRootCause(root, "0xdeadbeef")).toBe(
+      "INSUFFICIENT_OUTPUT_AMOUNT",
+    );
+  });
+
+  it("ignores deeper frames that reverted with different bytes (off-path)", () => {
+    const root = node(
+      "0xaaaa",
+      null,
+      [
+        node("0xbbbb", "STF", [], "revert"), // caught/rewrapped, never reached the tx root
+      ],
+      "revert",
+    );
+    expect(findRootCause(root, "0xaaaa")).toBeNull();
+  });
+
+  it("returns the parent's reason when it re-wraps the child's error (try/catch)", () => {
+    const root = node(
+      "0xcafebabe",
+      "Multicall: call failed",
+      [node("0xdeadbeef", "INSUFFICIENT_OUTPUT_AMOUNT", [], "revert")],
+      "revert",
+    );
+    expect(findRootCause(root, "0xcafebabe")).toBe("Multicall: call failed");
+  });
+
+  it("falls back to the deepest decodable reason when the tx reverted empty", () => {
+    const root = node(
+      "0x",
+      null,
+      [node("0xdeadbeef", "INSUFFICIENT_OUTPUT_AMOUNT", [], "revert")],
+      "revert",
+    );
+    expect(findRootCause(root, "0x")).toBe("INSUFFICIENT_OUTPUT_AMOUNT");
+  });
+
+  it("returns null when the tx reverted with data but nothing decoded it", () => {
+    const root = node(
+      "0xdeadbeef",
+      null,
+      [
+        node("0xdeadbeef", null, [], "revert"), // same bytes bubbled, but undecodable
+      ],
+      "revert",
+    );
+    expect(findRootCause(root, "0xdeadbeef")).toBeNull();
+  });
+
+  it("picks the deepest on-path frame in a bubbling chain", () => {
+    const root = node(
+      "0xdeadbeef",
+      null,
+      [
+        node("0xdeadbeef", "Generic", [
+          node("0xdeadbeef", "INSUFFICIENT_OUTPUT_AMOUNT"),
+        ]),
+      ],
+      "revert",
+    );
+    expect(findRootCause(root, "0xdeadbeef")).toBe(
+      "INSUFFICIENT_OUTPUT_AMOUNT",
+    );
+  });
+
+  it("propagates the reason through a chain where all frames bubble the same bytes", () => {
+    const root = node(
+      "0xdeadbeef",
+      null,
+      [
+        node(
+          "0xdeadbeef",
+          null,
+          [node("0xdeadbeef", "STF", [], "revert")],
+          "revert",
+        ),
+      ],
+      "revert",
+    );
+    expect(findRootCause(root, "0xdeadbeef")).toBe("STF");
+  });
+
+  it("resumes propagation after an intermediate frame bubbles the bytes", () => {
+    const root = node(
+      "0xdeadbeef",
+      null,
+      [
+        node(
+          "0xdeadbeef",
+          null,
+          [node("0xdeadbeef", "INSUFFICIENT_OUTPUT_AMOUNT", [], "revert")],
+          "revert",
+        ),
+      ],
+      "revert",
+    );
+    expect(findRootCause(root, "0xdeadbeef")).toBe(
+      "INSUFFICIENT_OUTPUT_AMOUNT",
+    );
   });
 });
 
