@@ -7,8 +7,17 @@ export function hasVercelBlobCredentials() {
   );
 }
 
+export function isBlobStoreEnabled() {
+  return (
+    process.env.BLOB_STORE_ENABLED === "1" ||
+    process.env.BLOB_STORE_ENABLED === "true"
+  );
+}
+
 export function shouldUseVercelBlob() {
-  return isVercelRuntime() && hasVercelBlobCredentials();
+  return (
+    isVercelRuntime() && isBlobStoreEnabled() && hasVercelBlobCredentials()
+  );
 }
 
 export async function blobPut(path, data, opts = {}) {

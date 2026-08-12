@@ -24,6 +24,7 @@ const ORIGINAL_ENV = {
   VERCEL: process.env.VERCEL,
   BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
   BLOB_STORE_ID: process.env.BLOB_STORE_ID,
+  BLOB_STORE_ENABLED: process.env.BLOB_STORE_ENABLED,
   VERCEL_OIDC_TOKEN: process.env.VERCEL_OIDC_TOKEN,
 };
 
@@ -62,6 +63,7 @@ describe("simulationCache", () => {
     delete process.env.VERCEL;
     delete process.env.BLOB_READ_WRITE_TOKEN;
     delete process.env.BLOB_STORE_ID;
+    delete process.env.BLOB_STORE_ENABLED;
     delete process.env.VERCEL_OIDC_TOKEN;
   });
 

@@ -295,8 +295,11 @@ curl -X POST http://localhost:3000/api/simulate-tx \
 
 Required Vercel Blob environment:
 
+- `BLOB_STORE_ENABLED=true`, and
 - `BLOB_READ_WRITE_TOKEN`, or
 - `BLOB_STORE_ID` with `VERCEL_OIDC_TOKEN`
+
+Blob storage is only used when `BLOB_STORE_ENABLED=true` is set; unset it (or set to anything other than `true`/`1`) to force the filesystem cache instead.
 
 ## Deploy to Vercel
 

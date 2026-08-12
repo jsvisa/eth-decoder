@@ -15,6 +15,7 @@ const ORIGINAL_ENV = {
   VERCEL: process.env.VERCEL,
   BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
   BLOB_STORE_ID: process.env.BLOB_STORE_ID,
+  BLOB_STORE_ENABLED: process.env.BLOB_STORE_ENABLED,
   VERCEL_OIDC_TOKEN: process.env.VERCEL_OIDC_TOKEN,
   CACHE_DIR: process.env.CACHE_DIR,
 };
@@ -53,6 +54,7 @@ describe("serverAbiBlobCache", () => {
     delete process.env.VERCEL;
     delete process.env.BLOB_READ_WRITE_TOKEN;
     delete process.env.BLOB_STORE_ID;
+    delete process.env.BLOB_STORE_ENABLED;
     delete process.env.VERCEL_OIDC_TOKEN;
     delete process.env.CACHE_DIR;
 
@@ -79,6 +81,7 @@ describe("serverAbiBlobCache", () => {
     it("reads from blob when on Vercel with credentials", async () => {
       process.env.VERCEL = "1";
       process.env.BLOB_READ_WRITE_TOKEN = "token";
+      process.env.BLOB_STORE_ENABLED = "true";
       const abiEntry = makeAbiEntry();
       const now = Date.now();
       const entry = { data: abiEntry, createdAt: now, expiresAt: now + 60_000 };
@@ -103,6 +106,7 @@ describe("serverAbiBlobCache", () => {
     it("writes to blob and local FS when on Vercel with credentials", async () => {
       process.env.VERCEL = "1";
       process.env.BLOB_READ_WRITE_TOKEN = "token";
+      process.env.BLOB_STORE_ENABLED = "true";
       process.env.CACHE_DIR = TEST_CACHE_DIR;
       putBlob.mockResolvedValue({});
 
@@ -139,6 +143,7 @@ describe("serverAbiBlobCache", () => {
     it("falls through to local FS when blob is unavailable", async () => {
       process.env.VERCEL = "1";
       process.env.BLOB_READ_WRITE_TOKEN = "token";
+      process.env.BLOB_STORE_ENABLED = "true";
       getBlob.mockRejectedValue(new Error("Not found"));
 
       const abiEntry = makeAbiEntry();
@@ -162,6 +167,7 @@ describe("serverAbiBlobCache", () => {
     it("returns null for expired blob entries", async () => {
       process.env.VERCEL = "1";
       process.env.BLOB_READ_WRITE_TOKEN = "token";
+      process.env.BLOB_STORE_ENABLED = "true";
       const entry = { data: makeAbiEntry(), createdAt: 1, expiresAt: 2 };
       getBlob.mockResolvedValue({
         stream: new Response(JSON.stringify(entry)).body,
