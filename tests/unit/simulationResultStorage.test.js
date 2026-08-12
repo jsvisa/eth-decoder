@@ -50,6 +50,7 @@ const ORIGINAL_ENV = {
   VERCEL: process.env.VERCEL,
   BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
   BLOB_STORE_ID: process.env.BLOB_STORE_ID,
+  BLOB_STORE_ENABLED: process.env.BLOB_STORE_ENABLED,
   VERCEL_OIDC_TOKEN: process.env.VERCEL_OIDC_TOKEN,
   CACHE_DIR: process.env.CACHE_DIR,
   SIMULATION_CACHE_DIR: process.env.SIMULATION_CACHE_DIR,
@@ -76,6 +77,7 @@ describe("simulation result storage backends", () => {
     delete process.env.VERCEL;
     delete process.env.BLOB_READ_WRITE_TOKEN;
     delete process.env.BLOB_STORE_ID;
+    delete process.env.BLOB_STORE_ENABLED;
     delete process.env.VERCEL_OIDC_TOKEN;
     delete process.env.CACHE_DIR;
     delete process.env.SIMULATION_CACHE_DIR;
@@ -87,9 +89,10 @@ describe("simulation result storage backends", () => {
     restoreEnv();
   });
 
-  it("saves Vercel deployments to private Blob storage when credentials exist", async () => {
+  it("saves Vercel deployments to private Blob storage when credentials and BLOB_STORE_ENABLED exist", async () => {
     process.env.VERCEL = "1";
     process.env.BLOB_READ_WRITE_TOKEN = "vercel-blob-token";
+    process.env.BLOB_STORE_ENABLED = "true";
     putBlob.mockResolvedValue({
       pathname: "simulations/mock.json",
       url: "https://example.com/mock.json",
@@ -132,6 +135,21 @@ describe("simulation result storage backends", () => {
       "simulations/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.json",
       { access: "private" },
     );
+  });
+
+  it("saves to local cache on Vercel when BLOB_STORE_ENABLED is not set", async () => {
+    process.env.VERCEL = "1";
+    process.env.BLOB_READ_WRITE_TOKEN = "vercel-blob-token";
+    process.env.SIMULATION_CACHE_DIR = join(DEFAULT_CACHE_TEST_DIR, "opt-out");
+
+    const id = await saveSimulationResult(SIM_DATA);
+
+    expect(id).not.toMatch(/^vb1_/);
+    expect(putBlob).not.toHaveBeenCalled();
+    await expect(
+      fs.access(join(DEFAULT_CACHE_TEST_DIR, "opt-out", `${id}.json`)),
+    ).resolves.toBeUndefined();
+    await expect(getSimulationResult(id)).resolves.toEqual(SIM_DATA);
   });
 
   it("uses home cache by default outside Vercel", async () => {
