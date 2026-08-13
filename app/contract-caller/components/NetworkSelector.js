@@ -1,9 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { BUILT_IN_CHAIN_IDS } from "../../utils/chains";
 import styles from "./NetworkSelector.module.css";
 
+const SORT_OPTIONS = [
+  { value: "sort:name", label: "Sort by name" },
+  { value: "sort:chainId", label: "Sort by chain ID" },
+];
+
 /**
- * Chain dropdown with icon, a sort toggle, and a button to open the Add Chain modal.
+ * Chain dropdown with icon, an in-dropdown sort control, and a button to open
+ * the Add Chain modal. The sort options live at the top of the select; picking
+ * one re-sorts the chain list and shows as the header until a chain is chosen.
  *
  * @param {{
  *   chain: string,
@@ -21,13 +28,28 @@ export default function NetworkSelector({
   disabled,
 }) {
   const [sortBy, setSortBy] = useState("name");
-  const selectedChain = allChains.find((c) => c.id === chain);
+  const [selectValue, setSelectValue] = useState(chain);
+  useEffect(() => {
+    setSelectValue(chain);
+  }, [chain]);
+
+  const selectedChain = allChains.find((c) => c.id === selectValue);
   const chainIdOf = (c) => c.chainId || BUILT_IN_CHAIN_IDS[c.id] || 0;
   const sortedChains = [...allChains].sort((a, b) =>
     sortBy === "chainId"
       ? chainIdOf(a) - chainIdOf(b)
       : a.name.localeCompare(b.name),
   );
+
+  const handleChange = (value) => {
+    if (value.startsWith("sort:")) {
+      setSortBy(value.slice("sort:".length));
+      setSelectValue(value);
+    } else {
+      setSelectValue(value);
+      onChainChange(value);
+    }
+  };
 
   return React.createElement(
     "div",
@@ -47,11 +69,18 @@ export default function NetworkSelector({
       React.createElement(
         "select",
         {
-          value: chain,
-          onChange: (e) => onChainChange(e.target.value),
+          value: selectValue,
+          onChange: (e) => handleChange(e.target.value),
           className: styles.select,
           disabled,
         },
+        ...SORT_OPTIONS.map((opt) =>
+          React.createElement(
+            "option",
+            { key: opt.value, value: opt.value },
+            opt.label,
+          ),
+        ),
         ...sortedChains.map((c) => {
           const chainIdNum = chainIdOf(c);
           return React.createElement(
@@ -60,36 +89,6 @@ export default function NetworkSelector({
             `${c.name} (${chainIdNum})`,
           );
         }),
-      ),
-    ),
-    React.createElement(
-      "div",
-      { className: styles.sortToggle },
-      React.createElement(
-        "button",
-        {
-          type: "button",
-          className:
-            styles.sortBtn +
-            (sortBy === "name" ? " " + styles.sortBtnActive : ""),
-          onClick: () => setSortBy("name"),
-          title: "Sort by name",
-          disabled,
-        },
-        "Name",
-      ),
-      React.createElement(
-        "button",
-        {
-          type: "button",
-          className:
-            styles.sortBtn +
-            (sortBy === "chainId" ? " " + styles.sortBtnActive : ""),
-          onClick: () => setSortBy("chainId"),
-          title: "Sort by chain ID",
-          disabled,
-        },
-        "#ID",
       ),
     ),
     React.createElement(

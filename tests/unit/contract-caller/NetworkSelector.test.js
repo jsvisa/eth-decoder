@@ -30,6 +30,14 @@ function optionValues(container) {
   return Array.from(container.querySelectorAll("option")).map((o) => o.value);
 }
 
+function selectOption(container, value) {
+  const select = container.querySelector("select");
+  act(() => {
+    select.value = value;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+}
+
 const BASE_PROPS = {
   chain: "ethereum",
   onChainChange: () => {},
@@ -39,44 +47,44 @@ const BASE_PROPS = {
 };
 
 describe("NetworkSelector", () => {
-  it("renders a select with one option per chain", () => {
+  it("renders a select with sort options followed by one option per chain", () => {
     const { container, cleanup } = renderComponent(BASE_PROPS);
 
     const select = container.querySelector("select");
     expect(select).not.toBeNull();
-    expect(select.querySelectorAll("option")).toHaveLength(MOCK_CHAINS.length);
+    const options = Array.from(select.querySelectorAll("option"));
+    expect(options).toHaveLength(MOCK_CHAINS.length + 2);
+    expect(options[0].textContent).toBe("Sort by name");
+    expect(options[1].textContent).toBe("Sort by chain ID");
 
     cleanup();
   });
 
   it("sorts options by name by default", () => {
     const { container, cleanup } = renderComponent(BASE_PROPS);
-    // Arbitrum, Base, Ethereum
-    expect(optionValues(container)).toEqual(["arbitrum", "base", "ethereum"]);
+    // sort options first, then Arbitrum, Base, Ethereum
+    expect(optionValues(container)).toEqual([
+      "sort:name",
+      "sort:chainId",
+      "arbitrum",
+      "base",
+      "ethereum",
+    ]);
     cleanup();
   });
 
-  it("renders the sort toggle and add buttons", () => {
+  it("sorts options by chain ID when the sort option is picked", () => {
     const { container, cleanup } = renderComponent(BASE_PROPS);
-    const labels = Array.from(container.querySelectorAll("button")).map(
-      (b) => b.textContent,
-    );
-    expect(labels).toContain("Name");
-    expect(labels).toContain("#ID");
-    expect(labels).toContain("+");
-    cleanup();
-  });
-
-  it("sorts options by chain ID when #ID is selected", () => {
-    const { container, cleanup } = renderComponent(BASE_PROPS);
-    const idBtn = Array.from(container.querySelectorAll("button")).find(
-      (b) => b.textContent === "#ID",
-    );
-    act(() => {
-      idBtn.click();
-    });
-    // Ethereum(1), Base(8453), Arbitrum(42161)
-    expect(optionValues(container)).toEqual(["ethereum", "base", "arbitrum"]);
+    selectOption(container, "sort:chainId");
+    // sort options first, then Ethereum(1), Base(8453), Arbitrum(42161)
+    expect(optionValues(container)).toEqual([
+      "sort:name",
+      "sort:chainId",
+      "ethereum",
+      "base",
+      "arbitrum",
+    ]);
+    expect(container.querySelector("select").value).toBe("sort:chainId");
     cleanup();
   });
 
@@ -90,14 +98,11 @@ describe("NetworkSelector", () => {
       ...BASE_PROPS,
       allChains,
     });
-    const idBtn = Array.from(container.querySelectorAll("button")).find(
-      (b) => b.textContent === "#ID",
-    );
-    act(() => {
-      idBtn.click();
-    });
-    // ethereum(1), Alpha(10), chain-999(999), Base(8453), Arbitrum(42161)
+    selectOption(container, "sort:chainId");
+    // sort options first, then ethereum(1), Alpha(10), chain-999(999), Base(8453), Arbitrum(42161)
     expect(optionValues(container)).toEqual([
+      "sort:name",
+      "sort:chainId",
       "ethereum",
       "chain-10",
       "chain-999",
@@ -107,21 +112,30 @@ describe("NetworkSelector", () => {
     cleanup();
   });
 
-  it("switches back to name sort after toggling", () => {
+  it("switches back to name sort after picking the chain ID sort", () => {
     const { container, cleanup } = renderComponent(BASE_PROPS);
-    const idBtn = Array.from(container.querySelectorAll("button")).find(
-      (b) => b.textContent === "#ID",
-    );
-    const nameBtn = Array.from(container.querySelectorAll("button")).find(
-      (b) => b.textContent === "Name",
-    );
-    act(() => {
-      idBtn.click();
+    selectOption(container, "sort:chainId");
+    selectOption(container, "sort:name");
+    expect(optionValues(container)).toEqual([
+      "sort:name",
+      "sort:chainId",
+      "arbitrum",
+      "base",
+      "ethereum",
+    ]);
+    cleanup();
+  });
+
+  it("selecting a chain calls onChainChange and shows it as the header", () => {
+    const onChainChange = vi.fn();
+    const { container, cleanup } = renderComponent({
+      ...BASE_PROPS,
+      onChainChange,
     });
-    act(() => {
-      nameBtn.click();
-    });
-    expect(optionValues(container)).toEqual(["arbitrum", "base", "ethereum"]);
+    selectOption(container, "sort:chainId");
+    selectOption(container, "base");
+    expect(onChainChange).toHaveBeenCalledWith("base");
+    expect(container.querySelector("select").value).toBe("base");
     cleanup();
   });
 
