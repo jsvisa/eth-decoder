@@ -370,6 +370,33 @@ describe("POST /api/simulate-tx — simulation", () => {
     expect(body.gasUsed).toBe(63086);
   });
 
+  it("omits metrics by default", async () => {
+    simulateWithTevm.mockResolvedValue({
+      ...SIM_RESULT,
+      metrics: { totalMs: 123, rpc: {}, phases: {}, touched: {} },
+    });
+    const res = await POST(makeRequest(VALID_BODY));
+    const body = await res.json();
+    expect(body.metrics).toBeUndefined();
+  });
+
+  it("includes metrics when includeMetrics: true", async () => {
+    simulateWithTevm.mockResolvedValue({
+      ...SIM_RESULT,
+      metrics: { totalMs: 123, rpc: {}, phases: {}, touched: {} },
+    });
+    const res = await POST(
+      makeRequest({ ...VALID_BODY, includeMetrics: true }),
+    );
+    const body = await res.json();
+    expect(body.metrics).toEqual({
+      totalMs: 123,
+      rpc: {},
+      phases: {},
+      touched: {},
+    });
+  });
+
   it("includes simulationId and requestBody when save: true", async () => {
     const res = await POST(makeRequest({ ...VALID_BODY, save: true }));
     expect(res.status).toBe(200);
