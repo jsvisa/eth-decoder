@@ -15,7 +15,7 @@ import { useHistory } from "./hooks/useHistory";
 import { useBookmarkModal } from "./hooks/useBookmarkModal";
 import { useAddChainModal } from "./hooks/useAddChainModal";
 import { useTokenMetadata } from "./hooks/useTokenMetadata";
-import { getFunctionSig, isReadOnly } from "./utils/functionArgs";
+import { getFunctionSig, isReadOnly, isPayable } from "./utils/functionArgs";
 import {
   NATIVE_TOKEN_SYMBOLS,
   enrichBalanceChanges,
@@ -591,52 +591,53 @@ export default function ContractCallerPage() {
                   onDecodeAndFill={fn.handleDecodeAndFill}
                   disabled={exec.loading}
                 />
-                {fn.pasteCalldataExpanded && (
-                  <div className={argsStyles.field}>
-                    <label className={argsStyles.label}>ETH Value</label>
-                    <div className={argsStyles.ethValueWrapper}>
-                      <input
-                        type="text"
-                        value={fn.ethValue}
-                        onChange={(e) => fn.setEthValue(e.target.value)}
-                        placeholder={fn.ethValueUnit === "ETH" ? "0.0" : "0"}
-                        className={
-                          argsStyles.ethValueInput +
-                          (fn.fieldErrors.ethValue
-                            ? " " + argsStyles.inputError
-                            : "")
-                        }
-                        disabled={exec.loading}
-                      />
-                      <div className={argsStyles.ethValueUnitToggle}>
-                        <button
-                          type="button"
+                {fn.pasteCalldataExpanded &&
+                  !(selectedFn && isPayable(selectedFn)) && (
+                    <div className={argsStyles.field}>
+                      <label className={argsStyles.label}>ETH Value</label>
+                      <div className={argsStyles.ethValueWrapper}>
+                        <input
+                          type="text"
+                          value={fn.ethValue}
+                          onChange={(e) => fn.setEthValue(e.target.value)}
+                          placeholder={fn.ethValueUnit === "ETH" ? "0.0" : "0"}
                           className={
-                            argsStyles.ethValueUnitBtn +
-                            (fn.ethValueUnit === "Wei"
-                              ? " " + argsStyles.active
+                            argsStyles.ethValueInput +
+                            (fn.fieldErrors.ethValue
+                              ? " " + argsStyles.inputError
                               : "")
                           }
-                          onClick={() => fn.setEthValueUnit("Wei")}
-                        >
-                          Wei
-                        </button>
-                        <button
-                          type="button"
-                          className={
-                            argsStyles.ethValueUnitBtn +
-                            (fn.ethValueUnit === "ETH"
-                              ? " " + argsStyles.active
-                              : "")
-                          }
-                          onClick={() => fn.setEthValueUnit("ETH")}
-                        >
-                          ETH
-                        </button>
+                          disabled={exec.loading}
+                        />
+                        <div className={argsStyles.ethValueUnitToggle}>
+                          <button
+                            type="button"
+                            className={
+                              argsStyles.ethValueUnitBtn +
+                              (fn.ethValueUnit === "Wei"
+                                ? " " + argsStyles.active
+                                : "")
+                            }
+                            onClick={() => fn.handleEthValueUnitChange("Wei")}
+                          >
+                            Wei
+                          </button>
+                          <button
+                            type="button"
+                            className={
+                              argsStyles.ethValueUnitBtn +
+                              (fn.ethValueUnit === "ETH"
+                                ? " " + argsStyles.active
+                                : "")
+                            }
+                            onClick={() => fn.handleEthValueUnitChange("ETH")}
+                          >
+                            ETH
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
                 <SimulationOptions
                   forkBlockNumber={simOpts.forkBlockNumber}
                   onForkBlockChange={simOpts.setForkBlockNumber}
@@ -669,7 +670,7 @@ export default function ContractCallerPage() {
                   ethValue={fn.ethValue}
                   onEthValueChange={fn.setEthValue}
                   ethValueUnit={fn.ethValueUnit}
-                  onEthValueUnitChange={fn.setEthValueUnit}
+                  onEthValueUnitChange={fn.handleEthValueUnitChange}
                   disabled={exec.loading}
                 />
               </>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { parseEther } from "viem";
 import {
   simulateWithTevm,
   simulateWithClient,
@@ -119,17 +120,14 @@ export function useCallExecution({
 
   const getEthValueWithUnit = () => {
     if (!ethValue || ethValue.trim() === "")
-      return { value: undefined, unit: "ETH" };
+      return { value: undefined, unit: "Wei" };
     try {
-      if (ethValueUnit === "Wei") {
-        BigInt(ethValue);
-      } else {
-        parseFloat(ethValue);
-      }
+      const valueInWei =
+        ethValueUnit === "Wei" ? BigInt(ethValue) : parseEther(ethValue);
+      return { value: valueInWei.toString(), unit: "Wei" };
     } catch {
-      return { value: undefined, unit: ethValueUnit };
+      return { value: undefined, unit: "Wei" };
     }
-    return { value: ethValue, unit: ethValueUnit };
   };
 
   // ── handleCall ─────────────────────────────────────────────────────────────
