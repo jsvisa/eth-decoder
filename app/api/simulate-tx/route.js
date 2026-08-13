@@ -54,6 +54,7 @@ export async function POST(request) {
     price = true,
     rpcBatchSize = 20,
     save = false,
+    includeMetrics = false,
   } = body;
 
   if (!chainId) {
@@ -379,6 +380,9 @@ export async function POST(request) {
 
     const resultWithRequest = { ...enrichedResult, requestBody };
     let responseData = { ...enrichedResult, requestBody };
+    if (includeMetrics !== true) {
+      delete responseData.metrics;
+    }
     if (save) {
       const simulationId = await saveSimulationResult(resultWithRequest);
       responseData.simulationId = simulationId;

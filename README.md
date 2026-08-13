@@ -218,6 +218,7 @@ Simulate a raw transaction against forked chain state and return decoded results
 | `cheatcodes`       | No       | Object with `deal`, `warp`, or `prank` keys. See cheatcodes details below.                                      |
 | `price`            | No       | `true` (default) to enrich `balanceChanges` with token symbols, decimals, and USD prices. Pass `false` to skip. |
 | `rpcBatchSize`     | No       | JSON-RPC batch size for state-fetch requests during prefetch (default `20`).                                    |
+| `includeMetrics`   | No       | `true` to include the `metrics` field (timing + RPC call counters) in the response. Omitted by default.         |
 
 **Cheatcodes:**
 
@@ -253,7 +254,7 @@ curl -X POST http://localhost:3000/api/simulate-tx \
 | `callTrace`          | `object\|null` | Tree of call frames with decoded inputs/outputs                                                                           |
 | `balanceChanges`     | `Array`        | Token + native ETH balance changes extracted from logs and trace                                                          |
 | `stateChanges`       | `Array`        | Storage slot changes (currently always `[]`)                                                                              |
-| `metrics`            | `object`       | Timing and RPC call counters                                                                                              |
+| `metrics`            | `object`       | Timing and RPC call counters. Only present when the request sets `includeMetrics: true`                                   |
 | `rawData`            | `string`       | Hex-encoded raw return data from the contract call. `"0x"` for void functions (e.g. `transfer`) or when the call reverted |
 | `decoded`            | `Array`        | Decoded function return values `[{name, type, value}]`. Empty `[]` for void functions or when the ABI has no outputs      |
 | `error`              | `string\|null` | Human-readable revert reason or `null`                                                                                    |
