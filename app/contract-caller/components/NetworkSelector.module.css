@@ -5,17 +5,16 @@
   width: 100%;
 }
 
-.chainSelectWithIcon {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.comboboxWrapper {
+  position: relative;
   flex: 1;
   min-width: 0;
 }
 
-.chainSelectWithIcon .select {
-  flex: 1;
-  min-width: 0;
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .chainIconSmall {
@@ -23,22 +22,81 @@
   height: 24px;
   border-radius: 50%;
   object-fit: cover;
+  flex: 0 0 auto;
 }
 
-.select {
+.input {
+  flex: 1;
+  min-width: 0;
   padding: 0.875rem 1rem;
   font-size: 1rem;
   border: 2px solid var(--border-primary);
   border-radius: 6px;
   background-color: var(--bg-input);
   color: var(--text-primary);
-  cursor: pointer;
   transition: border-color 0.3s;
 }
 
-.select:focus {
+.input:focus {
   outline: none;
   border-color: var(--border-focus);
+}
+
+.input:disabled {
+  background-color: var(--bg-hover);
+  cursor: not-allowed;
+}
+
+.list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: var(--bg-input);
+  border: 2px solid var(--border-primary);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.listItem {
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.listItem:last-child {
+  border-bottom: none;
+}
+
+.listItem:hover,
+.listItemActive {
+  background-color: var(--bg-hover);
+}
+
+.itemName {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.itemId {
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.noMatch {
+  padding: 0.75rem 1rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
 }
 
 .addChainButton {

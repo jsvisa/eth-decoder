@@ -26,87 +26,151 @@ const MOCK_CHAINS = [
   { id: "base", name: "Base", icon: "https://example.com/base.jpg" },
 ];
 
-describe("NetworkSelector", () => {
-  it("renders a select with one option per chain", () => {
-    const { container, cleanup } = renderComponent({
-      chain: "ethereum",
-      onChainChange: () => {},
-      allChains: MOCK_CHAINS,
-      onOpenAddChain: () => {},
-      disabled: false,
-    });
+const BASE_PROPS = {
+  chain: "ethereum",
+  onChainChange: () => {},
+  allChains: MOCK_CHAINS,
+  onOpenAddChain: () => {},
+  disabled: false,
+};
 
-    const select = container.querySelector("select");
-    expect(select).not.toBeNull();
-    expect(select.querySelectorAll("option")).toHaveLength(MOCK_CHAINS.length);
+function inputOf(container) {
+  return container.querySelector("input");
+}
+
+function openList(container) {
+  act(() => {
+    inputOf(container).focus();
+  });
+}
+
+function typeText(container, text) {
+  const input = inputOf(container);
+  const setter = Object.getOwnPropertyDescriptor(
+    window.HTMLInputElement.prototype,
+    "value",
+  ).set;
+  act(() => {
+    setter.call(input, text);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+function chainIds(container) {
+  return Array.from(container.querySelectorAll("[data-chain]")).map(
+    (el) => el.dataset.chain,
+  );
+}
+
+function clickByLabel(container, label) {
+  return Array.from(container.querySelectorAll("button")).find(
+    (b) => b.textContent === label,
+  );
+}
+
+describe("NetworkSelector", () => {
+  it("renders a search input and the add button", () => {
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+
+    expect(inputOf(container)).not.toBeNull();
+    const labels = Array.from(container.querySelectorAll("button")).map(
+      (b) => b.textContent,
+    );
+    expect(labels).toEqual(["+"]);
 
     cleanup();
   });
 
-  it("sets the select value to the current chain", () => {
+  it("shows the current chain in the input", () => {
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    expect(inputOf(container).value).toBe("Ethereum (1)");
+    cleanup();
+  });
+
+  it("lists chains ordered by name by default", () => {
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    openList(container);
+    // Arbitrum, Base, Ethereum
+    expect(chainIds(container)).toEqual(["arbitrum", "base", "ethereum"]);
+    cleanup();
+  });
+
+  it("filters chains by name", () => {
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    openList(container);
+    typeText(container, "arb");
+    expect(chainIds(container)).toEqual(["arbitrum"]);
+    cleanup();
+  });
+
+  it("filters chains by chain ID", () => {
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    openList(container);
+    typeText(container, "8453");
+    expect(chainIds(container)).toEqual(["base"]);
+    cleanup();
+  });
+
+  it("shows a no-match message when nothing matches", () => {
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    openList(container);
+    typeText(container, "xyz");
+    expect(chainIds(container)).toEqual([]);
+    expect(container.textContent).toContain("No matching networks");
+    cleanup();
+  });
+
+  it("selecting a chain calls onChainChange and shows it in the input", () => {
+    const onChainChange = vi.fn();
     const { container, cleanup } = renderComponent({
-      chain: "arbitrum",
-      onChainChange: () => {},
-      allChains: MOCK_CHAINS,
-      onOpenAddChain: () => {},
-      disabled: false,
+      ...BASE_PROPS,
+      onChainChange,
     });
-
-    const select = container.querySelector("select");
-    expect(select.value).toBe("arbitrum");
-
+    openList(container);
+    const item = Array.from(container.querySelectorAll("[data-chain]")).find(
+      (el) => el.dataset.chain === "base",
+    );
+    act(() => {
+      item.click();
+    });
+    expect(onChainChange).toHaveBeenCalledWith("base");
+    expect(inputOf(container).value).toBe("Base (8453)");
     cleanup();
   });
 
   it("renders the add chain button with + label", () => {
-    const { container, cleanup } = renderComponent({
-      chain: "ethereum",
-      onChainChange: () => {},
-      allChains: MOCK_CHAINS,
-      onOpenAddChain: () => {},
-      disabled: false,
-    });
-
-    const button = container.querySelector("button");
-    expect(button).not.toBeNull();
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    const button = clickByLabel(container, "+");
+    expect(button).not.toBeUndefined();
     expect(button.textContent).toBe("+");
-
     cleanup();
   });
 
   it("calls onOpenAddChain when the add button is clicked", () => {
     const onOpenAddChain = vi.fn();
     const { container, cleanup } = renderComponent({
-      chain: "ethereum",
-      onChainChange: () => {},
-      allChains: MOCK_CHAINS,
+      ...BASE_PROPS,
       onOpenAddChain,
-      disabled: false,
     });
-
-    const button = container.querySelector("button");
     act(() => {
-      button.click();
+      clickByLabel(container, "+").click();
     });
-
     expect(onOpenAddChain).toHaveBeenCalledOnce();
-
     cleanup();
   });
 
-  it("disables both select and button when disabled=true", () => {
+  it("disables input and all buttons when disabled=true", () => {
     const { container, cleanup } = renderComponent({
-      chain: "ethereum",
-      onChainChange: () => {},
-      allChains: MOCK_CHAINS,
-      onOpenAddChain: () => {},
+      ...BASE_PROPS,
       disabled: true,
     });
 
-    const select = container.querySelector("select");
-    const button = container.querySelector("button");
-    expect(select.disabled).toBe(true);
-    expect(button.disabled).toBe(true);
+    expect(inputOf(container).disabled).toBe(true);
+    const buttons = container.querySelectorAll("button");
+    expect(buttons.length).toBeGreaterThan(0);
+    buttons.forEach((button) => {
+      expect(button.disabled).toBe(true);
+    });
 
     cleanup();
   });
