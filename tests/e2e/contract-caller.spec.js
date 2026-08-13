@@ -3,23 +3,21 @@ import { test, expect } from "@playwright/test";
 test.describe("Contract Caller page", () => {
   test("loads and shows the chain selector", async ({ page }) => {
     await page.goto("/contract-caller");
-    // Chains render inside <select> elements; verify the main chain select is visible
-    // and defaults to 'ethereum'
-    const chainSelect = page.locator("select").first();
-    await expect(chainSelect).toBeVisible();
-    await expect(chainSelect).toHaveValue("ethereum");
+    // The network picker is a searchable combobox; verify it is visible and
+    // defaults to 'Ethereum (1)'
+    const chainInput = page.getByRole("combobox");
+    await expect(chainInput).toBeVisible();
+    await expect(chainInput).toHaveValue("Ethereum (1)");
   });
 
   test("shows all built-in chains", async ({ page }) => {
     await page.goto("/contract-caller");
-    // Options inside <select> are hidden per Playwright's visibility model;
-    // verify each chain value is present as an option in the DOM
-    const chainSelect = page.locator("select").first();
-    await expect(chainSelect).toBeVisible();
+    // Focusing the input opens the dropdown list; each chain appears once
+    const chainInput = page.getByRole("combobox");
+    await expect(chainInput).toBeVisible();
+    await chainInput.click();
     for (const value of ["ethereum", "arbitrum", "base", "polygon", "bsc"]) {
-      await expect(chainSelect.locator(`option[value="${value}"]`)).toHaveCount(
-        1,
-      );
+      await expect(page.locator(`[data-chain="${value}"]`)).toHaveCount(1);
     }
   });
 
