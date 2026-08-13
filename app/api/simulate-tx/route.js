@@ -8,6 +8,8 @@ import { fetchAbi } from "../fetch-abi/route";
 import { getAbiFromCache, setAbiInCache } from "../../utils/serverAbiBlobCache";
 import {
   simulateWithTevm,
+  simulateWithClient,
+  createTevmClient,
   redecodeLogs,
   redecodeCallTrace,
   collectAllCallAddresses,
@@ -30,144 +32,131 @@ import {
   DECIMALS_ABI,
 } from "../../utils/tokenTransfers";
 
-export async function POST(request) {
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+/**
+ * Validate the per-call fields shared by single-call and session modes.
+ * Returns { error } on failure, or { error: null }.
+ */
+function validateCallFields(call) {
+  if (!call || typeof call !== "object") {
+    return { error: "Each entry in 'calls' must be an object" };
   }
+  if (!call.to) {
+    return { error: "Missing required field: to" };
+  }
+  if (!call.data) {
+    return { error: "Missing required field: data" };
+  }
+  if (!call.from) {
+    return { error: "Missing required field: from" };
+  }
+  if (!/^0x[0-9a-fA-F]*$/.test(String(call.data).trim())) {
+    return { error: "Invalid 'data' — must be a 0x-prefixed hex string" };
+  }
+  if (!isValidEthAddress(call.to)) {
+    return { error: "Invalid 'to' address format" };
+  }
+  if (!isValidEthAddress(call.from)) {
+    return { error: "Invalid 'from' address format" };
+  }
+  if (call.gas !== null && call.gas !== undefined) {
+    try {
+      BigInt(call.gas);
+    } catch {
+      return {
+        error: "Invalid 'gas' format — must be a decimal or hex integer",
+      };
+    }
+  }
+  try {
+    String(BigInt(call.value ?? "0x0"));
+  } catch {
+    return { error: "Invalid 'value' format" };
+  }
+  return { error: null };
+}
 
+/**
+ * Merge a session call entry with session-level defaults. Per-call overrides
+ * win; omitted per-call fields fall back to the top-level values.
+ */
+function mergeCallDefaults(call, defaults) {
+  return {
+    ...defaults,
+    ...call,
+    balanceOverrides: call.balanceOverrides ?? defaults.balanceOverrides,
+    storageOverrides: call.storageOverrides ?? defaults.storageOverrides,
+    cheatcodes: call.cheatcodes ?? defaults.cheatcodes,
+  };
+}
+
+/**
+ * Simulate a single transaction. Used for both the top-level single-call body
+ * and each entry in a session-mode `calls` array. In session mode, pass an
+ * existing `sessionClient` + `pinnedBlock` so each call runs on (and, on
+ * success, commits to) the shared tevm client. `abiEntryCache` and
+ * `abiCacheMap` are shared across session calls so ABIs are fetched once.
+ *
+ * Returns { status, body } where body is the JSON response payload.
+ */
+async function runSingleSimulation({
+  request,
+  chain,
+  numericChainId,
+  etherscanKey,
+  routescanKey,
+  call,
+  abiEntryCache,
+  abiCacheMap,
+  sessionClient = null,
+  pinnedBlock = null,
+  customChainId = null,
+  rpcUrl = null,
+  rpcBatchSize = 20,
+  price = true,
+  save = false,
+  includeMetrics = false,
+}) {
   const {
-    chainId,
     to,
     data,
     from,
-    value = "0x0",
-    gas = null,
-    blockNumber = "latest",
-    apiKeys = {},
-    rpcUrl = null,
-    balanceOverrides = [],
-    storageOverrides = [],
-    cheatcodes = {},
-    price = true,
-    rpcBatchSize = 20,
-    save = false,
-    includeMetrics = false,
-  } = body;
+    value,
+    gas,
+    blockNumber,
+    balanceOverrides,
+    storageOverrides,
+    cheatcodes,
+  } = call;
 
-  if (!chainId) {
-    return NextResponse.json(
-      { error: "Missing required field: chainId" },
-      { status: 400 },
-    );
-  }
-  if (!to) {
-    return NextResponse.json(
-      { error: "Missing required field: to" },
-      { status: 400 },
-    );
-  }
-  if (!data) {
-    return NextResponse.json(
-      { error: "Missing required field: data" },
-      { status: 400 },
-    );
-  }
-  if (!/^0x[0-9a-fA-F]*$/.test(String(data).trim())) {
-    return NextResponse.json(
-      { error: "Invalid 'data' — must be a 0x-prefixed hex string" },
-      { status: 400 },
-    );
-  }
-  if (!from) {
-    return NextResponse.json(
-      { error: "Missing required field: from" },
-      { status: 400 },
-    );
+  let valueStr;
+  try {
+    valueStr = String(BigInt(value ?? "0x0"));
+  } catch {
+    return { status: 400, body: { error: "Invalid 'value' format" } };
   }
 
-  if (!isValidEthAddress(to)) {
-    return NextResponse.json(
-      { error: "Invalid 'to' address format" },
-      { status: 400 },
-    );
-  }
-
-  if (!isValidEthAddress(from)) {
-    return NextResponse.json(
-      { error: "Invalid 'from' address format" },
-      { status: 400 },
-    );
-  }
-
-  if (gas !== null && gas !== undefined) {
-    try {
-      BigInt(gas);
-    } catch {
-      return NextResponse.json(
-        { error: "Invalid 'gas' format — must be a decimal or hex integer" },
-        { status: 400 },
-      );
+  const toKey = to.toLowerCase();
+  let abiEntry = abiEntryCache.get(toKey);
+  if (!abiEntry) {
+    abiEntry = await getAbiFromCache(numericChainId, to);
+    if (!abiEntry) {
+      const fetched = await fetchAbi(to, numericChainId, {
+        etherscanKey,
+        routescanKey,
+        viemChain: chain.viemChain,
+        rpcUrl: chain.rpcUrl,
+        detectProxy: true,
+      });
+      if (fetched?.abi) {
+        abiEntry = { ...fetched, fetchedAt: Date.now() };
+        await setAbiInCache(numericChainId, to, abiEntry);
+      }
     }
+    abiEntryCache.set(toKey, abiEntry || null);
   }
 
-  if (blockNumber !== "latest") {
-    if (!/^(0x[0-9a-fA-F]+|\d+)$/.test(String(blockNumber).trim())) {
-      return NextResponse.json(
-        {
-          error:
-            "Invalid 'blockNumber' — must be 'latest', a decimal integer, or a hex string",
-        },
-        { status: 400 },
-      );
-    }
-  }
-
-  // Only allow http(s) URLs for user-supplied RPC endpoints
-  if (rpcUrl && !isValidHttpUrl(rpcUrl)) {
-    return NextResponse.json(
-      { error: "Invalid rpcUrl — must be an http:// or https:// URL" },
-      { status: 400 },
-    );
-  }
-
-  const numericChainId = Number(chainId);
-  const chain = rpcUrl
-    ? buildCustomChainConfig(numericChainId, rpcUrl)
-    : getChainConfigByChainId(numericChainId);
-  if (!chain) {
-    return NextResponse.json(
-      {
-        error: `Unsupported chainId: ${chainId}. Provide an rpcUrl to simulate on a non-builtin chain.`,
-      },
-      { status: 400 },
-    );
-  }
-
-  const etherscanKey = apiKeys.etherscan || process.env.ETHERSCAN_API_KEY || "";
-  const routescanKey = apiKeys.routescan || process.env.ROUTESCAN_API_KEY || "";
-
-  let abiEntry = await getAbiFromCache(numericChainId, to);
   let functionName = null;
   let decodedArgs = null;
-  if (!abiEntry) {
-    const fetched = await fetchAbi(to, numericChainId, {
-      etherscanKey,
-      routescanKey,
-      viemChain: chain.viemChain,
-      rpcUrl: chain.rpcUrl,
-      detectProxy: true,
-    });
-    if (fetched?.abi) {
-      abiEntry = { ...fetched, fetchedAt: Date.now() };
-      await setAbiInCache(numericChainId, to, abiEntry);
-    }
-  }
-
-  const abiCacheMap = new Map();
-
   if (abiEntry?.abi) {
     try {
       ({ functionName, args: decodedArgs } = decodeFunctionData({
@@ -177,17 +166,7 @@ export async function POST(request) {
     } catch {
       functionName = null;
     }
-    abiCacheMap.set(to.toLowerCase(), abiEntry.abi);
-  }
-
-  let valueStr;
-  try {
-    valueStr = String(BigInt(value));
-  } catch {
-    return NextResponse.json(
-      { error: "Invalid 'value' format" },
-      { status: 400 },
-    );
+    abiCacheMap.set(toKey, abiEntry.abi);
   }
 
   const resolvedCheatcodes = await autoFillWarpTimestamp(
@@ -197,26 +176,29 @@ export async function POST(request) {
     chain.viemChain,
   );
 
-  pruneExpiredResults().catch(() => {});
-
   const requestBody = {
     chainId: numericChainId,
     to,
     data,
     from,
-    value,
-    gas,
+    value: value ?? "0x0",
+    gas: gas ?? null,
     blockNumber,
     rpcUrl,
     functionName,
     args: serializeBigInts(decodedArgs),
   };
 
+  const normalizedBatchSize = Math.max(
+    1,
+    Math.min(100, Number(rpcBatchSize) || 20),
+  );
+
   try {
-    const result = await simulateWithTevm({
+    const simParams = {
       chain: chain.id,
       rpcUrl: chain.forkRpcUrl,
-      ...(rpcUrl ? { customChainId: numericChainId } : {}),
+      ...(customChainId ? { customChainId } : {}),
       address: to,
       functionName,
       args: decodedArgs,
@@ -226,14 +208,26 @@ export async function POST(request) {
       value: valueStr,
       valueUnit: "Wei",
       gas: gas != null ? String(BigInt(gas)) : null,
-      blockNumber:
-        blockNumber === "latest" ? "latest" : String(BigInt(blockNumber)),
       abiCache: abiCacheMap,
       balanceOverrides,
       storageOverrides,
       cheatcodes: resolvedCheatcodes,
-      rpcBatchSize: Math.max(1, Math.min(100, Number(rpcBatchSize) || 20)),
-    });
+      rpcBatchSize: normalizedBatchSize,
+    };
+
+    let result;
+    if (sessionClient) {
+      result = await simulateWithClient(sessionClient, pinnedBlock, {
+        ...simParams,
+        persistState: true,
+      });
+    } else {
+      result = await simulateWithTevm({
+        ...simParams,
+        blockNumber:
+          blockNumber === "latest" ? "latest" : String(BigInt(blockNumber)),
+      });
+    }
 
     // Collect all addresses needing ABIs, fetch uncached ones in parallel, re-decode
     const neededAddrs = new Set(
@@ -388,7 +382,7 @@ export async function POST(request) {
       responseData.simulationId = simulationId;
       responseData.simulationLink = buildSimulationLink(request, simulationId);
     }
-    return NextResponse.json(responseData);
+    return { status: 200, body: responseData };
   } catch (error) {
     const errorResult = {
       success: false,
@@ -401,6 +395,196 @@ export async function POST(request) {
       responseData.simulationId = simulationId;
       responseData.simulationLink = buildSimulationLink(request, simulationId);
     }
-    return NextResponse.json(responseData, { status: 500 });
+    return { status: 500, body: responseData };
   }
+}
+
+export async function POST(request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const {
+    chainId,
+    to,
+    data,
+    from,
+    value = "0x0",
+    gas = null,
+    blockNumber = "latest",
+    apiKeys = {},
+    rpcUrl = null,
+    balanceOverrides = [],
+    storageOverrides = [],
+    cheatcodes = {},
+    price = true,
+    rpcBatchSize = 20,
+    save = false,
+    includeMetrics = false,
+    calls,
+  } = body;
+
+  if (!chainId) {
+    return NextResponse.json(
+      { error: "Missing required field: chainId" },
+      { status: 400 },
+    );
+  }
+
+  const sessionMode = Array.isArray(calls);
+  if (calls !== undefined && !sessionMode) {
+    return NextResponse.json(
+      { error: "'calls' must be an array" },
+      { status: 400 },
+    );
+  }
+  if (sessionMode && calls.length === 0) {
+    return NextResponse.json(
+      { error: "'calls' must contain at least one entry" },
+      { status: 400 },
+    );
+  }
+
+  if (blockNumber !== "latest") {
+    if (!/^(0x[0-9a-fA-F]+|\d+)$/.test(String(blockNumber).trim())) {
+      return NextResponse.json(
+        {
+          error:
+            "Invalid 'blockNumber' — must be 'latest', a decimal integer, or a hex string",
+        },
+        { status: 400 },
+      );
+    }
+  }
+
+  // Only allow http(s) URLs for user-supplied RPC endpoints
+  if (rpcUrl && !isValidHttpUrl(rpcUrl)) {
+    return NextResponse.json(
+      { error: "Invalid rpcUrl — must be an http:// or https:// URL" },
+      { status: 400 },
+    );
+  }
+
+  const numericChainId = Number(chainId);
+  const chain = rpcUrl
+    ? buildCustomChainConfig(numericChainId, rpcUrl)
+    : getChainConfigByChainId(numericChainId);
+  if (!chain) {
+    return NextResponse.json(
+      {
+        error: `Unsupported chainId: ${chainId}. Provide an rpcUrl to simulate on a non-builtin chain.`,
+      },
+      { status: 400 },
+    );
+  }
+
+  const etherscanKey = apiKeys.etherscan || process.env.ETHERSCAN_API_KEY || "";
+  const routescanKey = apiKeys.routescan || process.env.ROUTESCAN_API_KEY || "";
+
+  pruneExpiredResults().catch(() => {});
+
+  const abiCacheMap = new Map();
+  const abiEntryCache = new Map();
+  const customChainId = rpcUrl ? numericChainId : null;
+
+  const singleCallContext = {
+    request,
+    chain,
+    numericChainId,
+    etherscanKey,
+    routescanKey,
+    rpcUrl,
+    abiEntryCache,
+    abiCacheMap,
+    customChainId,
+    rpcBatchSize,
+    price,
+    save,
+    includeMetrics,
+  };
+
+  if (sessionMode) {
+    // Validate every call before starting the session
+    for (const rawCall of calls) {
+      const merged = mergeCallDefaults(rawCall, {
+        balanceOverrides,
+        storageOverrides,
+        cheatcodes,
+      });
+      const { error } = validateCallFields(merged);
+      if (error) {
+        return NextResponse.json({ error }, { status: 400 });
+      }
+    }
+
+    let client;
+    let pinnedBlock;
+    try {
+      const created = await createTevmClient(
+        chain.id,
+        chain.forkRpcUrl,
+        blockNumber === "latest" ? "latest" : String(BigInt(blockNumber)),
+        customChainId,
+        Math.max(1, Math.min(100, Number(rpcBatchSize) || 20)),
+      );
+      client = created.client;
+      pinnedBlock = created.blockNumber;
+    } catch (error) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.message || "Failed to start simulation session",
+        },
+        { status: 500 },
+      );
+    }
+
+    const results = [];
+    for (const rawCall of calls) {
+      const merged = mergeCallDefaults(rawCall, {
+        balanceOverrides,
+        storageOverrides,
+        cheatcodes,
+      });
+      const { body: resultBody } = await runSingleSimulation({
+        ...singleCallContext,
+        call: { ...merged, blockNumber },
+        sessionClient: client,
+        pinnedBlock,
+      });
+      results.push(resultBody);
+    }
+
+    return NextResponse.json({
+      session: true,
+      chainId: numericChainId,
+      blockNumber,
+      results,
+    });
+  }
+
+  const { error } = validateCallFields({ to, data, from, value, gas });
+  if (error) {
+    return NextResponse.json({ error }, { status: 400 });
+  }
+
+  const { status, body: resultBody } = await runSingleSimulation({
+    ...singleCallContext,
+    call: {
+      to,
+      data,
+      from,
+      value,
+      gas,
+      blockNumber,
+      balanceOverrides,
+      storageOverrides,
+      cheatcodes,
+    },
+  });
+
+  return NextResponse.json(resultBody, { status });
 }

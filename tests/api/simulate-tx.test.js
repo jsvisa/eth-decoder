@@ -81,6 +81,8 @@ vi.mock("../../app/utils/serverAbiBlobCache.js", () => ({
 }));
 vi.mock("../../app/utils/tevmSimulator.js", () => ({
   simulateWithTevm: vi.fn(),
+  simulateWithClient: vi.fn(),
+  createTevmClient: vi.fn(),
   collectAllCallAddresses: vi.fn(() => []),
 }));
 vi.mock("../../app/utils/simulationCache.js");
@@ -96,6 +98,10 @@ import {
   setAbiInCache,
 } from "../../app/utils/serverAbiBlobCache.js";
 import { simulateWithTevm } from "../../app/utils/tevmSimulator.js";
+import {
+  simulateWithClient,
+  createTevmClient,
+} from "../../app/utils/tevmSimulator.js";
 import {
   saveSimulationResult,
   pruneExpiredResults,
@@ -114,6 +120,11 @@ beforeEach(() => {
   getAbiFromCache.mockResolvedValue(null);
   fetchAbi.mockResolvedValue({ ...CACHE_ENTRY });
   simulateWithTevm.mockResolvedValue(SIM_RESULT);
+  simulateWithClient.mockResolvedValue(SIM_RESULT);
+  createTevmClient.mockResolvedValue({
+    client: { tevmReady: async () => {} },
+    blockNumber: "latest",
+  });
   saveSimulationResult.mockResolvedValue(FAKE_SIMULATION_ID);
   pruneExpiredResults.mockResolvedValue(0);
   VIEM_MOCKS.createPublicClient.mockReturnValue({
@@ -735,5 +746,231 @@ describe("POST /api/simulate-tx — state overrides", () => {
     );
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/rpcUrl/i);
+  });
+});
+
+describe("POST /api/simulate-tx — session mode", () => {
+  const SESSION_BODY = {
+    chainId: 1,
+    blockNumber: "latest",
+    calls: [
+      {
+        to: "0x99161BA892ECae335616624c84FAA418F64FF9A6",
+        data: "0x5e7db13d000000000000000000000000e556aba6fe6036275ec1f87eda296be72c811bce0000000000000000000000000000000000000000000000000000000000000001",
+        from: "0xd719fc03782E9617e81D138a3e9B1875da4D6a03",
+      },
+      {
+        to: "0x99161BA892ECae335616624c84FAA418F64FF9A6",
+        data: "0x5e7db13d000000000000000000000000e556aba6fe6036275ec1f87eda296be72c811bce0000000000000000000000000000000000000000000000000000000000000002",
+        from: "0xd719fc03782E9617e81D138a3e9B1875da4D6a03",
+      },
+    ],
+  };
+
+  it("returns 400 when calls is not an array", async () => {
+    const res = await POST(makeRequest({ ...VALID_BODY, calls: "nope" }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/calls/i);
+  });
+
+  it("returns 400 when calls is an empty array", async () => {
+    const res = await POST(makeRequest({ ...VALID_BODY, calls: [] }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/calls/i);
+  });
+
+  it("returns 400 when a call is missing required fields", async () => {
+    const res = await POST(
+      makeRequest({
+        ...SESSION_BODY,
+        calls: [{ to: SESSION_BODY.calls[0].to, data: "0x", from: undefined }],
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/from/i);
+  });
+
+  it("returns 400 when a call has an invalid address", async () => {
+    const res = await POST(
+      makeRequest({
+        ...SESSION_BODY,
+        calls: [{ ...SESSION_BODY.calls[0], to: "invalid" }],
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/to/i);
+  });
+
+  it("returns 400 when a call has invalid data hex", async () => {
+    const res = await POST(
+      makeRequest({
+        ...SESSION_BODY,
+        calls: [{ ...SESSION_BODY.calls[0], data: "not-hex" }],
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/data/i);
+  });
+
+  it("creates a single tevm client and simulates each call on it", async () => {
+    const fakeClient = { tevmReady: async () => {} };
+    createTevmClient.mockResolvedValue({
+      client: fakeClient,
+      blockNumber: "latest",
+    });
+    const res = await POST(makeRequest(SESSION_BODY));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.session).toBe(true);
+    expect(body.chainId).toBe(1);
+    expect(body.results).toHaveLength(2);
+    expect(body.results[0].success).toBe(true);
+    expect(body.results[1].success).toBe(true);
+
+    expect(createTevmClient).toHaveBeenCalledOnce();
+    expect(simulateWithClient).toHaveBeenCalledTimes(2);
+    expect(simulateWithClient).toHaveBeenNthCalledWith(
+      1,
+      fakeClient,
+      "latest",
+      expect.objectContaining({
+        functionName: "unlockAsset",
+        persistState: true,
+      }),
+    );
+    expect(simulateWithClient).toHaveBeenNthCalledWith(
+      2,
+      fakeClient,
+      "latest",
+      expect.objectContaining({
+        callData: SESSION_BODY.calls[1].data,
+        persistState: true,
+      }),
+    );
+    expect(simulateWithTevm).not.toHaveBeenCalled();
+  });
+
+  it("passes the fork RPC and customChainId when rpcUrl is provided", async () => {
+    const rpcUrl = "https://custom-rpc.example.com";
+    await POST(makeRequest({ ...SESSION_BODY, chainId: 999999, rpcUrl }));
+    expect(createTevmClient).toHaveBeenCalledWith(
+      "chain-999999",
+      rpcUrl,
+      "latest",
+      999999,
+      expect.any(Number),
+    );
+    expect(simulateWithClient).toHaveBeenCalledWith(
+      expect.anything(),
+      "latest",
+      expect.objectContaining({ rpcUrl, customChainId: 999999 }),
+    );
+  });
+
+  it("applies session-level overrides and cheatcodes to each call", async () => {
+    const balanceOverrides = [{ address: "0xabc", balance: "1.5" }];
+    const storageOverrides = [{ address: "0xdef", slot: "0x0", value: "0xff" }];
+    const cheatcodes = { deal: { address: "0xabc", amount: "1.5" } };
+    const res = await POST(
+      makeRequest({
+        ...SESSION_BODY,
+        balanceOverrides,
+        storageOverrides,
+        cheatcodes,
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(simulateWithClient).toHaveBeenCalledTimes(2);
+    for (const call of simulateWithClient.mock.calls) {
+      expect(call[2]).toEqual(
+        expect.objectContaining({
+          balanceOverrides,
+          storageOverrides,
+          cheatcodes,
+        }),
+      );
+    }
+  });
+
+  it("lets per-call overrides take precedence over session-level ones", async () => {
+    const topLevel = [{ address: "0xabc", balance: "1.5" }];
+    const perCall = [{ address: "0xbbb", balance: "2.5" }];
+    await POST(
+      makeRequest({
+        ...SESSION_BODY,
+        balanceOverrides: topLevel,
+        calls: [
+          SESSION_BODY.calls[0],
+          { ...SESSION_BODY.calls[1], balanceOverrides: perCall },
+        ],
+      }),
+    );
+    expect(simulateWithClient).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      "latest",
+      expect.objectContaining({ balanceOverrides: topLevel }),
+    );
+    expect(simulateWithClient).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      "latest",
+      expect.objectContaining({ balanceOverrides: perCall }),
+    );
+  });
+
+  it("includes requestBody on each session result", async () => {
+    const res = await POST(makeRequest(SESSION_BODY));
+    const body = await res.json();
+    expect(body.results[0].requestBody).toEqual(
+      expect.objectContaining({
+        chainId: 1,
+        to: SESSION_BODY.calls[0].to,
+        functionName: "unlockAsset",
+      }),
+    );
+    expect(body.results[1].requestBody).toEqual(
+      expect.objectContaining({
+        data: SESSION_BODY.calls[1].data,
+        functionName: "unlockAsset",
+      }),
+    );
+  });
+
+  it("saves each session result separately when save: true", async () => {
+    const res = await POST(makeRequest({ ...SESSION_BODY, save: true }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(saveSimulationResult).toHaveBeenCalledTimes(2);
+    expect(body.results[0].simulationId).toBe(FAKE_SIMULATION_ID);
+    expect(body.results[1].simulationId).toBe(FAKE_SIMULATION_ID);
+    expect(body.results[0].simulationLink).toContain(FAKE_SIMULATION_ID);
+  });
+
+  it("records a per-call error and continues when a call throws", async () => {
+    simulateWithClient
+      .mockResolvedValueOnce(SIM_RESULT)
+      .mockRejectedValueOnce(new Error("tevm internal error"));
+    const res = await POST(makeRequest(SESSION_BODY));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.results).toHaveLength(2);
+    expect(body.results[0].success).toBe(true);
+    expect(body.results[1].success).toBe(false);
+    expect(body.results[1].error).toMatch(/tevm internal error/i);
+  });
+
+  it("returns 500 when createTevmClient fails", async () => {
+    createTevmClient.mockRejectedValue(new Error("fork failed"));
+    const res = await POST(makeRequest(SESSION_BODY));
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toMatch(/fork failed/i);
+  });
+
+  it("fetches the ABI once and reuses it across session calls", async () => {
+    await POST(makeRequest(SESSION_BODY));
+    expect(fetchAbi).toHaveBeenCalledOnce();
+    expect(getAbiFromCache).toHaveBeenCalledOnce();
   });
 });
