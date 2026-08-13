@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { encodeFunctionData, decodeFunctionData } from "viem";
+import {
+  encodeFunctionData,
+  decodeFunctionData,
+  parseEther,
+  formatEther,
+} from "viem";
 import {
   getDefaultArgValue,
   getFunctionSelector,
@@ -168,6 +173,27 @@ export function useFunctionSelection({
     }
   }, [selectedFunction, args, parsedAbi]);
 
+  // --- Callback: toggle ETH value unit, converting the entered value in place ---
+  const handleEthValueUnitChange = useCallback(
+    (newUnit) => {
+      if (newUnit === ethValueUnit) return;
+      let nextValue = ethValue;
+      if (ethValue && ethValue.trim() !== "") {
+        try {
+          nextValue =
+            newUnit === "Wei"
+              ? parseEther(ethValue).toString()
+              : formatEther(BigInt(ethValue));
+        } catch {
+          nextValue = ethValue;
+        }
+      }
+      setEthValue(nextValue);
+      setEthValueUnit(newUnit);
+    },
+    [ethValue, ethValueUnit],
+  );
+
   // --- Callback: decode pasted calldata and fill args (lines 2939-2983) ---
   const handleDecodeAndFill = useCallback(() => {
     const hex = pasteCalldataValue.trim();
@@ -284,6 +310,7 @@ export function useFunctionSelection({
     setEthValue,
     ethValueUnit,
     setEthValueUnit,
+    handleEthValueUnitChange,
     blockNumber,
     setBlockNumber,
     calldataCopied,

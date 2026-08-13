@@ -617,7 +617,7 @@ export default function ContractCallerPage() {
                               ? " " + argsStyles.active
                               : "")
                           }
-                          onClick={() => fn.setEthValueUnit("Wei")}
+                          onClick={() => fn.handleEthValueUnitChange("Wei")}
                         >
                           Wei
                         </button>
@@ -629,7 +629,7 @@ export default function ContractCallerPage() {
                               ? " " + argsStyles.active
                               : "")
                           }
-                          onClick={() => fn.setEthValueUnit("ETH")}
+                          onClick={() => fn.handleEthValueUnitChange("ETH")}
                         >
                           ETH
                         </button>
@@ -669,7 +669,7 @@ export default function ContractCallerPage() {
                   ethValue={fn.ethValue}
                   onEthValueChange={fn.setEthValue}
                   ethValueUnit={fn.ethValueUnit}
-                  onEthValueUnitChange={fn.setEthValueUnit}
+                  onEthValueUnitChange={fn.handleEthValueUnitChange}
                   disabled={exec.loading}
                 />
               </>

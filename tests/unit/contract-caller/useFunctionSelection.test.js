@@ -110,6 +110,7 @@ describe("useFunctionSelection — initial state", () => {
       "setEthValue",
       "ethValueUnit",
       "setEthValueUnit",
+      "handleEthValueUnitChange",
       "blockNumber",
       "setBlockNumber",
       "calldataCopied",
@@ -342,6 +343,88 @@ describe("useFunctionSelection — handleDecodeAndFill", () => {
       "0x0000000000000000000000000000000000000002",
     );
     expect(result.current.args[1]).toBe("500");
+  });
+});
+
+describe("useFunctionSelection — handleEthValueUnitChange", () => {
+  it("converts an ETH value to wei when toggling to Wei", () => {
+    const { result } = renderHook(() =>
+      useFunctionSelection({
+        parsedAbi: TRANSFER_ABI,
+        functions: TRANSFER_ABI,
+        address: "",
+      }),
+    );
+
+    act(() => {
+      result.current.setEthValue("1");
+    });
+    act(() => {
+      result.current.handleEthValueUnitChange("Wei");
+    });
+
+    expect(result.current.ethValueUnit).toBe("Wei");
+    expect(result.current.ethValue).toBe("1000000000000000000");
+  });
+
+  it("converts a wei value back to ETH when toggling to ETH", () => {
+    const { result } = renderHook(() =>
+      useFunctionSelection({
+        parsedAbi: TRANSFER_ABI,
+        functions: TRANSFER_ABI,
+        address: "",
+      }),
+    );
+
+    act(() => {
+      result.current.handleEthValueUnitChange("Wei");
+    });
+    act(() => {
+      result.current.setEthValue("1500000000000000000");
+    });
+    act(() => {
+      result.current.handleEthValueUnitChange("ETH");
+    });
+
+    expect(result.current.ethValueUnit).toBe("ETH");
+    expect(result.current.ethValue).toBe("1.5");
+  });
+
+  it("switches unit without converting an empty value", () => {
+    const { result } = renderHook(() =>
+      useFunctionSelection({
+        parsedAbi: TRANSFER_ABI,
+        functions: TRANSFER_ABI,
+        address: "",
+      }),
+    );
+
+    act(() => {
+      result.current.handleEthValueUnitChange("Wei");
+    });
+
+    expect(result.current.ethValueUnit).toBe("Wei");
+    expect(result.current.ethValue).toBe("");
+  });
+
+  it("keeps the value unchanged when toggling to the same unit", () => {
+    const { result } = renderHook(() =>
+      useFunctionSelection({
+        parsedAbi: TRANSFER_ABI,
+        functions: TRANSFER_ABI,
+        address: "",
+      }),
+    );
+
+    act(() => {
+      result.current.setEthValue("1");
+    });
+    act(() => {
+      result.current.handleEthValueUnitChange("ETH");
+    });
+
+    expect(result.current.ethValueUnit).toBe("ETH");
+    expect(result.current.ethValue).toBe("1");
   });
 });
 
