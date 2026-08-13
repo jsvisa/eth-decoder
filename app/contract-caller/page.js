@@ -780,12 +780,14 @@ export default function ContractCallerPage() {
           onToggleAddedCollapsed={() =>
             addChain.setAddedChainsCollapsed((v) => !v)
           }
-          chainlistData={addChain.chainlistData}
+          chainlistData={addChain.visibleChains}
           loading={addChain.chainlistLoading}
           error={addChain.chainlistError}
           onAddChain={addChain.addCustomChain}
           onRemoveChain={addChain.removeCustomChain}
           isChainAdded={addChain.isChainAdded}
+          showTestnets={addChain.showTestnets}
+          onShowTestnetsChange={addChain.setShowTestnets}
         />
       </div>
     </main>

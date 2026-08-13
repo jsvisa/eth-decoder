@@ -16,6 +16,7 @@ export function useAddChainModal({ chain, setChain }) {
   const [chainlistSearch, setChainlistSearch] = useState("");
   const [chainlistError, setChainlistError] = useState(null);
   const [addedChainsCollapsed, setAddedChainsCollapsed] = useState(true);
+  const [showTestnets, setShowTestnets] = useState(false);
 
   const searchInputRef = useRef(null);
 
@@ -39,11 +40,12 @@ export function useAddChainModal({ chain, setChain }) {
         throw new Error("Failed to fetch chainlist data");
       }
       const data = await response.json();
-      // Filter out testnets and sort by TVL (higher first)
-      const mainnets = data
-        .filter((c) => !c.isTestnet && c.chainId)
+      // Keep all networks (mainnets + testnets), sorted by TVL (higher first).
+      // Network-type filtering happens in `visibleChains` below.
+      const chains = data
+        .filter((c) => c.chainId)
         .sort((a, b) => (b.tvl || 0) - (a.tvl || 0));
-      setChainlistData(mainnets);
+      setChainlistData(chains);
     } catch (err) {
       console.error("Failed to fetch chainlist:", err);
       setChainlistError("Failed to load chain data. Please try again.");
@@ -60,7 +62,20 @@ export function useAddChainModal({ chain, setChain }) {
   const closeAddChainModal = () => {
     setShowAddChainModal(false);
     setChainlistSearch("");
+    setShowTestnets(false);
   };
+
+  // Chains shown in the modal: filtered by network type (mainnet/testnet) and search
+  const visibleChains = chainlistData.filter((c) => {
+    if (Boolean(c.isTestnet) !== showTestnets) return false;
+    if (!chainlistSearch) return true;
+    const q = chainlistSearch.trim().toLowerCase();
+    return (
+      String(c.name || "")
+        .toLowerCase()
+        .includes(q) || String(c.chainId).includes(q)
+    );
+  });
 
   // Get the best RPC URL from a chain's RPC list
   const getBestRpcUrl = (rpcs) => {
@@ -162,6 +177,9 @@ export function useAddChainModal({ chain, setChain }) {
     chainlistError,
     chainlistSearch,
     setChainlistSearch,
+    visibleChains,
+    showTestnets,
+    setShowTestnets,
     addedChainsCollapsed,
     setAddedChainsCollapsed,
     addCustomChain,

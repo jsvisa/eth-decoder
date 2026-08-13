@@ -46,6 +46,38 @@
   gap: 0.375rem;
 }
 
+/* Network type toggle (Mainnets / Testnets) */
+.networkTypeToggle {
+  display: flex;
+  gap: 0.375rem;
+  background-color: var(--bg-hover);
+  padding: 0.25rem;
+  border-radius: 8px;
+}
+
+.networkTypeBtn {
+  flex: 1;
+  padding: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.networkTypeBtn:hover {
+  color: var(--text-primary);
+}
+
+.networkTypeBtnActive {
+  color: var(--accent-blue);
+  background-color: var(--bg-card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
 .modalLabel {
   font-weight: 500;
   color: #555;

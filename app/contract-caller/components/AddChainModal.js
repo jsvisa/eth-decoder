@@ -17,6 +17,8 @@ export default function AddChainModal({
   onAddChain,
   onRemoveChain,
   isChainAdded,
+  showTestnets,
+  onShowTestnetsChange,
 }) {
   if (!open) return null;
 
@@ -208,6 +210,32 @@ export default function AddChainModal({
       React.createElement(
         "div",
         { className: styles.modalBody },
+        React.createElement(
+          "div",
+          { className: styles.networkTypeToggle },
+          React.createElement(
+            "button",
+            {
+              type: "button",
+              className:
+                styles.networkTypeBtn +
+                (!showTestnets ? " " + styles.networkTypeBtnActive : ""),
+              onClick: () => onShowTestnetsChange(false),
+            },
+            "Mainnets",
+          ),
+          React.createElement(
+            "button",
+            {
+              type: "button",
+              className:
+                styles.networkTypeBtn +
+                (showTestnets ? " " + styles.networkTypeBtnActive : ""),
+              onClick: () => onShowTestnetsChange(true),
+            },
+            "Testnets",
+          ),
+        ),
         React.createElement(
           "div",
           { className: styles.modalField },
