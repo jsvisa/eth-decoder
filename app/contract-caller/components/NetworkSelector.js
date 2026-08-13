@@ -74,11 +74,15 @@ export default function NetworkSelector({
           className: styles.select,
           disabled,
         },
-        ...SORT_OPTIONS.map((opt) =>
-          React.createElement(
-            "option",
-            { key: opt.value, value: opt.value },
-            opt.label,
+        React.createElement(
+          "optgroup",
+          { label: "Sort networks" },
+          ...SORT_OPTIONS.map((opt) =>
+            React.createElement(
+              "option",
+              { key: opt.value, value: opt.value },
+              opt.label,
+            ),
           ),
         ),
         ...sortedChains.map((c) => {

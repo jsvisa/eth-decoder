@@ -47,15 +47,18 @@ const BASE_PROPS = {
 };
 
 describe("NetworkSelector", () => {
-  it("renders a select with sort options followed by one option per chain", () => {
+  it("renders a select with a sort optgroup followed by one option per chain", () => {
     const { container, cleanup } = renderComponent(BASE_PROPS);
 
     const select = container.querySelector("select");
     expect(select).not.toBeNull();
-    const options = Array.from(select.querySelectorAll("option"));
-    expect(options).toHaveLength(MOCK_CHAINS.length + 2);
-    expect(options[0].textContent).toBe("Sort by name");
-    expect(options[1].textContent).toBe("Sort by chain ID");
+    const group = select.querySelector("optgroup");
+    expect(group).not.toBeNull();
+    expect(group.label).toBe("Sort networks");
+    expect(group.querySelectorAll("option")).toHaveLength(2);
+    expect(select.querySelectorAll("option")).toHaveLength(
+      MOCK_CHAINS.length + 2,
+    );
 
     cleanup();
   });
