@@ -26,18 +26,6 @@ const MOCK_CHAINS = [
   { id: "base", name: "Base", icon: "https://example.com/base.jpg" },
 ];
 
-function optionValues(container) {
-  return Array.from(container.querySelectorAll("option")).map((o) => o.value);
-}
-
-function selectOption(container, value) {
-  const select = container.querySelector("select");
-  act(() => {
-    select.value = value;
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-}
-
 const BASE_PROPS = {
   chain: "ethereum",
   onChainChange: () => {},
@@ -46,48 +34,75 @@ const BASE_PROPS = {
   disabled: false,
 };
 
+function inputOf(container) {
+  return container.querySelector("input");
+}
+
+function openList(container) {
+  act(() => {
+    inputOf(container).focus();
+  });
+}
+
+function typeText(container, text) {
+  const input = inputOf(container);
+  const setter = Object.getOwnPropertyDescriptor(
+    window.HTMLInputElement.prototype,
+    "value",
+  ).set;
+  act(() => {
+    setter.call(input, text);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+function chainIds(container) {
+  return Array.from(container.querySelectorAll("[data-chain]")).map(
+    (el) => el.dataset.chain,
+  );
+}
+
+function clickByLabel(container, label) {
+  return Array.from(container.querySelectorAll("button")).find(
+    (b) => b.textContent === label,
+  );
+}
+
 describe("NetworkSelector", () => {
-  it("renders a select with a sort optgroup followed by one option per chain", () => {
+  it("renders a search input, sort toggle and add buttons", () => {
     const { container, cleanup } = renderComponent(BASE_PROPS);
 
-    const select = container.querySelector("select");
-    expect(select).not.toBeNull();
-    const group = select.querySelector("optgroup");
-    expect(group).not.toBeNull();
-    expect(group.label).toBe("Sort networks");
-    expect(group.querySelectorAll("option")).toHaveLength(2);
-    expect(select.querySelectorAll("option")).toHaveLength(
-      MOCK_CHAINS.length + 2,
+    expect(inputOf(container)).not.toBeNull();
+    const labels = Array.from(container.querySelectorAll("button")).map(
+      (b) => b.textContent,
     );
+    expect(labels).toEqual(["Name", "#ID", "+"]);
 
     cleanup();
   });
 
-  it("sorts options by name by default", () => {
+  it("shows the current chain in the input", () => {
     const { container, cleanup } = renderComponent(BASE_PROPS);
-    // sort options first, then Arbitrum, Base, Ethereum
-    expect(optionValues(container)).toEqual([
-      "sort:name",
-      "sort:chainId",
-      "arbitrum",
-      "base",
-      "ethereum",
-    ]);
+    expect(inputOf(container).value).toBe("Ethereum (1)");
     cleanup();
   });
 
-  it("sorts options by chain ID when the sort option is picked", () => {
+  it("sorts list by name by default", () => {
     const { container, cleanup } = renderComponent(BASE_PROPS);
-    selectOption(container, "sort:chainId");
-    // sort options first, then Ethereum(1), Base(8453), Arbitrum(42161)
-    expect(optionValues(container)).toEqual([
-      "sort:name",
-      "sort:chainId",
-      "ethereum",
-      "base",
-      "arbitrum",
-    ]);
-    expect(container.querySelector("select").value).toBe("sort:chainId");
+    openList(container);
+    // Arbitrum, Base, Ethereum
+    expect(chainIds(container)).toEqual(["arbitrum", "base", "ethereum"]);
+    cleanup();
+  });
+
+  it("sorts list by chain ID when #ID is selected", () => {
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    openList(container);
+    act(() => {
+      clickByLabel(container, "#ID").click();
+    });
+    // Ethereum(1), Base(8453), Arbitrum(42161)
+    expect(chainIds(container)).toEqual(["ethereum", "base", "arbitrum"]);
     cleanup();
   });
 
@@ -101,11 +116,12 @@ describe("NetworkSelector", () => {
       ...BASE_PROPS,
       allChains,
     });
-    selectOption(container, "sort:chainId");
-    // sort options first, then ethereum(1), Alpha(10), chain-999(999), Base(8453), Arbitrum(42161)
-    expect(optionValues(container)).toEqual([
-      "sort:name",
-      "sort:chainId",
+    openList(container);
+    act(() => {
+      clickByLabel(container, "#ID").click();
+    });
+    // ethereum(1), Alpha(10), chain-999(999), Base(8453), Arbitrum(42161)
+    expect(chainIds(container)).toEqual([
       "ethereum",
       "chain-10",
       "chain-999",
@@ -115,57 +131,67 @@ describe("NetworkSelector", () => {
     cleanup();
   });
 
-  it("switches back to name sort after picking the chain ID sort", () => {
+  it("switches back to name sort after picking chain ID sort", () => {
     const { container, cleanup } = renderComponent(BASE_PROPS);
-    selectOption(container, "sort:chainId");
-    selectOption(container, "sort:name");
-    expect(optionValues(container)).toEqual([
-      "sort:name",
-      "sort:chainId",
-      "arbitrum",
-      "base",
-      "ethereum",
-    ]);
+    openList(container);
+    act(() => {
+      clickByLabel(container, "#ID").click();
+    });
+    act(() => {
+      clickByLabel(container, "Name").click();
+    });
+    expect(chainIds(container)).toEqual(["arbitrum", "base", "ethereum"]);
     cleanup();
   });
 
-  it("selecting a chain calls onChainChange and shows it as the header", () => {
+  it("filters chains by name", () => {
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    openList(container);
+    typeText(container, "arb");
+    expect(chainIds(container)).toEqual(["arbitrum"]);
+    cleanup();
+  });
+
+  it("filters chains by chain ID", () => {
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    openList(container);
+    typeText(container, "8453");
+    expect(chainIds(container)).toEqual(["base"]);
+    cleanup();
+  });
+
+  it("shows a no-match message when nothing matches", () => {
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    openList(container);
+    typeText(container, "xyz");
+    expect(chainIds(container)).toEqual([]);
+    expect(container.textContent).toContain("No matching networks");
+    cleanup();
+  });
+
+  it("selecting a chain calls onChainChange and shows it in the input", () => {
     const onChainChange = vi.fn();
     const { container, cleanup } = renderComponent({
       ...BASE_PROPS,
       onChainChange,
     });
-    selectOption(container, "sort:chainId");
-    selectOption(container, "base");
-    expect(onChainChange).toHaveBeenCalledWith("base");
-    expect(container.querySelector("select").value).toBe("base");
-    cleanup();
-  });
-
-  it("sets the select value to the current chain", () => {
-    const { container, cleanup } = renderComponent({
-      chain: "arbitrum",
-      onChainChange: () => {},
-      allChains: MOCK_CHAINS,
-      onOpenAddChain: () => {},
-      disabled: false,
+    openList(container);
+    const item = Array.from(container.querySelectorAll("[data-chain]")).find(
+      (el) => el.dataset.chain === "base",
+    );
+    act(() => {
+      item.click();
     });
-
-    const select = container.querySelector("select");
-    expect(select.value).toBe("arbitrum");
-
+    expect(onChainChange).toHaveBeenCalledWith("base");
+    expect(inputOf(container).value).toBe("Base (8453)");
     cleanup();
   });
 
   it("renders the add chain button with + label", () => {
     const { container, cleanup } = renderComponent(BASE_PROPS);
-
-    const button = Array.from(container.querySelectorAll("button")).find(
-      (b) => b.textContent === "+",
-    );
+    const button = clickByLabel(container, "+");
     expect(button).not.toBeUndefined();
     expect(button.textContent).toBe("+");
-
     cleanup();
   });
 
@@ -175,28 +201,21 @@ describe("NetworkSelector", () => {
       ...BASE_PROPS,
       onOpenAddChain,
     });
-
-    const button = Array.from(container.querySelectorAll("button")).find(
-      (b) => b.textContent === "+",
-    );
     act(() => {
-      button.click();
+      clickByLabel(container, "+").click();
     });
-
     expect(onOpenAddChain).toHaveBeenCalledOnce();
-
     cleanup();
   });
 
-  it("disables select and all buttons when disabled=true", () => {
+  it("disables input and all buttons when disabled=true", () => {
     const { container, cleanup } = renderComponent({
       ...BASE_PROPS,
       disabled: true,
     });
 
-    const select = container.querySelector("select");
+    expect(inputOf(container).disabled).toBe(true);
     const buttons = container.querySelectorAll("button");
-    expect(select.disabled).toBe(true);
     expect(buttons.length).toBeGreaterThan(0);
     buttons.forEach((button) => {
       expect(button.disabled).toBe(true);
