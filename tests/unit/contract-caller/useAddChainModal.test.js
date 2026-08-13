@@ -66,6 +66,9 @@ describe("useAddChainModal – initial state", () => {
       "chainlistError",
       "chainlistSearch",
       "setChainlistSearch",
+      "visibleChains",
+      "showTestnets",
+      "setShowTestnets",
       "addedChainsCollapsed",
       "setAddedChainsCollapsed",
       "addCustomChain",
@@ -93,7 +96,6 @@ describe("useAddChainModal – openAddChainModal / closeAddChainModal", () => {
         nativeCurrency: { symbol: "TST" },
         tvl: 1000,
       },
-      // this testnet entry should be filtered out
       {
         chainId: 998,
         name: "Test Net",
@@ -121,9 +123,10 @@ describe("useAddChainModal – openAddChainModal / closeAddChainModal", () => {
     });
 
     expect(result.current.showAddChainModal).toBe(true);
-    // Testnet should be filtered out
-    expect(result.current.chainlistData).toHaveLength(1);
-    expect(result.current.chainlistData[0].chainId).toBe(999);
+    // All networks are kept, but by default only mainnets are visible
+    expect(result.current.chainlistData).toHaveLength(2);
+    expect(result.current.visibleChains).toHaveLength(1);
+    expect(result.current.visibleChains[0].chainId).toBe(999);
     expect(result.current.chainlistLoading).toBe(false);
     expect(result.current.chainlistError).toBeNull();
   });
@@ -145,8 +148,10 @@ describe("useAddChainModal – openAddChainModal / closeAddChainModal", () => {
 
     act(() => {
       result.current.setChainlistSearch("foo");
+      result.current.setShowTestnets(true);
     });
     expect(result.current.chainlistSearch).toBe("foo");
+    expect(result.current.showTestnets).toBe(true);
 
     act(() => {
       result.current.closeAddChainModal();
@@ -154,6 +159,102 @@ describe("useAddChainModal – openAddChainModal / closeAddChainModal", () => {
 
     expect(result.current.showAddChainModal).toBe(false);
     expect(result.current.chainlistSearch).toBe("");
+    expect(result.current.showTestnets).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// visibleChains (testnet toggle + search filtering)
+// ---------------------------------------------------------------------------
+describe("useAddChainModal – visibleChains", () => {
+  const PAYLOAD = [
+    {
+      chainId: 999,
+      name: "Alpha Mainnet",
+      isTestnet: false,
+      rpc: [],
+      tvl: 1000,
+    },
+    {
+      chainId: 998,
+      name: "Alpha Testnet",
+      isTestnet: true,
+      rpc: [],
+      tvl: 0,
+    },
+    {
+      chainId: 997,
+      name: "Beta Testnet",
+      isTestnet: true,
+      rpc: [],
+      tvl: 0,
+    },
+  ];
+
+  async function load(result) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => PAYLOAD }),
+    );
+    await act(async () => {
+      result.current.openAddChainModal();
+    });
+  }
+
+  it("shows only mainnets by default", () => {
+    const setChain = vi.fn();
+    const { result } = renderHook(() =>
+      useAddChainModal({ chain: "ethereum", setChain }),
+    );
+
+    return load(result).then(() => {
+      expect(result.current.visibleChains.map((c) => c.chainId)).toEqual([999]);
+    });
+  });
+
+  it("shows only testnets when showTestnets is toggled on", () => {
+    const setChain = vi.fn();
+    const { result } = renderHook(() =>
+      useAddChainModal({ chain: "ethereum", setChain }),
+    );
+
+    return load(result).then(() => {
+      act(() => {
+        result.current.setShowTestnets(true);
+      });
+      expect(result.current.visibleChains.map((c) => c.chainId)).toEqual([
+        998, 997,
+      ]);
+    });
+  });
+
+  it("filters by search within the selected network type", () => {
+    const setChain = vi.fn();
+    const { result } = renderHook(() =>
+      useAddChainModal({ chain: "ethereum", setChain }),
+    );
+
+    return load(result).then(() => {
+      act(() => {
+        result.current.setShowTestnets(true);
+        result.current.setChainlistSearch("beta");
+      });
+      expect(result.current.visibleChains.map((c) => c.chainId)).toEqual([997]);
+    });
+  });
+
+  it("filters by chain ID within the selected network type", () => {
+    const setChain = vi.fn();
+    const { result } = renderHook(() =>
+      useAddChainModal({ chain: "ethereum", setChain }),
+    );
+
+    return load(result).then(() => {
+      act(() => {
+        result.current.setChainlistSearch("999");
+      });
+      expect(result.current.visibleChains.map((c) => c.chainId)).toEqual([999]);
+    });
   });
 });
 

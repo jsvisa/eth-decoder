@@ -255,4 +255,57 @@ describe("AddChainModal", () => {
     );
     cleanup();
   });
+
+  it("renders the Mainnets/Testnets toggle", () => {
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    const buttons = Array.from(container.querySelectorAll("button")).filter(
+      (b) => b.textContent === "Mainnets" || b.textContent === "Testnets",
+    );
+    expect(buttons).toHaveLength(2);
+    cleanup();
+  });
+
+  it("highlights Mainnets when showTestnets=false", () => {
+    const { container, cleanup } = renderComponent({
+      ...BASE_PROPS,
+      showTestnets: false,
+    });
+    const mainnetsBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent === "Mainnets",
+    );
+    expect(mainnetsBtn.className).toContain("networkTypeBtnActive");
+    const testnetsBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent === "Testnets",
+    );
+    expect(testnetsBtn.className).not.toContain("networkTypeBtnActive");
+    cleanup();
+  });
+
+  it("highlights Testnets when showTestnets=true", () => {
+    const { container, cleanup } = renderComponent({
+      ...BASE_PROPS,
+      showTestnets: true,
+    });
+    const testnetsBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent === "Testnets",
+    );
+    expect(testnetsBtn.className).toContain("networkTypeBtnActive");
+    cleanup();
+  });
+
+  it("calls onShowTestnetsChange when a toggle button is clicked", () => {
+    const onShowTestnetsChange = vi.fn();
+    const { container, cleanup } = renderComponent({
+      ...BASE_PROPS,
+      onShowTestnetsChange,
+    });
+    const testnetsBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent === "Testnets",
+    );
+    act(() => {
+      testnetsBtn.click();
+    });
+    expect(onShowTestnetsChange).toHaveBeenCalledWith(true);
+    cleanup();
+  });
 });
