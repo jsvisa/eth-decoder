@@ -69,14 +69,14 @@ function clickByLabel(container, label) {
 }
 
 describe("NetworkSelector", () => {
-  it("renders a search input, sort toggle and add buttons", () => {
+  it("renders a search input and the add button", () => {
     const { container, cleanup } = renderComponent(BASE_PROPS);
 
     expect(inputOf(container)).not.toBeNull();
     const labels = Array.from(container.querySelectorAll("button")).map(
       (b) => b.textContent,
     );
-    expect(labels).toEqual(["Name", "#ID", "+"]);
+    expect(labels).toEqual(["+"]);
 
     cleanup();
   });
@@ -87,59 +87,10 @@ describe("NetworkSelector", () => {
     cleanup();
   });
 
-  it("sorts list by name by default", () => {
+  it("lists chains ordered by name by default", () => {
     const { container, cleanup } = renderComponent(BASE_PROPS);
     openList(container);
     // Arbitrum, Base, Ethereum
-    expect(chainIds(container)).toEqual(["arbitrum", "base", "ethereum"]);
-    cleanup();
-  });
-
-  it("sorts list by chain ID when #ID is selected", () => {
-    const { container, cleanup } = renderComponent(BASE_PROPS);
-    openList(container);
-    act(() => {
-      clickByLabel(container, "#ID").click();
-    });
-    // Ethereum(1), Base(8453), Arbitrum(42161)
-    expect(chainIds(container)).toEqual(["ethereum", "base", "arbitrum"]);
-    cleanup();
-  });
-
-  it("sorts custom chains by their own chainId field", () => {
-    const allChains = [
-      ...MOCK_CHAINS,
-      { id: "chain-999", name: "Zeta", chainId: 999 },
-      { id: "chain-10", name: "Alpha", chainId: 10 },
-    ];
-    const { container, cleanup } = renderComponent({
-      ...BASE_PROPS,
-      allChains,
-    });
-    openList(container);
-    act(() => {
-      clickByLabel(container, "#ID").click();
-    });
-    // ethereum(1), Alpha(10), chain-999(999), Base(8453), Arbitrum(42161)
-    expect(chainIds(container)).toEqual([
-      "ethereum",
-      "chain-10",
-      "chain-999",
-      "base",
-      "arbitrum",
-    ]);
-    cleanup();
-  });
-
-  it("switches back to name sort after picking chain ID sort", () => {
-    const { container, cleanup } = renderComponent(BASE_PROPS);
-    openList(container);
-    act(() => {
-      clickByLabel(container, "#ID").click();
-    });
-    act(() => {
-      clickByLabel(container, "Name").click();
-    });
     expect(chainIds(container)).toEqual(["arbitrum", "base", "ethereum"]);
     cleanup();
   });

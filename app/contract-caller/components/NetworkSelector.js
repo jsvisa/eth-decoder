@@ -3,10 +3,9 @@ import { BUILT_IN_CHAIN_IDS } from "../../utils/chains";
 import styles from "./NetworkSelector.module.css";
 
 /**
- * Searchable network picker with a sort toggle and a button to open the
- * Add Chain modal. Type in the input to fuzzy-filter chains by name or chain
- * ID; the Name / #ID toggle orders the results. The chosen chain is shown in
- * the input.
+ * Searchable network picker with a button to open the Add Chain modal. Type in
+ * the input to fuzzy-filter chains by name or chain ID. The chosen chain is
+ * shown in the input.
  *
  * @param {{
  *   chain: string,
@@ -23,7 +22,6 @@ export default function NetworkSelector({
   onOpenAddChain,
   disabled,
 }) {
-  const [sortBy, setSortBy] = useState("name");
   const [query, setQuery] = useState("");
   const [showList, setShowList] = useState(false);
   const [highlighted, setHighlighted] = useState(0);
@@ -39,11 +37,7 @@ export default function NetworkSelector({
   const isSelectionText = selectedChain && query === displayOf(selectedChain);
   const q = isSelectionText ? "" : query.trim().toLowerCase();
   const filtered = [...allChains]
-    .sort((a, b) =>
-      sortBy === "chainId"
-        ? chainIdOf(a) - chainIdOf(b)
-        : a.name.localeCompare(b.name),
-    )
+    .sort((a, b) => a.name.localeCompare(b.name))
     .filter((c) => {
       if (!q) return true;
       return (
@@ -162,44 +156,6 @@ export default function NetworkSelector({
                 ),
               ),
         ),
-    ),
-    React.createElement(
-      "div",
-      { className: styles.sortToggle },
-      React.createElement(
-        "button",
-        {
-          type: "button",
-          className:
-            styles.sortBtn +
-            (sortBy === "name" ? " " + styles.sortBtnActive : ""),
-          onClick: () => {
-            setSortBy("name");
-            setHighlighted(0);
-          },
-          title: "Sort by name",
-          disabled,
-          onMouseDown: (e) => e.preventDefault(),
-        },
-        "Name",
-      ),
-      React.createElement(
-        "button",
-        {
-          type: "button",
-          className:
-            styles.sortBtn +
-            (sortBy === "chainId" ? " " + styles.sortBtnActive : ""),
-          onClick: () => {
-            setSortBy("chainId");
-            setHighlighted(0);
-          },
-          title: "Sort by chain ID",
-          disabled,
-          onMouseDown: (e) => e.preventDefault(),
-        },
-        "#ID",
-      ),
     ),
     React.createElement(
       "button",
