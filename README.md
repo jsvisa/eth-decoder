@@ -339,6 +339,14 @@ curl -X POST http://localhost:3000/api/simulate-tx \
   }'
 ```
 
+The example above is a real 3-call flow on Base (chain `8453`) from the EOA `0x00eF...6297`:
+
+1. **Call 1 — approve SYND to the Universal Router** (`0x095ea7b3`): approves the router contract (`0xFdf6...fbC7`) via the Permit2 token approval path, spending the SYND token (`0x11dC...2B9`) up to `uint256.max`.
+2. **Call 2 — approve the SYND/USDC pool on Permit2** (`0x87517c45`): calls the Permit2 contract (`0x0000...a78BA3`) to approve the SYND token for the router's token spender, with a `uint160.max` amount and a set expiration.
+3. **Call 3 — execute the swap** (`0x3593564c`): invokes the Universal Router's `execute` to swap SYND → USDC (and ETH → WETH) through the pools, using the approvals granted in calls 1–2.
+
+The sequence matters: the swap (call 3) only succeeds because the two approvals run first, which is why a session — not three separate simulations — is the correct way to model it.
+
 **Session inputs:**
 
 | Field              | Required | Description                                                                                                                                                                       |
@@ -537,7 +545,7 @@ Session-level `value`, `gas`, `balanceOverrides`, `storageOverrides`, `cheatcode
 
 **Restoring a saved session:** With `save: true`, the entire session (all calls) is stored under a single `simulationId`. Open the returned `simulationLink` (or append `?simulationId=<id>` to the Contract Caller URL) to restore the whole session. The page renders every call's result as its own panel and repopulates the form with the last call's `requestBody`.
 
-The example script [`simulate-session.sh`](./simulate-session.sh) runs this exact request against a local RPC fork. Restoring the saved result in the Contract Caller UI looks like:
+Restoring the saved result in the Contract Caller UI looks like:
 
 ![Restored session result](./docs/simulate-session.png)
 
