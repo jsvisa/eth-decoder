@@ -131,6 +131,7 @@ GET /api/v1/decode?data=0xa9059cbb000000000000000000000000...
 | `0x60fc8466` | `multicall((bool,bytes)[])`                         | tuple_array      |
 | `0x374f435d` | `multicall((address,bytes,uint256,bool,bytes32)[])` | tuple_array      |
 | `0x82ad56cb` | `aggregate3((address,bool,bytes)[])`                | tuple_array      |
+| `0x571d3dc7` | `execute((address,uint256,bytes)[],bytes32)`        | tuple_array      |
 | `0x24856bc3` | `execute(bytes,bytes[])`                            | Universal Router |
 | `0x3593564c` | `execute(bytes,bytes[],uint256)`                    | Universal Router |
 

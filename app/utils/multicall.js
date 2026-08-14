@@ -5,6 +5,7 @@ export const MULTICALL_SELECTORS = new Set([
   "0x60fc8466", // multicall((bool,bytes)[])                             — tuple_array
   "0x374f435d", // multicall((address,bytes,uint256,bool,bytes32)[])     — tuple_array
   "0x82ad56cb", // aggregate3((address,bool,bytes)[])                    — tuple_array (Multicall3)
+  "0x571d3dc7", // execute((address,uint256,bytes)[],bytes32)             — tuple_array
   "0x24856bc3", // execute(bytes,bytes[])                                — universal_router
   "0x3593564c", // execute(bytes,bytes[],uint256)                        — universal_router
 ]);

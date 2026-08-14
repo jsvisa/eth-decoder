@@ -90,6 +90,31 @@ export const MULTICALL_ABIS = {
     dataField: "callData",
     targetField: "target",
   },
+
+  // execute((address,uint256,bytes)[],bytes32)  — tuple_array + bytes32 salt/commit
+  "0x571d3dc7": {
+    abi: {
+      name: "execute",
+      type: "function",
+      inputs: [
+        {
+          name: "calls",
+          type: "tuple[]",
+          components: [
+            { name: "to", type: "address" },
+            { name: "value", type: "uint256" },
+            { name: "data", type: "bytes" },
+          ],
+        },
+        { name: "commit", type: "bytes32" },
+      ],
+      outputs: [],
+      stateMutability: "payable",
+    },
+    arrayParam: "calls",
+    dataField: "data",
+    targetField: "to",
+  },
 };
 
 /**
@@ -143,15 +168,12 @@ export function decodeMulticall(data) {
     return entry;
   });
 
-  // Build named outer args (e.g. { bundle: [...] }) with serialized values
-  const outerArgs = {
-    [config.arrayParam]: calls.map((call) => {
-      if (config.isBytesArray) return serializeValue(call);
-      const obj = {};
-      for (const [k, v] of Object.entries(call)) obj[k] = serializeValue(v);
-      return obj;
-    }),
-  };
+  // Build named outer args (e.g. { calls: [...], commit: '0x...' }) with serialized values
+  const outerArgs = {};
+  decoded.args.forEach((arg, i) => {
+    const name = config.abi.inputs[i]?.name || `arg${i}`;
+    outerArgs[name] = serializeValue(arg);
+  });
 
   const funcSig =
     config.abi.name +
