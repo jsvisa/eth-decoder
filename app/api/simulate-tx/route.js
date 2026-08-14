@@ -551,6 +551,7 @@ export async function POST(request) {
       });
       const { body: resultBody } = await runSingleSimulation({
         ...singleCallContext,
+        save: false,
         call: { ...merged, blockNumber },
         sessionClient: client,
         pinnedBlock,
@@ -558,12 +559,27 @@ export async function POST(request) {
       results.push(resultBody);
     }
 
-    return NextResponse.json({
+    const sessionResponse = {
       session: true,
       chainId: numericChainId,
       blockNumber,
       results,
-    });
+    };
+
+    if (save) {
+      try {
+        const simulationId = await saveSimulationResult(sessionResponse);
+        sessionResponse.simulationId = simulationId;
+        sessionResponse.simulationLink = buildSimulationLink(
+          request,
+          simulationId,
+        );
+      } catch (error) {
+        // Session save failed — return the session without a simulation id
+      }
+    }
+
+    return NextResponse.json(sessionResponse);
   }
 
   const { error } = validateCallFields({ to, data, from, value, gas });

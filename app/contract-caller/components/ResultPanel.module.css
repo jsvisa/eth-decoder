@@ -19,6 +19,37 @@
   margin-top: 1rem;
 }
 
+/* Session result container */
+.sessionResult {
+  margin-top: 1rem;
+}
+
+.sessionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.sessionTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sessionTitle h2 {
+  margin: 0;
+  color: #d4d4d4;
+  font-size: 1.5rem;
+}
+
+.sessionMeta {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
 /* Header */
 .resultHeader {
   display: flex;

@@ -302,6 +302,47 @@ Required Vercel Blob environment:
 
 Blob storage is only used when `BLOB_STORE_ENABLED=true` is set; unset it (or set to anything other than `true`/`1`) to force the filesystem cache instead.
 
+### Session mode
+
+Pass a `calls` array instead of single `to`/`data`/`from` to simulate a sequence of transactions against a single shared forked state. Each call commits its state changes, so later calls see the effects of earlier ones.
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:3000/api/simulate-tx \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chainId": 8453,
+    "blockNumber": "latest",
+    "calls": [
+      {
+        "to": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+        "data": "0x095ea7b3...",
+        "from": "0x28C79F7607cFbAFcdFbC88606767333cB5AaBdAD"
+      },
+      {
+        "to": "0xFdf682F51FE81Aa4898F0AE2163d8A55c127fbC7",
+        "data": "0x3593564c...",
+        "from": "0x28C79F7607cFbAFcdFbC88606767333cB5AaBdAD"
+      }
+    ]
+  }'
+```
+
+Session-level `value`, `gas`, `balanceOverrides`, `storageOverrides`, and `cheatcodes` act as defaults for every call; a call may override any of them per-call.
+
+**Session response:**
+
+| Field          | Type      | Description                                                                                               |
+| -------------- | --------- | --------------------------------------------------------------------------------------------------------- |
+| `session`      | `boolean` | Always `true`                                                                                             |
+| `chainId`      | `number`  | Chain the session ran on                                                                                  |
+| `blockNumber`  | `string`  | Block the session forked from                                                                             |
+| `results`      | `Array`   | One result per call, in order — each shaped like a single-call response (including its own `requestBody`) |
+| `simulationId` | `string`  | Present when `save: true` — restores the whole session via `?simulationId=`                               |
+
+**Restoring a saved session:** With `save: true`, the entire session (all calls) is stored under a single `simulationId`. Open the returned `simulationLink` (or append `?simulationId=<id>` to the Contract Caller URL) to restore the whole session. The page renders every call's result as its own panel and repopulates the form with the first call's `requestBody`.
+
 ## Deploy to Vercel
 
 ### Method 1: Deploy via Vercel CLI

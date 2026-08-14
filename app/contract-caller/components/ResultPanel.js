@@ -466,6 +466,40 @@ export default function ResultPanel({
 
   if (!error && !result) return null;
 
+  // ── Session view: a saved multi-call session renders each call as its own panel ──
+  if (result && result.session === true && Array.isArray(result.results)) {
+    return (
+      <div className={styles.sessionResult}>
+        <div className={styles.sessionHeader}>
+          <div className={styles.sessionTitle}>
+            <h2>Session Result</h2>
+            {result.results.some((r) => r.success === false) && (
+              <span className={styles.failedBadge}>Failed</span>
+            )}
+          </div>
+          <div className={styles.sessionMeta}>
+            {result.results.length} call{result.results.length !== 1 ? "s" : ""}
+            {result.chainId ? ` · Chain ${result.chainId}` : ""}
+            {result.blockNumber ? ` · Block ${result.blockNumber}` : ""}
+          </div>
+        </div>
+        {result.results.map((subResult, index) => (
+          <ResultPanel
+            key={index}
+            result={subResult}
+            error={subResult.success === false ? subResult.error : null}
+            chain={chain}
+            address={subResult.requestBody?.to || address}
+            fromAddress={subResult.requestBody?.from || fromAddress}
+            tokenSymbols={tokenSymbols}
+            tokenDecimals={tokenDecimals}
+            tokenPrices={tokenPrices}
+          />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <>
       {error && (
