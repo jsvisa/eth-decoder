@@ -341,21 +341,18 @@ export function useCallExecution({
         if (sessionActive) {
           const ts = Date.now();
           if (typeof setSessionHistory === "function") {
-            setSessionHistory((prev) => [
-              ...prev,
-              {
-                id: ts,
-                address,
-                contractName: contractName || address.slice(0, 8) + "...",
-                functionName: isRawCall ? null : selectedFunction,
-                type: "write",
-                success: data.success,
-                inputs: data.callTrace?.decodedInputs || [],
-                outputs: data.decoded || [],
-                timestamp: ts,
-                metrics: data.metrics ?? null,
-              },
-            ]);
+            setSessionHistory({
+              id: ts,
+              address,
+              contractName: contractName || address.slice(0, 8) + "...",
+              functionName: isRawCall ? null : selectedFunction,
+              type: "write",
+              success: data.success,
+              inputs: data.callTrace?.decodedInputs || [],
+              outputs: data.decoded || [],
+              timestamp: ts,
+              metrics: data.metrics ?? null,
+            });
           }
         }
 
