@@ -787,3 +787,208 @@ describe("populateTraceToNames", () => {
     expect(calls).toEqual([mixedCase.toLowerCase()]);
   });
 });
+
+// ── Local mock fork RPC (no network) ─────────────────────────────────────────
+// Serves a single contract whose runtime reads storage slot 0 (SLOAD/MLOAD/
+// RETURN), so a raw CALL to it returns the current value of slot 0. Lets the
+// prefetch regression test run without hitting a real RPC.
+import { createServer } from "node:http";
+
+const SLOT0 = "0x" + "0".repeat(64);
+const ZERO32 = "0x" + "0".repeat(64);
+const STORAGE_READER_CODE = "0x60005460005260206000f3";
+
+function createForkRpc({ code, balance, storage = {} }) {
+  const requests = [];
+  const blockNumber = "0x10";
+  const block = {
+    number: blockNumber,
+    hash: "0x" + "ab".repeat(32),
+    parentHash: "0x" + "cd".repeat(32),
+    nonce: "0x0000000000000000",
+    sha3Uncles:
+      "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+    logsBloom: "0x" + "00".repeat(256),
+    transactionsRoot: "0x" + "00".repeat(32),
+    stateRoot: "0x" + "00".repeat(32),
+    receiptsRoot: "0x" + "00".repeat(32),
+    miner: "0x" + "00".repeat(20),
+    difficulty: "0x0",
+    totalDifficulty: "0x0",
+    extraData: "0x",
+    size: "0x0",
+    gasLimit: "0x1c9c380",
+    gasUsed: "0x0",
+    timestamp: "0x6611a4c8",
+    transactions: [],
+    uncles: [],
+    baseFeePerGas: "0x7",
+    mixHash: "0x" + "00".repeat(32),
+  };
+
+  const respond = (r) => {
+    requests.push(r.method);
+    let result = null;
+    switch (r.method) {
+      case "eth_chainId":
+        result = "0x1";
+        break;
+      case "eth_blockNumber":
+        result = blockNumber;
+        break;
+      case "eth_gasPrice":
+        result = "0x1";
+        break;
+      case "eth_feeHistory":
+        result = {
+          oldestBlock: blockNumber,
+          baseFeePerGas: ["0x7"],
+          gasUsedRatio: [],
+        };
+        break;
+      case "eth_maxPriorityFeePerGas":
+        result = "0x0";
+        break;
+      case "eth_getBalance":
+        result = balance;
+        break;
+      case "eth_getCode":
+        result = code;
+        break;
+      case "eth_getStorageAt": {
+        const [addr, slot] = r.params;
+        result = storage[addr.toLowerCase()]?.[slot.toLowerCase()] ?? ZERO32;
+        break;
+      }
+      case "eth_getTransactionCount":
+        result = "0x0";
+        break;
+      case "eth_createAccessList": {
+        const [tx] = r.params;
+        result = { accessList: [{ address: tx.to, storageKeys: [SLOT0] }] };
+        break;
+      }
+      case "eth_getBlockByNumber":
+      case "eth_getBlockByHash":
+        result = block;
+        break;
+      default:
+        break;
+    }
+    return { jsonrpc: "2.0", id: r.id, result };
+  };
+
+  const server = createServer((req, res) => {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", () => {
+      const parsed = JSON.parse(body);
+      const payload = Array.isArray(parsed)
+        ? parsed.map(respond)
+        : respond(parsed);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(payload));
+    });
+  });
+
+  return new Promise((resolve) => {
+    server.listen(0, "127.0.0.1", () => {
+      const { port } = server.address();
+      resolve({
+        url: `http://127.0.0.1:${port}`,
+        requests,
+        close: () => new Promise((r) => server.close(r)),
+      });
+    });
+  });
+}
+
+describe("simulateWithClient — session state vs prefetch (regression)", () => {
+  const CONTRACT = "0x1111111111111111111111111111111111111111";
+  const SENDER = "0x2222222222222222222222222222222222222222";
+
+  it("does not clobber committed storage with the fork prefetch by default", async () => {
+    const forkValue = "0x" + "0".repeat(63) + "1";
+    const committedValue = "0x" + "0".repeat(63) + "2";
+    const fork = await createForkRpc({
+      code: STORAGE_READER_CODE,
+      balance: "0x0",
+      storage: { [CONTRACT]: { [SLOT0]: forkValue } },
+    });
+
+    try {
+      const { client, blockNumber } = await createTevmClient(
+        "ethereum",
+        fork.url,
+        "0x10",
+        null,
+        1,
+      );
+
+      // Prior session call committed slot0 = 2
+      await client.tevmSetAccount({
+        address: CONTRACT,
+        state: { [SLOT0]: committedValue },
+      });
+
+      // Default session read: prefetch disabled, committed state must survive.
+      const read = await simulateWithClient(client, blockNumber, {
+        chain: "ethereum",
+        address: CONTRACT,
+        callData: "0x",
+        abi: null,
+        fromAddress: SENDER,
+        rpcUrl: fork.url,
+      });
+
+      expect(read.success).toBe(true);
+      expect(read.rawData).toBe(committedValue);
+      // eth_createAccessList is only ever issued by the prefetch; its absence
+      // proves the fork-state prefetch was skipped.
+      expect(fork.requests).not.toContain("eth_createAccessList");
+    } finally {
+      await fork.close();
+    }
+  }, 30000);
+
+  it("lets an explicit prefetch: true opt back in (and shows why it must be off by default)", async () => {
+    const forkValue = "0x" + "0".repeat(63) + "1";
+    const committedValue = "0x" + "0".repeat(63) + "2";
+    const fork = await createForkRpc({
+      code: STORAGE_READER_CODE,
+      balance: "0x0",
+      storage: { [CONTRACT]: { [SLOT0]: forkValue } },
+    });
+
+    try {
+      const { client, blockNumber } = await createTevmClient(
+        "ethereum",
+        fork.url,
+        "0x10",
+        null,
+        1,
+      );
+      await client.tevmSetAccount({
+        address: CONTRACT,
+        state: { [SLOT0]: committedValue },
+      });
+
+      const read = await simulateWithClient(client, blockNumber, {
+        chain: "ethereum",
+        address: CONTRACT,
+        callData: "0x",
+        abi: null,
+        fromAddress: SENDER,
+        rpcUrl: fork.url,
+        prefetch: true,
+      });
+
+      // The prefetch re-applies the fork's original value (tevmSetAccount with
+      // `state` clears storage first), reverting the committed session change.
+      expect(read.success).toBe(true);
+      expect(read.rawData).toBe(forkValue);
+    } finally {
+      await fork.close();
+    }
+  }, 30000);
+});
