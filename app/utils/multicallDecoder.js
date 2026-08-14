@@ -90,6 +90,180 @@ export const MULTICALL_ABIS = {
     dataField: "callData",
     targetField: "target",
   },
+
+  // execute((address,uint256,bytes)[],bytes32)  — tuple_array + bytes32 salt/commit
+  "0x571d3dc7": {
+    abi: {
+      name: "execute",
+      type: "function",
+      inputs: [
+        {
+          name: "calls",
+          type: "tuple[]",
+          components: [
+            { name: "to", type: "address" },
+            { name: "value", type: "uint256" },
+            { name: "data", type: "bytes" },
+          ],
+        },
+        { name: "commit", type: "bytes32" },
+      ],
+      outputs: [],
+      stateMutability: "payable",
+    },
+    arrayParam: "calls",
+    dataField: "data",
+    targetField: "to",
+  },
+
+  // multicall(uint256,bytes[])  — bytes_array with a leading deadline (Uniswap V3 SwapRouter02)
+  "0x5ae401dc": {
+    abi: {
+      name: "multicall",
+      type: "function",
+      inputs: [
+        { name: "deadline", type: "uint256" },
+        { name: "data", type: "bytes[]" },
+      ],
+      outputs: [],
+      stateMutability: "payable",
+    },
+    arrayParam: "data",
+    dataField: "data",
+    targetField: null,
+    isBytesArray: true,
+    arrayIndex: 1,
+  },
+
+  // multicall(uint256,bytes[],address[],address[],uint256[],address)  — bytes_array at index 1,
+  // targets split across two address[] args (ambiguous), so decode data-only; target falls back to tx.to
+  "0x1e859a05": {
+    abi: {
+      name: "multicall",
+      type: "function",
+      inputs: [
+        { name: "deadline", type: "uint256" },
+        { name: "data", type: "bytes[]" },
+        { name: "targetsA", type: "address[]" },
+        { name: "targetsB", type: "address[]" },
+        { name: "values", type: "uint256[]" },
+        { name: "to", type: "address" },
+      ],
+      outputs: [],
+      stateMutability: "payable",
+    },
+    arrayParam: "data",
+    dataField: "data",
+    targetField: null,
+    isBytesArray: true,
+    arrayIndex: 1,
+  },
+
+  // multicall((address,uint256,bytes)[],bool)  — tuple_array + trailing bool (same shape as 0x571d3dc7)
+  "0x69340beb": {
+    abi: {
+      name: "multicall",
+      type: "function",
+      inputs: [
+        {
+          name: "calls",
+          type: "tuple[]",
+          components: [
+            { name: "to", type: "address" },
+            { name: "value", type: "uint256" },
+            { name: "data", type: "bytes" },
+          ],
+        },
+        { name: "strict", type: "bool" },
+      ],
+      outputs: [],
+      stateMutability: "payable",
+    },
+    arrayParam: "calls",
+    dataField: "data",
+    targetField: "to",
+  },
+
+  // multicall((address,bytes)[])  — tuple_array
+  "0xcaa5c23f": {
+    abi: {
+      name: "multicall",
+      type: "function",
+      inputs: [
+        {
+          name: "calls",
+          type: "tuple[]",
+          components: [
+            { name: "to", type: "address" },
+            { name: "data", type: "bytes" },
+          ],
+        },
+      ],
+      outputs: [],
+      stateMutability: "payable",
+    },
+    arrayParam: "calls",
+    dataField: "data",
+    targetField: "to",
+  },
+
+  // multicall(address[],bytes[])  — parallel_arrays, no values
+  "0x63fb0b96": {
+    abi: {
+      name: "multicall",
+      type: "function",
+      inputs: [
+        { name: "targets", type: "address[]" },
+        { name: "calldatas", type: "bytes[]" },
+      ],
+      outputs: [],
+      stateMutability: "payable",
+    },
+    isParallelArrays: true,
+    targetParam: "targets",
+    valueParam: "values",
+    dataParam: "calldatas",
+  },
+
+  // multicall(address[],bytes[],uint256[],address)  — parallel_arrays + trailing address
+  "0x61f9a531": {
+    abi: {
+      name: "multicall",
+      type: "function",
+      inputs: [
+        { name: "targets", type: "address[]" },
+        { name: "calldatas", type: "bytes[]" },
+        { name: "values", type: "uint256[]" },
+        { name: "to", type: "address" },
+      ],
+      outputs: [],
+      stateMutability: "payable",
+    },
+    isParallelArrays: true,
+    targetParam: "targets",
+    valueParam: "values",
+    dataParam: "calldatas",
+  },
+
+  // execute(address[],uint256[],bytes[],bytes32)  — parallel_arrays (OZ Governor)
+  "0x2656227d": {
+    abi: {
+      name: "execute",
+      type: "function",
+      inputs: [
+        { name: "targets", type: "address[]" },
+        { name: "values", type: "uint256[]" },
+        { name: "calldatas", type: "bytes[]" },
+        { name: "descriptionHash", type: "bytes32" },
+      ],
+      outputs: [],
+      stateMutability: "payable",
+    },
+    isParallelArrays: true,
+    targetParam: "targets",
+    valueParam: "values",
+    dataParam: "calldatas",
+  },
 };
 
 /**
@@ -109,49 +283,69 @@ export function decodeMulticall(data) {
     return null;
   }
 
-  const [callsArg] = decoded.args;
-  const calls = Array.isArray(callsArg) ? callsArg : [];
+  let inner_calls;
+  if (config.isParallelArrays) {
+    // Parallel arrays — targets/values/calldatas are separate top-level args
+    const argByName = {};
+    decoded.args.forEach((arg, i) => {
+      argByName[config.abi.inputs[i]?.name] = arg;
+    });
+    const targets = argByName[config.targetParam] ?? [];
+    const values = argByName[config.valueParam] ?? [];
+    const calldatas = argByName[config.dataParam] ?? [];
 
-  const inner_calls = calls.map((call, idx) => {
-    let innerData, target;
+    inner_calls = calldatas.map((innerData, idx) => {
+      const dataHex = typeof innerData === "string" ? innerData : "0x";
+      const inner_selector =
+        dataHex.length >= 10 ? dataHex.slice(0, 10).toLowerCase() : null;
+      const entry = { index: idx, selector: inner_selector, data: dataHex };
+      if (targets[idx] !== undefined)
+        entry.target = serializeValue(targets[idx]);
+      if (values[idx] !== undefined) entry.value = serializeValue(values[idx]);
+      return entry;
+    });
+  } else {
+    const callsArg = decoded.args[config.arrayIndex ?? 0];
+    const calls = Array.isArray(callsArg) ? callsArg : [];
 
-    if (config.isBytesArray) {
-      // bytes[] — element is the raw calldata hex string
-      innerData = typeof call === "string" ? call : serializeValue(call);
-      target = null;
-    } else {
-      innerData = call[config.dataField] ?? "0x";
-      target = config.targetField ? call[config.targetField] : null;
-    }
+    inner_calls = calls.map((call, idx) => {
+      let innerData, target;
 
-    const dataHex = typeof innerData === "string" ? innerData : "0x";
-    const inner_selector =
-      dataHex.length >= 10 ? dataHex.slice(0, 10).toLowerCase() : null;
+      if (config.isBytesArray) {
+        // bytes[] — element is the raw calldata hex string
+        innerData = typeof call === "string" ? call : serializeValue(call);
+        target = null;
+      } else {
+        innerData = call[config.dataField] ?? "0x";
+        target = config.targetField ? call[config.targetField] : null;
+      }
 
-    const entry = { index: idx, selector: inner_selector, data: dataHex };
-    if (target !== null) entry.target = serializeValue(target);
+      const dataHex = typeof innerData === "string" ? innerData : "0x";
+      const inner_selector =
+        dataHex.length >= 10 ? dataHex.slice(0, 10).toLowerCase() : null;
 
-    // Include remaining tuple fields (value, skipRevert, allowFailure, etc.)
-    if (!config.isBytesArray && call && typeof call === "object") {
-      for (const [k, v] of Object.entries(call)) {
-        if (k !== config.dataField && k !== config.targetField) {
-          entry[k] = serializeValue(v);
+      const entry = { index: idx, selector: inner_selector, data: dataHex };
+      if (target !== null) entry.target = serializeValue(target);
+
+      // Include remaining tuple fields (value, skipRevert, allowFailure, etc.)
+      if (!config.isBytesArray && call && typeof call === "object") {
+        for (const [k, v] of Object.entries(call)) {
+          if (k !== config.dataField && k !== config.targetField) {
+            entry[k] = serializeValue(v);
+          }
         }
       }
-    }
 
-    return entry;
+      return entry;
+    });
+  }
+
+  // Build named outer args (e.g. { calls: [...], commit: '0x...' }) with serialized values
+  const outerArgs = {};
+  decoded.args.forEach((arg, i) => {
+    const name = config.abi.inputs[i]?.name || `arg${i}`;
+    outerArgs[name] = serializeValue(arg);
   });
-
-  // Build named outer args (e.g. { bundle: [...] }) with serialized values
-  const outerArgs = {
-    [config.arrayParam]: calls.map((call) => {
-      if (config.isBytesArray) return serializeValue(call);
-      const obj = {};
-      for (const [k, v] of Object.entries(call)) obj[k] = serializeValue(v);
-      return obj;
-    }),
-  };
 
   const funcSig =
     config.abi.name +

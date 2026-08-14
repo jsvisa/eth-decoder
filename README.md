@@ -125,16 +125,24 @@ GET /api/v1/decode?data=0xa9059cbb000000000000000000000000...
 
 **Multicall auto-detection.** The following selectors are recognised automatically and the response includes an `inner_calls` array:
 
-| Selector     | Function                                            | Type             |
-| ------------ | --------------------------------------------------- | ---------------- |
-| `0xac9650d8` | `multicall(bytes[])`                                | bytes_array      |
-| `0x60fc8466` | `multicall((bool,bytes)[])`                         | tuple_array      |
-| `0x374f435d` | `multicall((address,bytes,uint256,bool,bytes32)[])` | tuple_array      |
-| `0x82ad56cb` | `aggregate3((address,bool,bytes)[])`                | tuple_array      |
-| `0x24856bc3` | `execute(bytes,bytes[])`                            | Universal Router |
-| `0x3593564c` | `execute(bytes,bytes[],uint256)`                    | Universal Router |
+| Selector     | Function                                                           | Type             |
+| ------------ | ------------------------------------------------------------------ | ---------------- |
+| `0xac9650d8` | `multicall(bytes[])`                                               | bytes_array      |
+| `0x5ae401dc` | `multicall(uint256,bytes[])`                                       | bytes_array      |
+| `0x1e859a05` | `multicall(uint256,bytes[],address[],address[],uint256[],address)` | bytes_array      |
+| `0x60fc8466` | `multicall((bool,bytes)[])`                                        | tuple_array      |
+| `0x374f435d` | `multicall((address,bytes,uint256,bool,bytes32)[])`                | tuple_array      |
+| `0x82ad56cb` | `aggregate3((address,bool,bytes)[])`                               | tuple_array      |
+| `0x571d3dc7` | `execute((address,uint256,bytes)[],bytes32)`                       | tuple_array      |
+| `0x69340beb` | `multicall((address,uint256,bytes)[],bool)`                        | tuple_array      |
+| `0xcaa5c23f` | `multicall((address,bytes)[])`                                     | tuple_array      |
+| `0x63fb0b96` | `multicall(address[],bytes[])`                                     | parallel_arrays  |
+| `0x61f9a531` | `multicall(address[],bytes[],uint256[],address)`                   | parallel_arrays  |
+| `0x2656227d` | `execute(address[],uint256[],bytes[],bytes32)`                     | parallel_arrays  |
+| `0x24856bc3` | `execute(bytes,bytes[])`                                           | Universal Router |
+| `0x3593564c` | `execute(bytes,bytes[],uint256)`                                   | Universal Router |
 
-Each element of `inner_calls` contains at minimum `index`, `selector`, and `data`. For `tuple_array` variants the target address and extra fields (`value`, `skipRevert`, …) are included. For Universal Router commands, `name` (e.g. `V3_SWAP_EXACT_IN`) and decoded `args` are included instead. When the inner selector is known to OpenChain, a `decoded` object with `func` and `args` is attached.
+Each element of `inner_calls` contains at minimum `index`, `selector`, and `data`. For `tuple_array` variants the target address and extra fields (`value`, `skipRevert`, …) are included. For `parallel_arrays` variants the target address and value are zipped from the parallel arrays. For Universal Router commands, `name` (e.g. `V3_SWAP_EXACT_IN`) and decoded `args` are included instead. When the inner selector is known to OpenChain, a `decoded` object with `func` and `args` is attached.
 
 ### `GET /api/v1/query`
 
@@ -361,7 +369,7 @@ vercel --prod
 2. The 4-byte selector is checked against known multicall signatures — if matched, inner-call decoding is enabled automatically
 3. Frontend sends a request to `/api/decode`
 4. The route queries the backend; if the backend has the contract in its DB it returns the decoded outer call, otherwise the route decodes client-side using Sourcify (4byte.directory) signature lookup as a fallback
-5. For recognised multicall selectors the route decodes inner calls client-side (no extra round-trip): Universal Router commands use hardcoded command ABIs; `bytes_array` / `tuple_array` variants look up each inner selector via Sourcify first, then the configured backend
+5. For recognised multicall selectors the route decodes inner calls client-side (no extra round-trip): Universal Router commands use hardcoded command ABIs; `bytes_array` / `tuple_array` / `parallel_arrays` variants look up each inner selector via Sourcify first, then the configured backend
 6. The fully decoded response — outer `func`/`args` plus `inner_calls` — is returned to the browser
 
 ### Contract Caller
