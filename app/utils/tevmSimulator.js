@@ -880,6 +880,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     callData: rawCallData = null,
     persistState = false,
     gas = null,
+    prefetch = true,
   } = params;
 
   // Validate inputs before the try/catch so callers receive a rejected promise
@@ -1008,19 +1009,21 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
         : String(pinnedBlock).trim();
 
     collector.markPhase("prefetch", "start");
-    await prefetchAccountsFromAccessList({
-      client,
-      forkRpcUrl: rpcUrl || FORK_RPC_URLS[chain] || "",
-      callParams: {
-        to: address,
-        from: sender,
-        data: callData,
-        value: valueInWei,
-      },
-      blockTag: resolvedBlockTag,
-      batchSize: rpcBatchSize,
-      collector,
-    });
+    if (prefetch) {
+      await prefetchAccountsFromAccessList({
+        client,
+        forkRpcUrl: rpcUrl || FORK_RPC_URLS[chain] || "",
+        callParams: {
+          to: address,
+          from: sender,
+          data: callData,
+          value: valueInWei,
+        },
+        blockTag: resolvedBlockTag,
+        batchSize: rpcBatchSize,
+        collector,
+      });
+    }
     collector.markPhase("prefetch", "end");
 
     // ── callTracer implementation (forge/anvil/geth style) ──────────────────
@@ -1412,13 +1415,22 @@ export async function simulateWithTevm(params) {
 /**
  * Simulate a contract call using an existing tevm client (session mode).
  * The caller is responsible for creating and managing the client lifecycle.
+ *
+ * Runs on a shared client whose state may already include commits from earlier
+ * calls, so the fork-state prefetch is disabled by default: prefetching would
+ * overwrite those commits with the fork's original values and revert earlier
+ * session calls' effects. Pass `prefetch: true` explicitly to opt back in.
+ *
  * @param {object} client - An existing tevm memory client
  * @param {string} pinnedBlock - The block number/tag the client was forked at
  * @param {Object} params - Same simulation parameters as simulateWithTevm (chain/rpcUrl/blockNumber are ignored)
  */
 export async function simulateWithClient(client, pinnedBlock, params) {
   if (!client) throw new Error("client is required");
-  return _runSimulationOnClient(client, pinnedBlock, params);
+  return _runSimulationOnClient(client, pinnedBlock, {
+    ...params,
+    prefetch: params.prefetch ?? false,
+  });
 }
 
 /**
