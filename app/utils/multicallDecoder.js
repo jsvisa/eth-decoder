@@ -115,6 +115,45 @@ export const MULTICALL_ABIS = {
     dataField: "data",
     targetField: "to",
   },
+
+  // multicall(uint256,bytes[])  — bytes_array with a leading deadline (Uniswap V3 SwapRouter02)
+  "0x5ae401dc": {
+    abi: {
+      name: "multicall",
+      type: "function",
+      inputs: [
+        { name: "deadline", type: "uint256" },
+        { name: "data", type: "bytes[]" },
+      ],
+      outputs: [],
+      stateMutability: "payable",
+    },
+    arrayParam: "data",
+    dataField: "data",
+    targetField: null,
+    isBytesArray: true,
+    arrayIndex: 1,
+  },
+
+  // execute(address[],uint256[],bytes[],bytes32)  — parallel_arrays (OZ Governor)
+  "0x2656227d": {
+    abi: {
+      name: "execute",
+      type: "function",
+      inputs: [
+        { name: "targets", type: "address[]" },
+        { name: "values", type: "uint256[]" },
+        { name: "calldatas", type: "bytes[]" },
+        { name: "descriptionHash", type: "bytes32" },
+      ],
+      outputs: [],
+      stateMutability: "payable",
+    },
+    isParallelArrays: true,
+    targetParam: "targets",
+    valueParam: "values",
+    dataParam: "calldatas",
+  },
 };
 
 /**
@@ -134,39 +173,62 @@ export function decodeMulticall(data) {
     return null;
   }
 
-  const [callsArg] = decoded.args;
-  const calls = Array.isArray(callsArg) ? callsArg : [];
+  let inner_calls;
+  if (config.isParallelArrays) {
+    // Parallel arrays — targets/values/calldatas are separate top-level args
+    const argByName = {};
+    decoded.args.forEach((arg, i) => {
+      argByName[config.abi.inputs[i]?.name] = arg;
+    });
+    const targets = argByName[config.targetParam] ?? [];
+    const values = argByName[config.valueParam] ?? [];
+    const calldatas = argByName[config.dataParam] ?? [];
 
-  const inner_calls = calls.map((call, idx) => {
-    let innerData, target;
+    inner_calls = calldatas.map((innerData, idx) => {
+      const dataHex = typeof innerData === "string" ? innerData : "0x";
+      const inner_selector =
+        dataHex.length >= 10 ? dataHex.slice(0, 10).toLowerCase() : null;
+      const entry = { index: idx, selector: inner_selector, data: dataHex };
+      if (targets[idx] !== undefined)
+        entry.target = serializeValue(targets[idx]);
+      if (values[idx] !== undefined) entry.value = serializeValue(values[idx]);
+      return entry;
+    });
+  } else {
+    const callsArg = decoded.args[config.arrayIndex ?? 0];
+    const calls = Array.isArray(callsArg) ? callsArg : [];
 
-    if (config.isBytesArray) {
-      // bytes[] — element is the raw calldata hex string
-      innerData = typeof call === "string" ? call : serializeValue(call);
-      target = null;
-    } else {
-      innerData = call[config.dataField] ?? "0x";
-      target = config.targetField ? call[config.targetField] : null;
-    }
+    inner_calls = calls.map((call, idx) => {
+      let innerData, target;
 
-    const dataHex = typeof innerData === "string" ? innerData : "0x";
-    const inner_selector =
-      dataHex.length >= 10 ? dataHex.slice(0, 10).toLowerCase() : null;
+      if (config.isBytesArray) {
+        // bytes[] — element is the raw calldata hex string
+        innerData = typeof call === "string" ? call : serializeValue(call);
+        target = null;
+      } else {
+        innerData = call[config.dataField] ?? "0x";
+        target = config.targetField ? call[config.targetField] : null;
+      }
 
-    const entry = { index: idx, selector: inner_selector, data: dataHex };
-    if (target !== null) entry.target = serializeValue(target);
+      const dataHex = typeof innerData === "string" ? innerData : "0x";
+      const inner_selector =
+        dataHex.length >= 10 ? dataHex.slice(0, 10).toLowerCase() : null;
 
-    // Include remaining tuple fields (value, skipRevert, allowFailure, etc.)
-    if (!config.isBytesArray && call && typeof call === "object") {
-      for (const [k, v] of Object.entries(call)) {
-        if (k !== config.dataField && k !== config.targetField) {
-          entry[k] = serializeValue(v);
+      const entry = { index: idx, selector: inner_selector, data: dataHex };
+      if (target !== null) entry.target = serializeValue(target);
+
+      // Include remaining tuple fields (value, skipRevert, allowFailure, etc.)
+      if (!config.isBytesArray && call && typeof call === "object") {
+        for (const [k, v] of Object.entries(call)) {
+          if (k !== config.dataField && k !== config.targetField) {
+            entry[k] = serializeValue(v);
+          }
         }
       }
-    }
 
-    return entry;
-  });
+      return entry;
+    });
+  }
 
   // Build named outer args (e.g. { calls: [...], commit: '0x...' }) with serialized values
   const outerArgs = {};
