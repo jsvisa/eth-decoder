@@ -135,6 +135,116 @@ export const MULTICALL_ABIS = {
     arrayIndex: 1,
   },
 
+  // multicall(uint256,bytes[],address[],address[],uint256[],address)  — bytes_array at index 1,
+  // targets split across two address[] args (ambiguous), so decode data-only; target falls back to tx.to
+  "0x1e859a05": {
+    abi: {
+      name: "multicall",
+      type: "function",
+      inputs: [
+        { name: "deadline", type: "uint256" },
+        { name: "data", type: "bytes[]" },
+        { name: "targetsA", type: "address[]" },
+        { name: "targetsB", type: "address[]" },
+        { name: "values", type: "uint256[]" },
+        { name: "to", type: "address" },
+      ],
+      outputs: [],
+      stateMutability: "payable",
+    },
+    arrayParam: "data",
+    dataField: "data",
+    targetField: null,
+    isBytesArray: true,
+    arrayIndex: 1,
+  },
+
+  // multicall((address,uint256,bytes)[],bool)  — tuple_array + trailing bool (same shape as 0x571d3dc7)
+  "0x69340beb": {
+    abi: {
+      name: "multicall",
+      type: "function",
+      inputs: [
+        {
+          name: "calls",
+          type: "tuple[]",
+          components: [
+            { name: "to", type: "address" },
+            { name: "value", type: "uint256" },
+            { name: "data", type: "bytes" },
+          ],
+        },
+        { name: "strict", type: "bool" },
+      ],
+      outputs: [],
+      stateMutability: "payable",
+    },
+    arrayParam: "calls",
+    dataField: "data",
+    targetField: "to",
+  },
+
+  // multicall((address,bytes)[])  — tuple_array
+  "0xcaa5c23f": {
+    abi: {
+      name: "multicall",
+      type: "function",
+      inputs: [
+        {
+          name: "calls",
+          type: "tuple[]",
+          components: [
+            { name: "to", type: "address" },
+            { name: "data", type: "bytes" },
+          ],
+        },
+      ],
+      outputs: [],
+      stateMutability: "payable",
+    },
+    arrayParam: "calls",
+    dataField: "data",
+    targetField: "to",
+  },
+
+  // multicall(address[],bytes[])  — parallel_arrays, no values
+  "0x63fb0b96": {
+    abi: {
+      name: "multicall",
+      type: "function",
+      inputs: [
+        { name: "targets", type: "address[]" },
+        { name: "calldatas", type: "bytes[]" },
+      ],
+      outputs: [],
+      stateMutability: "payable",
+    },
+    isParallelArrays: true,
+    targetParam: "targets",
+    valueParam: "values",
+    dataParam: "calldatas",
+  },
+
+  // multicall(address[],bytes[],uint256[],address)  — parallel_arrays + trailing address
+  "0x61f9a531": {
+    abi: {
+      name: "multicall",
+      type: "function",
+      inputs: [
+        { name: "targets", type: "address[]" },
+        { name: "calldatas", type: "bytes[]" },
+        { name: "values", type: "uint256[]" },
+        { name: "to", type: "address" },
+      ],
+      outputs: [],
+      stateMutability: "payable",
+    },
+    isParallelArrays: true,
+    targetParam: "targets",
+    valueParam: "values",
+    dataParam: "calldatas",
+  },
+
   // execute(address[],uint256[],bytes[],bytes32)  — parallel_arrays (OZ Governor)
   "0x2656227d": {
     abi: {
