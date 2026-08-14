@@ -454,7 +454,7 @@ export default function ContractCallerPage() {
             );
             if (builtInSlug) setChain(builtInSlug);
           }
-          const first = data.results[0];
+          const first = data.results[data.results.length - 1];
           if (first?.requestBody) {
             const {
               to,

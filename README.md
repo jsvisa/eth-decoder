@@ -202,23 +202,24 @@ Simulate a raw transaction against forked chain state and return decoded results
 
 **Request body:**
 
-| Field              | Required | Description                                                                                                     |
-| ------------------ | -------- | --------------------------------------------------------------------------------------------------------------- |
-| `chainId`          | Yes      | Numeric chain ID (1 = Ethereum, 42161 = Arbitrum, 8453 = Base, 137 = Polygon, 56 = BSC)                         |
-| `to`               | Yes      | Contract address                                                                                                |
-| `data`             | Yes      | Hex-encoded calldata                                                                                            |
-| `from`             | Yes      | Sender address — used as `msg.sender` in simulation                                                             |
-| `value`            | No       | Hex-encoded ETH value (default `"0x0"`)                                                                         |
-| `blockNumber`      | No       | Hex block number or `"latest"` (default `"latest"`)                                                             |
-| `gas`              | No       | Hex gas limit (passed through; tevm estimates if omitted)                                                       |
-| `apiKeys`          | No       | `{ "etherscan": "...", "routescan": "..." }` — falls back to `ETHERSCAN_API_KEY` / `ROUTESCAN_API_KEY` env vars |
-| `rpcUrl`           | No       | Custom RPC URL for forking chain state. Falls back to default public node if omitted.                           |
-| `balanceOverrides` | No       | Array of `{address, balance}` — sets native ETH balance for addresses before simulation (same as `vm.deal`)     |
-| `storageOverrides` | No       | Array of `{address, slot, value}` — sets contract storage slots before simulation                               |
-| `cheatcodes`       | No       | Object with `deal`, `warp`, or `prank` keys. See cheatcodes details below.                                      |
-| `price`            | No       | `true` (default) to enrich `balanceChanges` with token symbols, decimals, and USD prices. Pass `false` to skip. |
-| `rpcBatchSize`     | No       | JSON-RPC batch size for state-fetch requests during prefetch (default `20`).                                    |
-| `includeMetrics`   | No       | `true` to include the `metrics` field (timing + RPC call counters) in the response. Omitted by default.         |
+| Field              | Required | Description                                                                                                                      |
+| ------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `chainId`          | Yes      | Numeric chain ID (1 = Ethereum, 42161 = Arbitrum, 8453 = Base, 137 = Polygon, 56 = BSC)                                          |
+| `to`               | Yes      | Contract address                                                                                                                 |
+| `data`             | Yes      | Hex-encoded calldata                                                                                                             |
+| `from`             | Yes      | Sender address — used as `msg.sender` in simulation                                                                              |
+| `value`            | No       | Hex-encoded ETH value (default `"0x0"`)                                                                                          |
+| `blockNumber`      | No       | Hex block number or `"latest"` (default `"latest"`)                                                                              |
+| `gas`              | No       | Hex gas limit (passed through; tevm estimates if omitted)                                                                        |
+| `apiKeys`          | No       | `{ "etherscan": "...", "routescan": "..." }` — falls back to `ETHERSCAN_API_KEY` / `ROUTESCAN_API_KEY` env vars                  |
+| `rpcUrl`           | No       | Custom RPC URL for forking chain state. Falls back to default public node if omitted.                                            |
+| `balanceOverrides` | No       | Array of `{address, balance}` — sets native ETH balance for addresses before simulation (same as `vm.deal`)                      |
+| `storageOverrides` | No       | Array of `{address, slot, value}` — sets contract storage slots before simulation                                                |
+| `cheatcodes`       | No       | Object with `deal`, `warp`, or `prank` keys. See cheatcodes details below.                                                       |
+| `price`            | No       | `true` (default) to enrich `balanceChanges` with token symbols, decimals, and USD prices. Pass `false` to skip.                  |
+| `rpcBatchSize`     | No       | JSON-RPC batch size for state-fetch requests during prefetch (default `20`).                                                     |
+| `includeMetrics`   | No       | `true` to include the `metrics` field (timing + RPC call counters) in the response. Omitted by default.                          |
+| `save`             | No       | `true` to store the result and return `simulationId` / `simulationLink` for later restore via `?simulationId=`. Default `false`. |
 
 **Cheatcodes:**
 
@@ -261,7 +262,7 @@ curl -X POST http://localhost:3000/api/simulate-tx \
 | `accessList`         | `Array`        | Addresses and storage keys accessed                                                                                       |
 | `undecodedAddresses` | `Array`        | Log-emitting addresses whose ABI wasn't available                                                                         |
 | `requestBody`        | `object`       | Input params used (`chainId`, `to`, `from`, `value`, `data`, `gas`, `blockNumber`, `functionName`, `args`)                |
-| `simulationId`       | `string\|null` | UUID for retrieving a saved result via `?simulationId=`                                                                   |
+| `simulationId`       | `string\|null` | UUID for retrieving a saved result via `?simulationId=`. Only set when the request had `save: true`                       |
 
 **Example with cheatcodes:**
 
@@ -314,24 +315,217 @@ curl -X POST http://localhost:3000/api/simulate-tx \
   -d '{
     "chainId": 8453,
     "blockNumber": "latest",
+    "save": true,
     "calls": [
       {
+        "to": "0x11dC28D01984079b7efE7763b533e6ed9E3722B9",
+        "data": "0x095ea7b3000000000000000000000000000000000022d473030f116ddee9f6b43ac78ba3ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "value": "0x00",
+        "from": "0x00eF17D98Ca5AcF523379CFdf006B739cCF46297"
+      },
+      {
         "to": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
-        "data": "0x095ea7b3...",
-        "from": "0x28C79F7607cFbAFcdFbC88606767333cB5AaBdAD"
+        "data": "0x87517c4500000000000000000000000011dc28d01984079b7efe7763b533e6ed9e3722b9000000000000000000000000fdf682f51fe81aa4898f0ae2163d8a55c127fbc7000000000000000000000000ffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000006aa6a541",
+        "value": "0x00",
+        "from": "0x00eF17D98Ca5AcF523379CFdf006B739cCF46297"
       },
       {
         "to": "0xFdf682F51FE81Aa4898F0AE2163d8A55c127fbC7",
-        "data": "0x3593564c...",
-        "from": "0x28C79F7607cFbAFcdFbC88606767333cB5AaBdAD"
+        "data": "0x3593564c0000000000000000000000000000000000000000000000000000000000000060...756e697800000000000c",
+        "value": "0x00",
+        "from": "0x00eF17D98Ca5AcF523379CFdf006B739cCF46297"
       }
     ]
   }'
 ```
 
-Session-level `value`, `gas`, `balanceOverrides`, `storageOverrides`, and `cheatcodes` act as defaults for every call; a call may override any of them per-call.
+**Session inputs:**
+
+| Field              | Required | Description                                                                                                                                                                       |
+| ------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `calls`            | Yes      | Array of per-call request objects (min 1). Each call supports the single-call fields: `to`, `data`, `from`, `value`, `gas`, `balanceOverrides`, `storageOverrides`, `cheatcodes`. |
+| `to`               | Yes      | Contract address the call targets.                                                                                                                                                |
+| `data`             | Yes      | Hex-encoded calldata for the call.                                                                                                                                                |
+| `from`             | Yes      | Sender address — used as `msg.sender` for the call.                                                                                                                               |
+| `value`            | No       | Hex-encoded ETH value sent with the call (default `"0x0"`).                                                                                                                       |
+| `gas`              | No       | Hex gas limit for the call (tevm estimates if omitted).                                                                                                                           |
+| `balanceOverrides` | No       | Per-call balance overrides; merged over session-level ones (later keys win).                                                                                                      |
+| `storageOverrides` | No       | Per-call storage overrides; merged over session-level ones.                                                                                                                       |
+| `cheatcodes`       | No       | Per-call cheatcodes; merged over session-level ones.                                                                                                                              |
+
+Session-level `value`, `gas`, `balanceOverrides`, `storageOverrides`, `cheatcodes`, `rpcUrl`, and `price` act as defaults for every call; a call may override any of them per-call. Calls run sequentially in order — each call's state changes are committed before the next one executes.
 
 **Session response:**
+
+<details>
+<summary>Click to expand the session response example</summary>
+
+```json
+{
+  "session": true,
+  "chainId": 8453,
+  "blockNumber": "latest",
+  "results": [
+    {
+      "success": true,
+      "simulated": true,
+      "gasUsed": 24611,
+      "callTrace": {
+        "functionName": "approve",
+        "to": "0x11dc28d01984079b7efe7763b533e6ed9e3722b9",
+        "decodedInputs": [
+          {
+            "name": "spender",
+            "type": "address",
+            "value": "0x000000000022D473030F116dDEE9F6B43aC78BA3"
+          },
+          {
+            "name": "amount",
+            "type": "uint256",
+            "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+          }
+        ],
+        "decodedOutputs": [{ "name": "result", "type": "bool", "value": true }],
+        "logs": []
+      },
+      "logs": [
+        {
+          "name": "Approval",
+          "address": "0x11dc28d01984079b7efe7763b533e6ed9e3722b9",
+          "inputs": []
+        }
+      ],
+      "requestBody": {
+        "chainId": 8453,
+        "to": "0x11dC28D01984079b7efE7763b533e6ed9E3722B9",
+        "from": "0x00eF17D98Ca5AcF523379CFdf006B739cCF46297",
+        "data": "0x095ea7b3000000000000000000000000000000000022d473030f116ddee9f6b43ac78ba3ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "functionName": "approve"
+      }
+    },
+    {
+      "success": true,
+      "simulated": true,
+      "gasUsed": 25450,
+      "callTrace": {
+        "functionName": "approve",
+        "to": "0x000000000022d473030f116ddee9f6b43ac78ba3",
+        "decodedInputs": [
+          {
+            "name": "token",
+            "type": "address",
+            "value": "0x11dC28D01984079b7efE7763b533e6ed9E3722B9"
+          },
+          {
+            "name": "spender",
+            "type": "address",
+            "value": "0xFdf682F51FE81Aa4898F0AE2163d8A55c127fbC7"
+          },
+          {
+            "name": "amount",
+            "type": "uint160",
+            "value": "1461501637330902918203684832716283019655932542975"
+          },
+          { "name": "expiration", "type": "uint48", "value": 1789306177 }
+        ],
+        "decodedOutputs": [],
+        "logs": []
+      },
+      "logs": [
+        {
+          "name": "Approval",
+          "address": "0x000000000022d473030f116ddee9f6b43ac78ba3",
+          "inputs": []
+        }
+      ],
+      "requestBody": {
+        "chainId": 8453,
+        "to": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+        "from": "0x00eF17D98Ca5AcF523379CFdf006B739cCF46297",
+        "data": "0x87517c4500000000000000000000000011dc28d01984079b7efe7763b533e6ed9e3722b9000000000000000000000000fdf682f51fe81aa4898f0ae2163d8a55c127fbc7000000000000000000000000ffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000006aa6a541",
+        "functionName": "approve"
+      }
+    },
+    {
+      "_tokenMeta": {
+        "tokenSymbols": {
+          "0x11dc28d01984079b7efe7763b533e6ed9e3722b9": "SYND",
+          "0x4200000000000000000000000000000000000006": "WETH",
+          "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913": "USDC"
+        },
+        "tokenDecimals": {
+          "0x11dc28d01984079b7efe7763b533e6ed9e3722b9": 18,
+          "0x4200000000000000000000000000000000000006": 18,
+          "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913": 6
+        },
+        "tokenPrices": {
+          "0x0000000000000000000000000000000000000000": 1869.5,
+          "0x11dc28d01984079b7efe7763b533e6ed9e3722b9": 0.00826309,
+          "0x4200000000000000000000000000000000000006": 1867.67,
+          "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913": 0.999626
+        }
+      },
+      "success": true,
+      "simulated": true,
+      "gasUsed": 445553,
+      "callTrace": {
+        "functionName": "execute",
+        "to": "0xfdf682f51fe81aa4898f0ae2163d8a55c127fbc7",
+        "calls": [
+          {
+            "functionName": "unlockCallback",
+            "to": "0x498581ff718922c3f8e6a244956af099b2652b2b",
+            "calls": []
+          }
+        ]
+      },
+      "balanceChanges": [
+        {
+          "address": "0x00ef17d98ca5acf523379cfdf006b739ccf46297",
+          "amount": "-0.053340",
+          "decimals": 18,
+          "name": "SYND",
+          "price": 0.00826309,
+          "symbol": "SYND",
+          "tokenAddress": "0x11dc28d01984079b7efe7763b533e6ed9e3722b9",
+          "value": "-53340583743236474",
+          "valueUsd": -0.0004407580441228999
+        },
+        {
+          "address": "0x00ef17d98ca5acf523379cfdf006b739ccf46297",
+          "amount": "0.000439",
+          "decimals": 6,
+          "name": "USDC",
+          "price": 0.999626,
+          "symbol": "USDC",
+          "tokenAddress": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "value": "439",
+          "valueUsd": 0.000438835814
+        }
+      ],
+      "logs": [
+        {
+          "name": "Swap",
+          "address": "0x498581ff718922c3f8e6a244956af099b2652b2b",
+          "inputs": []
+        }
+      ],
+      "requestBody": {
+        "chainId": 8453,
+        "to": "0xFdf682F51FE81Aa4898F0AE2163d8A55c127fbC7",
+        "from": "0x00eF17D98Ca5AcF523379CFdf006B739cCF46297",
+        "data": "0x3593564c0000000000000000000000000000000000000000000000000000000000000060...756e697800000000000c",
+        "functionName": "execute"
+      }
+    }
+  ],
+  "simulationId": "e31a1c0f-cb0b-4f27-8f45-92be4c3ab7f1"
+}
+```
+
+</details>
+
+**Session response fields:**
 
 | Field          | Type      | Description                                                                                               |
 | -------------- | --------- | --------------------------------------------------------------------------------------------------------- |
@@ -341,7 +535,7 @@ Session-level `value`, `gas`, `balanceOverrides`, `storageOverrides`, and `cheat
 | `results`      | `Array`   | One result per call, in order — each shaped like a single-call response (including its own `requestBody`) |
 | `simulationId` | `string`  | Present when `save: true` — restores the whole session via `?simulationId=`                               |
 
-**Restoring a saved session:** With `save: true`, the entire session (all calls) is stored under a single `simulationId`. Open the returned `simulationLink` (or append `?simulationId=<id>` to the Contract Caller URL) to restore the whole session. The page renders every call's result as its own panel and repopulates the form with the first call's `requestBody`.
+**Restoring a saved session:** With `save: true`, the entire session (all calls) is stored under a single `simulationId`. Open the returned `simulationLink` (or append `?simulationId=<id>` to the Contract Caller URL) to restore the whole session. The page renders every call's result as its own panel and repopulates the form with the last call's `requestBody`.
 
 ## Deploy to Vercel
 

@@ -550,11 +550,15 @@ describe("ContractCallerPage wiring", () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(simulationOptionsState.setFromAddress).toHaveBeenCalledWith(
-      sessionResult.results[0].requestBody.from,
+      sessionResult.results[sessionResult.results.length - 1].requestBody.from,
     );
     expect(functionSelectionState.applyPendingArgs).toHaveBeenCalledWith({
-      functionSig: sessionResult.results[0].requestBody.functionName,
-      calldata: sessionResult.results[0].requestBody.data,
+      functionSig:
+        sessionResult.results[sessionResult.results.length - 1].requestBody
+          .functionName,
+      calldata:
+        sessionResult.results[sessionResult.results.length - 1].requestBody
+          .data,
       timestamp: expect.any(Number),
     });
     expect(tokenMetadataState.setTokenSymbols).toHaveBeenCalledWith({
