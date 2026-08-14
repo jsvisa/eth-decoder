@@ -352,3 +352,63 @@ describe("useCallExecution – local sim populates trace toName labels", () => {
     );
   });
 });
+
+describe("useCallExecution – handleCall in session mode", () => {
+  it("appends an entry object (not an updater function) to session history", async () => {
+    const tevm = await import("../../../app/utils/tevmSimulator.js");
+
+    tevm.simulateWithClient.mockResolvedValue({
+      success: true,
+      simulated: true,
+      decoded: [{ name: "", type: "bool", value: "true" }],
+      callTrace: {
+        type: "CALL",
+        functionName: "transfer(address,uint256)",
+        decodedInputs: [
+          {
+            name: "to",
+            type: "address",
+            value: "0x1234567890123456789012345678901234567890",
+          },
+          { name: "amount", type: "uint256", value: "100" },
+        ],
+        decodedOutputs: [],
+      },
+      metrics: null,
+      undecodedAddresses: [],
+    });
+
+    const setSessionHistory = vi.fn();
+    const params = {
+      ...baseParams,
+      parsedAbi: TRANSFER_ABI,
+      selectedFunction: "transfer(address,uint256)",
+      args: ["0x1234567890123456789012345678901234567890", "100"],
+      fromAddress: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      sessionActive: true,
+      sessionClientRef: { current: { mock: true } },
+      sessionBlock: "21000000",
+      setSessionHistory,
+    };
+
+    const { result } = renderHook(() => useCallExecution(params));
+
+    await act(async () => {
+      await result.current.handleCall();
+    });
+
+    expect(setSessionHistory).toHaveBeenCalledTimes(1);
+
+    const entry = setSessionHistory.mock.calls[0][0];
+    expect(typeof entry).toBe("object");
+    expect(Array.isArray(entry)).toBe(false);
+    expect(entry.type).toBe("write");
+    expect(entry.success).toBe(true);
+    expect(Array.isArray(entry.inputs)).toBe(true);
+    expect(entry.inputs).toHaveLength(2);
+    expect(entry.inputs[0].value).toBe(
+      "0x1234567890123456789012345678901234567890",
+    );
+    expect(Array.isArray(entry.outputs)).toBe(true);
+  });
+});
