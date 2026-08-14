@@ -537,6 +537,10 @@ Session-level `value`, `gas`, `balanceOverrides`, `storageOverrides`, `cheatcode
 
 **Restoring a saved session:** With `save: true`, the entire session (all calls) is stored under a single `simulationId`. Open the returned `simulationLink` (or append `?simulationId=<id>` to the Contract Caller URL) to restore the whole session. The page renders every call's result as its own panel and repopulates the form with the last call's `requestBody`.
 
+The example script [`simulate-session.sh`](./simulate-session.sh) runs this exact request against a local RPC fork. Restoring the saved result in the Contract Caller UI looks like:
+
+![Restored session result](./docs/simulate-session.png)
+
 ## Deploy to Vercel
 
 ### Method 1: Deploy via Vercel CLI
