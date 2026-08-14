@@ -13,6 +13,8 @@ export const MULTICALL_SELECTORS = new Set([
   "0x63fb0b96", // multicall(address[],bytes[])                          — parallel_arrays
   "0x61f9a531", // multicall(address[],bytes[],uint256[],address)        — parallel_arrays
   "0x2656227d", // execute(address[],uint256[],bytes[],bytes32)          — parallel_arrays (OZ Governor)
+  // The two Universal Router selectors below have no MULTICALL_ABIS entry;
+  // they are decoded by decodeUniversalRouter() in universalRouter.js instead.
   "0x24856bc3", // execute(bytes,bytes[])                                — universal_router
   "0x3593564c", // execute(bytes,bytes[],uint256)                        — universal_router
 ]);
