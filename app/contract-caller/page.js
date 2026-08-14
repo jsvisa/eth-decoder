@@ -447,6 +447,57 @@ export default function ContractCallerPage() {
       })
       .then(async (data) => {
         if (controller.signal.aborted) return;
+        if (data.session === true && Array.isArray(data.results)) {
+          if (data.chainId) {
+            const builtInSlug = Object.keys(BUILT_IN_CHAIN_IDS).find(
+              (s) => BUILT_IN_CHAIN_IDS[s] === Number(data.chainId),
+            );
+            if (builtInSlug) setChain(builtInSlug);
+          }
+          const first = data.results[data.results.length - 1];
+          if (first?.requestBody) {
+            const {
+              to,
+              from,
+              value,
+              functionName,
+              args,
+              data: calldata,
+            } = first.requestBody;
+            if (to) setAddress(to);
+            if (from) simOpts.setFromAddress(from);
+            if (value) fn.setEthValue(value);
+            if (functionName && (args || calldata)) {
+              fn.applyPendingArgs({
+                functionSig: functionName,
+                ...(args ? { args } : {}),
+                ...(calldata ? { calldata } : {}),
+                timestamp: Date.now(),
+              });
+            } else if (calldata) {
+              fn.setPasteCalldataValue(calldata);
+              fn.setPasteCalldataExpanded(true);
+            }
+          }
+          const mergedMeta = { symbols: {}, decimals: {}, prices: {} };
+          for (const result of data.results) {
+            if (!result?._tokenMeta) continue;
+            const { tokenSymbols, tokenDecimals, tokenPrices } =
+              result._tokenMeta;
+            if (tokenSymbols) Object.assign(mergedMeta.symbols, tokenSymbols);
+            if (tokenDecimals)
+              Object.assign(mergedMeta.decimals, tokenDecimals);
+            if (tokenPrices) Object.assign(mergedMeta.prices, tokenPrices);
+          }
+          if (Object.keys(mergedMeta.symbols).length > 0)
+            tokens.setTokenSymbols(mergedMeta.symbols);
+          if (Object.keys(mergedMeta.decimals).length > 0)
+            tokens.setTokenDecimals(mergedMeta.decimals);
+          if (Object.keys(mergedMeta.prices).length > 0)
+            tokens.setTokenPrices(mergedMeta.prices);
+          exec.setResult(data);
+          return;
+        }
         if (data.requestBody) {
           const {
             chainId,

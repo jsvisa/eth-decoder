@@ -492,6 +492,92 @@ describe("ContractCallerPage wiring", () => {
     unmount();
   });
 
+  it("restores a saved session from the simulationId URL param", async () => {
+    const sessionResult = {
+      session: true,
+      chainId: 8453,
+      blockNumber: "latest",
+      results: [
+        {
+          success: true,
+          simulated: true,
+          _tokenMeta: {
+            tokenSymbols: { [TOKEN_ADDRESS]: "USDC" },
+            tokenDecimals: { [TOKEN_ADDRESS]: 6 },
+            tokenPrices: { [TOKEN_ADDRESS]: 1 },
+          },
+          requestBody: {
+            to: "0x99161BA892ECae335616624c84FAA418F64FF9A6",
+            from: "0xd719fc03782E9617e81D138a3e9B1875da4D6a03",
+            value: "0x0",
+            functionName: "approve",
+            data: "0x12345678",
+          },
+        },
+        {
+          success: true,
+          simulated: true,
+          _tokenMeta: {
+            tokenSymbols: { [NATIVE_TOKEN_ADDRESS]: "ETH" },
+            tokenDecimals: { [NATIVE_TOKEN_ADDRESS]: 18 },
+            tokenPrices: { [NATIVE_TOKEN_ADDRESS]: 2500 },
+          },
+          requestBody: {
+            to: "0x99161BA892ECae335616624c84FAA418F64FF9A6",
+            from: "0xd719fc03782E9617e81D138a3e9B1875da4D6a03",
+            functionName: "transfer",
+            data: "0x87654321",
+          },
+        },
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => sessionResult,
+      }),
+    );
+    window.history.pushState(null, "", "/?simulationId=vb1_session");
+
+    const { unmount } = renderPage();
+
+    await vi.waitFor(() => {
+      expect(callExecutionState.setResult).toHaveBeenCalledWith(sessionResult);
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/simulate-result/vb1_session",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(simulationOptionsState.setFromAddress).toHaveBeenCalledWith(
+      sessionResult.results[sessionResult.results.length - 1].requestBody.from,
+    );
+    expect(functionSelectionState.applyPendingArgs).toHaveBeenCalledWith({
+      functionSig:
+        sessionResult.results[sessionResult.results.length - 1].requestBody
+          .functionName,
+      calldata:
+        sessionResult.results[sessionResult.results.length - 1].requestBody
+          .data,
+      timestamp: expect.any(Number),
+    });
+    expect(tokenMetadataState.setTokenSymbols).toHaveBeenCalledWith({
+      [TOKEN_ADDRESS]: "USDC",
+      [NATIVE_TOKEN_ADDRESS]: "ETH",
+    });
+    expect(tokenMetadataState.setTokenDecimals).toHaveBeenCalledWith({
+      [TOKEN_ADDRESS]: 6,
+      [NATIVE_TOKEN_ADDRESS]: 18,
+    });
+    expect(tokenMetadataState.setTokenPrices).toHaveBeenCalledWith({
+      [TOKEN_ADDRESS]: 1,
+      [NATIVE_TOKEN_ADDRESS]: 2500,
+    });
+    expect(callExecutionState.setLoading).toHaveBeenLastCalledWith(false);
+
+    unmount();
+  });
+
   it("adds enriched balanceChanges to save metadata for simulated results", async () => {
     callExecutionState.result = {
       success: true,

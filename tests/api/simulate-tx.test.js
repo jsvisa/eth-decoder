@@ -938,14 +938,23 @@ describe("POST /api/simulate-tx — session mode", () => {
     );
   });
 
-  it("saves each session result separately when save: true", async () => {
+  it("saves the whole session under a single id when save: true", async () => {
     const res = await POST(makeRequest({ ...SESSION_BODY, save: true }));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(saveSimulationResult).toHaveBeenCalledTimes(2);
-    expect(body.results[0].simulationId).toBe(FAKE_SIMULATION_ID);
-    expect(body.results[1].simulationId).toBe(FAKE_SIMULATION_ID);
-    expect(body.results[0].simulationLink).toContain(FAKE_SIMULATION_ID);
+    expect(saveSimulationResult).toHaveBeenCalledTimes(1);
+    expect(body.simulationId).toBe(FAKE_SIMULATION_ID);
+    expect(body.simulationLink).toContain(FAKE_SIMULATION_ID);
+    const saved = saveSimulationResult.mock.calls[0][0];
+    expect(saved.session).toBe(true);
+    expect(saved.results).toHaveLength(2);
+    expect(saved.results[0].requestBody).toBeDefined();
+    expect(body.results[0].simulationId).toBeUndefined();
+  });
+
+  it("does not call saveSimulationResult in session mode when save is omitted", async () => {
+    await POST(makeRequest(SESSION_BODY));
+    expect(saveSimulationResult).not.toHaveBeenCalled();
   });
 
   it("records a per-call error and continues when a call throws", async () => {

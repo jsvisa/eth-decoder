@@ -156,6 +156,34 @@ describe("ResultPanel", () => {
     cleanup();
   });
 
+  it("renders a session view with one panel per call", () => {
+    const sessionResult = {
+      session: true,
+      chainId: 8453,
+      blockNumber: "latest",
+      results: [
+        { ...simResult, requestBody: { to: "0xTo1", from: "0xFrom1" } },
+        {
+          ...simResult,
+          success: false,
+          error: "AllowanceExpired(0)",
+          requestBody: { to: "0xTo2", from: "0xFrom2" },
+        },
+      ],
+    };
+    const { container, cleanup } = renderComponent(
+      React.createElement(ResultPanel, {
+        ...defaultProps,
+        result: sessionResult,
+      }),
+    );
+    expect(container.textContent).toContain("Session Result");
+    expect(container.textContent).toContain("2 calls");
+    expect(container.textContent).toContain("Chain 8453");
+    expect(container.textContent).toContain("AllowanceExpired(0)");
+    cleanup();
+  });
+
   it("renders Decoded Output section for a read result", () => {
     const { container, cleanup } = renderComponent(
       React.createElement(ResultPanel, { ...defaultProps, result: readResult }),
