@@ -9,8 +9,7 @@
 }
 
 .container {
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
   background: var(--bg-card);
   padding: 2rem;
   border-radius: 12px;
