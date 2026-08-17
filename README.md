@@ -1,4 +1,4 @@
-# EVM Tx.input Decoder & Contract Caller
+# Transaction Decoder & Contract Caller
 
 A web application for decoding EVM transaction input data and interacting with smart contracts. Built with Next.js and designed for deployment on Vercel.
 
