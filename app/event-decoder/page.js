@@ -162,7 +162,7 @@ export default function EventDecoder() {
   return (
     <main className={styles.main}>
       <div className={styles.container}>
-        <h1 className={styles.title}>EVM Event Log Decoder</h1>
+        <h1 className={styles.title}>Event Log Decoder</h1>
 
         <form onSubmit={handleSubmit} className={styles.form}>
           {/* Topics */}

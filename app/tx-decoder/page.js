@@ -598,7 +598,7 @@ export default function TxDecoderPage() {
   return (
     <main className={styles.main}>
       <div className={styles.container}>
-        <h1 className={styles.title}>Transaction Decoder</h1>
+        <h1 className={styles.title}>Transaction Calldata Decoder</h1>
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <input
