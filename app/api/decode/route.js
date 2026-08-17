@@ -24,7 +24,15 @@ export async function GET(request) {
       const inner_calls = await decodeInnerCalls(mc.inner_calls);
       return NextResponse.json({
         msg: "ok",
-        data: [{ func: mc.func, args: mc.args, inner_calls, source: "client" }],
+        data: [
+          {
+            func: mc.func,
+            args: mc.args,
+            inner_calls,
+            multicall_type: mc.multicall_type,
+            source: "client",
+          },
+        ],
       });
     }
 
@@ -37,6 +45,7 @@ export async function GET(request) {
             func: ur.func,
             args: ur.args,
             inner_calls: ur.inner_calls,
+            multicall_type: ur.multicall_type,
             source: "client",
           },
         ],

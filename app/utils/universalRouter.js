@@ -183,7 +183,7 @@ export function decodeUniversalRouter(data) {
       args = { raw: inputHex };
     }
 
-    return { index: idx, name, allow_revert, args };
+    return { index: idx, type: "command", name, allow_revert, args };
   });
 
   const funcName =
@@ -197,5 +197,10 @@ export function decodeUniversalRouter(data) {
   };
   if (deadline !== undefined) outerArgs.deadline = serializeValue(deadline);
 
-  return { func: funcName, args: outerArgs, inner_calls };
+  return {
+    func: funcName,
+    args: outerArgs,
+    inner_calls,
+    multicall_type: "universal_router",
+  };
 }

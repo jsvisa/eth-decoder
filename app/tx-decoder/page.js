@@ -18,8 +18,6 @@ import {
 const STORAGE_KEY = "evm_decoder_history";
 const MAX_HISTORY_ITEMS = 100;
 
-const UR_SELECTORS = new Set(["0x24856bc3", "0x3593564c"]);
-
 // Decode each inner call's `data` field via /api/decode and patch result state.
 // Fires all requests in parallel; each resolved call updates state immediately.
 async function decodeInnerCallsAsync(innerCalls, setResult) {
@@ -362,24 +360,14 @@ export default function TxDecoderPage() {
       }
 
       // Augment result with client-side multicall inner-call decoding
-      const hex = inputData.trim().toLowerCase();
-      const selector = (hex.startsWith("0x") ? hex : "0x" + hex).slice(0, 10);
-      if (UR_SELECTORS.has(selector)) {
-        const urDecoded = decodeUniversalRouter(inputData);
-        if (urDecoded?.inner_calls) {
-          resultToDisplay = {
-            ...resultToDisplay,
-            inner_calls: urDecoded.inner_calls,
-          };
-        }
-      } else {
-        const mcDecoded = decodeMulticall(inputData);
-        if (mcDecoded?.inner_calls) {
-          resultToDisplay = {
-            ...resultToDisplay,
-            inner_calls: mcDecoded.inner_calls,
-          };
-        }
+      const clientDecoded =
+        decodeUniversalRouter(inputData) ?? decodeMulticall(inputData);
+      if (clientDecoded?.inner_calls) {
+        resultToDisplay = {
+          ...resultToDisplay,
+          inner_calls: clientDecoded.inner_calls,
+          multicall_type: clientDecoded.multicall_type,
+        };
       }
 
       setResult(resultToDisplay);
@@ -496,14 +484,7 @@ export default function TxDecoderPage() {
     return syntaxHighlight(result);
   };
 
-  const decodedSelector = decodedInput
-    ? (decodedInput.startsWith("0x") ? decodedInput : "0x" + decodedInput)
-        .slice(0, 10)
-        .toLowerCase()
-    : null;
-  const isURResult = decodedSelector
-    ? UR_SELECTORS.has(decodedSelector)
-    : false;
+  const isURResult = result?.multicall_type === "universal_router";
 
   const editTargets = [];
   if (result?.func && result?.args) {
@@ -518,7 +499,11 @@ export default function TxDecoderPage() {
             label: `inner #${i}: ${call.name}`,
           });
         }
-      } else if (call.decoded?.func && call.decoded?.args) {
+      } else if (
+        call.type === "call" &&
+        call.decoded?.func &&
+        call.decoded?.args
+      ) {
         editTargets.push({
           id: `mc-${i}`,
           label: `inner #${i}: ${call.decoded.func}`,

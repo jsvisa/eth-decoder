@@ -195,7 +195,9 @@ describe("GET /api/decode — multicall augmentation", () => {
     const d0 = body.data[0];
 
     expect(d0.func).toBe("multicall((address,bytes,uint256,bool,bytes32)[])");
+    expect(d0.multicall_type).toBe("tuple_array");
     expect(d0.inner_calls).toHaveLength(3);
+    expect(d0.inner_calls[0].type).toBe("call");
     expect(d0.inner_calls[0].selector).toBeNull();
     expect(d0.inner_calls[1].selector).toBe("0x3244c12c");
     expect(d0.inner_calls[2].selector).toBe("0x6ef5eeae");
@@ -214,7 +216,9 @@ describe("GET /api/decode — multicall augmentation", () => {
     const d0 = body.data[0];
 
     expect(d0.func).toBe("multicall(bytes[])");
+    expect(d0.multicall_type).toBe("bytes_array");
     expect(d0.inner_calls).toHaveLength(2);
+    expect(d0.inner_calls[0].type).toBe("call");
     expect(d0.inner_calls[0].selector).toBe("0xdb3e2198");
     expect(d0.inner_calls[1].selector).toBe("0x12210e8a");
     expect(d0.inner_calls[1].decoded.func).toBe("refundETH()");
@@ -378,9 +382,11 @@ describe("GET /api/decode — multicall augmentation", () => {
     const d0 = body.data[0];
 
     expect(d0.func).toBe("multicall(address[],bytes[])");
+    expect(d0.multicall_type).toBe("parallel_arrays");
     expect(d0.args.targets).toHaveLength(1);
     expect(d0.args.calldatas).toHaveLength(1);
     expect(d0.inner_calls).toHaveLength(1);
+    expect(d0.inner_calls[0].type).toBe("call");
 
     expect(d0.inner_calls[0].target).toBe(
       "0xdAC17F958D2ee523a2206206994597C13D831ec7",
@@ -449,7 +455,9 @@ describe("GET /api/decode — multicall augmentation", () => {
     const d0 = body.data[0];
 
     expect(d0.func).toBe("execute(bytes,bytes[])");
+    expect(d0.multicall_type).toBe("universal_router");
     expect(d0.inner_calls).toHaveLength(5);
+    expect(d0.inner_calls[0].type).toBe("command");
     expect(d0.inner_calls[0].name).toBe("V3_SWAP_EXACT_IN");
     expect(d0.inner_calls[1].name).toBe("PERMIT2_TRANSFER_FROM_BATCH");
     expect(d0.inner_calls[2].name).toBe("V2_SWAP_EXACT_OUT");
@@ -466,7 +474,9 @@ describe("GET /api/decode — multicall augmentation", () => {
     const d0 = body.data[0];
 
     expect(d0.func).toBe("execute(bytes,bytes[],uint256)");
+    expect(d0.multicall_type).toBe("universal_router");
     expect(d0.inner_calls).toHaveLength(3);
+    expect(d0.inner_calls[0].type).toBe("command");
     expect(d0.inner_calls[0].name).toBe("WRAP_ETH");
     expect(d0.inner_calls[1].name).toBe("V3_SWAP_EXACT_IN");
     expect(d0.inner_calls[2].name).toBe("SWEEP");

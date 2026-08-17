@@ -298,7 +298,12 @@ export function decodeMulticall(data) {
       const dataHex = typeof innerData === "string" ? innerData : "0x";
       const inner_selector =
         dataHex.length >= 10 ? dataHex.slice(0, 10).toLowerCase() : null;
-      const entry = { index: idx, selector: inner_selector, data: dataHex };
+      const entry = {
+        index: idx,
+        type: "call",
+        selector: inner_selector,
+        data: dataHex,
+      };
       if (targets[idx] !== undefined)
         entry.target = serializeValue(targets[idx]);
       if (values[idx] !== undefined) entry.value = serializeValue(values[idx]);
@@ -324,7 +329,12 @@ export function decodeMulticall(data) {
       const inner_selector =
         dataHex.length >= 10 ? dataHex.slice(0, 10).toLowerCase() : null;
 
-      const entry = { index: idx, selector: inner_selector, data: dataHex };
+      const entry = {
+        index: idx,
+        type: "call",
+        selector: inner_selector,
+        data: dataHex,
+      };
       if (target !== null) entry.target = serializeValue(target);
 
       // Include remaining tuple fields (value, skipRevert, allowFailure, etc.)
@@ -359,5 +369,16 @@ export function decodeMulticall(data) {
       .join(",") +
     ")";
 
-  return { func: funcSig, args: outerArgs, inner_calls };
+  const multicallType = config.isParallelArrays
+    ? "parallel_arrays"
+    : config.isBytesArray
+      ? "bytes_array"
+      : "tuple_array";
+
+  return {
+    func: funcSig,
+    args: outerArgs,
+    inner_calls,
+    multicall_type: multicallType,
+  };
 }
