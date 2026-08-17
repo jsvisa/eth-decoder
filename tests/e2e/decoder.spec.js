@@ -56,6 +56,55 @@ test.describe("Decoder page", () => {
       timeout: 5000,
     });
   });
+
+  test("adds an independent second decoder tab", async ({ page }) => {
+    await page.goto(DECODER_PATH);
+    const activePanel = () =>
+      page.locator('[role="tabpanel"]').filter({ visible: true });
+    const inputOf = () =>
+      activePanel().getByPlaceholder(
+        "Enter hex data to decode (e.g., 0x1234abcd...)",
+      );
+
+    await page.getByRole("button", { name: "+ Add Tab" }).click();
+    await expect(page.getByRole("tab")).toHaveCount(2);
+
+    await inputOf().fill("0xaaaa");
+    await expect(inputOf()).toHaveValue("0xaaaa");
+
+    // Switch back to the first tab — its input is still empty
+    await page.getByRole("tab").nth(0).click();
+    await expect(inputOf()).toHaveValue("");
+    await inputOf().fill("0xbbbb");
+
+    // Switch to the second tab — its value is preserved independently
+    await page.getByRole("tab").nth(1).click();
+    await expect(inputOf()).toHaveValue("0xaaaa");
+  });
+
+  test("restores tabs and their inputs after a reload", async ({ page }) => {
+    await page.goto(DECODER_PATH);
+    const activePanel = () =>
+      page.locator('[role="tabpanel"]').filter({ visible: true });
+    const inputOf = () =>
+      activePanel().getByPlaceholder(
+        "Enter hex data to decode (e.g., 0x1234abcd...)",
+      );
+
+    await inputOf().fill("0xaaaa");
+    await page.getByRole("button", { name: "+ Add Tab" }).click();
+    await inputOf().fill("0xbbbb");
+
+    await page.reload();
+
+    // The second tab was active; its input is restored from localStorage.
+    await expect(page.getByRole("tab")).toHaveCount(2);
+    await expect(inputOf()).toHaveValue("0xbbbb");
+
+    // Switch to the first tab — its input is restored too.
+    await page.getByRole("tab").nth(0).click();
+    await expect(inputOf()).toHaveValue("0xaaaa");
+  });
 });
 
 test.describe("Encode back", () => {

@@ -28,6 +28,8 @@ const MAX_HISTORY_ITEMS = 50;
  * @param {Function} params.setEthValue         – setter for ETH value input
  * @param {Function} params.setBlockNumber  – setter for read block number
  * @param {Function} params.applyPendingArgs    – queue pending function/args in selection state
+ * @param {boolean}  params.skipUrlHydration    – skip URL-param hydration on mount
+ *                                                (used for non-initial tabs)
  */
 export function useHistory({
   chain,
@@ -47,6 +49,7 @@ export function useHistory({
   setEthValue,
   setBlockNumber,
   applyPendingArgs,
+  skipUrlHydration = false,
 }) {
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(true);
@@ -86,6 +89,7 @@ export function useHistory({
 
   // ── Effect 3 (lines 1422-1505): hydrate from URL params on mount ─────────
   useEffect(() => {
+    if (skipUrlHydration) return;
     const params = new URLSearchParams(window.location.search);
     const urlChain = params.get("chain");
     const urlAddress = params.get("address");

@@ -31,4 +31,23 @@ test.describe("Contract Caller page", () => {
       "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
     );
   });
+
+  test("adds an independent second contract caller tab", async ({ page }) => {
+    await page.goto("/contract-caller");
+    const activePanel = () =>
+      page.locator('[role="tabpanel"]').filter({ visible: true });
+    const addressInput = () => activePanel().getByPlaceholder("0x...");
+
+    await page.getByRole("button", { name: "+ Add Tab" }).click();
+    await expect(page.getByRole("tab")).toHaveCount(2);
+
+    await addressInput().fill("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    await expect(addressInput()).toHaveValue(
+      "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    );
+
+    // Switch back to the first tab — its address is still empty
+    await page.getByRole("tab").nth(0).click();
+    await expect(addressInput()).toHaveValue("");
+  });
 });
