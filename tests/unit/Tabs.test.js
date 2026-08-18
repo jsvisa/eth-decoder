@@ -1,0 +1,167 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import React, { act } from "react";
+import { createRoot } from "react-dom/client";
+import Tabs from "../../app/components/Tabs.js";
+
+const STORAGE_KEY = "test_tabs_v1";
+
+function renderTabs(overrides = {}) {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const renderTab =
+    overrides.renderTab ||
+    ((tab) =>
+      React.createElement(
+        "div",
+        { "data-testid": `tab-${tab.id}` },
+        tab.title,
+      ));
+  act(() => {
+    createRoot(container).render(
+      React.createElement(Tabs, {
+        storageKey: STORAGE_KEY,
+        newTabTitle: "New",
+        defaultTabId: "tab-1",
+        renderTab,
+        ...overrides,
+      }),
+    );
+  });
+  return {
+    container,
+    cleanup() {
+      act(() => {
+        document.body.removeChild(container);
+      });
+    },
+  };
+}
+
+function click(container, el) {
+  act(() => {
+    el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+}
+
+beforeEach(() => {
+  localStorage.clear();
+});
+
+describe("Tabs", () => {
+  it("renders the default tab and an Add Tab button", () => {
+    const { container, cleanup } = renderTabs();
+    expect(container.textContent).toContain("+ Add Tab");
+    expect(container.querySelector('[data-testid="tab-tab-1"]')).toBeTruthy();
+    cleanup();
+  });
+
+  it("adds a new tab and makes it active", () => {
+    const { container, cleanup } = renderTabs();
+    const addBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent === "+ Add Tab",
+    );
+    click(container, addBtn);
+    expect(container.querySelectorAll('[role="tab"]').length).toBe(2);
+    // New tab content is mounted (lazy mount on activation) and visible
+    const panels = Array.from(container.querySelectorAll('[role="tabpanel"]'));
+    expect(panels.length).toBe(2);
+    const visiblePanels = panels.filter((p) => p.style.display !== "none");
+    expect(visiblePanels.length).toBe(1);
+    cleanup();
+  });
+
+  it("switches back to a previously created tab without losing its content", () => {
+    const { container, cleanup } = renderTabs();
+    const addBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent === "+ Add Tab",
+    );
+    click(container, addBtn);
+    const tabs = Array.from(container.querySelectorAll('[role="tab"]'));
+    click(container, tabs[0]);
+    // Both panels stay mounted; the first is now visible
+    const panels = Array.from(container.querySelectorAll('[role="tabpanel"]'));
+    expect(panels.length).toBe(2);
+    const visiblePanels = panels.filter((p) => p.style.display !== "none");
+    expect(visiblePanels.length).toBe(1);
+    expect(
+      visiblePanels[0].querySelector('[data-testid="tab-tab-1"]'),
+    ).toBeTruthy();
+    cleanup();
+  });
+
+  it("closes a tab and keeps the rest", () => {
+    const { container, cleanup } = renderTabs();
+    const addBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent === "+ Add Tab",
+    );
+    click(container, addBtn);
+    const closeBtn = container.querySelector('[role="tab"] button');
+    click(container, closeBtn);
+    expect(container.querySelectorAll('[role="tab"]').length).toBe(1);
+    cleanup();
+  });
+
+  it("persists the tab list to localStorage", () => {
+    const { container, cleanup } = renderTabs();
+    const addBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent === "+ Add Tab",
+    );
+    click(container, addBtn);
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    expect(stored.tabs.length).toBe(2);
+    expect(stored.activeId).toBeTruthy();
+    cleanup();
+  });
+
+  it("restores persisted tabs on load and marks the active one for URL hydration", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        tabs: [
+          { id: "tab-a", title: "Alpha" },
+          { id: "tab-b", title: "Beta" },
+        ],
+        activeId: "tab-b",
+      }),
+    );
+    let hydrated;
+    const renderTab = vi.fn((tab, ctx) => {
+      if (ctx.hydrateFromUrl) hydrated = tab.id;
+      return React.createElement(
+        "div",
+        { "data-testid": `tab-${tab.id}` },
+        tab.title,
+      );
+    });
+    const { container, cleanup } = renderTabs({ renderTab });
+    // Only the active tab is mounted on load
+    expect(container.querySelector('[data-testid="tab-tab-b"]')).toBeTruthy();
+    expect(container.querySelector('[data-testid="tab-tab-a"]')).toBeFalsy();
+    expect(hydrated).toBe("tab-b");
+    // Select the other tab -> it mounts lazily, no URL hydration
+    const tabs = Array.from(container.querySelectorAll('[role="tab"]'));
+    click(container, tabs[0]);
+    expect(container.querySelector('[data-testid="tab-tab-a"]')).toBeTruthy();
+    cleanup();
+  });
+
+  it("renames a tab via the renderTab onRename callback", () => {
+    let rename;
+    const renderTab = vi.fn((tab, ctx) => {
+      rename = ctx.onRename;
+      return React.createElement(
+        "div",
+        { "data-testid": `tab-${tab.id}` },
+        tab.title,
+      );
+    });
+    const { container, cleanup } = renderTabs({ renderTab });
+    act(() => {
+      rename("myTitle");
+    });
+    expect(container.querySelector('[role="tab"]').textContent).toContain(
+      "myTitle",
+    );
+    cleanup();
+  });
+});

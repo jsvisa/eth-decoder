@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import yaml from "js-yaml";
 import styles from "./page.module.css";
+import Tabs from "../components/Tabs";
+import { useTabState } from "../components/useTabState";
 import { decodeUniversalRouter } from "../utils/universalRouter.js";
 import { decodeMulticall } from "../utils/multicallDecoder.js";
 import {
@@ -17,6 +19,8 @@ import {
 
 const STORAGE_KEY = "evm_decoder_history";
 const MAX_HISTORY_ITEMS = 100;
+const TABS_STORAGE_KEY = "evm_decoder_tabs_v1";
+const DEFAULT_TAB_ID = "decoder-1";
 
 // Decode each inner call's `data` field via /api/decode and patch result state.
 // Fires all requests in parallel; each resolved call updates state immediately.
@@ -48,20 +52,57 @@ async function decodeInnerCallsAsync(innerCalls, setResult) {
 }
 
 export default function TxDecoderPage() {
+  return (
+    <main className={styles.main}>
+      <div className={styles.container}>
+        <h1 className={styles.title}>Transaction Calldata Decoder</h1>
+        <Tabs
+          storageKey={TABS_STORAGE_KEY}
+          newTabTitle="New Decode"
+          defaultTabId={DEFAULT_TAB_ID}
+          renderTab={(tab, ctx) => (
+            <DecoderWorkspace key={tab.id} tabId={tab.id} {...ctx} />
+          )}
+        />
+      </div>
+    </main>
+  );
+}
+
+function DecoderWorkspace({ tabId, hydrateFromUrl, onRename }) {
   const modalContentRef = useRef(null);
-  const [inputData, setInputData] = useState("");
-  const [result, setResult] = useState(null);
+  const formRef = useRef(null);
+  const [tabState, setTabState, tabStateLoaded] = useTabState({
+    tabId,
+    initial: {
+      inputData: "",
+      withAbi: false,
+      withSign: false,
+      isYaml: false,
+      decodedInput: null,
+      result: null,
+    },
+  });
+  const { inputData, withAbi, withSign, isYaml, decodedInput, result } =
+    tabState;
+  const setInputData = (v) => setTabState((s) => ({ ...s, inputData: v }));
+  const setWithAbi = (v) => setTabState((s) => ({ ...s, withAbi: v }));
+  const setWithSign = (v) => setTabState((s) => ({ ...s, withSign: v }));
+  const setIsYaml = (v) => setTabState((s) => ({ ...s, isYaml: v }));
+  const setDecodedInput = (v) =>
+    setTabState((s) => ({ ...s, decodedInput: v }));
+  const setResult = (v) =>
+    setTabState((s) => ({
+      ...s,
+      result: typeof v === "function" ? v(s.result) : v,
+    }));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [withAbi, setWithAbi] = useState(false);
-  const [withSign, setWithSign] = useState(false);
-  const [isYaml, setIsYaml] = useState(false);
   const [copied, setCopied] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(true);
   const [historySearch, setHistorySearch] = useState("");
-  const [decodedInput, setDecodedInput] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
   const [editText, setEditText] = useState("");
   const [encodedHex, setEncodedHex] = useState(null);
@@ -80,8 +121,9 @@ export default function TxDecoderPage() {
     }
   }, []);
 
-  // Load from URL parameters on mount
+  // Load from URL parameters on mount (only for the tab active on page load)
   useEffect(() => {
+    if (!hydrateFromUrl || !tabStateLoaded) return;
     const params = new URLSearchParams(window.location.search);
     const urlData = params.get("data");
 
@@ -94,10 +136,10 @@ export default function TxDecoderPage() {
 
       // Auto-decode after a short delay to ensure state is set
       setTimeout(() => {
-        document.querySelector("form")?.requestSubmit();
+        formRef.current?.requestSubmit();
       }, 100);
     }
-  }, []);
+  }, [hydrateFromUrl, tabStateLoaded]);
 
   // Save to history
   const saveToHistory = (input, output, options) => {
@@ -594,177 +636,185 @@ export default function TxDecoderPage() {
       console.error("Failed to copy:", err);
     }
   };
+  // Keep the tab title in sync with the current decode
+  const onRenameRef = useRef(onRename);
+  onRenameRef.current = onRename;
+  useEffect(() => {
+    let title = "New Decode";
+    if (result?.func) {
+      title = result.func;
+    } else if (inputData) {
+      title = inputData.length > 16 ? `${inputData.slice(0, 14)}…` : inputData;
+    }
+    onRenameRef.current(title);
+  }, [result?.func, inputData]);
 
   return (
-    <main className={styles.main}>
-      <div className={styles.container}>
-        <h1 className={styles.title}>Transaction Calldata Decoder</h1>
+    <>
+      <form ref={formRef} onSubmit={handleSubmit} className={styles.form}>
+        <input
+          type="text"
+          value={inputData}
+          onChange={(e) => setInputData(e.target.value)}
+          placeholder="Enter hex data to decode (e.g., 0x1234abcd...)"
+          className={styles.input}
+          disabled={loading}
+        />
 
-        <form onSubmit={handleSubmit} className={styles.form}>
-          <input
-            type="text"
-            value={inputData}
-            onChange={(e) => setInputData(e.target.value)}
-            placeholder="Enter hex data to decode (e.g., 0x1234abcd...)"
-            className={styles.input}
-            disabled={loading}
-          />
-
-          <div className={styles.options}>
-            <label className={styles.checkbox}>
-              <input
-                type="checkbox"
-                checked={withAbi}
-                onChange={(e) => setWithAbi(e.target.checked)}
-                disabled={loading}
-              />
-              <span>With ABI</span>
-            </label>
-
-            <label className={styles.checkbox}>
-              <input
-                type="checkbox"
-                checked={withSign}
-                onChange={(e) => setWithSign(e.target.checked)}
-                disabled={loading}
-              />
-              <span>With Sign</span>
-            </label>
-          </div>
-
-          <div className={styles.buttonGroup}>
-            <button type="submit" className={styles.button} disabled={loading}>
-              {loading ? "Decoding..." : "Decode"}
-            </button>
-            {inputData && (
-              <button
-                type="button"
-                onClick={handleShareUrl}
-                className={styles.shareButton}
-                disabled={loading}
-              >
-                {urlCopied ? "URL Copied!" : "Share URL"}
-              </button>
-            )}
-          </div>
-        </form>
-
-        {error && (
-          <div className={styles.error}>
-            <strong>Error:</strong> {error}
-          </div>
-        )}
-
-        {result && (
-          <div className={styles.result}>
-            <div className={styles.resultHeader}>
-              <h2>Result:</h2>
-              <div className={styles.resultActions}>
-                {editTargets.length > 0 && (
-                  <button
-                    onClick={() => openEditor(editTargets[0].id)}
-                    className={styles.actionButton}
-                    type="button"
-                  >
-                    Edit & Encode
-                  </button>
-                )}
-                <button
-                  onClick={() => setIsYaml(!isYaml)}
-                  className={styles.actionButton}
-                  type="button"
-                >
-                  {isYaml ? "Convert to JSON" : "Convert to YAML"}
-                </button>
-                <button
-                  onClick={handleCopy}
-                  className={styles.actionButton}
-                  type="button"
-                >
-                  {copied ? "Copied!" : `Copy ${isYaml ? "YAML" : "JSON"}`}
-                </button>
-              </div>
-            </div>
-            <pre
-              className={styles.json}
-              dangerouslySetInnerHTML={{ __html: getDisplayContent() }}
+        <div className={styles.options}>
+          <label className={styles.checkbox}>
+            <input
+              type="checkbox"
+              checked={withAbi}
+              onChange={(e) => setWithAbi(e.target.checked)}
+              disabled={loading}
             />
-          </div>
-        )}
+            <span>With ABI</span>
+          </label>
 
-        {history.length > 0 && (
-          <div className={styles.historySection}>
-            <div className={styles.historyHeader}>
-              <h3>Recent Decodes ({history.length})</h3>
-              <div className={styles.historyActions}>
-                <input
-                  type="text"
-                  placeholder="Search…"
-                  value={historySearch}
-                  onChange={(e) => setHistorySearch(e.target.value)}
-                  className={styles.historySearch}
-                />
+          <label className={styles.checkbox}>
+            <input
+              type="checkbox"
+              checked={withSign}
+              onChange={(e) => setWithSign(e.target.checked)}
+              disabled={loading}
+            />
+            <span>With Sign</span>
+          </label>
+        </div>
+
+        <div className={styles.buttonGroup}>
+          <button type="submit" className={styles.button} disabled={loading}>
+            {loading ? "Decoding..." : "Decode"}
+          </button>
+          {inputData && (
+            <button
+              type="button"
+              onClick={handleShareUrl}
+              className={styles.shareButton}
+              disabled={loading}
+            >
+              {urlCopied ? "URL Copied!" : "Share URL"}
+            </button>
+          )}
+        </div>
+      </form>
+
+      {error && (
+        <div className={styles.error}>
+          <strong>Error:</strong> {error}
+        </div>
+      )}
+
+      {result && (
+        <div className={styles.result}>
+          <div className={styles.resultHeader}>
+            <h2>Result:</h2>
+            <div className={styles.resultActions}>
+              {editTargets.length > 0 && (
                 <button
-                  onClick={() => setShowHistory(!showHistory)}
-                  className={styles.historyToggle}
+                  onClick={() => openEditor(editTargets[0].id)}
+                  className={styles.actionButton}
                   type="button"
                 >
-                  {showHistory ? "Hide" : "Show"}
+                  Edit & Encode
                 </button>
-                <button
-                  onClick={clearHistory}
-                  className={styles.historyClear}
-                  type="button"
-                >
-                  Clear All
-                </button>
-              </div>
+              )}
+              <button
+                onClick={() => setIsYaml(!isYaml)}
+                className={styles.actionButton}
+                type="button"
+              >
+                {isYaml ? "Convert to JSON" : "Convert to YAML"}
+              </button>
+              <button
+                onClick={handleCopy}
+                className={styles.actionButton}
+                type="button"
+              >
+                {copied ? "Copied!" : `Copy ${isYaml ? "YAML" : "JSON"}`}
+              </button>
             </div>
-
-            {showHistory && (
-              <div className={styles.historyList}>
-                {history
-                  .filter(
-                    (item) =>
-                      !historySearch ||
-                      item.output?.func
-                        ?.toLowerCase()
-                        .includes(historySearch.toLowerCase()),
-                  )
-                  .map((item) => (
-                    <div
-                      key={item.id}
-                      className={styles.historyItem}
-                      onClick={() => loadFromHistory(item)}
-                    >
-                      <div className={styles.historyTop}>
-                        <div className={styles.historyInput}>
-                          {item.input.slice(0, 20)}...{item.input.slice(-10)}
-                        </div>
-                        {item.output && item.output.func && (
-                          <div className={styles.historyFunc}>
-                            {item.output.func}
-                          </div>
-                        )}
-                      </div>
-                      <div className={styles.historyMeta}>
-                        <span className={styles.historyTime}>
-                          {new Date(item.timestamp).toLocaleString()}
-                        </span>
-                        {(item.options.withAbi || item.options.withSign) && (
-                          <span className={styles.historyOptions}>
-                            {item.options.withAbi && "A"}
-                            {item.options.withSign && "S"}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            )}
           </div>
-        )}
-      </div>
+          <pre
+            className={styles.json}
+            dangerouslySetInnerHTML={{ __html: getDisplayContent() }}
+          />
+        </div>
+      )}
+
+      {history.length > 0 && (
+        <div className={styles.historySection}>
+          <div className={styles.historyHeader}>
+            <h3>Recent Decodes ({history.length})</h3>
+            <div className={styles.historyActions}>
+              <input
+                type="text"
+                placeholder="Search…"
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                className={styles.historySearch}
+              />
+              <button
+                onClick={() => setShowHistory(!showHistory)}
+                className={styles.historyToggle}
+                type="button"
+              >
+                {showHistory ? "Hide" : "Show"}
+              </button>
+              <button
+                onClick={clearHistory}
+                className={styles.historyClear}
+                type="button"
+              >
+                Clear All
+              </button>
+            </div>
+          </div>
+
+          {showHistory && (
+            <div className={styles.historyList}>
+              {history
+                .filter(
+                  (item) =>
+                    !historySearch ||
+                    item.output?.func
+                      ?.toLowerCase()
+                      .includes(historySearch.toLowerCase()),
+                )
+                .map((item) => (
+                  <div
+                    key={item.id}
+                    className={styles.historyItem}
+                    onClick={() => loadFromHistory(item)}
+                  >
+                    <div className={styles.historyTop}>
+                      <div className={styles.historyInput}>
+                        {item.input.slice(0, 20)}...{item.input.slice(-10)}
+                      </div>
+                      {item.output && item.output.func && (
+                        <div className={styles.historyFunc}>
+                          {item.output.func}
+                        </div>
+                      )}
+                    </div>
+                    <div className={styles.historyMeta}>
+                      <span className={styles.historyTime}>
+                        {new Date(item.timestamp).toLocaleString()}
+                      </span>
+                      {(item.options.withAbi || item.options.withSign) && (
+                        <span className={styles.historyOptions}>
+                          {item.options.withAbi && "A"}
+                          {item.options.withSign && "S"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
       {editTarget && (
         <div
           className={styles.modalBackdrop}
@@ -840,6 +890,6 @@ export default function TxDecoderPage() {
           </div>
         </div>
       )}
-    </main>
+    </>
   );
 }

@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from "react";
 import { useSettings } from "../contexts/SettingsContext";
 import { CHAINS, BUILT_IN_CHAIN_IDS } from "../utils/chains";
 import { isValidEthAddress } from "../utils/validation";
+import Tabs from "../components/Tabs";
+import { useTabState } from "../components/useTabState";
 
 import { useAbi } from "./hooks/useAbi";
 import { useFunctionSelection } from "./hooks/useFunctionSelection";
@@ -43,6 +45,9 @@ import BookmarkModal from "./components/BookmarkModal";
 import AddChainModal from "./components/AddChainModal";
 
 import styles from "./page.module.css";
+
+const TABS_STORAGE_KEY = "contract_caller_tabs_v1";
+const DEFAULT_TAB_ID = "caller-1";
 
 const validateAddressesInArg = (
   argValue,
@@ -150,6 +155,24 @@ const validateAddressesInArg = (
 };
 
 export default function ContractCallerPage() {
+  return (
+    <main className={styles.main}>
+      <div className={styles.container}>
+        <h1 className={styles.title}>Contract Caller</h1>
+        <Tabs
+          storageKey={TABS_STORAGE_KEY}
+          newTabTitle="New Call"
+          defaultTabId={DEFAULT_TAB_ID}
+          renderTab={(tab, ctx) => (
+            <CallerWorkspace key={tab.id} tabId={tab.id} {...ctx} />
+          )}
+        />
+      </div>
+    </main>
+  );
+}
+
+function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
   // --- Settings ---
   const {
     rpcBatchSize,
@@ -159,6 +182,14 @@ export default function ContractCallerPage() {
     customChains,
     setShowSettings,
   } = useSettings();
+
+  // --- Per-tab persisted state ---
+  const [savedTabState, setSavedTabState, tabStateLoaded] = useTabState({
+    tabId,
+    initial: null,
+  });
+  const [booted, setBooted] = useState(false);
+  const restoreAppliedRef = useRef(false);
 
   // --- Top-level shared state ---
   const [chain, setChain] = useState("ethereum");
@@ -323,14 +354,16 @@ export default function ContractCallerPage() {
     setEthValue: fn.setEthValue,
     setBlockNumber: fn.setBlockNumber,
     applyPendingArgs: fn.applyPendingArgs,
+    skipUrlHydration: !hydrateFromUrl,
   });
 
   // Wire remaining deferred refs
   saveBundleRef.current = history.saveSessionBundle;
   saveToHistoryRef.current = history.saveToHistory;
 
-  // ── URL sync: keep browser URL in sync with current state ─────────────
+  // ── URL sync: keep browser URL in sync with the active tab ──────────────
   useEffect(() => {
+    if (!isActive) return;
     const currentParams = new URLSearchParams(window.location.search);
     if (currentParams.has("simulationId")) return;
 
@@ -363,6 +396,7 @@ export default function ContractCallerPage() {
       `${window.location.pathname}?${params}`,
     );
   }, [
+    isActive,
     chain,
     address,
     fn.selectedFunction,
@@ -430,8 +464,10 @@ export default function ContractCallerPage() {
   });
   const addChain = useAddChainModal({ chain, setChain });
 
-  // Load simulation result from query param on mount
+  // Load simulation result from query param on mount (only for the tab
+  // active on page load)
   useEffect(() => {
+    if (!hydrateFromUrl) return;
     const params = new URLSearchParams(window.location.search);
     const querySimulationId = params.get("simulationId");
     if (!querySimulationId) return;
@@ -558,7 +594,77 @@ export default function ContractCallerPage() {
       });
 
     return () => controller.abort();
-  }, []);
+  }, [hydrateFromUrl]);
+
+  // ── Per-tab restore / persist ──────────────────────────────────────────────
+  // Keep the latest fetchAbi so a delayed auto-fetch uses the restored address.
+  const fetchAbiRef = useRef(abi.fetchAbi);
+  fetchAbiRef.current = abi.fetchAbi;
+
+  // Restore persisted tab state once, after useTabState has loaded it.
+  useEffect(() => {
+    if (!tabStateLoaded || restoreAppliedRef.current) return;
+    restoreAppliedRef.current = true;
+    const s = savedTabState;
+    if (s) {
+      if (s.chain && s.chain !== chain) setChain(s.chain);
+      if (s.address) setAddress(s.address);
+      if (s.selectedFunction) {
+        fn.applyPendingArgs({
+          functionSig: s.selectedFunction,
+          args: s.args || [],
+          timestamp: Date.now(),
+        });
+      }
+      if (s.fromAddress) simOpts.setFromAddress(s.fromAddress);
+      if (s.ethValue) fn.setEthValue(s.ethValue);
+      if (s.blockNumber) fn.setBlockNumber(s.blockNumber);
+    }
+    setBooted(true);
+    if (s && !hydrateFromUrl && s.address) {
+      // Non-initial tab: fetch its ABI (URL-hydrated tabs do this via
+      // useHistory's URL hydration effect).
+      const timer = setTimeout(() => fetchAbiRef.current(), 150);
+      return () => clearTimeout(timer);
+    }
+  }, [tabStateLoaded]);
+
+  // Persist core tab state (same fields that are synced to the URL).
+  useEffect(() => {
+    if (!booted) return;
+    setSavedTabState({
+      chain,
+      address,
+      selectedFunction: fn.selectedFunction,
+      args: fn.args,
+      fromAddress: simOpts.fromAddress,
+      ethValue: fn.ethValue,
+      blockNumber: fn.blockNumber,
+    });
+  }, [
+    booted,
+    chain,
+    address,
+    fn.selectedFunction,
+    fn.args,
+    simOpts.fromAddress,
+    fn.ethValue,
+    fn.blockNumber,
+    setSavedTabState,
+  ]);
+
+  // Keep the tab title in sync with the loaded contract.
+  const onRenameRef = useRef(onRename);
+  onRenameRef.current = onRename;
+  useEffect(() => {
+    let title = "New Call";
+    if (abi.contractName) {
+      title = abi.contractName;
+    } else if (address) {
+      title = `${address.slice(0, 6)}…${address.slice(-4)}`;
+    }
+    onRenameRef.current(title);
+  }, [abi.contractName, address]);
 
   // Derive isWrite from selected function
   const selectedFn = abi.parsedAbi?.find(
@@ -569,279 +675,274 @@ export default function ContractCallerPage() {
 
   // --- Layout ---
   return (
-    <main className={styles.main}>
-      <div className={styles.container}>
-        <h1 className={styles.title}>Contract Caller</h1>
-        <div className={styles.form}>
-          <div className={styles.row}>
-            <div className={styles.networkField}>
-              <label className={styles.label}>Network</label>
-              <NetworkSelector
-                chain={chain}
-                onChainChange={setChain}
-                allChains={allChains}
-                onOpenAddChain={addChain.openAddChainModal}
-                disabled={exec.loading}
-              />
-            </div>
-
-            <ContractAddressInput
-              address={address}
-              onAddressChange={setAddress}
-              addressBook={bookmark.addressBook}
-              cachedAddresses={abi.cachedAddresses}
-              contractName={abi.contractName}
-              onFetchAbi={abi.fetchAbi}
-              fetchingAbi={abi.fetchingAbi}
-              onSaveAbiBackend={handleSaveAbiBackend}
-              savingAbiBackend={savingAbiBackend}
-              canSaveAbiBackend={
-                (abi.parsedAbi || []).length > 0 &&
-                isValidEthAddress(address) &&
-                Boolean(apiKeys.backend)
-              }
-              saveAbiBackendMsg={saveAbiBackendMsg}
-              fieldError={fn.fieldErrors.address}
-              onOpenBookmarkModal={bookmark.openBookmarkModal}
+    <>
+      <div className={styles.form}>
+        <div className={styles.row}>
+          <div className={styles.networkField}>
+            <label className={styles.label}>Network</label>
+            <NetworkSelector
+              chain={chain}
+              onChainChange={setChain}
+              allChains={allChains}
+              onOpenAddChain={addChain.openAddChainModal}
               disabled={exec.loading}
             />
           </div>
 
-          <AbiPanel
-            abi={abi.abi}
-            onAbiChange={abi.setAbi}
-            parsedAbi={abi.parsedAbi}
-            abiSource={abi.abiSource}
-            abiSaved={abi.abiSaved}
-            onSaveAbi={abi.saveAbiToCache}
-            onRefetchAbi={() => abi.fetchAbi({ forceRefresh: true })}
-            loading={exec.loading}
-          />
-
-          <FunctionEventsTabs
-            activeTab={events.activeTab}
-            onTabChange={events.setActiveTab}
-            functionsCount={abi.functions.length}
-            eventsCount={
-              (abi.parsedAbi || []).filter((x) => x.type === "event").length
-            }
-            functionsContent={
-              <>
-                <FunctionSelector
-                  functions={abi.functions}
-                  selectedFunction={fn.selectedFunction}
-                  onSelectFunction={fn.setSelectedFunction}
-                  disabled={exec.loading}
-                />
-                <CalldataSection
-                  expanded={fn.pasteCalldataExpanded}
-                  onToggle={() => fn.setPasteCalldataExpanded((v) => !v)}
-                  value={fn.pasteCalldataValue}
-                  onValueChange={fn.setPasteCalldataValue}
-                  error={fn.pasteCalldataError}
-                  onDecodeAndFill={fn.handleDecodeAndFill}
-                  disabled={exec.loading}
-                />
-                {fn.pasteCalldataExpanded &&
-                  !(selectedFn && isPayable(selectedFn)) && (
-                    <div className={argsStyles.field}>
-                      <label className={argsStyles.label}>ETH Value</label>
-                      <div className={argsStyles.ethValueWrapper}>
-                        <input
-                          type="text"
-                          value={fn.ethValue}
-                          onChange={(e) => fn.setEthValue(e.target.value)}
-                          placeholder={fn.ethValueUnit === "ETH" ? "0.0" : "0"}
-                          className={
-                            argsStyles.ethValueInput +
-                            (fn.fieldErrors.ethValue
-                              ? " " + argsStyles.inputError
-                              : "")
-                          }
-                          disabled={exec.loading}
-                        />
-                        <div className={argsStyles.ethValueUnitToggle}>
-                          <button
-                            type="button"
-                            className={
-                              argsStyles.ethValueUnitBtn +
-                              (fn.ethValueUnit === "Wei"
-                                ? " " + argsStyles.active
-                                : "")
-                            }
-                            onClick={() => fn.handleEthValueUnitChange("Wei")}
-                          >
-                            Wei
-                          </button>
-                          <button
-                            type="button"
-                            className={
-                              argsStyles.ethValueUnitBtn +
-                              (fn.ethValueUnit === "ETH"
-                                ? " " + argsStyles.active
-                                : "")
-                            }
-                            onClick={() => fn.handleEthValueUnitChange("ETH")}
-                          >
-                            ETH
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                <SimulationOptions
-                  forkBlockNumber={simOpts.forkBlockNumber}
-                  onForkBlockChange={simOpts.setForkBlockNumber}
-                  fromAddress={simOpts.fromAddress}
-                  onFromAddressChange={simOpts.setFromAddress}
-                  cheatcodes={simOpts.cheatcodes}
-                  onCheatcodesChange={simOpts.setCheatcodes}
-                  balanceOverrides={simOpts.balanceOverrides}
-                  onBalanceOverridesChange={simOpts.setBalanceOverrides}
-                  storageOverrides={simOpts.storageOverrides}
-                  onStorageOverridesChange={simOpts.setStorageOverrides}
-                  expanded={simOpts.simOptionsExpanded}
-                  onToggleExpanded={() =>
-                    simOpts.setSimOptionsExpanded((v) => !v)
-                  }
-                  fieldErrors={fn.fieldErrors}
-                  onOpenBookmarkModal={bookmark.openBookmarkModal}
-                  addressBook={bookmark.addressBook}
-                  disabled={exec.loading}
-                />
-                <ArgsInput
-                  fn={selectedFn}
-                  args={fn.args}
-                  onArgsChange={fn.setArgs}
-                  fieldErrors={fn.fieldErrors}
-                  addressBook={bookmark.addressBook}
-                  onOpenBookmarkModal={bookmark.openBookmarkModal}
-                  blockNumber={fn.blockNumber}
-                  onReadBlockNumberChange={fn.setBlockNumber}
-                  ethValue={fn.ethValue}
-                  onEthValueChange={fn.setEthValue}
-                  ethValueUnit={fn.ethValueUnit}
-                  onEthValueUnitChange={fn.handleEthValueUnitChange}
-                  disabled={exec.loading}
-                />
-              </>
-            }
-            eventsContent={
-              <EventsTab
-                events={(abi.parsedAbi || []).filter((x) => x.type === "event")}
-                selectedEvents={events.selectedEvents}
-                onToggleEvent={events.toggleEventSelection}
-                onSelectAll={events.selectAllEvents}
-                onClearSelection={events.clearEventSelection}
-                eventFilter={events.eventFilter}
-                onEventFilterChange={events.setEventFilter}
-                eventListCollapsed={events.eventListCollapsed}
-                onToggleEventList={() =>
-                  events.setEventListCollapsed((v) => !v)
-                }
-                logsFromBlock={events.logsFromBlock}
-                logsToBlock={events.logsToBlock}
-                onLogsFromBlockChange={events.setLogsFromBlock}
-                onLogsToBlockChange={events.setLogsToBlock}
-                logsPage={events.logsPage}
-                logsOffset={events.logsOffset}
-                onLogsPageChange={events.setLogsPage}
-                onLogsOffsetChange={events.setLogsOffset}
-                onFetchLogs={events.fetchLogs}
-                fetchingLogs={events.fetchingLogs}
-                logsError={events.logsError}
-                logsFetched={events.logsFetched}
-                eventLogs={events.eventLogs}
-                logsFilter={events.logsFilter}
-                onLogsFilterChange={events.setLogsFilter}
-                onDownloadCsv={events.downloadLogsAsCsv}
-                latestBlock={events.latestBlockCache}
-              />
-            }
-          />
-
-          <CallActionBar
-            selectedFunction={fn.selectedFunction}
-            rawCalldata={fn.pasteCalldataValue}
-            isWrite={isWrite}
-            loading={exec.loading}
-            simProgress={exec.simProgress}
-            sessionActive={session.sessionActive}
-            sessionBlock={session.sessionBlock}
-            sessionStarting={session.sessionStarting}
-            calldataCopied={fn.calldataCopied}
-            urlCopied={exec.urlCopied}
-            activeTab={events.activeTab}
-            onCall={exec.handleCall}
-            onCancel={exec.handleCancel}
-            onCopyCalldata={fn.handleCopyCalldata}
-            onShareUrl={exec.handleShareUrl}
-            onStartSession={session.handleStartSession}
-            onResetSession={session.handleResetSession}
-          />
-
-          <SessionHistoryStrip
-            active={session.sessionActive}
-            items={session.sessionHistory}
-            expandedIds={history.expandedHistoryIds}
-            onToggleExpanded={history.toggleHistoryExpanded}
-          />
-
-          <ResultPanel
-            result={exec.result}
-            error={exec.error}
-            chain={chain}
+          <ContractAddressInput
             address={address}
-            fromAddress={simOpts.fromAddress}
-            tokenSymbols={tokens.tokenSymbols}
-            tokenDecimals={tokens.tokenDecimals}
-            tokenPrices={tokens.tokenPrices}
-          />
-
-          <HistorySidebar
-            history={history.history}
-            chain={chain}
-            show={history.showHistory}
-            onShowChange={history.setShowHistory}
-            search={history.historySearch}
-            onSearchChange={history.setHistorySearch}
-            onLoad={history.loadFromHistory}
-            onClear={history.clearHistory}
+            onAddressChange={setAddress}
+            addressBook={bookmark.addressBook}
+            cachedAddresses={abi.cachedAddresses}
+            contractName={abi.contractName}
+            onFetchAbi={abi.fetchAbi}
+            fetchingAbi={abi.fetchingAbi}
+            onSaveAbiBackend={handleSaveAbiBackend}
+            savingAbiBackend={savingAbiBackend}
+            canSaveAbiBackend={
+              (abi.parsedAbi || []).length > 0 &&
+              isValidEthAddress(address) &&
+              Boolean(apiKeys.backend)
+            }
+            saveAbiBackendMsg={saveAbiBackendMsg}
+            fieldError={fn.fieldErrors.address}
+            onOpenBookmarkModal={bookmark.openBookmarkModal}
+            disabled={exec.loading}
           />
         </div>
 
-        <BookmarkModal
-          open={bookmark.showBookmarkModal}
-          address={bookmark.bookmarkAddress}
-          label={bookmark.bookmarkLabel}
-          notes={bookmark.bookmarkNotes}
-          onLabelChange={bookmark.setBookmarkLabel}
-          onNotesChange={bookmark.setBookmarkNotes}
-          onSave={bookmark.saveBookmark}
-          onRemove={bookmark.removeBookmark}
-          onClose={bookmark.closeBookmarkModal}
+        <AbiPanel
+          abi={abi.abi}
+          onAbiChange={abi.setAbi}
+          parsedAbi={abi.parsedAbi}
+          abiSource={abi.abiSource}
+          abiSaved={abi.abiSaved}
+          onSaveAbi={abi.saveAbiToCache}
+          onRefetchAbi={() => abi.fetchAbi({ forceRefresh: true })}
+          loading={exec.loading}
         />
 
-        <AddChainModal
-          open={addChain.showAddChainModal}
-          onClose={addChain.closeAddChainModal}
-          search={addChain.chainlistSearch}
-          onSearchChange={addChain.setChainlistSearch}
-          customChains={customChains}
-          addedCollapsed={addChain.addedChainsCollapsed}
-          onToggleAddedCollapsed={() =>
-            addChain.setAddedChainsCollapsed((v) => !v)
+        <FunctionEventsTabs
+          activeTab={events.activeTab}
+          onTabChange={events.setActiveTab}
+          functionsCount={abi.functions.length}
+          eventsCount={
+            (abi.parsedAbi || []).filter((x) => x.type === "event").length
           }
-          chainlistData={addChain.visibleChains}
-          loading={addChain.chainlistLoading}
-          error={addChain.chainlistError}
-          onAddChain={addChain.addCustomChain}
-          onRemoveChain={addChain.removeCustomChain}
-          isChainAdded={addChain.isChainAdded}
-          showTestnets={addChain.showTestnets}
-          onShowTestnetsChange={addChain.setShowTestnets}
+          functionsContent={
+            <>
+              <FunctionSelector
+                functions={abi.functions}
+                selectedFunction={fn.selectedFunction}
+                onSelectFunction={fn.setSelectedFunction}
+                disabled={exec.loading}
+              />
+              <CalldataSection
+                expanded={fn.pasteCalldataExpanded}
+                onToggle={() => fn.setPasteCalldataExpanded((v) => !v)}
+                value={fn.pasteCalldataValue}
+                onValueChange={fn.setPasteCalldataValue}
+                error={fn.pasteCalldataError}
+                onDecodeAndFill={fn.handleDecodeAndFill}
+                disabled={exec.loading}
+              />
+              {fn.pasteCalldataExpanded &&
+                !(selectedFn && isPayable(selectedFn)) && (
+                  <div className={argsStyles.field}>
+                    <label className={argsStyles.label}>ETH Value</label>
+                    <div className={argsStyles.ethValueWrapper}>
+                      <input
+                        type="text"
+                        value={fn.ethValue}
+                        onChange={(e) => fn.setEthValue(e.target.value)}
+                        placeholder={fn.ethValueUnit === "ETH" ? "0.0" : "0"}
+                        className={
+                          argsStyles.ethValueInput +
+                          (fn.fieldErrors.ethValue
+                            ? " " + argsStyles.inputError
+                            : "")
+                        }
+                        disabled={exec.loading}
+                      />
+                      <div className={argsStyles.ethValueUnitToggle}>
+                        <button
+                          type="button"
+                          className={
+                            argsStyles.ethValueUnitBtn +
+                            (fn.ethValueUnit === "Wei"
+                              ? " " + argsStyles.active
+                              : "")
+                          }
+                          onClick={() => fn.handleEthValueUnitChange("Wei")}
+                        >
+                          Wei
+                        </button>
+                        <button
+                          type="button"
+                          className={
+                            argsStyles.ethValueUnitBtn +
+                            (fn.ethValueUnit === "ETH"
+                              ? " " + argsStyles.active
+                              : "")
+                          }
+                          onClick={() => fn.handleEthValueUnitChange("ETH")}
+                        >
+                          ETH
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              <SimulationOptions
+                forkBlockNumber={simOpts.forkBlockNumber}
+                onForkBlockChange={simOpts.setForkBlockNumber}
+                fromAddress={simOpts.fromAddress}
+                onFromAddressChange={simOpts.setFromAddress}
+                cheatcodes={simOpts.cheatcodes}
+                onCheatcodesChange={simOpts.setCheatcodes}
+                balanceOverrides={simOpts.balanceOverrides}
+                onBalanceOverridesChange={simOpts.setBalanceOverrides}
+                storageOverrides={simOpts.storageOverrides}
+                onStorageOverridesChange={simOpts.setStorageOverrides}
+                expanded={simOpts.simOptionsExpanded}
+                onToggleExpanded={() =>
+                  simOpts.setSimOptionsExpanded((v) => !v)
+                }
+                fieldErrors={fn.fieldErrors}
+                onOpenBookmarkModal={bookmark.openBookmarkModal}
+                addressBook={bookmark.addressBook}
+                disabled={exec.loading}
+              />
+              <ArgsInput
+                fn={selectedFn}
+                args={fn.args}
+                onArgsChange={fn.setArgs}
+                fieldErrors={fn.fieldErrors}
+                addressBook={bookmark.addressBook}
+                onOpenBookmarkModal={bookmark.openBookmarkModal}
+                blockNumber={fn.blockNumber}
+                onReadBlockNumberChange={fn.setBlockNumber}
+                ethValue={fn.ethValue}
+                onEthValueChange={fn.setEthValue}
+                ethValueUnit={fn.ethValueUnit}
+                onEthValueUnitChange={fn.handleEthValueUnitChange}
+                disabled={exec.loading}
+              />
+            </>
+          }
+          eventsContent={
+            <EventsTab
+              events={(abi.parsedAbi || []).filter((x) => x.type === "event")}
+              selectedEvents={events.selectedEvents}
+              onToggleEvent={events.toggleEventSelection}
+              onSelectAll={events.selectAllEvents}
+              onClearSelection={events.clearEventSelection}
+              eventFilter={events.eventFilter}
+              onEventFilterChange={events.setEventFilter}
+              eventListCollapsed={events.eventListCollapsed}
+              onToggleEventList={() => events.setEventListCollapsed((v) => !v)}
+              logsFromBlock={events.logsFromBlock}
+              logsToBlock={events.logsToBlock}
+              onLogsFromBlockChange={events.setLogsFromBlock}
+              onLogsToBlockChange={events.setLogsToBlock}
+              logsPage={events.logsPage}
+              logsOffset={events.logsOffset}
+              onLogsPageChange={events.setLogsPage}
+              onLogsOffsetChange={events.setLogsOffset}
+              onFetchLogs={events.fetchLogs}
+              fetchingLogs={events.fetchingLogs}
+              logsError={events.logsError}
+              logsFetched={events.logsFetched}
+              eventLogs={events.eventLogs}
+              logsFilter={events.logsFilter}
+              onLogsFilterChange={events.setLogsFilter}
+              onDownloadCsv={events.downloadLogsAsCsv}
+              latestBlock={events.latestBlockCache}
+            />
+          }
+        />
+
+        <CallActionBar
+          selectedFunction={fn.selectedFunction}
+          rawCalldata={fn.pasteCalldataValue}
+          isWrite={isWrite}
+          loading={exec.loading}
+          simProgress={exec.simProgress}
+          sessionActive={session.sessionActive}
+          sessionBlock={session.sessionBlock}
+          sessionStarting={session.sessionStarting}
+          calldataCopied={fn.calldataCopied}
+          urlCopied={exec.urlCopied}
+          activeTab={events.activeTab}
+          onCall={exec.handleCall}
+          onCancel={exec.handleCancel}
+          onCopyCalldata={fn.handleCopyCalldata}
+          onShareUrl={exec.handleShareUrl}
+          onStartSession={session.handleStartSession}
+          onResetSession={session.handleResetSession}
+        />
+
+        <SessionHistoryStrip
+          active={session.sessionActive}
+          items={session.sessionHistory}
+          expandedIds={history.expandedHistoryIds}
+          onToggleExpanded={history.toggleHistoryExpanded}
+        />
+
+        <ResultPanel
+          result={exec.result}
+          error={exec.error}
+          chain={chain}
+          address={address}
+          fromAddress={simOpts.fromAddress}
+          tokenSymbols={tokens.tokenSymbols}
+          tokenDecimals={tokens.tokenDecimals}
+          tokenPrices={tokens.tokenPrices}
+        />
+
+        <HistorySidebar
+          history={history.history}
+          chain={chain}
+          show={history.showHistory}
+          onShowChange={history.setShowHistory}
+          search={history.historySearch}
+          onSearchChange={history.setHistorySearch}
+          onLoad={history.loadFromHistory}
+          onClear={history.clearHistory}
         />
       </div>
-    </main>
+
+      <BookmarkModal
+        open={bookmark.showBookmarkModal}
+        address={bookmark.bookmarkAddress}
+        label={bookmark.bookmarkLabel}
+        notes={bookmark.bookmarkNotes}
+        onLabelChange={bookmark.setBookmarkLabel}
+        onNotesChange={bookmark.setBookmarkNotes}
+        onSave={bookmark.saveBookmark}
+        onRemove={bookmark.removeBookmark}
+        onClose={bookmark.closeBookmarkModal}
+      />
+
+      <AddChainModal
+        open={addChain.showAddChainModal}
+        onClose={addChain.closeAddChainModal}
+        search={addChain.chainlistSearch}
+        onSearchChange={addChain.setChainlistSearch}
+        customChains={customChains}
+        addedCollapsed={addChain.addedChainsCollapsed}
+        onToggleAddedCollapsed={() =>
+          addChain.setAddedChainsCollapsed((v) => !v)
+        }
+        chainlistData={addChain.visibleChains}
+        loading={addChain.chainlistLoading}
+        error={addChain.chainlistError}
+        onAddChain={addChain.addCustomChain}
+        onRemoveChain={addChain.removeCustomChain}
+        isChainAdded={addChain.isChainAdded}
+        showTestnets={addChain.showTestnets}
+        onShowTestnetsChange={addChain.setShowTestnets}
+      />
+    </>
   );
 }
