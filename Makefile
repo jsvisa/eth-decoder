@@ -1,4 +1,4 @@
-.PHONY: lint test format e2e
+.PHONY: lint test format e2e macos-build macos-run macos-test
 
 lint:
 	npx eslint app/ tests/
@@ -11,3 +11,23 @@ format:
 
 e2e:
 	npm run test:e2e
+
+macos-build:
+	cd macos && swift build -c release && \
+	rm -rf EthDecodeMac.app && \
+	mkdir -p EthDecodeMac.app/Contents/MacOS && \
+	cp .build/release/EthDecodeMac EthDecodeMac.app/Contents/MacOS/ && \
+	plutil -create xml1 EthDecodeMac.app/Contents/Info.plist && \
+	plutil -insert CFBundleName        -string "EthDecodeMac" EthDecodeMac.app/Contents/Info.plist && \
+	plutil -insert CFBundleExecutable  -string "EthDecodeMac" EthDecodeMac.app/Contents/Info.plist && \
+	plutil -insert CFBundleIdentifier  -string "com.ethdecodmac.app" EthDecodeMac.app/Contents/Info.plist && \
+	plutil -insert CFBundleVersion     -string "1" EthDecodeMac.app/Contents/Info.plist && \
+	plutil -insert CFBundlePackageType -string "APPL" EthDecodeMac.app/Contents/Info.plist && \
+	plutil -insert LSMinimumSystemVersion -string "13.0" EthDecodeMac.app/Contents/Info.plist && \
+	echo "Built: macos/EthDecodeMac.app"
+
+macos-run:
+	cd macos && swift run EthDecodeMac
+
+macos-test:
+	cd macos && swift run EthDecodeMacRunTests
