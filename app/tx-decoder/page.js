@@ -55,7 +55,7 @@ export default function TxDecoderPage() {
   return (
     <main className={styles.main}>
       <div className={styles.container}>
-        <h1 className={styles.title}>EVM Tx.input Decoder App</h1>
+        <h1 className={styles.title}>Transaction Calldata Decoder</h1>
         <Tabs
           storageKey={TABS_STORAGE_KEY}
           newTabTitle="New Decode"

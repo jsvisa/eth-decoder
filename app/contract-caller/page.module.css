@@ -6,8 +6,6 @@
 
 .container {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
   background: var(--bg-card);
   padding: 2rem;
   border-radius: 12px;
@@ -18,6 +16,7 @@
   color: var(--text-primary);
   font-size: 2rem;
   margin: 0 0 1.5rem 0;
+  text-align: center;
 }
 
 .form {
