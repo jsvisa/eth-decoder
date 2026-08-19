@@ -33,7 +33,6 @@ import AbiPanel from "./components/AbiPanel";
 import FunctionEventsTabs from "./components/FunctionEventsTabs";
 import FunctionSelector from "./components/FunctionSelector";
 import CalldataSection from "./components/CalldataSection";
-import argsStyles from "./components/ArgsInput.module.css";
 import SimulationOptions from "./components/SimulationOptions";
 import ArgsInput from "./components/ArgsInput";
 import EventsTab from "./components/EventsTab";
@@ -304,8 +303,8 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     args: fn.args,
     rawCalldata: fn.pasteCalldataValue,
     fromAddress: simOpts.fromAddress,
-    ethValue: fn.ethValue,
-    ethValueUnit: fn.ethValueUnit,
+    ethValue: simOpts.ethValue,
+    ethValueUnit: simOpts.ethValueUnit,
     forkBlockNumber: simOpts.forkBlockNumber,
     blockNumber: fn.blockNumber,
     apiKeys,
@@ -351,7 +350,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     setFromAddress: simOpts.setFromAddress,
     setResult: exec.setResult,
     setError: exec.setError,
-    setEthValue: fn.setEthValue,
+    setEthValue: simOpts.setEthValue,
     setBlockNumber: fn.setBlockNumber,
     applyPendingArgs: fn.applyPendingArgs,
     skipUrlHydration: !hydrateFromUrl,
@@ -384,8 +383,8 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     if (simOpts.fromAddress) {
       params.set("from", simOpts.fromAddress);
     }
-    if (fn.ethValue) {
-      params.set("value", fn.ethValue);
+    if (simOpts.ethValue) {
+      params.set("value", simOpts.ethValue);
     }
     if (fn.blockNumber) {
       params.set("block", fn.blockNumber);
@@ -402,7 +401,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     fn.selectedFunction,
     fn.args,
     simOpts.fromAddress,
-    fn.ethValue,
+    simOpts.ethValue,
     fn.blockNumber,
   ]);
 
@@ -502,7 +501,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
             } = first.requestBody;
             if (to) setAddress(to);
             if (from) simOpts.setFromAddress(from);
-            if (value) fn.setEthValue(value);
+            if (value) simOpts.setEthValue(value);
             if (functionName && (args || calldata)) {
               fn.applyPendingArgs({
                 functionSig: functionName,
@@ -559,7 +558,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
           }
           if (to) setAddress(to);
           if (from) simOpts.setFromAddress(from);
-          if (value) fn.setEthValue(value);
+          if (value) simOpts.setEthValue(value);
           if (functionName && (args || calldata)) {
             fn.applyPendingArgs({
               functionSig: functionName,
@@ -617,7 +616,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
         });
       }
       if (s.fromAddress) simOpts.setFromAddress(s.fromAddress);
-      if (s.ethValue) fn.setEthValue(s.ethValue);
+      if (s.ethValue) simOpts.setEthValue(s.ethValue);
       if (s.blockNumber) fn.setBlockNumber(s.blockNumber);
     }
     setBooted(true);
@@ -638,7 +637,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
       selectedFunction: fn.selectedFunction,
       args: fn.args,
       fromAddress: simOpts.fromAddress,
-      ethValue: fn.ethValue,
+      ethValue: simOpts.ethValue,
       blockNumber: fn.blockNumber,
     });
   }, [
@@ -648,7 +647,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     fn.selectedFunction,
     fn.args,
     simOpts.fromAddress,
-    fn.ethValue,
+    simOpts.ethValue,
     fn.blockNumber,
     setSavedTabState,
   ]);
@@ -746,53 +745,6 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
                 onDecodeAndFill={fn.handleDecodeAndFill}
                 disabled={exec.loading}
               />
-              {fn.pasteCalldataExpanded &&
-                !(selectedFn && isPayable(selectedFn)) && (
-                  <div className={argsStyles.field}>
-                    <label className={argsStyles.label}>ETH Value</label>
-                    <div className={argsStyles.ethValueWrapper}>
-                      <input
-                        type="text"
-                        value={fn.ethValue}
-                        onChange={(e) => fn.setEthValue(e.target.value)}
-                        placeholder={fn.ethValueUnit === "ETH" ? "0.0" : "0"}
-                        className={
-                          argsStyles.ethValueInput +
-                          (fn.fieldErrors.ethValue
-                            ? " " + argsStyles.inputError
-                            : "")
-                        }
-                        disabled={exec.loading}
-                      />
-                      <div className={argsStyles.ethValueUnitToggle}>
-                        <button
-                          type="button"
-                          className={
-                            argsStyles.ethValueUnitBtn +
-                            (fn.ethValueUnit === "Wei"
-                              ? " " + argsStyles.active
-                              : "")
-                          }
-                          onClick={() => fn.handleEthValueUnitChange("Wei")}
-                        >
-                          Wei
-                        </button>
-                        <button
-                          type="button"
-                          className={
-                            argsStyles.ethValueUnitBtn +
-                            (fn.ethValueUnit === "ETH"
-                              ? " " + argsStyles.active
-                              : "")
-                          }
-                          onClick={() => fn.handleEthValueUnitChange("ETH")}
-                        >
-                          ETH
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
               <SimulationOptions
                 forkBlockNumber={simOpts.forkBlockNumber}
                 onForkBlockChange={simOpts.setForkBlockNumber}
@@ -812,6 +764,12 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
                 onOpenBookmarkModal={bookmark.openBookmarkModal}
                 addressBook={bookmark.addressBook}
                 disabled={exec.loading}
+                ethValue={simOpts.ethValue}
+                onEthValueChange={simOpts.setEthValue}
+                ethValueUnit={simOpts.ethValueUnit}
+                onEthValueUnitChange={simOpts.handleEthValueUnitChange}
+                selectedFn={selectedFn}
+                isPayable={isPayable}
               />
               <ArgsInput
                 fn={selectedFn}
@@ -822,10 +780,6 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
                 onOpenBookmarkModal={bookmark.openBookmarkModal}
                 blockNumber={fn.blockNumber}
                 onReadBlockNumberChange={fn.setBlockNumber}
-                ethValue={fn.ethValue}
-                onEthValueChange={fn.setEthValue}
-                ethValueUnit={fn.ethValueUnit}
-                onEthValueUnitChange={fn.handleEthValueUnitChange}
                 disabled={exec.loading}
               />
             </>

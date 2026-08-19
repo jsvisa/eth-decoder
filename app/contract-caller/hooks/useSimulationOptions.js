@@ -1,11 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { parseEther, formatEther } from "viem";
 
-/**
- * Owns write-mode simulation knobs: from address, fork block, cheatcodes,
- * state overrides, and the options-section expanded flag.
- */
 export function useSimulationOptions() {
   const [fromAddress, setFromAddress] = useState("");
   const [forkBlockNumber, setForkBlockNumber] = useState("");
@@ -17,6 +14,28 @@ export function useSimulationOptions() {
   const [balanceOverrides, setBalanceOverrides] = useState([]);
   const [storageOverrides, setStorageOverrides] = useState([]);
   const [simOptionsExpanded, setSimOptionsExpanded] = useState(false);
+  const [ethValue, setEthValue] = useState("");
+  const [ethValueUnit, setEthValueUnit] = useState("ETH");
+
+  const handleEthValueUnitChange = useCallback(
+    (newUnit) => {
+      if (newUnit === ethValueUnit) return;
+      let nextValue = ethValue;
+      if (ethValue && ethValue.trim() !== "") {
+        try {
+          nextValue =
+            newUnit === "Wei"
+              ? parseEther(ethValue).toString()
+              : formatEther(BigInt(ethValue));
+        } catch {
+          nextValue = ethValue;
+        }
+      }
+      setEthValue(nextValue);
+      setEthValueUnit(newUnit);
+    },
+    [ethValue, ethValueUnit],
+  );
 
   const resetWriteOptions = () => {
     setFromAddress("");
@@ -29,6 +48,8 @@ export function useSimulationOptions() {
     setBalanceOverrides([]);
     setStorageOverrides([]);
     setSimOptionsExpanded(false);
+    setEthValue("");
+    setEthValueUnit("ETH");
   };
 
   return {
@@ -44,6 +65,11 @@ export function useSimulationOptions() {
     setStorageOverrides,
     simOptionsExpanded,
     setSimOptionsExpanded,
+    ethValue,
+    setEthValue,
+    ethValueUnit,
+    setEthValueUnit,
+    handleEthValueUnitChange,
     resetWriteOptions,
   };
 }

@@ -245,6 +245,81 @@
   color: #a78bfa !important;
 }
 
+/* ETH Value inline in simulation options */
+.ethValueInline {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.ethValueInline input {
+  width: 100px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  border-radius: 6px 0 0 6px;
+  border-right: none;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.ethValueInline input:focus {
+  outline: none;
+  border-color: #eab308;
+  box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.15);
+}
+
+.ethValueInline input::placeholder {
+  color: #facc15;
+}
+
+.ethValueUnitToggle {
+  display: flex;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  border-radius: 0 6px 6px 0;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.ethValueUnitBtn {
+  padding: 0.5rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  background-color: var(--bg-hover);
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1;
+}
+
+.ethValueUnitBtn:first-child {
+  border-right: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.ethValueUnitBtn:hover {
+  background-color: var(--bg-secondary);
+}
+
+.ethValueUnitBtn.active {
+  background: linear-gradient(135deg, #eab308 0%, #f59e0b 100%);
+  color: white;
+}
+
+.payableBadge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #7c3aed;
+  background-color: #ede9fe;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  margin-left: 0.35rem;
+  white-space: nowrap;
+}
+
 /* State override buttons */
 .addOverrideBtn {
   padding: 0.25rem 0.5rem;

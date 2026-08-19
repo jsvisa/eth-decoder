@@ -3,11 +3,11 @@
 import React from "react";
 import styles from "./ArgsInput.module.css";
 import ArgInputRouter from "./ArgInputRouter";
-import { isReadOnly, isPayable } from "../utils/functionArgs";
+import { isReadOnly } from "../utils/functionArgs";
 
 /**
  * ArgsInput — renders per-argument inputs for a selected ABI function,
- * plus inline ETH-value input (payable) and block-number input (read).
+ * plus block-number input (read-only functions).
  *
  * Props:
  *   fn                     {AbiFunction|null}          - selected function
@@ -18,10 +18,6 @@ import { isReadOnly, isPayable } from "../utils/functionArgs";
  *   onOpenBookmarkModal    {(addr: string) => void}    - bookmark an address arg
  *   blockNumber            {string}                    - block-number for read state
  *   onBlockNumberChange    {(s: string) => void}       - set historical block-number
- *   ethValue               {string}                    - ETH value for payable
- *   onEthValueChange       {(s: string) => void}       - update ETH value
- *   ethValueUnit           {'ETH'|'Wei'}               - unit toggle
- *   onEthValueUnitChange   {(u) => void}               - toggle unit
  *   disabled               {boolean}                   - disabled while loading
  *   ArgInputComponent      {React.Component|undefined} - optional arg input component
  */
@@ -34,10 +30,6 @@ export default function ArgsInput({
   onOpenBookmarkModal,
   blockNumber,
   onBlockNumberChange,
-  ethValue,
-  onEthValueChange,
-  ethValueUnit,
-  onEthValueUnitChange,
   disabled,
   ArgInputComponent,
 }) {
@@ -53,69 +45,6 @@ export default function ArgsInput({
   };
 
   const children = [];
-
-  // Payable ETH value section
-  if (isPayable(fn)) {
-    children.push(
-      React.createElement(
-        "div",
-        { key: "eth-value", className: styles.field },
-        React.createElement(
-          "label",
-          { className: styles.label },
-          "ETH Value",
-          " ",
-          React.createElement(
-            "span",
-            { className: styles.payableBadge },
-            "payable",
-          ),
-        ),
-        React.createElement(
-          "div",
-          { className: styles.ethValueWrapper },
-          React.createElement("input", {
-            type: "text",
-            value: ethValue,
-            onChange: (e) => onEthValueChange(e.target.value),
-            placeholder: ethValueUnit === "ETH" ? "0.0" : "0",
-            className:
-              styles.ethValueInput +
-              (fieldErrors.ethValue ? " " + styles.inputError : ""),
-            disabled: disabled,
-          }),
-          React.createElement(
-            "div",
-            { className: styles.ethValueUnitToggle },
-            React.createElement(
-              "button",
-              {
-                type: "button",
-                className:
-                  styles.ethValueUnitBtn +
-                  (ethValueUnit === "Wei" ? " " + styles.active : ""),
-                onClick: () => onEthValueUnitChange("Wei"),
-              },
-              "Wei",
-            ),
-            React.createElement(
-              "button",
-              {
-                type: "button",
-                className:
-                  styles.ethValueUnitBtn +
-                  (ethValueUnit === "ETH" ? " " + styles.active : ""),
-                onClick: () => onEthValueUnitChange("ETH"),
-              },
-              "ETH",
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Arguments section (when the function has inputs)
   if (hasArgs) {
     const argFields = inputs.map((input, index) => {
       const argError = fieldErrors[`arg_${index}`];

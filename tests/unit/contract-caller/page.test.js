@@ -67,6 +67,11 @@ const simulationOptionsState = {
   setStorageOverrides: vi.fn(),
   simOptionsExpanded: false,
   setSimOptionsExpanded: vi.fn(),
+  ethValue: "",
+  setEthValue: vi.fn(),
+  ethValueUnit: "ETH",
+  setEthValueUnit: vi.fn(),
+  handleEthValueUnitChange: vi.fn(),
 };
 
 const tevmSessionState = {
@@ -356,7 +361,7 @@ describe("ContractCallerPage wiring", () => {
     functionSelectionState.setArgs.mockReset();
     functionSelectionState.setPasteCalldataValue.mockReset();
     functionSelectionState.setPasteCalldataError.mockReset();
-    functionSelectionState.setEthValue.mockReset();
+    simulationOptionsState.setEthValue.mockReset();
     functionSelectionState.applyPendingArgs.mockReset();
     simulationOptionsState.setFromAddress.mockReset();
     tokenMetadataState.fetchTokenSymbolsForLogs.mockReset();
@@ -470,7 +475,7 @@ describe("ContractCallerPage wiring", () => {
     expect(simulationOptionsState.setFromAddress).toHaveBeenCalledWith(
       sharedResult.requestBody.from,
     );
-    expect(functionSelectionState.setEthValue).toHaveBeenCalledWith(
+    expect(simulationOptionsState.setEthValue).toHaveBeenCalledWith(
       sharedResult.requestBody.value,
     );
     expect(tokenMetadataState.setTokenSymbols).toHaveBeenCalledWith(
