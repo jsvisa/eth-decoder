@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ContractCallerView: View {
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var history: HistoryStore
     @State private var chain: Chain = Chains.all[0]
     @State private var address = ""
     @State private var abi: [ABIItem]?
@@ -17,6 +18,7 @@ struct ContractCallerView: View {
     @State private var actionError: String?
     @State private var readResult: CallContractResponse?
     @State private var simulateResult: (SimulateResponse, JSONValue)?
+    @State private var rawResultJSON: JSONValue?
 
     private var functions: [ABIItem] { (abi ?? []).filter { $0.isFunction } }
     private var selectedFunction: ABIItem? {
@@ -26,19 +28,24 @@ struct ContractCallerView: View {
     private var validAddress: String { address.trimmingCharacters(in: .whitespaces) }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                contractCard
-                if let abi { functionCard(abi) }
-                if let actionError { ErrorView(message: actionError) { self.actionError = nil } }
-                if let readResult { resultCard("Read Result", readResult) }
-                if let (sim, raw) = simulateResult { SimulationResultView(result: sim, rawJSON: raw) }
-                if abi == nil && actionError == nil && !isLoadingAbi {
-                    EmptyState(icon: "phone.badge.checkmark", title: "Contract Caller",
-                               message: "Enter a contract address and fetch its ABI to get started.")
-                }
+        HStack(spacing: 0) {
+            CallerHistorySidebar(currentChain: chain.id) { item in
+                loadFromHistory(item)
             }
-            .padding(24)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    contractCard
+                    if let abi { functionCard(abi) }
+                    if let actionError { ErrorView(message: actionError) { self.actionError = nil } }
+                    if let readResult { resultCard("Read Result", readResult) }
+                    if let (sim, raw) = simulateResult { SimulationResultView(result: sim, rawJSON: raw) }
+                    if abi == nil && actionError == nil && !isLoadingAbi {
+                        EmptyState(icon: "phone.badge.checkmark", title: "Contract Caller",
+                                   message: "Enter a contract address and fetch its ABI to get started.")
+                    }
+                }
+                .padding(24)
+            }
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .onChange(of: selectedFunctionID) { newID in
@@ -193,7 +200,14 @@ struct ContractCallerView: View {
         isRunning = true; actionError = nil; simulateResult = nil
         do {
             let req = CallContractRequest(chain: chain.id, address: validAddress, functionName: fn.canonicalSignature, args: argTexts, abi: abi, fromAddress: fromAddress.isEmpty ? nil : fromAddress)
-            readResult = try await DecoderAPI(client: settings.client).callContract(req)
+            let res = try await DecoderAPI(client: settings.client).callContract(req)
+            readResult = res
+            // Build JSON output for history
+            let out = try? JSONEncoder().encode(res)
+            let json = out.flatMap { try? JSONDecoder().decode(JSONValue.self, from: $0) }
+            history.saveCaller(chain: chain.id, address: validAddress, functionSig: fn.canonicalSignature,
+                               args: argTexts, fromAddress: fromAddress.isEmpty ? nil : fromAddress,
+                               output: json, contractName: contractName, isWrite: false)
         } catch { actionError = error.localizedDescription }
         isRunning = false
     }
@@ -205,9 +219,39 @@ struct ContractCallerView: View {
             let calldata = try ABIEncoder.encodeCalldata(function: fn, args: argTexts)
             let valueHex = try valueToHex(ethValue)
             let req = SimulateRequest(chainId: chain.chainId, to: validAddress, data: calldata, from: fromAddress.isEmpty ? "0x0000000000000000000000000000000000000000" : fromAddress, value: valueHex, gas: nil, blockNumber: nil, apiKeys: settings.etherscanApiKey.isEmpty ? nil : ["etherscan": settings.etherscanApiKey], price: true)
-            simulateResult = try await DecoderAPI(client: settings.client).simulate(req)
+            let (sim, raw) = try await DecoderAPI(client: settings.client).simulate(req)
+            simulateResult = (sim, raw)
+            history.saveCaller(chain: chain.id, address: validAddress, functionSig: fn.canonicalSignature,
+                               args: argTexts, fromAddress: fromAddress.isEmpty ? nil : fromAddress,
+                               output: raw, contractName: contractName, isWrite: true)
         } catch { actionError = error.localizedDescription }
         isRunning = false
+    }
+
+    private func loadFromHistory(_ item: CallHistoryItem) {
+        chain = Chains.chain(named: item.chain) ?? Chains.all[0]
+        address = item.address
+        fromAddress = item.fromAddress ?? ""
+        if let sig = item.functionSig {
+            selectedFunctionID = functions.first(where: { $0.canonicalSignature == sig })?.id
+            if let args = item.args { argTexts = args }
+        }
+        // Re-fetch ABI if needed
+        if address != validAddress || abi == nil {
+            Task { await fetchAbi() }
+        }
+        // Restore result
+        if let output = item.output {
+            if item.isWrite == true {
+                if let sim = try? APIClient.typed(SimulateResponse.self, from: output) {
+                    simulateResult = (sim, output)
+                }
+            } else {
+                if let res = try? APIClient.typed(CallContractResponse.self, from: output) {
+                    readResult = res
+                }
+            }
+        }
     }
 
     // MARK: - Helpers

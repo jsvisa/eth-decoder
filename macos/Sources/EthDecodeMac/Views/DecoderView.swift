@@ -3,6 +3,7 @@ import SwiftUI
 
 struct DecoderView: View {
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var history: HistoryStore
     @State private var calldata = ""
     @State private var includeAbi = true
     @State private var includeSign = true
@@ -14,17 +15,22 @@ struct DecoderView: View {
     private var trimmedCalldata: String { calldata.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                inputCard
-                if let errorMessage { ErrorView(message: errorMessage) { self.errorMessage = nil } }
-                if let (decoded, raw) = result { resultsCard(decoded, raw) }
-                if result == nil && errorMessage == nil && !isLoading {
-                    EmptyState(icon: "arrow.left.arrow.right", title: "Decode Calldata",
-                               message: "Paste a transaction hex string above to get started.")
-                }
+        HStack(spacing: 0) {
+            DecoderHistorySidebar(calldata: $calldata, withAbi: $includeAbi, withSign: $includeSign) { input, abi, sign in
+                Task { await decodeWith(input: input, withAbi: abi, withSign: sign) }
             }
-            .padding(24)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    inputCard
+                    if let errorMessage { ErrorView(message: errorMessage) { self.errorMessage = nil } }
+                    if let (decoded, raw) = result { resultsCard(decoded, raw) }
+                    if result == nil && errorMessage == nil && !isLoading {
+                        EmptyState(icon: "arrow.left.arrow.right", title: "Decode Calldata",
+                                   message: "Paste a transaction hex string above to get started.")
+                    }
+                }
+                .padding(24)
+            }
         }
         .background(Color(nsColor: .windowBackgroundColor))
     }
@@ -93,11 +99,20 @@ struct DecoderView: View {
         return items.count == 1 ? items[0] : nil
     }
 
+    private func decodeWith(input: String, withAbi: Bool, withSign: Bool) async {
+        calldata = input
+        includeAbi = withAbi
+        includeSign = withSign
+        await decode()
+    }
+
     private func decode() async {
         guard !trimmedCalldata.isEmpty else { return }
         isLoading = true; errorMessage = nil
         do {
-            result = try await DecoderAPI(client: settings.client).decode(data: trimmedCalldata, withAbi: includeAbi, withSign: includeSign)
+            let (decoded, raw) = try await DecoderAPI(client: settings.client).decode(data: trimmedCalldata, withAbi: includeAbi, withSign: includeSign)
+            result = (decoded, raw)
+            history.saveDecoder(input: trimmedCalldata, output: raw, withAbi: includeAbi, withSign: includeSign)
         } catch { errorMessage = error.localizedDescription }
         isLoading = false
     }

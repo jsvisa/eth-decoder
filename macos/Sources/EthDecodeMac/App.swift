@@ -5,11 +5,13 @@ import SwiftUI
 struct EthDecodeMacApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var settings = AppSettings()
+    @StateObject private var history = HistoryStore()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(settings)
+                .environmentObject(history)
                 .frame(minWidth: 960, minHeight: 680)
         }
         .defaultSize(width: 1200, height: 800)

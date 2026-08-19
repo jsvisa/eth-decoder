@@ -37,6 +37,21 @@ extension JSONValue: Decodable {
     }
 }
 
+extension JSONValue: Encodable {
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        switch self {
+        case .null: try c.encodeNil()
+        case .bool(let b): try c.encode(b)
+        case .number(.int(let i)): try c.encode(i)
+        case .number(.text(let t)): try c.encode(t)
+        case .string(let s): try c.encode(s)
+        case .array(let a): try c.encode(a)
+        case .object(let o): try c.encode(o)
+        }
+    }
+}
+
 public extension JSONValue {
     public var display: String {
         switch self {
@@ -332,17 +347,31 @@ public struct CallContractRequest: Encodable {
     }
 }
 
-public struct CallContractResponse: Decodable {
+public struct CallContractResponse: Decodable, Encodable {
     public let rawData: String?
     public let decoded: [DecodedOutput]?
     public let result: JSONValue?
     public let simulated: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case rawData, decoded, result, simulated
+    }
 }
 
 public struct DecodedOutput: Decodable {
     public let name: String?
     public let type: String?
     public let value: JSONValue?
+}
+
+extension DecodedOutput: Encodable {
+    enum CodingKeys: String, CodingKey { case name, type, value }
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(name, forKey: .name)
+        try c.encodeIfPresent(type, forKey: .type)
+        try c.encodeIfPresent(value, forKey: .value)
+    }
 }
 
 // MARK: - Simulation

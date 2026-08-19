@@ -15,8 +15,11 @@ e2e:
 macos-build:
 	cd macos && swift build -c release && \
 	rm -rf EthDecodeMac.app && \
-	mkdir -p EthDecodeMac.app/Contents/MacOS && \
+	mkdir -p EthDecodeMac.app/Contents/MacOS \
+	         EthDecodeMac.app/Contents/Resources/AppIcon.appiconset && \
 	cp .build/release/EthDecodeMac EthDecodeMac.app/Contents/MacOS/ && \
+	cp Assets.xcassets/AppIcon.appiconset/*.png \
+	   EthDecodeMac.app/Contents/Resources/AppIcon.appiconset/ && \
 	plutil -create xml1 EthDecodeMac.app/Contents/Info.plist && \
 	plutil -insert CFBundleName        -string "EthDecodeMac" EthDecodeMac.app/Contents/Info.plist && \
 	plutil -insert CFBundleExecutable  -string "EthDecodeMac" EthDecodeMac.app/Contents/Info.plist && \
@@ -24,6 +27,8 @@ macos-build:
 	plutil -insert CFBundleVersion     -string "1" EthDecodeMac.app/Contents/Info.plist && \
 	plutil -insert CFBundlePackageType -string "APPL" EthDecodeMac.app/Contents/Info.plist && \
 	plutil -insert LSMinimumSystemVersion -string "13.0" EthDecodeMac.app/Contents/Info.plist && \
+	plutil -insert CFBundleIconFile    -string "AppIcon" EthDecodeMac.app/Contents/Info.plist && \
+	plutil -insert CFBundleIconName    -string "AppIcon" EthDecodeMac.app/Contents/Info.plist && \
 	echo "Built: macos/EthDecodeMac.app"
 
 macos-run:
