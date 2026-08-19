@@ -668,42 +668,47 @@ export default function ResultPanel({
               )}
 
               {/* Balance Changes (legacy ETH before/after — simulation only) */}
-              {result.simulated && legacyNativeBalanceChanges.length > 0 && (
-                <div className={styles.balanceSection}>
-                  <h3 className={styles.balanceTitle}>
-                    Balance Changes ({legacyNativeBalanceChanges.length})
-                  </h3>
-                  {legacyNativeBalanceChanges.map((change, index) => (
-                    <div key={index} className={styles.balanceItem}>
-                      <div className={styles.balanceAddress}>
-                        {change.address?.slice(0, 10)}...
-                        {change.address?.slice(-8)}
-                      </div>
-                      <div className={styles.balanceValues}>
-                        <span className={styles.balanceBefore}>
-                          {formatNativeWhole(change.before)} {nativeTokenSymbol}
-                        </span>
-                        <span className={styles.balanceArrow}>→</span>
-                        <span className={styles.balanceAfter}>
-                          {formatNativeWhole(change.after)} {nativeTokenSymbol}
-                        </span>
-                        {parseBigIntOrNull(change.value) !== null && (
-                          <span
-                            className={`${styles.balanceDiff} ${isNonNegativeBigInt(change.value) ? styles.balanceDiffPositive : styles.balanceDiffNegative}`}
-                          >
-                            ({isNonNegativeBigInt(change.value) ? "+" : ""}
-                            {formatNativeWhole(change.value)}{" "}
-                            {nativeTokenSymbol})
+              {result.simulated &&
+                result.success !== false &&
+                legacyNativeBalanceChanges.length > 0 && (
+                  <div className={styles.balanceSection}>
+                    <h3 className={styles.balanceTitle}>
+                      Balance Changes ({legacyNativeBalanceChanges.length})
+                    </h3>
+                    {legacyNativeBalanceChanges.map((change, index) => (
+                      <div key={index} className={styles.balanceItem}>
+                        <div className={styles.balanceAddress}>
+                          {change.address?.slice(0, 10)}...
+                          {change.address?.slice(-8)}
+                        </div>
+                        <div className={styles.balanceValues}>
+                          <span className={styles.balanceBefore}>
+                            {formatNativeWhole(change.before)}{" "}
+                            {nativeTokenSymbol}
                           </span>
-                        )}
+                          <span className={styles.balanceArrow}>→</span>
+                          <span className={styles.balanceAfter}>
+                            {formatNativeWhole(change.after)}{" "}
+                            {nativeTokenSymbol}
+                          </span>
+                          {parseBigIntOrNull(change.value) !== null && (
+                            <span
+                              className={`${styles.balanceDiff} ${isNonNegativeBigInt(change.value) ? styles.balanceDiffPositive : styles.balanceDiffNegative}`}
+                            >
+                              ({isNonNegativeBigInt(change.value) ? "+" : ""}
+                              {formatNativeWhole(change.value)}{" "}
+                              {nativeTokenSymbol})
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
 
               {/* Balance Changes table (simulation only) */}
               {result.simulated &&
+                result.success !== false &&
                 (() => {
                   const rows = enrichBalanceChanges({
                     logs: result.logs,
