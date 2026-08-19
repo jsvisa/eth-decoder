@@ -135,7 +135,7 @@ export function useCallExecution({
   const handleCall = async () => {
     if (typeof setFieldErrors === "function") setFieldErrors({});
 
-    if (!address || (!selectedFunction && !rawCalldata)) {
+    if (!address) {
       const errors = {};
       if (!address || !isValidEthAddress(address)) errors.address = true;
       if (typeof setFieldErrors === "function") setFieldErrors(errors);
@@ -144,8 +144,13 @@ export function useCallExecution({
     }
 
     const selectedFunc = getSelectedFunction();
-    const isRawCall = !selectedFunc && !!rawCalldata;
-    const isWrite = isRawCall ? true : !isReadOnly(selectedFunc);
+    const isNativeTransfer = !selectedFunc && !rawCalldata;
+    const isRawCall = isNativeTransfer ? true : !selectedFunc && !!rawCalldata;
+    const isWrite = isNativeTransfer
+      ? true
+      : isRawCall
+        ? true
+        : !isReadOnly(selectedFunc);
 
     // ── validation ────────────────────────────────────────────────────────────
     const errors = {};
@@ -163,8 +168,7 @@ export function useCallExecution({
     }
 
     if (
-      selectedFunc &&
-      isPayable(selectedFunc) &&
+      ((selectedFunc && isPayable(selectedFunc)) || isNativeTransfer) &&
       ethValue &&
       !isValidNumber(ethValue)
     ) {
@@ -311,7 +315,9 @@ export function useCallExecution({
           functionName: isRawCall ? null : selectedFunction,
           args: isRawCall ? [] : args,
           abi: isRawCall ? null : parsedAbi,
-          ...(isRawCall ? { callData: rawCalldata } : {}),
+          ...(isRawCall
+            ? { callData: isNativeTransfer ? "0x" : rawCalldata }
+            : {}),
           fromAddress: fromAddress || undefined,
           value: ethValueInfo.value,
           valueUnit: ethValueInfo.unit,

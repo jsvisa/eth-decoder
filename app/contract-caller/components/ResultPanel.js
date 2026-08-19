@@ -628,7 +628,7 @@ export default function ResultPanel({
                         )}
                       </div>
                     )}
-                    {result.gasUsed && (
+                    {result.gasUsed !== undefined && (
                       <div className={styles.txInfoRow}>
                         <span className={styles.txInfoLabel}>Gas Used:</span>
                         <span className={styles.txInfoValue}>

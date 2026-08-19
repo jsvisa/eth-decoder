@@ -58,6 +58,25 @@ function isUnsupportedTransaction(tx) {
   );
 }
 
+/**
+ * Compute the intrinsic gas for a transaction based on its calldata.
+ * Base: 21,000, plus 4 gas per zero byte, 16 gas per non-zero byte.
+ * @param {string} data Hex calldata (with or without 0x prefix)
+ * @returns {number}
+ */
+function computeIntrinsicGas(data) {
+  const TX_BASE = 21000;
+  const ZERO_BYTE_COST = 4;
+  const NON_ZERO_BYTE_COST = 16;
+  const hex = data?.startsWith("0x") ? data.slice(2) : data || "";
+  let cost = TX_BASE;
+  for (let i = 0; i < hex.length; i += 2) {
+    const byteVal = parseInt(hex.slice(i, i + 2), 16);
+    cost += byteVal === 0 ? ZERO_BYTE_COST : NON_ZERO_BYTE_COST;
+  }
+  return cost;
+}
+
 export function sanitizeForkRpcResult(method, result) {
   if (
     (method !== "eth_getBlockByNumber" && method !== "eth_getBlockByHash") ||
@@ -1090,6 +1109,9 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
         return;
       }
       node.gasUsed = (result.execResult?.executionGasUsed ?? 0n).toString();
+      if (node.gasUsed === "0" && node === callTraceRoot) {
+        node.gasUsed = String(computeIntrinsicGas(node.input));
+      }
       if (result.execResult?.returnValue?.length) {
         node.output = bytesToHex(result.execResult.returnValue);
       }
@@ -1311,7 +1333,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     // Get gas used
     const gasUsed = callResult.executionGasUsed
       ? Number(callResult.executionGasUsed)
-      : 0;
+      : computeIntrinsicGas(callData);
 
     // Access list if available
     const accessList = Array.isArray(callResult.accessList)

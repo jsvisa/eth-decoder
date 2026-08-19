@@ -74,13 +74,26 @@ describe("CallActionBar", () => {
     cleanup();
   });
 
-  it("disables call button when no selectedFunction", () => {
+  it("disables call button when no address and no function selected", () => {
     const { container, cleanup } = renderComponent(
-      makeProps({ selectedFunction: "" }),
+      makeProps({ selectedFunction: "", address: "" }),
     );
     const btns = Array.from(container.querySelectorAll("button"));
-    const callBtn = btns.find((b) => /call contract/i.test(b.textContent));
+    const callBtn = btns.find((b) => /simulate transfer/i.test(b.textContent));
     expect(callBtn.disabled).toBe(true);
+    cleanup();
+  });
+
+  it("enables call button as native transfer when address is set but no function selected", () => {
+    const { container, cleanup } = renderComponent(
+      makeProps({
+        selectedFunction: "",
+        address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      }),
+    );
+    const btns = Array.from(container.querySelectorAll("button"));
+    const callBtn = btns.find((b) => /simulate transfer/i.test(b.textContent));
+    expect(callBtn.disabled).toBe(false);
     cleanup();
   });
 

@@ -168,12 +168,13 @@ describe("useCallExecution – handleCall validation", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it("sets error when parsedAbi is null and no raw calldata", async () => {
+  it("validates fromAddress for native transfer when no function and no calldata", async () => {
     const params = {
       ...baseParams,
       parsedAbi: null,
       selectedFunction: null,
       rawCalldata: "",
+      fromAddress: "",
     };
     const { result } = renderHook(() => useCallExecution(params));
 
@@ -181,7 +182,9 @@ describe("useCallExecution – handleCall validation", () => {
       await result.current.handleCall();
     });
 
-    expect(result.current.error).toBe("Please fill in all required fields");
+    expect(result.current.error).toBe(
+      "From Address must be a valid Ethereum address",
+    );
   });
 });
 
