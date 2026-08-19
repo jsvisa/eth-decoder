@@ -182,7 +182,9 @@ describe("useCallExecution – handleCall validation", () => {
       await result.current.handleCall();
     });
 
-    expect(result.current.error).toBe("From Address must be a valid Ethereum address");
+    expect(result.current.error).toBe(
+      "From Address must be a valid Ethereum address",
+    );
   });
 });
 

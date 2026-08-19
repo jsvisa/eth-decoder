@@ -86,7 +86,10 @@ describe("CallActionBar", () => {
 
   it("enables call button as native transfer when address is set but no function selected", () => {
     const { container, cleanup } = renderComponent(
-      makeProps({ selectedFunction: "", address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" }),
+      makeProps({
+        selectedFunction: "",
+        address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      }),
     );
     const btns = Array.from(container.querySelectorAll("button"));
     const callBtn = btns.find((b) => /simulate transfer/i.test(b.textContent));
