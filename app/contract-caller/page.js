@@ -666,12 +666,12 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     onRenameRef.current(title);
   }, [abi.contractName, address]);
 
-  // Derive isWrite from selected function
+  // Derive isWrite from selected function — when no function selected, it's a native transfer (write)
   const selectedFn = abi.parsedAbi?.find(
     (item) =>
       item.type === "function" && getFunctionSig(item) === fn.selectedFunction,
   );
-  const isWrite = selectedFn ? !isReadOnly(selectedFn) : false;
+  const isWrite = selectedFn ? !isReadOnly(selectedFn) : true;
 
   // --- Layout ---
   return (
@@ -863,6 +863,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
         />
 
         <CallActionBar
+          address={address}
           selectedFunction={fn.selectedFunction}
           rawCalldata={fn.pasteCalldataValue}
           isWrite={isWrite}

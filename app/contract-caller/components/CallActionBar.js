@@ -8,6 +8,7 @@ import styles from "./CallActionBar.module.css";
  * plus Copy Calldata, Share URL, session banner, and sim progress bar.
  *
  * Props:
+ *   address            {string}       – contract/address being called
  *   selectedFunction   {string}       – disable when none picked, unless rawCalldata
  *   rawCalldata        {string}       – raw hex calldata for ABI-less simulation
  *   isWrite            {boolean}      – show simulate vs call label
@@ -27,6 +28,7 @@ import styles from "./CallActionBar.module.css";
  *   activeTab          {string}       – hide buttons on Events tab
  */
 export default function CallActionBar({
+  address,
   selectedFunction,
   rawCalldata,
   isWrite,
@@ -73,7 +75,7 @@ export default function CallActionBar({
         sessionStarting ? "Starting..." : "Start Session",
       );
 
-  const hasCalldata = !!selectedFunction || !!rawCalldata;
+  const hasCalldata = !!selectedFunction || !!rawCalldata || !!address;
 
   // Build call button label
   let callButtonLabel;
@@ -81,6 +83,8 @@ export default function CallActionBar({
     callButtonLabel = isWrite ? "Simulating..." : "Calling...";
   } else if (rawCalldata && !selectedFunction) {
     callButtonLabel = "Simulate Calldata";
+  } else if (!selectedFunction && !rawCalldata) {
+    callButtonLabel = "Simulate Transfer";
   } else if (isWrite) {
     callButtonLabel = sessionActive ? "Execute in Session" : "Simulate Call";
   } else {
