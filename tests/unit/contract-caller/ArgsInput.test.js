@@ -38,14 +38,6 @@ const VIEW_FN = {
   outputs: [{ name: "", type: "uint256" }],
 };
 
-const PAYABLE_FN = {
-  type: "function",
-  name: "deposit",
-  stateMutability: "payable",
-  inputs: [],
-  outputs: [],
-};
-
 const NO_ARGS_READ_FN = {
   type: "function",
   name: "totalSupply",
@@ -100,10 +92,6 @@ function makeProps(overrides = {}) {
     onOpenBookmarkModal: vi.fn(),
     blockNumber: "",
     onReadBlockNumberChange: vi.fn(),
-    ethValue: "",
-    onEthValueChange: vi.fn(),
-    ethValueUnit: "ETH",
-    onEthValueUnitChange: vi.fn(),
     disabled: false,
     ...overrides,
   };
@@ -134,17 +122,6 @@ describe("ArgsInput", () => {
     cleanup();
   });
 
-  it("renders ETH value input for payable function", () => {
-    const { container, cleanup } = renderComponent(
-      makeProps({ fn: PAYABLE_FN }),
-    );
-    expect(container.textContent).toContain("ETH Value");
-    expect(container.textContent).toContain("payable");
-    const ethInput = container.querySelector('input[placeholder="0.0"]');
-    expect(ethInput).toBeTruthy();
-    cleanup();
-  });
-
   it("renders standalone block input for read-only function with no args", () => {
     const { container, cleanup } = renderComponent(
       makeProps({ fn: NO_ARGS_READ_FN }),
@@ -152,32 +129,6 @@ describe("ArgsInput", () => {
     const blockInput = container.querySelector('input[placeholder="latest"]');
     expect(blockInput).toBeTruthy();
     expect(container.textContent).not.toContain("Arguments");
-    cleanup();
-  });
-
-  it("calls onEthValueChange when ETH value input changes", () => {
-    const onEthValueChange = vi.fn();
-    const { container, cleanup } = renderComponent(
-      makeProps({ fn: PAYABLE_FN, onEthValueChange }),
-    );
-    const ethInput = container.querySelector('input[placeholder="0.0"]');
-    act(() => {
-      fireInputChange(ethInput, "1.5");
-    });
-    expect(onEthValueChange).toHaveBeenCalledWith("1.5");
-    cleanup();
-  });
-
-  it("calls onEthValueUnitChange when Wei button is clicked", () => {
-    const onEthValueUnitChange = vi.fn();
-    const { container, cleanup } = renderComponent(
-      makeProps({ fn: PAYABLE_FN, onEthValueUnitChange }),
-    );
-    const buttons = container.querySelectorAll("button");
-    const weiBtn = Array.from(buttons).find((b) => b.textContent === "Wei");
-    expect(weiBtn).toBeTruthy();
-    act(() => weiBtn.click());
-    expect(onEthValueUnitChange).toHaveBeenCalledWith("Wei");
     cleanup();
   });
 

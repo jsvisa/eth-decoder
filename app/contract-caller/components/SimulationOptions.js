@@ -5,7 +5,7 @@ import styles from "./SimulationOptions.module.css";
 
 /**
  * SimulationOptions — write-mode panel for fork-block, from-address,
- * and cheatcodes.
+ * ETH value, and cheatcodes.
  *
  * Props:
  *   forkBlockNumber          {string}
@@ -24,6 +24,12 @@ import styles from "./SimulationOptions.module.css";
  *   onOpenBookmarkModal      {(addr: string) => void}
  *   disabled                 {boolean}
  *   addressBook              {Array}
+ *   ethValue                 {string}
+ *   onEthValueChange         {(s: string) => void}
+ *   ethValueUnit             {'ETH'|'Wei'}
+ *   onEthValueUnitChange     {(u) => void}
+ *   selectedFn               {object|null}
+ *   isPayable                {(fn) => boolean}
  */
 
 function AddressArgInput({
@@ -92,6 +98,12 @@ export default function SimulationOptions({
   onOpenBookmarkModal,
   disabled,
   addressBook = [],
+  ethValue,
+  onEthValueChange,
+  ethValueUnit,
+  onEthValueUnitChange,
+  selectedFn,
+  isPayable: isPayableFn,
 }) {
   const hasCheatcodesExpanded =
     expanded && (cheatcodes.deal.enabled || cheatcodes.warp.enabled);
@@ -169,6 +181,59 @@ export default function SimulationOptions({
         onBookmarkClick: onOpenBookmarkModal,
         error: fieldErrors.fromAddress,
       }),
+    ),
+  );
+
+  // ETH Value
+  inlineItems.push(
+    React.createElement(
+      "div",
+      {
+        key: "ethValue",
+        className: styles.ethValueInline,
+        title: "ETH value to send with the transaction",
+      },
+      React.createElement("input", {
+        type: "text",
+        value: ethValue,
+        onChange: (e) => onEthValueChange(e.target.value),
+        placeholder: ethValueUnit === "ETH" ? "ETH Value" : "Wei Value",
+        className: `${styles.simOptionInputSmall} ${fieldErrors.ethValue ? styles.inputError : ""}`,
+        disabled: disabled,
+      }),
+      React.createElement(
+        "div",
+        { className: styles.ethValueUnitToggle },
+        React.createElement(
+          "button",
+          {
+            type: "button",
+            className:
+              styles.ethValueUnitBtn +
+              (ethValueUnit === "Wei" ? " " + styles.active : ""),
+            onClick: () => onEthValueUnitChange("Wei"),
+          },
+          "Wei",
+        ),
+        React.createElement(
+          "button",
+          {
+            type: "button",
+            className:
+              styles.ethValueUnitBtn +
+              (ethValueUnit === "ETH" ? " " + styles.active : ""),
+            onClick: () => onEthValueUnitChange("ETH"),
+          },
+          "ETH",
+        ),
+      ),
+      selectedFn &&
+        isPayableFn(selectedFn) &&
+        React.createElement(
+          "span",
+          { className: styles.payableBadge },
+          "payable",
+        ),
     ),
   );
 

@@ -1,12 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  encodeFunctionData,
-  decodeFunctionData,
-  parseEther,
-  formatEther,
-} from "viem";
+import { encodeFunctionData, decodeFunctionData } from "viem";
 import {
   getDefaultArgValue,
   getFunctionSelector,
@@ -36,8 +31,6 @@ export function useFunctionSelection({
   const [pasteCalldataExpanded, setPasteCalldataExpanded] = useState(false);
   const [pasteCalldataValue, setPasteCalldataValue] = useState("");
   const [pasteCalldataError, setPasteCalldataError] = useState(null);
-  const [ethValue, setEthValue] = useState("");
-  const [ethValueUnit, setEthValueUnit] = useState("ETH");
   const [blockNumber, setBlockNumber] = useState("");
   const [copiedItem, setCopiedItem] = useState(null); // 'selector' | 'signature' | null
   const [calldataCopied, setCalldataCopied] = useState(false);
@@ -173,27 +166,6 @@ export function useFunctionSelection({
     }
   }, [selectedFunction, args, parsedAbi]);
 
-  // --- Callback: toggle ETH value unit, converting the entered value in place ---
-  const handleEthValueUnitChange = useCallback(
-    (newUnit) => {
-      if (newUnit === ethValueUnit) return;
-      let nextValue = ethValue;
-      if (ethValue && ethValue.trim() !== "") {
-        try {
-          nextValue =
-            newUnit === "Wei"
-              ? parseEther(ethValue).toString()
-              : formatEther(BigInt(ethValue));
-        } catch {
-          nextValue = ethValue;
-        }
-      }
-      setEthValue(nextValue);
-      setEthValueUnit(newUnit);
-    },
-    [ethValue, ethValueUnit],
-  );
-
   // --- Callback: decode pasted calldata and fill args (lines 2939-2983) ---
   const handleDecodeAndFill = useCallback(() => {
     const hex = pasteCalldataValue.trim();
@@ -306,11 +278,6 @@ export function useFunctionSelection({
     setPasteCalldataValue,
     pasteCalldataError,
     setPasteCalldataError,
-    ethValue,
-    setEthValue,
-    ethValueUnit,
-    setEthValueUnit,
-    handleEthValueUnitChange,
     blockNumber,
     setBlockNumber,
     calldataCopied,
