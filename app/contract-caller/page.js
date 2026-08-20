@@ -756,10 +756,6 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
                 onBalanceOverridesChange={simOpts.setBalanceOverrides}
                 storageOverrides={simOpts.storageOverrides}
                 onStorageOverridesChange={simOpts.setStorageOverrides}
-                expanded={simOpts.simOptionsExpanded}
-                onToggleExpanded={() =>
-                  simOpts.setSimOptionsExpanded((v) => !v)
-                }
                 fieldErrors={fn.fieldErrors}
                 onOpenBookmarkModal={bookmark.openBookmarkModal}
                 addressBook={bookmark.addressBook}

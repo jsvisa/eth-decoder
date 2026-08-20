@@ -28,13 +28,14 @@
 .input {
   flex: 1;
   min-width: 0;
-  padding: 0.875rem 1rem;
-  font-size: 1rem;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.875rem;
   border: 2px solid var(--border-primary);
   border-radius: 6px;
   background-color: var(--bg-input);
   color: var(--text-primary);
   transition: border-color 0.3s;
+  text-overflow: ellipsis;
 }
 
 .input:focus {

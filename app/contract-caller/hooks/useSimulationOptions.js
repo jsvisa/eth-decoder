@@ -13,7 +13,6 @@ export function useSimulationOptions() {
   });
   const [balanceOverrides, setBalanceOverrides] = useState([]);
   const [storageOverrides, setStorageOverrides] = useState([]);
-  const [simOptionsExpanded, setSimOptionsExpanded] = useState(false);
   const [ethValue, setEthValue] = useState("");
   const [ethValueUnit, setEthValueUnit] = useState("ETH");
 
@@ -47,7 +46,6 @@ export function useSimulationOptions() {
     });
     setBalanceOverrides([]);
     setStorageOverrides([]);
-    setSimOptionsExpanded(false);
     setEthValue("");
     setEthValueUnit("ETH");
   };
@@ -63,8 +61,6 @@ export function useSimulationOptions() {
     setBalanceOverrides,
     storageOverrides,
     setStorageOverrides,
-    simOptionsExpanded,
-    setSimOptionsExpanded,
     ethValue,
     setEthValue,
     ethValueUnit,

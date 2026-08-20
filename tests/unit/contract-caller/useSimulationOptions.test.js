@@ -15,7 +15,6 @@ describe("useSimulationOptions – initial state", () => {
     });
     expect(result.current.balanceOverrides).toEqual([]);
     expect(result.current.storageOverrides).toEqual([]);
-    expect(result.current.simOptionsExpanded).toBe(false);
     expect(typeof result.current.resetWriteOptions).toBe("function");
   });
 });
@@ -37,11 +36,6 @@ describe("useSimulationOptions – happy path", () => {
       result.current.setForkBlockNumber("19000000");
     });
     expect(result.current.forkBlockNumber).toBe("19000000");
-
-    act(() => {
-      result.current.setSimOptionsExpanded(true);
-    });
-    expect(result.current.simOptionsExpanded).toBe(true);
 
     // Enable deal cheatcode
     act(() => {
@@ -87,7 +81,6 @@ describe("useSimulationOptions – resetWriteOptions", () => {
         "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
       );
       result.current.setForkBlockNumber("18000000");
-      result.current.setSimOptionsExpanded(true);
       result.current.setBalanceOverrides([{ address: "0x1", balance: "5" }]);
       result.current.setStorageOverrides([
         { address: "0x2", slot: "0x1", value: "0xff" },
@@ -117,7 +110,6 @@ describe("useSimulationOptions – resetWriteOptions", () => {
     });
     expect(result.current.balanceOverrides).toEqual([]);
     expect(result.current.storageOverrides).toEqual([]);
-    expect(result.current.simOptionsExpanded).toBe(false);
   });
 
   it("is idempotent when called on already-default state", () => {
@@ -136,6 +128,5 @@ describe("useSimulationOptions – resetWriteOptions", () => {
     });
     expect(result.current.balanceOverrides).toEqual([]);
     expect(result.current.storageOverrides).toEqual([]);
-    expect(result.current.simOptionsExpanded).toBe(false);
   });
 });

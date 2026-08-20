@@ -38,6 +38,10 @@
   gap: 0.5rem;
 }
 
+.dataSection .input {
+  margin-left: 2.5rem;
+}
+
 .sectionLabel {
   font-size: 0.85rem;
   font-weight: 600;
@@ -128,7 +132,7 @@
 /* Buttons */
 .buttonGroup {
   display: flex;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
 .button {
@@ -141,6 +145,7 @@
   border-radius: 6px;
   cursor: pointer;
   transition: background-color 0.2s;
+  flex: 1;
 }
 
 .button:hover:not(:disabled) {
@@ -149,21 +154,6 @@
 .button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-}
-
-.clearBtn {
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  background: none;
-  color: var(--text-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.clearBtn:hover:not(:disabled) {
-  border-color: var(--border-focus);
-  color: var(--text-primary);
 }
 
 /* Error */

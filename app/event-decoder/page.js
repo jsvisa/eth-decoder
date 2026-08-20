@@ -226,19 +226,6 @@ export default function EventDecoder() {
             <button type="submit" className={styles.button} disabled={loading}>
               {loading ? "Decoding..." : "Decode"}
             </button>
-            <button
-              type="button"
-              className={styles.clearBtn}
-              disabled={loading}
-              onClick={() => {
-                setTopics([""]);
-                setData("");
-                setResult(null);
-                setError(null);
-              }}
-            >
-              Clear
-            </button>
           </div>
         </form>
 

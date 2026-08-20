@@ -27,7 +27,20 @@ export default function NetworkSelector({
   const [highlighted, setHighlighted] = useState(0);
 
   const chainIdOf = (c) => c.chainId || BUILT_IN_CHAIN_IDS[c.id] || 0;
-  const displayOf = (c) => `${c.name} (${chainIdOf(c)})`;
+
+  // Compact display for the input: keep the chain id, truncate long names
+  // so they fit the field, e.g. "Pol... (137)".
+  const MAX_DISPLAY_CHARS = 20;
+  const displayOf = (c) => {
+    const name = c.name;
+    const suffix = ` (${chainIdOf(c)})`;
+    const maxName = Math.max(3, MAX_DISPLAY_CHARS - suffix.length);
+    const shown =
+      name.length > maxName
+        ? `${name.slice(0, Math.max(1, maxName - 3))}...`
+        : name;
+    return `${shown}${suffix}`;
+  };
   const selectedChain = allChains.find((c) => c.id === chain);
 
   useEffect(() => {
