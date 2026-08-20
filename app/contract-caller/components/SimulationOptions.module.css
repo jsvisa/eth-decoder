@@ -1,5 +1,25 @@
 .simOptionsSection {
   margin-bottom: 1rem;
+}
+
+.simOptionsToggle {
+  background: none;
+  border: none;
+  padding: 0.25rem 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #8b5cf6;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.simOptionsToggle:hover {
+  color: #c084fc;
+}
+
+.simOptionsBody {
+  margin-top: 0.5rem;
   padding: 0.75rem 1rem;
   background: linear-gradient(
     135deg,
@@ -12,36 +32,11 @@
   box-shadow: 0 2px 8px rgba(139, 92, 246, 0.1);
 }
 
-.simOptionsHeader {
+.simOptionsControls {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
-}
-
-.simOptionsLabel {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #8b5cf6;
-  white-space: nowrap;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.simOptionsToggle {
-  background: none;
-  border: none;
-  color: #a855f7;
-  cursor: pointer;
-  padding: 0.2rem;
-  font-size: 0.7rem;
-  line-height: 1;
-  transition: transform 0.2s;
-}
-
-.simOptionsToggle:hover {
-  color: #c084fc;
-  transform: scale(1.2);
 }
 
 .simOptionsInline {
@@ -412,12 +407,12 @@
 }
 
 @media (max-width: 620px) {
-  .simOptionsSection {
+  .simOptionsBody {
     padding: 0.75rem;
   }
 
-  .simOptionsInline,
-  .simOptionsHeader {
+  .simOptionsControls,
+  .simOptionsInline {
     align-items: stretch;
   }
 

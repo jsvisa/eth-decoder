@@ -69,7 +69,7 @@ describe("SimulationOptions", () => {
       makeProps({ expanded: false }),
     );
     const toggleBtn = container.querySelector("button");
-    expect(toggleBtn.textContent).toBe("▶");
+    expect(toggleBtn.textContent).toBe("▶ Simulation Options");
     cleanup();
   });
 
@@ -78,7 +78,7 @@ describe("SimulationOptions", () => {
       makeProps({ expanded: true }),
     );
     const toggleBtn = container.querySelector("button");
-    expect(toggleBtn.textContent).toBe("▼");
+    expect(toggleBtn.textContent).toBe("▼ Simulation Options");
     cleanup();
   });
 

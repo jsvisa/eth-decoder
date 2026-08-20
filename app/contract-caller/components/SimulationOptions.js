@@ -345,154 +345,154 @@ export default function SimulationOptions({
   return React.createElement(
     "div",
     { className: styles.simOptionsSection },
-    // Header row
+    // Header row (outside the box)
+    React.createElement(
+      "button",
+      {
+        type: "button",
+        onClick: onToggleExpanded,
+        className: styles.simOptionsToggle,
+      },
+      `${expanded ? "▼" : "▶"} Simulation Options`,
+    ),
+    // Boxed body with the actual controls
     React.createElement(
       "div",
-      { className: styles.simOptionsHeader },
-      React.createElement(
-        "span",
-        { className: styles.simOptionsLabel },
-        "Simulation Options",
-      ),
-      React.createElement(
-        "button",
-        {
-          onClick: onToggleExpanded,
-          className: styles.simOptionsToggle,
-          type: "button",
-        },
-        expanded ? "▼" : "▶",
-      ),
-      cheatcodeControls,
+      { className: styles.simOptionsBody },
       React.createElement(
         "div",
-        { className: styles.simOptionsInline },
-        ...inlineItems,
+        { className: styles.simOptionsControls },
+        cheatcodeControls,
+        React.createElement(
+          "div",
+          { className: styles.simOptionsInline },
+          ...inlineItems,
+        ),
       ),
+      // Expanded cheatcodes
+      expandedCheatcodes,
+      // Balance overrides
+      expanded &&
+        balanceOverrides.length > 0 &&
+        React.createElement(
+          "div",
+          { className: styles.simOptionsExpanded },
+          React.createElement(
+            "div",
+            { className: styles.overridesLabel },
+            "Balance Overrides:",
+          ),
+          ...balanceOverrides.map((override, index) =>
+            React.createElement(
+              "div",
+              { key: index, className: styles.cheatcodeExpandedRow },
+              React.createElement("input", {
+                type: "text",
+                value: override.address,
+                onChange: (e) => {
+                  const next = balanceOverrides.map((o, i) =>
+                    i === index ? { ...o, address: e.target.value } : o,
+                  );
+                  onBalanceOverridesChange(next);
+                },
+                placeholder: "Address (0x...)",
+                className: styles.simOptionInput,
+              }),
+              React.createElement("input", {
+                type: "text",
+                value: override.balance,
+                onChange: (e) => {
+                  const next = balanceOverrides.map((o, i) =>
+                    i === index ? { ...o, balance: e.target.value } : o,
+                  );
+                  onBalanceOverridesChange(next);
+                },
+                placeholder: "ETH Balance",
+                className: styles.simOptionInputSmall,
+              }),
+              React.createElement(
+                "button",
+                {
+                  type: "button",
+                  className: styles.removeOverrideBtn,
+                  onClick: () =>
+                    onBalanceOverridesChange(
+                      balanceOverrides.filter((_, i) => i !== index),
+                    ),
+                  title: "Remove override",
+                },
+                "×",
+              ),
+            ),
+          ),
+        ),
+      // Storage overrides
+      expanded &&
+        storageOverrides.length > 0 &&
+        React.createElement(
+          "div",
+          { className: styles.simOptionsExpanded },
+          React.createElement(
+            "div",
+            { className: styles.overridesLabel },
+            "Storage Overrides:",
+          ),
+          ...storageOverrides.map((override, index) =>
+            React.createElement(
+              "div",
+              { key: index, className: styles.cheatcodeExpandedRow },
+              React.createElement("input", {
+                type: "text",
+                value: override.address,
+                onChange: (e) => {
+                  const next = storageOverrides.map((o, i) =>
+                    i === index ? { ...o, address: e.target.value } : o,
+                  );
+                  onStorageOverridesChange(next);
+                },
+                placeholder: "Contract (0x...)",
+                className: styles.simOptionInput,
+              }),
+              React.createElement("input", {
+                type: "text",
+                value: override.slot,
+                onChange: (e) => {
+                  const next = storageOverrides.map((o, i) =>
+                    i === index ? { ...o, slot: e.target.value } : o,
+                  );
+                  onStorageOverridesChange(next);
+                },
+                placeholder: "Slot (0x...)",
+                className: styles.simOptionInputSmall,
+              }),
+              React.createElement("input", {
+                type: "text",
+                value: override.value,
+                onChange: (e) => {
+                  const next = storageOverrides.map((o, i) =>
+                    i === index ? { ...o, value: e.target.value } : o,
+                  );
+                  onStorageOverridesChange(next);
+                },
+                placeholder: "Value (0x...)",
+                className: styles.simOptionInputSmall,
+              }),
+              React.createElement(
+                "button",
+                {
+                  type: "button",
+                  className: styles.removeOverrideBtn,
+                  onClick: () =>
+                    onStorageOverridesChange(
+                      storageOverrides.filter((_, i) => i !== index),
+                    ),
+                  title: "Remove override",
+                },
+                "×",
+              ),
+            ),
+          ),
+        ),
     ),
-    // Expanded cheatcodes
-    expandedCheatcodes,
-    // Balance overrides
-    expanded &&
-      balanceOverrides.length > 0 &&
-      React.createElement(
-        "div",
-        { className: styles.simOptionsExpanded },
-        React.createElement(
-          "div",
-          { className: styles.overridesLabel },
-          "Balance Overrides:",
-        ),
-        ...balanceOverrides.map((override, index) =>
-          React.createElement(
-            "div",
-            { key: index, className: styles.cheatcodeExpandedRow },
-            React.createElement("input", {
-              type: "text",
-              value: override.address,
-              onChange: (e) => {
-                const next = balanceOverrides.map((o, i) =>
-                  i === index ? { ...o, address: e.target.value } : o,
-                );
-                onBalanceOverridesChange(next);
-              },
-              placeholder: "Address (0x...)",
-              className: styles.simOptionInput,
-            }),
-            React.createElement("input", {
-              type: "text",
-              value: override.balance,
-              onChange: (e) => {
-                const next = balanceOverrides.map((o, i) =>
-                  i === index ? { ...o, balance: e.target.value } : o,
-                );
-                onBalanceOverridesChange(next);
-              },
-              placeholder: "ETH Balance",
-              className: styles.simOptionInputSmall,
-            }),
-            React.createElement(
-              "button",
-              {
-                type: "button",
-                className: styles.removeOverrideBtn,
-                onClick: () =>
-                  onBalanceOverridesChange(
-                    balanceOverrides.filter((_, i) => i !== index),
-                  ),
-                title: "Remove override",
-              },
-              "×",
-            ),
-          ),
-        ),
-      ),
-    // Storage overrides
-    expanded &&
-      storageOverrides.length > 0 &&
-      React.createElement(
-        "div",
-        { className: styles.simOptionsExpanded },
-        React.createElement(
-          "div",
-          { className: styles.overridesLabel },
-          "Storage Overrides:",
-        ),
-        ...storageOverrides.map((override, index) =>
-          React.createElement(
-            "div",
-            { key: index, className: styles.cheatcodeExpandedRow },
-            React.createElement("input", {
-              type: "text",
-              value: override.address,
-              onChange: (e) => {
-                const next = storageOverrides.map((o, i) =>
-                  i === index ? { ...o, address: e.target.value } : o,
-                );
-                onStorageOverridesChange(next);
-              },
-              placeholder: "Contract (0x...)",
-              className: styles.simOptionInput,
-            }),
-            React.createElement("input", {
-              type: "text",
-              value: override.slot,
-              onChange: (e) => {
-                const next = storageOverrides.map((o, i) =>
-                  i === index ? { ...o, slot: e.target.value } : o,
-                );
-                onStorageOverridesChange(next);
-              },
-              placeholder: "Slot (0x...)",
-              className: styles.simOptionInputSmall,
-            }),
-            React.createElement("input", {
-              type: "text",
-              value: override.value,
-              onChange: (e) => {
-                const next = storageOverrides.map((o, i) =>
-                  i === index ? { ...o, value: e.target.value } : o,
-                );
-                onStorageOverridesChange(next);
-              },
-              placeholder: "Value (0x...)",
-              className: styles.simOptionInputSmall,
-            }),
-            React.createElement(
-              "button",
-              {
-                type: "button",
-                className: styles.removeOverrideBtn,
-                onClick: () =>
-                  onStorageOverridesChange(
-                    storageOverrides.filter((_, i) => i !== index),
-                  ),
-                title: "Remove override",
-              },
-              "×",
-            ),
-          ),
-        ),
-      ),
   );
 }
