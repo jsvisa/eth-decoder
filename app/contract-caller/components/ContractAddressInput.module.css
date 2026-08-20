@@ -48,11 +48,19 @@
   display: flex;
   gap: 0.75rem;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+}
+
+.abiActions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: nowrap;
+  flex: 0 1 auto;
 }
 
 .addressInputWrapper {
-  flex: 1 1 22rem;
+  flex: 1 1 auto;
   min-width: 0;
   position: relative;
 }
@@ -174,7 +182,8 @@
 }
 
 .fetchButton {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
   padding: 0.875rem 1.5rem;
   font-size: 1rem;
   font-weight: 600;
@@ -200,7 +209,8 @@
 }
 
 .saveButton {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
   padding: 0.875rem 1.5rem;
   font-size: 1rem;
   font-weight: 600;
@@ -245,19 +255,18 @@
     align-items: stretch;
   }
 
-  .addressInputWrapper {
-    flex-basis: 100%;
-  }
-
   .bookmarkButton {
     flex: 0 0 3.5rem;
   }
 
-  .fetchButton {
-    flex: 1 1 100%;
+  .abiActions {
+    flex: 0 1 auto;
   }
 
+  .fetchButton,
   .saveButton {
-    flex: 1 1 100%;
+    flex: 1 1 auto;
+    padding: 0.75rem 0.5rem;
+    font-size: 0.85rem;
   }
 }
