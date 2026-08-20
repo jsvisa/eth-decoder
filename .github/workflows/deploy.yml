@@ -6,6 +6,11 @@ env:
 on:
   pull_request:
     types: [closed]
+    paths:
+      - "app/**"
+      - "package.json"
+      - "package-lock.json"
+      - "next.config.mjs"
   workflow_dispatch:
 
 jobs:
