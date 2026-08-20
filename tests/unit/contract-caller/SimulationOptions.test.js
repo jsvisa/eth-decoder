@@ -38,8 +38,6 @@ function makeProps(overrides = {}) {
     onBalanceOverridesChange: vi.fn(),
     storageOverrides: [],
     onStorageOverridesChange: vi.fn(),
-    expanded: false,
-    onToggleExpanded: vi.fn(),
     fieldErrors: {},
     onOpenBookmarkModal: vi.fn(),
     disabled: false,
@@ -61,34 +59,6 @@ describe("SimulationOptions", () => {
   it("renders the section label", () => {
     const { container, cleanup } = renderComponent(makeProps());
     expect(container.textContent).toMatch(/simulation options/i);
-    cleanup();
-  });
-
-  it("shows collapsed toggle indicator (▶) when expanded=false", () => {
-    const { container, cleanup } = renderComponent(
-      makeProps({ expanded: false }),
-    );
-    const toggleBtn = container.querySelector("button");
-    expect(toggleBtn.textContent).toBe("▶ Simulation Options");
-    cleanup();
-  });
-
-  it("shows expanded toggle indicator (▼) when expanded=true", () => {
-    const { container, cleanup } = renderComponent(
-      makeProps({ expanded: true }),
-    );
-    const toggleBtn = container.querySelector("button");
-    expect(toggleBtn.textContent).toBe("▼ Simulation Options");
-    cleanup();
-  });
-
-  it("calls onToggleExpanded when toggle button is clicked", () => {
-    const props = makeProps();
-    const { container, cleanup } = renderComponent(props);
-    act(() => {
-      container.querySelector("button").click();
-    });
-    expect(props.onToggleExpanded).toHaveBeenCalledTimes(1);
     cleanup();
   });
 
@@ -180,9 +150,7 @@ describe("SimulationOptions", () => {
     const cheatcodes = makeCheatcodes({
       prank: { enabled: true, address: "0xabc" },
     });
-    const { container, cleanup } = renderComponent(
-      makeProps({ expanded: true, cheatcodes }),
-    );
+    const { container, cleanup } = renderComponent(makeProps({ cheatcodes }));
 
     expect(container.textContent).not.toContain("vm.prank:");
     const prankInput = Array.from(
@@ -205,13 +173,11 @@ describe("SimulationOptions", () => {
     cleanup();
   });
 
-  it("shows cheatcode expanded rows when expanded=true and deal is enabled", () => {
+  it("shows cheatcode expanded rows when deal is enabled", () => {
     const cheatcodes = makeCheatcodes({
       deal: { enabled: true, address: "", amount: "" },
     });
-    const { container, cleanup } = renderComponent(
-      makeProps({ expanded: true, cheatcodes }),
-    );
+    const { container, cleanup } = renderComponent(makeProps({ cheatcodes }));
     expect(container.textContent).toContain("vm.deal:");
     const inputs = container.querySelectorAll("input[type='text']");
     const addrInput = Array.from(inputs).find(
@@ -225,24 +191,11 @@ describe("SimulationOptions", () => {
     cleanup();
   });
 
-  it("does not show expanded cheatcode rows when expanded=false", () => {
-    const cheatcodes = makeCheatcodes({
-      deal: { enabled: true, address: "", amount: "" },
-    });
-    const { container, cleanup } = renderComponent(
-      makeProps({ expanded: false, cheatcodes }),
-    );
-    expect(container.textContent).not.toContain("vm.deal:");
-    cleanup();
-  });
-
-  it("shows warp expanded inputs when warp checkbox is enabled and expanded", () => {
+  it("shows warp expanded inputs when warp checkbox is enabled", () => {
     const cheatcodes = makeCheatcodes({
       warp: { enabled: true, address: "", timestamp: "" },
     });
-    const { container, cleanup } = renderComponent(
-      makeProps({ expanded: true, cheatcodes }),
-    );
+    const { container, cleanup } = renderComponent(makeProps({ cheatcodes }));
     expect(container.textContent).toContain("vm.warp:");
     const inputs = container.querySelectorAll("input[type='text']");
     const tsInput = Array.from(inputs).find(
@@ -296,7 +249,7 @@ describe("SimulationOptions", () => {
   it("renders balance override rows when expanded", () => {
     const balanceOverrides = [{ address: "0x123", balance: "1.5" }];
     const { container, cleanup } = renderComponent(
-      makeProps({ expanded: true, balanceOverrides }),
+      makeProps({ balanceOverrides }),
     );
     expect(container.textContent).toContain("Balance Overrides:");
     const inputs = container.querySelectorAll("input[type='text']");
@@ -307,10 +260,10 @@ describe("SimulationOptions", () => {
     cleanup();
   });
 
-  it("renders storage override rows when expanded", () => {
+  it("renders storage override rows when overrides exist", () => {
     const storageOverrides = [{ address: "0xabc", slot: "0x0", value: "0x1" }];
     const { container, cleanup } = renderComponent(
-      makeProps({ expanded: true, storageOverrides }),
+      makeProps({ storageOverrides }),
     );
     expect(container.textContent).toContain("Storage Overrides:");
     const inputs = container.querySelectorAll("input[type='text']");
@@ -324,7 +277,7 @@ describe("SimulationOptions", () => {
       { address: "0x1", balance: "1" },
       { address: "0x2", balance: "2" },
     ];
-    const props = makeProps({ expanded: true, balanceOverrides });
+    const props = makeProps({ balanceOverrides });
     const { container, cleanup } = renderComponent(props);
     const removeBtns = Array.from(container.querySelectorAll("button")).filter(
       (b) => b.title === "Remove override",
@@ -335,17 +288,6 @@ describe("SimulationOptions", () => {
     expect(props.onBalanceOverridesChange).toHaveBeenCalledWith([
       { address: "0x2", balance: "2" },
     ]);
-    cleanup();
-  });
-
-  it("does not show override rows when expanded=false", () => {
-    const balanceOverrides = [{ address: "0x1", balance: "1" }];
-    const storageOverrides = [{ address: "0x2", slot: "0x0", value: "0xff" }];
-    const { container, cleanup } = renderComponent(
-      makeProps({ expanded: false, balanceOverrides, storageOverrides }),
-    );
-    expect(container.textContent).not.toContain("Balance Overrides:");
-    expect(container.textContent).not.toContain("Storage Overrides:");
     cleanup();
   });
 });

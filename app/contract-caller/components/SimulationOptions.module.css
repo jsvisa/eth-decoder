@@ -2,20 +2,13 @@
   margin-bottom: 1rem;
 }
 
-.simOptionsToggle {
-  background: none;
-  border: none;
-  padding: 0.25rem 0;
+.simOptionsLabel {
+  display: block;
   font-size: 0.8rem;
   font-weight: 600;
   color: #8b5cf6;
-  cursor: pointer;
   letter-spacing: 0.3px;
   text-transform: uppercase;
-}
-
-.simOptionsToggle:hover {
-  color: #c084fc;
 }
 
 .simOptionsBody {

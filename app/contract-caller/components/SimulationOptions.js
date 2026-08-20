@@ -18,8 +18,6 @@ import styles from "./SimulationOptions.module.css";
  *   onBalanceOverridesChange {(Array) => void}
  *   storageOverrides         {Array<{address:string,slot:string,value:string}>}
  *   onStorageOverridesChange {(Array) => void}
- *   expanded                 {boolean}
- *   onToggleExpanded         {() => void}
  *   fieldErrors              {Record<string,string>}
  *   onOpenBookmarkModal      {(addr: string) => void}
  *   disabled                 {boolean}
@@ -92,8 +90,6 @@ export default function SimulationOptions({
   onBalanceOverridesChange,
   storageOverrides = [],
   onStorageOverridesChange,
-  expanded,
-  onToggleExpanded,
   fieldErrors = {},
   onOpenBookmarkModal,
   disabled,
@@ -106,7 +102,7 @@ export default function SimulationOptions({
   isPayable: isPayableFn,
 }) {
   const hasCheatcodesExpanded =
-    expanded && (cheatcodes.deal.enabled || cheatcodes.warp.enabled);
+    cheatcodes.deal.enabled || cheatcodes.warp.enabled;
 
   const cheatcodeControls = React.createElement(
     "div",
@@ -347,13 +343,9 @@ export default function SimulationOptions({
     { className: styles.simOptionsSection },
     // Header row (outside the box)
     React.createElement(
-      "button",
-      {
-        type: "button",
-        onClick: onToggleExpanded,
-        className: styles.simOptionsToggle,
-      },
-      `${expanded ? "▼" : "▶"} Simulation Options`,
+      "span",
+      { className: styles.simOptionsLabel },
+      "Simulation Options",
     ),
     // Boxed body with the actual controls
     React.createElement(
@@ -372,8 +364,7 @@ export default function SimulationOptions({
       // Expanded cheatcodes
       expandedCheatcodes,
       // Balance overrides
-      expanded &&
-        balanceOverrides.length > 0 &&
+      balanceOverrides.length > 0 &&
         React.createElement(
           "div",
           { className: styles.simOptionsExpanded },
@@ -427,8 +418,7 @@ export default function SimulationOptions({
           ),
         ),
       // Storage overrides
-      expanded &&
-        storageOverrides.length > 0 &&
+      storageOverrides.length > 0 &&
         React.createElement(
           "div",
           { className: styles.simOptionsExpanded },
