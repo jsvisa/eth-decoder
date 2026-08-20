@@ -67,8 +67,8 @@
 
 .input {
   width: 100%;
-  padding: 0.875rem 1rem;
-  font-size: 1rem;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.875rem;
   border: 2px solid var(--border-primary, #ddd);
   border-radius: 6px;
   transition: border-color 0.3s;
@@ -147,8 +147,8 @@
 }
 
 .bookmarkButton {
-  padding: 0.875rem 1rem;
-  font-size: 1.25rem;
+  padding: 0.6rem 0.875rem;
+  font-size: 1rem;
   color: #999;
   background-color: white;
   border: 2px solid #ddd;
@@ -182,10 +182,12 @@
 }
 
 .fetchButton {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 7rem;
   min-width: 0;
-  padding: 0.875rem 1.5rem;
-  font-size: 1rem;
+  padding: 0.6rem 1rem;
+  font-size: 0.875rem;
   font-weight: 600;
   color: #0070f3;
   background-color: white;
@@ -209,10 +211,12 @@
 }
 
 .saveButton {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 7rem;
   min-width: 0;
-  padding: 0.875rem 1.5rem;
-  font-size: 1rem;
+  padding: 0.6rem 1rem;
+  font-size: 0.875rem;
   font-weight: 600;
   color: #059669;
   background-color: white;
