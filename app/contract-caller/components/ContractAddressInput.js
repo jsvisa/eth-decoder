@@ -179,33 +179,35 @@ export default function ContractAddressInput({
         isBookmarked ? "★" : "☆",
       ),
 
-      // Fetch ABI button
+      // Fetch + Save ABI button group (kept on one line at any width)
       h(
-        "button",
-        {
-          type: "button",
-          onClick: () => onFetchAbi(),
-          className: styles.fetchButton,
-          disabled: disabled || fetchingAbi,
-          "data-fetch-abi": "true",
-        },
-        fetchingAbi ? "Fetching..." : "Fetch ABI",
+        "div",
+        { className: styles.abiActions },
+        h(
+          "button",
+          {
+            type: "button",
+            onClick: () => onFetchAbi(),
+            className: styles.fetchButton,
+            disabled: disabled || fetchingAbi,
+            "data-fetch-abi": "true",
+          },
+          fetchingAbi ? "Fetching..." : "Fetch ABI",
+        ),
+        onSaveAbiBackend
+          ? h(
+              "button",
+              {
+                type: "button",
+                onClick: () => onSaveAbiBackend(),
+                className: styles.saveButton,
+                disabled: disabled || savingAbiBackend || !canSaveAbiBackend,
+                "data-save-abi": "true",
+              },
+              savingAbiBackend ? "Saving..." : "Save ABI",
+            )
+          : null,
       ),
-
-      // Save ABI to backend button
-      onSaveAbiBackend
-        ? h(
-            "button",
-            {
-              type: "button",
-              onClick: () => onSaveAbiBackend(),
-              className: styles.saveButton,
-              disabled: disabled || savingAbiBackend || !canSaveAbiBackend,
-              "data-save-abi": "true",
-            },
-            savingAbiBackend ? "Saving..." : "Save ABI",
-          )
-        : null,
     ),
 
     // Save ABI backend feedback message
