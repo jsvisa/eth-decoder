@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { createPublicClient, http, defineChain } from "viem";
-import {
-  isValidEthAddress,
-  isValidHttpUrl,
-} from "../../utils/validation";
+import { isValidEthAddress, isValidHttpUrl } from "../../utils/validation";
 import { fetchContractInfoFromSourcify } from "../../utils/sourcify";
 import {
   BUILT_IN_CHAIN_IDS,

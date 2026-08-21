@@ -924,13 +924,19 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
   if (cheatcodes.deal?.address) {
     cheatcodes = {
       ...cheatcodes,
-      deal: { ...cheatcodes.deal, address: checksumAddress(cheatcodes.deal.address) },
+      deal: {
+        ...cheatcodes.deal,
+        address: checksumAddress(cheatcodes.deal.address),
+      },
     };
   }
   if (cheatcodes.prank?.address) {
     cheatcodes = {
       ...cheatcodes,
-      prank: { ...cheatcodes.prank, address: checksumAddress(cheatcodes.prank.address) },
+      prank: {
+        ...cheatcodes.prank,
+        address: checksumAddress(cheatcodes.prank.address),
+      },
     };
   }
 
