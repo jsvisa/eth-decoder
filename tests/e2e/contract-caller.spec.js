@@ -43,7 +43,7 @@ test.describe("Contract Caller page", () => {
 
     await addressInput().fill("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     await expect(addressInput()).toHaveValue(
-      "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa",
     );
 
     // Switch back to the first tab — its address is still empty
