@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { createPublicClient, http, defineChain } from "viem";
-import { isValidEthAddress, isValidHttpUrl } from "../../utils/validation";
+import {
+  isValidEthAddress,
+  isValidHttpUrl,
+  checksumAddress,
+} from "../../utils/validation";
 import { fetchContractInfoFromSourcify } from "../../utils/sourcify";
 import {
   BUILT_IN_CHAIN_IDS,
@@ -387,6 +391,7 @@ export async function GET(request) {
       );
     }
 
+    const checksummedAddress = checksumAddress(address);
     const customRpcUrl = searchParams.get("rpcUrl");
     const customChainIdParam = searchParams.get("chainId");
 
@@ -432,7 +437,7 @@ export async function GET(request) {
       "";
     const detectProxy = searchParams.get("detectProxy") === "true";
 
-    const result = await fetchAbi(address, chainId, {
+    const result = await fetchAbi(checksummedAddress, chainId, {
       etherscanKey: etherscanApiKey,
       routescanKey: routescanApiKey,
       viemChain: chainConfig,

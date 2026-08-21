@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { checksumAddress } from "../../utils/validation.js";
 import styles from "./SimulationOptions.module.css";
 
 /**
@@ -59,7 +60,8 @@ function AddressArgInput({
     React.createElement("input", {
       type: "text",
       value: value,
-      onChange: (e) => onChange(e.target.value),
+      onChange: (e) =>
+        onChange(checksumAddress(e.target.value) || e.target.value),
       placeholder: placeholder,
       className: `${styles.input} ${error ? styles.inputError : ""}`,
       disabled: disabled,
@@ -294,7 +296,10 @@ export default function SimulationOptions({
             onChange: (e) =>
               onCheatcodesChange({
                 ...cheatcodes,
-                deal: { ...cheatcodes.deal, address: e.target.value },
+                deal: {
+                  ...cheatcodes.deal,
+                  address: checksumAddress(e.target.value) || e.target.value,
+                },
               }),
             placeholder: "Address",
             className: `${styles.simOptionInput} ${fieldErrors.dealAddress ? styles.inputError : ""}`,
@@ -382,7 +387,13 @@ export default function SimulationOptions({
                 value: override.address,
                 onChange: (e) => {
                   const next = balanceOverrides.map((o, i) =>
-                    i === index ? { ...o, address: e.target.value } : o,
+                    i === index
+                      ? {
+                          ...o,
+                          address:
+                            checksumAddress(e.target.value) || e.target.value,
+                        }
+                      : o,
                   );
                   onBalanceOverridesChange(next);
                 },
@@ -436,7 +447,13 @@ export default function SimulationOptions({
                 value: override.address,
                 onChange: (e) => {
                   const next = storageOverrides.map((o, i) =>
-                    i === index ? { ...o, address: e.target.value } : o,
+                    i === index
+                      ? {
+                          ...o,
+                          address:
+                            checksumAddress(e.target.value) || e.target.value,
+                        }
+                      : o,
                   );
                   onStorageOverridesChange(next);
                 },
