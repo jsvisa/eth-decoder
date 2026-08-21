@@ -1,3 +1,5 @@
+import { checksumAddress } from "./validation";
+
 export class ArgValidationError extends Error {
   constructor(message) {
     super(message);
@@ -18,6 +20,13 @@ export function normalizeArg(value, type, components) {
   }
 
   if (type === "bool") return value === "true" || value === true;
+
+  if (type === "address") {
+    if (typeof value === "string") {
+      return checksumAddress(value);
+    }
+    return value;
+  }
 
   // bytes / bytesN: require 0x-prefixed hex.
   // The regex /^bytes\d+$/ matches bytes32, bytes16, etc. but NOT bytes32[] or

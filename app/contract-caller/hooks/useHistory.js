@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { CHAINS, BUILT_IN_CHAIN_IDS } from "../../utils/chains";
+import { checksumAddress } from "../../utils/validation";
 
 const STORAGE_KEY = "contract_caller_history";
 const CUSTOM_CHAINS_KEY = "custom_chains";
@@ -135,7 +136,7 @@ export function useHistory({
     }
 
     if (urlAddress) {
-      setAddress(urlAddress);
+      setAddress(checksumAddress(urlAddress));
 
       if (urlFunction) {
         let parsedArgs = [];
@@ -159,7 +160,7 @@ export function useHistory({
       }
 
       if (urlFrom) {
-        setFromAddress(urlFrom);
+        setFromAddress(checksumAddress(urlFrom));
       }
 
       if (urlValue) {
@@ -289,7 +290,7 @@ export function useHistory({
       if (sameContract && sameFunction) {
         setArgs(historyArgs);
         setChain(item.chain);
-        setFromAddress(item.fromAddress || "");
+        setFromAddress(checksumAddress(item.fromAddress || ""));
         setResult(item.output);
         setError(null);
         return;
@@ -306,8 +307,8 @@ export function useHistory({
       }
 
       setChain(item.chain);
-      setAddress(item.address);
-      setFromAddress(item.fromAddress || "");
+      setAddress(checksumAddress(item.address));
+      setFromAddress(checksumAddress(item.fromAddress || ""));
       setSelectedFunction(itemSig);
       setResult(item.output);
       setError(null);

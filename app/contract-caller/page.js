@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useSettings } from "../contexts/SettingsContext";
 import { CHAINS, BUILT_IN_CHAIN_IDS } from "../utils/chains";
-import { isValidEthAddress } from "../utils/validation";
+import { isValidEthAddress, checksumAddress } from "../utils/validation";
 import Tabs from "../components/Tabs";
 import { useTabState } from "../components/useTabState";
 
@@ -499,8 +499,8 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
               args,
               data: calldata,
             } = first.requestBody;
-            if (to) setAddress(to);
-            if (from) simOpts.setFromAddress(from);
+            if (to) setAddress(checksumAddress(to));
+            if (from) simOpts.setFromAddress(checksumAddress(from));
             if (value) simOpts.setEthValue(value);
             if (functionName && (args || calldata)) {
               fn.applyPendingArgs({
@@ -556,8 +556,8 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
               }
             }
           }
-          if (to) setAddress(to);
-          if (from) simOpts.setFromAddress(from);
+          if (to) setAddress(checksumAddress(to));
+          if (from) simOpts.setFromAddress(checksumAddress(from));
           if (value) simOpts.setEthValue(value);
           if (functionName && (args || calldata)) {
             fn.applyPendingArgs({
@@ -607,7 +607,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     const s = savedTabState;
     if (s) {
       if (s.chain && s.chain !== chain) setChain(s.chain);
-      if (s.address) setAddress(s.address);
+      if (s.address) setAddress(checksumAddress(s.address));
       if (s.selectedFunction) {
         fn.applyPendingArgs({
           functionSig: s.selectedFunction,
@@ -615,7 +615,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
           timestamp: Date.now(),
         });
       }
-      if (s.fromAddress) simOpts.setFromAddress(s.fromAddress);
+      if (s.fromAddress) simOpts.setFromAddress(checksumAddress(s.fromAddress));
       if (s.ethValue) simOpts.setEthValue(s.ethValue);
       if (s.blockNumber) fn.setBlockNumber(s.blockNumber);
     }

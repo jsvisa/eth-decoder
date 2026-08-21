@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { isValidEthAddress } from "../../utils/validation.js";
+import { isValidEthAddress, checksumAddress } from "../../utils/validation.js";
 import styles from "./ContractAddressInput.module.css";
 
 const h = React.createElement;
@@ -83,13 +83,13 @@ export default function ContractAddressInput({
 
   function handleInputChange(e) {
     const val = e.target.value;
-    onAddressChange(val);
+    onAddressChange(checksumAddress(val));
     setAddressFilter(val);
     setShowSuggestions(true);
   }
 
   function handleSelectSuggestion(addr) {
-    onAddressChange(addr);
+    onAddressChange(checksumAddress(addr));
     setShowSuggestions(false);
   }
 

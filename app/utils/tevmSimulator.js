@@ -10,7 +10,7 @@ import {
   keccak256,
   bytesToHex,
 } from "viem";
-import { isValidEthAddress } from "./validation";
+import { isValidEthAddress, checksumAddress } from "./validation";
 import { CHAIN_META, FORK_RPC_URLS } from "./chains";
 import { createPrecompilesForChain } from "./precompiles";
 import { createMetricsCollector } from "./rpcMetrics";
@@ -808,7 +808,7 @@ async function prefetchAccountsFromAccessList({
           });
 
           await client.tevmSetAccount({
-            address: addr,
+            address: checksumAddress(addr),
             balance: BigInt(balance),
             deployedBytecode: code,
             ...(slots.length > 0 ? { state } : {}),
@@ -879,7 +879,7 @@ function extractNativeChangesFromTrace(trace) {
  * simulateWithClient.
  */
 async function _runSimulationOnClient(client, pinnedBlock, params) {
-  const {
+  let {
     chain,
     address,
     functionName,
@@ -916,6 +916,36 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
   if (!isValidEthAddress(address)) {
     throw new Error("Invalid address format");
   }
+
+  // Checksum all addresses to satisfy viem's EIP-55 validation
+  address = checksumAddress(address);
+  fromAddress = fromAddress ? checksumAddress(fromAddress) : fromAddress;
+
+  if (cheatcodes.deal?.address) {
+    cheatcodes = {
+      ...cheatcodes,
+      deal: {
+        ...cheatcodes.deal,
+        address: checksumAddress(cheatcodes.deal.address),
+      },
+    };
+  }
+  if (cheatcodes.prank?.address) {
+    cheatcodes = {
+      ...cheatcodes,
+      prank: {
+        ...cheatcodes.prank,
+        address: checksumAddress(cheatcodes.prank.address),
+      },
+    };
+  }
+
+  balanceOverrides = balanceOverrides.map((ov) =>
+    ov.address ? { ...ov, address: checksumAddress(ov.address) } : ov,
+  );
+  storageOverrides = storageOverrides.map((ov) =>
+    ov.address ? { ...ov, address: checksumAddress(ov.address) } : ov,
+  );
 
   const collector = createMetricsCollector({ batchSize: rpcBatchSize });
   collector.start();

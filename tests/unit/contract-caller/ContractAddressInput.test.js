@@ -301,6 +301,8 @@ describe("ContractAddressInput", () => {
         (d) => d.textContent.includes("ExampleDAO") && d.children.length > 0,
       );
     act(() => suggestionEl.click());
-    expect(onAddressChange).toHaveBeenCalledWith(targetAddress);
+    expect(onAddressChange).toHaveBeenCalledWith(
+      "0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa",
+    );
   });
 });
