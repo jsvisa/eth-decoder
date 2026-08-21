@@ -674,7 +674,7 @@ export async function applyCheatcodes(client, cheatcodes = {}) {
   // vm.deal - Set ETH balance for an address
   if (deal && deal.address && deal.amount) {
     await client.tevmSetAccount({
-      address: checksumAddress(deal.address),
+      address: deal.address,
       balance: parseEther(deal.amount.toString()),
     });
   }
@@ -702,7 +702,7 @@ export async function applyCheatcodes(client, cheatcodes = {}) {
 
   // vm.prank is handled by setting the 'from' address in the call
   return {
-    prankAddress: prank?.address ? checksumAddress(prank.address) : null,
+    prankAddress: prank?.address || null,
   };
 }
 
@@ -808,7 +808,7 @@ async function prefetchAccountsFromAccessList({
           });
 
           await client.tevmSetAccount({
-            address: addr,
+            address: checksumAddress(addr),
             balance: BigInt(balance),
             deployedBytecode: code,
             ...(slots.length > 0 ? { state } : {}),
@@ -923,6 +923,29 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     ? checksumAddress(fromAddress)
     : fromAddress;
 
+  // Checksum cheatcodes addresses
+  const checksummedCheatcodes = { ...cheatcodes };
+  if (cheatcodes.deal?.address) {
+    checksummedCheatcodes.deal = {
+      ...cheatcodes.deal,
+      address: checksumAddress(cheatcodes.deal.address),
+    };
+  }
+  if (cheatcodes.prank?.address) {
+    checksummedCheatcodes.prank = {
+      ...cheatcodes.prank,
+      address: checksumAddress(cheatcodes.prank.address),
+    };
+  }
+
+  // Checksum balance/storage overrides
+  const checksummedBalanceOverrides = balanceOverrides.map((ov) =>
+    ov.address ? { ...ov, address: checksumAddress(ov.address) } : ov,
+  );
+  const checksummedStorageOverrides = storageOverrides.map((ov) =>
+    ov.address ? { ...ov, address: checksumAddress(ov.address) } : ov,
+  );
+
   const collector = createMetricsCollector({ batchSize: rpcBatchSize });
   collector.start();
   const finalize = (payload) => {
@@ -945,24 +968,27 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
         });
       }
     }
-    // Apply cheatcodes (checksum addresses inside)
-    const { prankAddress } = await applyCheatcodes(client, cheatcodes);
+    // Apply cheatcodes
+    const { prankAddress } = await applyCheatcodes(
+      client,
+      checksummedCheatcodes,
+    );
 
     // Apply balance overrides (additional deal-style balance sets)
-    for (const ov of balanceOverrides) {
+    for (const ov of checksummedBalanceOverrides) {
       if (ov.address && ov.balance) {
         await client.tevmSetAccount({
-          address: checksumAddress(ov.address),
+          address: ov.address,
           balance: parseEther(ov.balance.toString()),
         });
       }
     }
 
     // Apply storage overrides
-    for (const ov of storageOverrides) {
+    for (const ov of checksummedStorageOverrides) {
       if (ov.address && ov.slot && ov.value) {
         await client.tevmSetAccount({
-          address: checksumAddress(ov.address),
+          address: ov.address,
           state: { [ov.slot]: ov.value },
         });
       }
