@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { createMemoryClient } from "tevm";
 import { createCommon, createMockKzg } from "tevm/common";
 import { EvmError } from "tevm/evm";
-import { bytesToHex, hexToBytes } from "viem";
+import { bytesToHex, getContractAddress, hexToBytes } from "viem";
 import {
   ARBITRUM_PRECOMPILE_REFERENCES,
   createArbitrumPrecompiles,
@@ -85,6 +85,22 @@ const USDT_TRANSFER_AMOUNT = "1000000";
 const MAINNET_FORK_BLOCK = "latest";
 const ARBSYS_BLOCK_NUMBER_SELECTOR = "0xa3b1b31d";
 const ARBINFO_ADDRESS = "0x0000000000000000000000000000000000000065";
+const RETURN_42_INIT_CODE = "0x600a600c600039600a6000f3602a60005260206000f3";
+const NESTED_CREATE_INIT_CODE = "0x600060006000f05060006000f3";
+const REVERTING_INIT_CODE = "0x60006000fd";
+
+async function createLocalTevmClient() {
+  const client = createMemoryClient({
+    common: createCommon({
+      id: 1,
+      name: "ethereum",
+      customCrypto: { kzg: createMockKzg() },
+    }),
+  });
+  ensureTevmNodeCompat(client);
+  await client.tevmReady();
+  return client;
+}
 
 async function readTokenBalance(client, blockNumber, tokenAddress, account) {
   const result = await simulateWithClient(client, blockNumber, {
@@ -318,6 +334,77 @@ describe("simulateWithClient", () => {
         abi: [],
       }),
     ).rejects.toThrow("Missing required parameter");
+  });
+
+  it("executes CREATE and returns the deployed address", async () => {
+    const client = await createLocalTevmClient();
+    const result = await simulateWithClient(client, "latest", {
+      chain: "ethereum",
+      isCreate: true,
+      address: null,
+      callData: RETURN_42_INIT_CODE,
+      persistState: true,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.createdAddress).toMatch(/^0x[0-9a-f]{40}$/i);
+    expect(result.callTrace.type).toBe("CREATE");
+    expect(result.callTrace.to.toLowerCase()).toBe(
+      result.createdAddress.toLowerCase(),
+    );
+  });
+
+  it("persists deployed code and advances CREATE addresses", async () => {
+    const client = await createLocalTevmClient();
+    const create = () =>
+      simulateWithClient(client, "latest", {
+        chain: "ethereum",
+        isCreate: true,
+        address: null,
+        callData: RETURN_42_INIT_CODE,
+        persistState: true,
+      });
+    const first = await create();
+    const read = await simulateWithClient(client, "latest", {
+      chain: "ethereum",
+      address: first.createdAddress,
+      callData: "0x",
+    });
+    const second = await create();
+
+    expect(read.rawData).toBe(`0x${"0".repeat(62)}2a`);
+    expect(second.createdAddress).not.toBe(first.createdAddress);
+  });
+
+  it("traces CREATE executed by constructor init code", async () => {
+    const client = await createLocalTevmClient();
+    const result = await simulateWithClient(client, "latest", {
+      chain: "ethereum",
+      isCreate: true,
+      address: null,
+      callData: NESTED_CREATE_INIT_CODE,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.callTrace.calls[0]).toEqual(
+      expect.objectContaining({
+        type: "CREATE",
+        to: expect.stringMatching(/^0x[0-9a-f]{40}$/i),
+      }),
+    );
+  });
+
+  it("returns a null created address when constructor init code reverts", async () => {
+    const client = await createLocalTevmClient();
+    const result = await simulateWithClient(client, "latest", {
+      chain: "ethereum",
+      isCreate: true,
+      address: null,
+      callData: REVERTING_INIT_CODE,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.createdAddress).toBeNull();
   });
 
   it("persists a USDT transfer locally and exposes the new state to balanceOf reads", async () => {
@@ -798,7 +885,13 @@ const SLOT0 = "0x" + "0".repeat(64);
 const ZERO32 = "0x" + "0".repeat(64);
 const STORAGE_READER_CODE = "0x60005460005260206000f3";
 
-function createForkRpc({ code, balance, storage = {} }) {
+function createForkRpc({
+  code,
+  balance,
+  nonce = "0x0",
+  nonceAddress = null,
+  storage = {},
+}) {
   const requests = [];
   const blockNumber = "0x10";
   const block = {
@@ -861,7 +954,11 @@ function createForkRpc({ code, balance, storage = {} }) {
         break;
       }
       case "eth_getTransactionCount":
-        result = "0x0";
+        result =
+          !nonceAddress ||
+          r.params[0].toLowerCase() === nonceAddress.toLowerCase()
+            ? nonce
+            : "0x0";
         break;
       case "eth_createAccessList": {
         const [tx] = r.params;
@@ -902,6 +999,45 @@ function createForkRpc({ code, balance, storage = {} }) {
     });
   });
 }
+
+describe("simulateWithClient — CREATE fork nonce", () => {
+  const SENDER = "0x2222222222222222222222222222222222222222";
+
+  it("derives the created address from the forked sender nonce", async () => {
+    const fork = await createForkRpc({
+      code: "0x",
+      balance: "0xde0b6b3a7640000",
+      nonce: "0x7",
+      nonceAddress: SENDER,
+    });
+
+    try {
+      const { client, blockNumber } = await createTevmClient(
+        "ethereum",
+        fork.url,
+        "0x10",
+        null,
+        1,
+      );
+      const result = await simulateWithClient(client, blockNumber, {
+        chain: "ethereum",
+        isCreate: true,
+        address: null,
+        callData: RETURN_42_INIT_CODE,
+        fromAddress: SENDER,
+        rpcUrl: fork.url,
+      });
+
+      expect(result.success, result.error).toBe(true);
+      expect(result.createdAddress.toLowerCase()).toBe(
+        getContractAddress({ from: SENDER, nonce: 7n }).toLowerCase(),
+      );
+      expect(fork.requests).toContain("eth_getTransactionCount");
+    } finally {
+      await fork.close();
+    }
+  });
+});
 
 describe("simulateWithClient — session state vs prefetch (regression)", () => {
   const CONTRACT = "0x1111111111111111111111111111111111111111";

@@ -213,8 +213,8 @@ Simulate a raw transaction against forked chain state and return decoded results
 | Field              | Required | Description                                                                                                                      |
 | ------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `chainId`          | Yes      | Numeric chain ID (1 = Ethereum, 42161 = Arbitrum, 8453 = Base, 137 = Polygon, 56 = BSC)                                          |
-| `to`               | Yes      | Contract address                                                                                                                 |
-| `data`             | Yes      | Hex-encoded calldata                                                                                                             |
+| `to`               | No       | Contract address for CALL. Omit or pass `null` for CREATE.                                                                       |
+| `data`             | Yes      | Hex-encoded calldata for CALL, or complete init code for CREATE. Constructor arguments must already be appended.                 |
 | `from`             | Yes      | Sender address — used as `msg.sender` in simulation                                                                              |
 | `value`            | No       | Hex-encoded ETH value (default `"0x0"`)                                                                                          |
 | `blockNumber`      | No       | Hex block number or `"latest"` (default `"latest"`)                                                                              |
@@ -251,26 +251,43 @@ curl -X POST http://localhost:3000/api/simulate-tx \
   }'
 ```
 
+**CREATE example:**
+
+```bash
+curl -X POST http://localhost:3000/api/simulate-tx \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chainId": 1,
+    "data": "0x600a600c600039600a6000f3602a60005260206000f3",
+    "from": "0xd719fc03782E9617e81D138a3e9B1875da4D6a03",
+    "value": "0x0"
+  }'
+```
+
+Omitting `to` (or passing `null`) executes CREATE. The response includes the
+actual deployed address in `createdAddress`.
+
 **Response fields:**
 
-| Field                | Type           | Description                                                                                                               |
-| -------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `success`            | `boolean`      | `false` if the transaction reverted                                                                                       |
-| `simulated`          | `boolean`      | Always `true` for simulated results                                                                                       |
-| `blockNumber`        | `string`       | Block height the simulation ran against                                                                                   |
-| `gasUsed`            | `number`       | Gas consumed by the execution                                                                                             |
-| `logs`               | `Array`        | Decoded event logs (name, topics, data, inputs)                                                                           |
-| `callTrace`          | `object\|null` | Tree of call frames with decoded inputs/outputs                                                                           |
-| `balanceChanges`     | `Array`        | Token + native ETH balance changes extracted from logs and trace                                                          |
-| `stateChanges`       | `Array`        | Storage slot changes (currently always `[]`)                                                                              |
-| `metrics`            | `object`       | Timing and RPC call counters. Only present when the request sets `includeMetrics: true`                                   |
-| `rawData`            | `string`       | Hex-encoded raw return data from the contract call. `"0x"` for void functions (e.g. `transfer`) or when the call reverted |
-| `decoded`            | `Array`        | Decoded function return values `[{name, type, value}]`. Empty `[]` for void functions or when the ABI has no outputs      |
-| `error`              | `string\|null` | Human-readable revert reason or `null`                                                                                    |
-| `accessList`         | `Array`        | Addresses and storage keys accessed                                                                                       |
-| `undecodedAddresses` | `Array`        | Log-emitting addresses whose ABI wasn't available                                                                         |
-| `requestBody`        | `object`       | Input params used (`chainId`, `to`, `from`, `value`, `data`, `gas`, `blockNumber`, `functionName`, `args`)                |
-| `simulationId`       | `string\|null` | UUID for retrieving a saved result via `?simulationId=`. Only set when the request had `save: true`                       |
+| Field                | Type           | Description                                                                                                                           |
+| -------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `success`            | `boolean`      | `false` if the transaction reverted                                                                                                   |
+| `simulated`          | `boolean`      | Always `true` for simulated results                                                                                                   |
+| `createdAddress`     | `string\|null` | Created contract address for CREATE success; otherwise `null`                                                                         |
+| `blockNumber`        | `string`       | Block height the simulation ran against                                                                                               |
+| `gasUsed`            | `number`       | Gas consumed by the execution                                                                                                         |
+| `logs`               | `Array`        | Decoded event logs (name, topics, data, inputs)                                                                                       |
+| `callTrace`          | `object\|null` | Tree of call frames with decoded inputs/outputs                                                                                       |
+| `balanceChanges`     | `Array`        | Token + native ETH balance changes extracted from logs and trace                                                                      |
+| `stateChanges`       | `Array`        | Storage slot changes (currently always `[]`)                                                                                          |
+| `metrics`            | `object`       | Timing and RPC call counters. Only present when the request sets `includeMetrics: true`                                               |
+| `rawData`            | `string`       | Hex-encoded raw return data from the contract call. `"0x"` for void functions (e.g. `transfer`) or when the call reverted             |
+| `decoded`            | `Array`        | Decoded function return values `[{name, type, value}]`. Empty `[]` for void functions or when the ABI has no outputs                  |
+| `error`              | `string\|null` | Human-readable revert reason or `null`                                                                                                |
+| `accessList`         | `Array`        | Addresses and storage keys accessed                                                                                                   |
+| `undecodedAddresses` | `Array`        | Log-emitting addresses whose ABI wasn't available                                                                                     |
+| `requestBody`        | `object`       | Input params used (`chainId`, `to`, `from`, `value`, `data`, `gas`, `blockNumber`, `functionName`, `args`); `to` is `null` for CREATE |
+| `simulationId`       | `string\|null` | UUID for retrieving a saved result via `?simulationId=`. Only set when the request had `save: true`                                   |
 
 **Example with cheatcodes:**
 
@@ -355,19 +372,37 @@ The example above is a real 3-call flow on Base (chain `8453`) from the EOA `0x0
 
 The sequence matters: the swap (call 3) only succeeds because the two approvals run first, which is why a session — not three separate simulations — is the correct way to model it.
 
+CREATE can also be mixed into a session by omitting `to` from an entry:
+
+```json
+{
+  "chainId": 1,
+  "calls": [
+    {
+      "data": "0x600a600c600039600a6000f3602a60005260206000f3",
+      "from": "0xd719fc03782E9617e81D138a3e9B1875da4D6a03"
+    }
+  ]
+}
+```
+
+Successful CREATE entries commit the deployed code to the shared session
+state. A later entry can call the deterministic CREATE address derived from the
+sender and its session nonce.
+
 **Session inputs:**
 
-| Field              | Required | Description                                                                                                                                                                       |
-| ------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `calls`            | Yes      | Array of per-call request objects (min 1). Each call supports the single-call fields: `to`, `data`, `from`, `value`, `gas`, `balanceOverrides`, `storageOverrides`, `cheatcodes`. |
-| `to`               | Yes      | Contract address the call targets.                                                                                                                                                |
-| `data`             | Yes      | Hex-encoded calldata for the call.                                                                                                                                                |
-| `from`             | Yes      | Sender address — used as `msg.sender` for the call.                                                                                                                               |
-| `value`            | No       | Hex-encoded ETH value sent with the call (default `"0x0"`).                                                                                                                       |
-| `gas`              | No       | Hex gas limit for the call (tevm estimates if omitted).                                                                                                                           |
-| `balanceOverrides` | No       | Per-call balance overrides; merged over session-level ones (later keys win).                                                                                                      |
-| `storageOverrides` | No       | Per-call storage overrides; merged over session-level ones.                                                                                                                       |
-| `cheatcodes`       | No       | Per-call cheatcodes; merged over session-level ones.                                                                                                                              |
+| Field              | Required | Description                                                                                                                                                       |
+| ------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `calls`            | Yes      | Array of transaction request objects (min 1). Each entry supports `to`, `data`, `from`, `value`, `gas`, `balanceOverrides`, `storageOverrides`, and `cheatcodes`. |
+| `to`               | No       | Contract address for CALL. Omit or pass `null` for CREATE.                                                                                                        |
+| `data`             | Yes      | Hex-encoded calldata for CALL, or complete init code for CREATE.                                                                                                  |
+| `from`             | Yes      | Sender address — used as `msg.sender` for the call.                                                                                                               |
+| `value`            | No       | Hex-encoded ETH value sent with the call (default `"0x0"`).                                                                                                       |
+| `gas`              | No       | Hex gas limit for the call (tevm estimates if omitted).                                                                                                           |
+| `balanceOverrides` | No       | Per-call balance overrides; merged over session-level ones (later keys win).                                                                                      |
+| `storageOverrides` | No       | Per-call storage overrides; merged over session-level ones.                                                                                                       |
+| `cheatcodes`       | No       | Per-call cheatcodes; merged over session-level ones.                                                                                                              |
 
 Session-level `value`, `gas`, `balanceOverrides`, `storageOverrides`, `cheatcodes`, `rpcUrl`, and `price` act as defaults for every call; a call may override any of them per-call. Calls run sequentially in order — each call's state changes are committed before the next one executes.
 

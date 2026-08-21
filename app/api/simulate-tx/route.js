@@ -32,6 +32,10 @@ import {
   DECIMALS_ABI,
 } from "../../utils/tokenTransfers";
 
+function isCreateCall(call) {
+  return call.to === undefined || call.to === null;
+}
+
 /**
  * Validate the per-call fields shared by single-call and session modes.
  * Returns { error } on failure, or { error: null }.
@@ -39,9 +43,6 @@ import {
 function validateCallFields(call) {
   if (!call || typeof call !== "object") {
     return { error: "Each entry in 'calls' must be an object" };
-  }
-  if (!call.to) {
-    return { error: "Missing required field: to" };
   }
   if (!call.data) {
     return { error: "Missing required field: data" };
@@ -52,7 +53,7 @@ function validateCallFields(call) {
   if (!/^0x[0-9a-fA-F]*$/.test(String(call.data).trim())) {
     return { error: "Invalid 'data' — must be a 0x-prefixed hex string" };
   }
-  if (!isValidEthAddress(call.to)) {
+  if (!isCreateCall(call) && !isValidEthAddress(call.to)) {
     return { error: "Invalid 'to' address format" };
   }
   if (!isValidEthAddress(call.from)) {
@@ -127,6 +128,7 @@ async function runSingleSimulation({
     storageOverrides,
     cheatcodes,
   } = call;
+  const isCreate = isCreateCall(call);
 
   let valueStr;
   try {
@@ -135,24 +137,28 @@ async function runSingleSimulation({
     return { status: 400, body: { error: "Invalid 'value' format" } };
   }
 
-  const toKey = to.toLowerCase();
-  let abiEntry = abiEntryCache.get(toKey);
-  if (!abiEntry) {
-    abiEntry = await getAbiFromCache(numericChainId, to);
+  let abiEntry = null;
+  let toKey = null;
+  if (!isCreate) {
+    toKey = to.toLowerCase();
+    abiEntry = abiEntryCache.get(toKey);
     if (!abiEntry) {
-      const fetched = await fetchAbi(to, numericChainId, {
-        etherscanKey,
-        routescanKey,
-        viemChain: chain.viemChain,
-        rpcUrl: chain.rpcUrl,
-        detectProxy: true,
-      });
-      if (fetched?.abi) {
-        abiEntry = { ...fetched, fetchedAt: Date.now() };
-        await setAbiInCache(numericChainId, to, abiEntry);
+      abiEntry = await getAbiFromCache(numericChainId, to);
+      if (!abiEntry) {
+        const fetched = await fetchAbi(to, numericChainId, {
+          etherscanKey,
+          routescanKey,
+          viemChain: chain.viemChain,
+          rpcUrl: chain.rpcUrl,
+          detectProxy: true,
+        });
+        if (fetched?.abi) {
+          abiEntry = { ...fetched, fetchedAt: Date.now() };
+          await setAbiInCache(numericChainId, to, abiEntry);
+        }
       }
+      abiEntryCache.set(toKey, abiEntry || null);
     }
-    abiEntryCache.set(toKey, abiEntry || null);
   }
 
   let functionName = null;
@@ -178,7 +184,7 @@ async function runSingleSimulation({
 
   const requestBody = {
     chainId: numericChainId,
-    to,
+    to: isCreate ? null : to,
     data,
     from,
     value: value ?? "0x0",
@@ -199,7 +205,8 @@ async function runSingleSimulation({
       chain: chain.id,
       rpcUrl: chain.forkRpcUrl,
       ...(customChainId ? { customChainId } : {}),
-      address: to,
+      isCreate,
+      address: isCreate ? null : to,
       functionName,
       args: decodedArgs,
       callData: data,

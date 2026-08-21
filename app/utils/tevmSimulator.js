@@ -154,9 +154,9 @@ export function ensureTevmNodeCompat(client) {
 }
 
 // Wraps an HTTP transport to avoid eth_getProof, which is unsupported by many
-// public RPCs. Intercepts eth_getProof and emulates it with eth_getBalance +
-// eth_getCode only — nonce is omitted because it is irrelevant for CALL
-// simulation (only matters for CREATE address derivation, which is rare).
+// public RPCs. Intercepts eth_getProof and emulates account fields with simpler
+// RPC methods. The real nonce keeps CREATE address derivation consistent with
+// the forked account state.
 // Storage slots are unaffected since tevm already uses eth_getStorageAt.
 function createProofFreeTransport(rpcUrl, batchSize = 1, collector = null) {
   const baseHttpFactory = makeHttp(rpcUrl, batchSize);
@@ -173,15 +173,19 @@ function createProofFreeTransport(rpcUrl, batchSize = 1, collector = null) {
         if (method === "eth_getProof") {
           const [address, , blockTag] = params ?? [];
           const tag = blockTag ?? "latest";
-          const [balance, code] = await Promise.all([
+          const [balance, code, nonce] = await Promise.all([
             base.request({ method: "eth_getBalance", params: [address, tag] }),
             base.request({ method: "eth_getCode", params: [address, tag] }),
+            base.request({
+              method: "eth_getTransactionCount",
+              params: [address, tag],
+            }),
           ]);
           return {
             address,
             accountProof: [],
             balance,
-            nonce: "0x0", // nonce unused in CALL simulation
+            nonce,
             codeHash: keccak256(code),
             storageHash:
               "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
@@ -900,6 +904,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     persistState = false,
     gas = null,
     prefetch = true,
+    isCreate = false,
   } = params;
 
   // Validate inputs before the try/catch so callers receive a rejected promise
@@ -907,13 +912,13 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
   // When functionName is null, run a raw EVM call without decode/annotation
   // (the function selector might not be in the provided ABI).
   const isRawCall = !functionName;
-  if (!address) {
+  if (!isCreate && !address) {
     throw new Error("Missing required parameter: address");
   }
   if (!isRawCall && !abi) {
     throw new Error("Missing required parameters: address, functionName, abi");
   }
-  if (!isValidEthAddress(address)) {
+  if (!isCreate && !isValidEthAddress(address)) {
     throw new Error("Invalid address format");
   }
 
@@ -1028,7 +1033,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
         : String(pinnedBlock).trim();
 
     collector.markPhase("prefetch", "start");
-    if (prefetch) {
+    if (prefetch && !isCreate) {
       await prefetchAccountsFromAccessList({
         client,
         forkRpcUrl: rpcUrl || FORK_RPC_URLS[chain] || "",
@@ -1215,8 +1220,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       next?.();
     };
 
-    const callResult = await client.tevmCall({
-      to: address,
+    const callParams = {
       from: sender,
       data: callData,
       value: valueInWei,
@@ -1227,11 +1231,17 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       onBeforeMessage,
       onAfterMessage,
       onStep,
-    });
+    };
+    if (!isCreate) callParams.to = address;
+    const callResult = await client.tevmCall(callParams);
 
     // Check for errors
     const success = !callResult.errors || callResult.errors.length === 0;
     const rawOutput = callResult.rawData || "0x";
+    const createdAddress =
+      success && callResult.createdAddress
+        ? callResult.createdAddress.toString()
+        : null;
 
     // Decode output if function has outputs and call succeeded
     let decodedOutputs = [];
@@ -1343,6 +1353,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     return finalize({
       success,
       simulated: true,
+      createdAddress,
       blockNumber: pinnedBlock,
       rawData: rawOutput,
       decoded: decodedOutputs,
@@ -1397,6 +1408,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     return finalize({
       success: false,
       simulated: true,
+      createdAddress: null,
       rawData: "0x",
       decoded: [],
       gasUsed: 0,
