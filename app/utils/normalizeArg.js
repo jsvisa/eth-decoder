@@ -23,8 +23,7 @@ export function normalizeArg(value, type, components) {
 
   if (type === "address") {
     if (typeof value === "string") {
-      const checksummed = checksumAddress(value);
-      return checksummed || value;
+      return checksumAddress(value) || value;
     }
     return value;
   }

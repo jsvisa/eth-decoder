@@ -879,7 +879,7 @@ function extractNativeChangesFromTrace(trace) {
  * simulateWithClient.
  */
 async function _runSimulationOnClient(client, pinnedBlock, params) {
-  const {
+  let {
     chain,
     address,
     functionName,
@@ -918,31 +918,26 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
   }
 
   // Checksum all addresses to satisfy viem's EIP-55 validation
-  const checksummedAddress = checksumAddress(address);
-  const checksummedFromAddress = fromAddress
-    ? checksumAddress(fromAddress)
-    : fromAddress;
+  address = checksumAddress(address);
+  fromAddress = fromAddress ? checksumAddress(fromAddress) : fromAddress;
 
-  // Checksum cheatcodes addresses
-  const checksummedCheatcodes = { ...cheatcodes };
   if (cheatcodes.deal?.address) {
-    checksummedCheatcodes.deal = {
-      ...cheatcodes.deal,
-      address: checksumAddress(cheatcodes.deal.address),
+    cheatcodes = {
+      ...cheatcodes,
+      deal: { ...cheatcodes.deal, address: checksumAddress(cheatcodes.deal.address) },
     };
   }
   if (cheatcodes.prank?.address) {
-    checksummedCheatcodes.prank = {
-      ...cheatcodes.prank,
-      address: checksumAddress(cheatcodes.prank.address),
+    cheatcodes = {
+      ...cheatcodes,
+      prank: { ...cheatcodes.prank, address: checksumAddress(cheatcodes.prank.address) },
     };
   }
 
-  // Checksum balance/storage overrides
-  const checksummedBalanceOverrides = balanceOverrides.map((ov) =>
+  balanceOverrides = balanceOverrides.map((ov) =>
     ov.address ? { ...ov, address: checksumAddress(ov.address) } : ov,
   );
-  const checksummedStorageOverrides = storageOverrides.map((ov) =>
+  storageOverrides = storageOverrides.map((ov) =>
     ov.address ? { ...ov, address: checksumAddress(ov.address) } : ov,
   );
 
@@ -969,13 +964,10 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       }
     }
     // Apply cheatcodes
-    const { prankAddress } = await applyCheatcodes(
-      client,
-      checksummedCheatcodes,
-    );
+    const { prankAddress } = await applyCheatcodes(client, cheatcodes);
 
     // Apply balance overrides (additional deal-style balance sets)
-    for (const ov of checksummedBalanceOverrides) {
+    for (const ov of balanceOverrides) {
       if (ov.address && ov.balance) {
         await client.tevmSetAccount({
           address: ov.address,
@@ -985,7 +977,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     }
 
     // Apply storage overrides
-    for (const ov of checksummedStorageOverrides) {
+    for (const ov of storageOverrides) {
       if (ov.address && ov.slot && ov.value) {
         await client.tevmSetAccount({
           address: ov.address,
@@ -997,15 +989,15 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     // Determine sender address
     const sender =
       prankAddress ||
-      checksummedFromAddress ||
+      fromAddress ||
       "0x0000000000000000000000000000000000000001";
 
     // If using deal cheatcode, ensure sender has funds
     if (cheatcodes.deal?.address === sender) {
       // Already applied in applyCheatcodes
     } else if (
-      !checksummedFromAddress ||
-      checksummedFromAddress === "0x0000000000000000000000000000000000000001"
+      !fromAddress ||
+      fromAddress === "0x0000000000000000000000000000000000000001"
     ) {
       // Give the default sender some ETH for gas
       await client.tevmSetAccount({
@@ -1065,7 +1057,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
         client,
         forkRpcUrl: rpcUrl || FORK_RPC_URLS[chain] || "",
         callParams: {
-          to: checksummedAddress,
+          to: address,
           from: sender,
           data: callData,
           value: valueInWei,
@@ -1248,7 +1240,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     };
 
     const callResult = await client.tevmCall({
-      to: checksummedAddress,
+      to: address,
       from: sender,
       data: callData,
       value: valueInWei,

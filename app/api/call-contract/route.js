@@ -24,7 +24,7 @@ import {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const {
+    let {
       chain,
       address,
       functionName,
@@ -54,10 +54,8 @@ export async function POST(request) {
     }
 
     // Checksum addresses to satisfy viem's EIP-55 validation
-    const checksummedAddress = checksumAddress(address);
-    const checksummedFromAddress = fromAddress
-      ? checksumAddress(fromAddress)
-      : fromAddress;
+    address = checksumAddress(address);
+    fromAddress = fromAddress ? checksumAddress(fromAddress) : fromAddress;
 
     // Validate fromAddress if provided
     if (fromAddress && !isValidEthAddress(fromAddress)) {
@@ -128,13 +126,13 @@ export async function POST(request) {
 
     // Make the call (works for both read and simulate)
     const callParams = {
-      to: checksummedAddress,
+      to: address,
       data,
     };
 
     // Add from address if provided (useful for simulating write functions)
-    if (checksummedFromAddress) {
-      callParams.account = checksummedFromAddress;
+    if (fromAddress) {
+      callParams.account = fromAddress;
     }
 
     // Add block number if provided (for historical state queries)
