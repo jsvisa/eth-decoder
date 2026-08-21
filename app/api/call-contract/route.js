@@ -5,7 +5,11 @@ import {
   decodeFunctionResult,
   encodeFunctionData,
 } from "viem";
-import { isValidEthAddress, isValidHttpUrl } from "../../utils/validation";
+import {
+  isValidEthAddress,
+  isValidHttpUrl,
+  checksumAddress,
+} from "../../utils/validation";
 import { normalizeArg, ArgValidationError } from "../../utils/normalizeArg";
 import {
   VIEM_CHAINS,
@@ -48,6 +52,12 @@ export async function POST(request) {
         { status: 400 },
       );
     }
+
+    // Checksum addresses to satisfy viem's EIP-55 validation
+    const checksummedAddress = checksumAddress(address);
+    const checksummedFromAddress = fromAddress
+      ? checksumAddress(fromAddress)
+      : fromAddress;
 
     // Validate fromAddress if provided
     if (fromAddress && !isValidEthAddress(fromAddress)) {
@@ -118,13 +128,13 @@ export async function POST(request) {
 
     // Make the call (works for both read and simulate)
     const callParams = {
-      to: address,
+      to: checksummedAddress,
       data,
     };
 
     // Add from address if provided (useful for simulating write functions)
-    if (fromAddress) {
-      callParams.account = fromAddress;
+    if (checksummedFromAddress) {
+      callParams.account = checksummedFromAddress;
     }
 
     // Add block number if provided (for historical state queries)

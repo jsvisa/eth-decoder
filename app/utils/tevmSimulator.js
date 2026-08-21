@@ -10,7 +10,7 @@ import {
   keccak256,
   bytesToHex,
 } from "viem";
-import { isValidEthAddress } from "./validation";
+import { isValidEthAddress, checksumAddress } from "./validation";
 import { CHAIN_META, FORK_RPC_URLS } from "./chains";
 import { createPrecompilesForChain } from "./precompiles";
 import { createMetricsCollector } from "./rpcMetrics";
@@ -674,7 +674,7 @@ export async function applyCheatcodes(client, cheatcodes = {}) {
   // vm.deal - Set ETH balance for an address
   if (deal && deal.address && deal.amount) {
     await client.tevmSetAccount({
-      address: deal.address,
+      address: checksumAddress(deal.address),
       balance: parseEther(deal.amount.toString()),
     });
   }
@@ -702,7 +702,7 @@ export async function applyCheatcodes(client, cheatcodes = {}) {
 
   // vm.prank is handled by setting the 'from' address in the call
   return {
-    prankAddress: prank?.address || null,
+    prankAddress: prank?.address ? checksumAddress(prank.address) : null,
   };
 }
 
@@ -917,6 +917,12 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     throw new Error("Invalid address format");
   }
 
+  // Checksum all addresses to satisfy viem's EIP-55 validation
+  const checksummedAddress = checksumAddress(address);
+  const checksummedFromAddress = fromAddress
+    ? checksumAddress(fromAddress)
+    : fromAddress;
+
   const collector = createMetricsCollector({ batchSize: rpcBatchSize });
   collector.start();
   const finalize = (payload) => {
@@ -939,14 +945,14 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
         });
       }
     }
-    // Apply cheatcodes
+    // Apply cheatcodes (checksum addresses inside)
     const { prankAddress } = await applyCheatcodes(client, cheatcodes);
 
     // Apply balance overrides (additional deal-style balance sets)
     for (const ov of balanceOverrides) {
       if (ov.address && ov.balance) {
         await client.tevmSetAccount({
-          address: ov.address,
+          address: checksumAddress(ov.address),
           balance: parseEther(ov.balance.toString()),
         });
       }
@@ -956,7 +962,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     for (const ov of storageOverrides) {
       if (ov.address && ov.slot && ov.value) {
         await client.tevmSetAccount({
-          address: ov.address,
+          address: checksumAddress(ov.address),
           state: { [ov.slot]: ov.value },
         });
       }
@@ -965,15 +971,15 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     // Determine sender address
     const sender =
       prankAddress ||
-      fromAddress ||
+      checksummedFromAddress ||
       "0x0000000000000000000000000000000000000001";
 
     // If using deal cheatcode, ensure sender has funds
     if (cheatcodes.deal?.address === sender) {
       // Already applied in applyCheatcodes
     } else if (
-      !fromAddress ||
-      fromAddress === "0x0000000000000000000000000000000000000001"
+      !checksummedFromAddress ||
+      checksummedFromAddress === "0x0000000000000000000000000000000000000001"
     ) {
       // Give the default sender some ETH for gas
       await client.tevmSetAccount({
@@ -1033,7 +1039,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
         client,
         forkRpcUrl: rpcUrl || FORK_RPC_URLS[chain] || "",
         callParams: {
-          to: address,
+          to: checksummedAddress,
           from: sender,
           data: callData,
           value: valueInWei,
@@ -1216,7 +1222,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     };
 
     const callResult = await client.tevmCall({
-      to: address,
+      to: checksummedAddress,
       from: sender,
       data: callData,
       value: valueInWei,
