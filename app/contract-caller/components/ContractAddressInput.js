@@ -83,13 +83,13 @@ export default function ContractAddressInput({
 
   function handleInputChange(e) {
     const val = e.target.value;
-    onAddressChange(checksumAddress(val) || val);
+    onAddressChange(checksumAddress(val));
     setAddressFilter(val);
     setShowSuggestions(true);
   }
 
   function handleSelectSuggestion(addr) {
-    onAddressChange(checksumAddress(addr) || addr);
+    onAddressChange(checksumAddress(addr));
     setShowSuggestions(false);
   }
 

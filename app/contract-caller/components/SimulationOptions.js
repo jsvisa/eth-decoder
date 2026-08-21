@@ -61,7 +61,7 @@ function AddressArgInput({
       type: "text",
       value: value,
       onChange: (e) =>
-        onChange(checksumAddress(e.target.value) || e.target.value),
+        onChange(checksumAddress(e.target.value)),
       placeholder: placeholder,
       className: `${styles.input} ${error ? styles.inputError : ""}`,
       disabled: disabled,
@@ -298,7 +298,7 @@ export default function SimulationOptions({
                 ...cheatcodes,
                 deal: {
                   ...cheatcodes.deal,
-                  address: checksumAddress(e.target.value) || e.target.value,
+                  address: checksumAddress(e.target.value),
                 },
               }),
             placeholder: "Address",
@@ -391,7 +391,7 @@ export default function SimulationOptions({
                       ? {
                           ...o,
                           address:
-                            checksumAddress(e.target.value) || e.target.value,
+                            checksumAddress(e.target.value),
                         }
                       : o,
                   );
@@ -451,7 +451,7 @@ export default function SimulationOptions({
                       ? {
                           ...o,
                           address:
-                            checksumAddress(e.target.value) || e.target.value,
+                            checksumAddress(e.target.value),
                         }
                       : o,
                   );
