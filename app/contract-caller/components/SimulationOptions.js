@@ -60,8 +60,7 @@ function AddressArgInput({
     React.createElement("input", {
       type: "text",
       value: value,
-      onChange: (e) =>
-        onChange(checksumAddress(e.target.value)),
+      onChange: (e) => onChange(checksumAddress(e.target.value)),
       placeholder: placeholder,
       className: `${styles.input} ${error ? styles.inputError : ""}`,
       disabled: disabled,
@@ -390,8 +389,7 @@ export default function SimulationOptions({
                     i === index
                       ? {
                           ...o,
-                          address:
-                            checksumAddress(e.target.value),
+                          address: checksumAddress(e.target.value),
                         }
                       : o,
                   );
@@ -450,8 +448,7 @@ export default function SimulationOptions({
                     i === index
                       ? {
                           ...o,
-                          address:
-                            checksumAddress(e.target.value),
+                          address: checksumAddress(e.target.value),
                         }
                       : o,
                   );
