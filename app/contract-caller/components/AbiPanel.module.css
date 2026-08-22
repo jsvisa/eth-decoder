@@ -30,6 +30,47 @@
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   margin-left: auto;
+  position: relative;
+}
+
+.abiSourceLabel {
+  cursor: pointer;
+}
+
+.abiSourceTooltip {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0;
+  background: #333;
+  color: #fff;
+  font-size: 0.75rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 10;
+  line-height: 1.5;
+  pointer-events: none;
+  user-select: text;
+  transition: opacity 0.1s ease, visibility 0.1s ease;
+}
+
+.abiSourceTooltip::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 0;
+  right: 0;
+  height: 8px;
+}
+
+.abiSource:hover .abiSourceTooltip,
+.abiSourceTooltip:hover {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .refreshButton {

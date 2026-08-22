@@ -142,8 +142,8 @@ describe("GET /api/v1/fetch-abi", () => {
 
   it("returns the ABI for a verified contract", async () => {
     global.fetch
-      .mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // Sourcify: no abi
-      .mockResolvedValueOnce({ ok: true, json: async () => etherscanErc20 }); // Etherscan
+      .mockResolvedValueOnce({ ok: true, json: async () => etherscanErc20 }) // Etherscan
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // Sourcify: no abi
 
     const res = await fetchAbiGET(
       makeRequest("/api/v1/fetch-abi", {
