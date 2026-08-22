@@ -34,6 +34,7 @@ import { getFunctionSig, isReadOnly, isPayable } from "../utils/functionArgs";
  * @param {object} params
  * @param {string}   params.chain
  * @param {string}   params.address
+ * @param {boolean}  params.deployMode        - CREATE (deploy) simulation; no target address
  * @param {Array}    params.parsedAbi
  * @param {string}   params.selectedFunction  - canonical sig e.g. "transfer(address,uint256)"
  * @param {Array}    params.args
@@ -65,6 +66,7 @@ import { getFunctionSig, isReadOnly, isPayable } from "../utils/functionArgs";
 export function useCallExecution({
   chain,
   address,
+  deployMode = false,
   parsedAbi,
   selectedFunction,
   args,
@@ -135,7 +137,7 @@ export function useCallExecution({
   const handleCall = async () => {
     if (typeof setFieldErrors === "function") setFieldErrors({});
 
-    if (!address) {
+    if (!address && !deployMode) {
       const errors = {};
       if (!address || !isValidEthAddress(address)) errors.address = true;
       if (typeof setFieldErrors === "function") setFieldErrors(errors);
@@ -146,17 +148,22 @@ export function useCallExecution({
     const selectedFunc = getSelectedFunction();
     const isNativeTransfer = !selectedFunc && !rawCalldata;
     const isRawCall = isNativeTransfer ? true : !selectedFunc && !!rawCalldata;
+    const isDeploy = deployMode;
     const isWrite = isNativeTransfer
       ? true
-      : isRawCall
+      : isRawCall || isDeploy
         ? true
         : !isReadOnly(selectedFunc);
 
     // ── validation ────────────────────────────────────────────────────────────
     const errors = {};
 
-    if (!isValidEthAddress(address)) {
+    if (!deployMode && !isValidEthAddress(address)) {
       errors.address = true;
+    }
+
+    if (isDeploy && !rawCalldata) {
+      errors.calldata = true;
     }
 
     if (isWrite && !isValidEthAddress(fromAddress)) {
@@ -223,6 +230,8 @@ export function useCallExecution({
       const errorMessages = [];
       if (errors.address)
         errorMessages.push("Contract Address must be a valid Ethereum address");
+      if (errors.calldata)
+        errorMessages.push("Deployment bytecode (init code) is required");
       if (errors.fromAddress)
         errorMessages.push("From Address must be a valid Ethereum address");
       if (errors.forkBlockNumber)
@@ -311,7 +320,8 @@ export function useCallExecution({
 
         const simParams = {
           chain,
-          address,
+          address: isDeploy ? null : address,
+          isCreate: isDeploy,
           functionName: isRawCall ? null : selectedFunction,
           args: isRawCall ? [] : args,
           abi: isRawCall ? null : parsedAbi,
@@ -350,7 +360,9 @@ export function useCallExecution({
             setSessionHistory({
               id: ts,
               address,
-              contractName: contractName || address.slice(0, 8) + "...",
+              contractName:
+                contractName ||
+                (address ? address.slice(0, 8) + "..." : "Deploy"),
               functionName: isRawCall ? null : selectedFunction,
               type: "write",
               success: data.success,

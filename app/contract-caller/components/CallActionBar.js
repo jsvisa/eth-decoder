@@ -11,6 +11,7 @@ import styles from "./CallActionBar.module.css";
  *   address            {string}       – contract/address being called
  *   selectedFunction   {string}       – disable when none picked, unless rawCalldata
  *   rawCalldata        {string}       – raw hex calldata for ABI-less simulation
+ *   deployMode         {boolean}      – CREATE (deploy) simulation
  *   isWrite            {boolean}      – show simulate vs call label
  *   loading            {boolean}      – in-flight state
  *   simProgress        {number|null}  – 0–100 percent, or null when idle
@@ -31,6 +32,7 @@ export default function CallActionBar({
   address,
   selectedFunction,
   rawCalldata,
+  deployMode,
   isWrite,
   loading,
   simProgress,
@@ -81,6 +83,10 @@ export default function CallActionBar({
   let callButtonLabel;
   if (loading) {
     callButtonLabel = isWrite ? "Simulating..." : "Calling...";
+  } else if (deployMode) {
+    callButtonLabel = sessionActive
+      ? "Execute Deploy in Session"
+      : "Simulate Deploy";
   } else if (rawCalldata && !selectedFunction) {
     callButtonLabel = "Simulate Calldata";
   } else if (!selectedFunction && !rawCalldata) {

@@ -193,6 +193,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
   // --- Top-level shared state ---
   const [chain, setChain] = useState("ethereum");
   const [address, setAddress] = useState("");
+  const [deployMode, setDeployMode] = useState(false);
   const [savingAbiBackend, setSavingAbiBackend] = useState(false);
   const [saveAbiBackendMsg, setSaveAbiBackendMsg] = useState(null);
 
@@ -298,6 +299,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
   const exec = useCallExecution({
     chain,
     address,
+    deployMode,
     parsedAbi: abi.parsedAbi,
     selectedFunction: fn.selectedFunction,
     args: fn.args,
@@ -688,26 +690,69 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
             />
           </div>
 
-          <ContractAddressInput
-            address={address}
-            onAddressChange={setAddress}
-            addressBook={bookmark.addressBook}
-            cachedAddresses={abi.cachedAddresses}
-            contractName={abi.contractName}
-            onFetchAbi={abi.fetchAbi}
-            fetchingAbi={abi.fetchingAbi}
-            onSaveAbiBackend={handleSaveAbiBackend}
-            savingAbiBackend={savingAbiBackend}
-            canSaveAbiBackend={
-              (abi.parsedAbi || []).length > 0 &&
-              isValidEthAddress(address) &&
-              Boolean(apiKeys.backend)
-            }
-            saveAbiBackendMsg={saveAbiBackendMsg}
-            fieldError={fn.fieldErrors.address}
-            onOpenBookmarkModal={bookmark.openBookmarkModal}
-            disabled={exec.loading}
-          />
+          <div className={styles.networkField}>
+            <label className={styles.label}>Mode</label>
+            <div className={styles.modeToggle}>
+              <button
+                type="button"
+                className={
+                  styles.modeButton +
+                  (deployMode ? "" : " " + styles.modeActive)
+                }
+                onClick={() => setDeployMode(false)}
+                disabled={exec.loading}
+              >
+                Call
+              </button>
+              <button
+                type="button"
+                className={
+                  styles.modeButton +
+                  (deployMode ? " " + styles.modeActive : "")
+                }
+                onClick={() => {
+                  setDeployMode(true);
+                  setAddress("");
+                  resetFunctionState();
+                  setErrorRef.current?.(null);
+                }}
+                disabled={exec.loading}
+              >
+                Deploy
+              </button>
+            </div>
+          </div>
+
+          {deployMode ? (
+            <div className={styles.networkField}>
+              <label className={styles.label}>Deploying</label>
+              <p className={styles.deployNote}>
+                No target address. Paste deployment bytecode (init code) in the
+                calldata field below, then simulate.
+              </p>
+            </div>
+          ) : (
+            <ContractAddressInput
+              address={address}
+              onAddressChange={setAddress}
+              addressBook={bookmark.addressBook}
+              cachedAddresses={abi.cachedAddresses}
+              contractName={abi.contractName}
+              onFetchAbi={abi.fetchAbi}
+              fetchingAbi={abi.fetchingAbi}
+              onSaveAbiBackend={handleSaveAbiBackend}
+              savingAbiBackend={savingAbiBackend}
+              canSaveAbiBackend={
+                (abi.parsedAbi || []).length > 0 &&
+                isValidEthAddress(address) &&
+                Boolean(apiKeys.backend)
+              }
+              saveAbiBackendMsg={saveAbiBackendMsg}
+              fieldError={fn.fieldErrors.address}
+              onOpenBookmarkModal={bookmark.openBookmarkModal}
+              disabled={exec.loading}
+            />
+          )}
         </div>
 
         <AbiPanel
@@ -817,6 +862,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
           address={address}
           selectedFunction={fn.selectedFunction}
           rawCalldata={fn.pasteCalldataValue}
+          deployMode={deployMode}
           isWrite={isWrite}
           loading={exec.loading}
           simProgress={exec.simProgress}

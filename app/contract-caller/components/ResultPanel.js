@@ -589,6 +589,14 @@ export default function ResultPanel({
                         {result.callTrace?.to || address}
                       </span>
                     </div>
+                    {result.createdAddress && (
+                      <div className={styles.txInfoRow}>
+                        <span className={styles.txInfoLabel}>Created:</span>
+                        <span className={styles.txInfoValue}>
+                          {result.createdAddress}
+                        </span>
+                      </div>
+                    )}
                     {result.callTrace?.value &&
                       (() => {
                         try {

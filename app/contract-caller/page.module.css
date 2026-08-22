@@ -46,6 +46,42 @@
   font-size: 0.95rem;
 }
 
+.modeToggle {
+  display: inline-flex;
+  border: 1px solid var(--border-color, #d0d5dd);
+  border-radius: 8px;
+  overflow: hidden;
+  width: fit-content;
+}
+
+.modeButton {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary, #667085);
+}
+
+.modeButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.modeActive {
+  background: var(--primary-color, #2563eb);
+  color: #fff;
+}
+
+.deployNote {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #667085);
+  max-width: 280px;
+  line-height: 1.4;
+}
+
 @media (max-width: 768px) {
   .main {
     padding: 1rem;

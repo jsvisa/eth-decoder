@@ -50,4 +50,24 @@ test.describe("Contract Caller page", () => {
     await page.getByRole("tab").nth(0).click();
     await expect(addressInput()).toHaveValue("");
   });
+
+  test("deploy mode hides the target address and shows a deploy note", async ({
+    page,
+  }) => {
+    await page.goto("/contract-caller");
+    const addressInput = page.getByPlaceholder("0x...");
+    await expect(addressInput).toBeVisible();
+
+    // Enter deploy mode
+    await page.getByRole("button", { name: "Deploy", exact: true }).click();
+
+    // Target address field disappears, deploy note appears
+    await expect(addressInput).not.toBeVisible();
+    await expect(page.getByText(/deployment bytecode \(init code\)/i)).toBeVisible();
+
+    // Switching back to Call restores the address field
+    await page.getByRole("button", { name: "Call", exact: true }).click();
+    await expect(addressInput).toBeVisible();
+    await expect(page.getByText(/deployment bytecode \(init code\)/i)).not.toBeVisible();
+  });
 });
