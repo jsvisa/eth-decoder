@@ -102,13 +102,12 @@ async function fetchContractInfo(
   etherscanApiKey,
   routescanApiKey,
 ) {
-  // Try Sourcify first
-  const sourcifyInfo = await fetchContractInfoFromSourcify(address, chainId);
-  if (sourcifyInfo && sourcifyInfo.abi) {
-    return sourcifyInfo;
-  }
-
-  // Fallback to Etherscan
+  // Order matters: Etherscan first because its response includes the `Proxy`
+  // and `Implementation` fields needed to resolve a proxy's implementation ABI.
+  // Sourcify is tried next as a fallback for contracts not verified on Etherscan,
+  // but note it does NOT return proxy fields, so proxy detection falls back to
+  // on-chain RPC when the ABI comes from Sourcify. RouteScan is the keyless
+  // fallback last.
   if (etherscanApiKey) {
     const etherscanInfo = await fetchContractInfoFromEtherscan(
       address,
@@ -118,6 +117,12 @@ async function fetchContractInfo(
     if (etherscanInfo && etherscanInfo.abi) {
       return etherscanInfo;
     }
+  }
+
+  // Fallback to Sourcify
+  const sourcifyInfo = await fetchContractInfoFromSourcify(address, chainId);
+  if (sourcifyInfo && sourcifyInfo.abi) {
+    return sourcifyInfo;
   }
 
   // Fallback to RouteScan

@@ -68,7 +68,7 @@ describe("GET /api/fetch-abi", () => {
     expect(body.error).toMatch(/rpcUrl/i);
   });
 
-  it("falls back to RouteScan without a key when Sourcify has no match", async () => {
+  it("falls back to RouteScan without a key when Etherscan is skipped and Sourcify has no match", async () => {
     // No apiKey → Etherscan is skipped; Sourcify fails; RouteScan (keyless) succeeds
     mockFetch([
       { status: "404" }, // Sourcify
@@ -80,8 +80,9 @@ describe("GET /api/fetch-abi", () => {
     expect(body.abi).toBeDefined();
   });
 
-  it("returns ABI from Sourcify when verified there", async () => {
-    mockFetch([sourcifyV2]);
+  it("returns ABI from Sourcify when not verified on Etherscan", async () => {
+    // {} → Etherscan: no abi/status → null; sourcifyV2 → Sourcify: success
+    mockFetch([{}, sourcifyV2]);
 
     const res = await GET(
       makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
@@ -94,9 +95,9 @@ describe("GET /api/fetch-abi", () => {
     expect(body.abi.some((item) => item.name === "decimals")).toBe(true);
   });
 
-  it("falls back to Etherscan when Sourcify has no match", async () => {
-    // {} → Sourcify: no abi field → null; etherscanErc20 → Etherscan: success
-    mockFetch([{}, etherscanErc20]);
+  it("uses Etherscan directly when it has the contract verified", async () => {
+    // Etherscan succeeds first (Sourcify/RouteScan never consulted)
+    mockFetch([etherscanErc20]);
 
     const res = await GET(
       makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
@@ -111,8 +112,8 @@ describe("GET /api/fetch-abi", () => {
   });
 
   it("detects a proxy via Etherscan and returns merged proxy + implementation ABI", async () => {
-    // Sourcify miss for proxy, Etherscan proxy info, Sourcify miss for impl, Etherscan impl info
-    mockFetch([{}, etherscanProxy, {}, etherscanImpl]);
+    // Etherscan proxy info, then Etherscan impl info (Sourcify/RouteScan never consulted)
+    mockFetch([etherscanProxy, etherscanImpl]);
 
     const res = await GET(
       makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
