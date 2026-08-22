@@ -359,6 +359,8 @@ export async function fetchAbi(
         implContractName: implInfo.contractName,
         isProxy: true,
         implAddress,
+        source: proxyInfo.source,
+        implSource: implInfo.source,
       };
     }
   }
@@ -369,6 +371,8 @@ export async function fetchAbi(
     implContractName: null,
     isProxy: false,
     implAddress: null,
+    source: proxyInfo.source,
+    implSource: null,
   };
 }
 

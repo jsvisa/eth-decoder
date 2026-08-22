@@ -47,6 +47,8 @@ export const getCachedAbi = (chain, address) => {
  * @param {string|null} implAddress - Implementation address if proxy
  * @param {string|null} contractName - Contract name
  * @param {string|null} implContractName - Implementation contract name if proxy
+ * @param {string|null} source - Provider the ABI came from (etherscan/sourcify/routescan)
+ * @param {string|null} implSource - Provider the implementation ABI came from, if proxy
  */
 export const setCachedAbi = (
   chain,
@@ -56,6 +58,8 @@ export const setCachedAbi = (
   implAddress = null,
   contractName = null,
   implContractName = null,
+  source = null,
+  implSource = null,
 ) => {
   if (typeof window === "undefined") return;
 
@@ -69,6 +73,8 @@ export const setCachedAbi = (
         implAddress,
         contractName,
         implContractName,
+        source,
+        implSource,
         timestamp: Date.now(),
       }),
     );
@@ -174,6 +180,8 @@ export const fetchAndCacheAbi = async (
       data.implAddress || null,
       data.contractName || null,
       data.implContractName || null,
+      data.source || null,
+      data.implSource || null,
     );
 
     return data.abi;

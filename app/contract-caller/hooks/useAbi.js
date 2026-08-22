@@ -7,6 +7,25 @@ import { isReadOnly } from "../utils/functionArgs";
 
 const ABI_CACHE_PREFIX = "abi-";
 
+// Build the ABI source label, e.g. "fetched (etherscan)" or
+// "cached (proxy: etherscan → impl: routescan, 0x9bd289b14d...)".
+// Falls back to the legacy label when source info is absent (old cache entries).
+const formatAbiSourceLabel = (
+  prefix,
+  { isProxy, source, implSource, implAddress },
+) => {
+  if (isProxy) {
+    if (source) {
+      const implParts = [];
+      if (implSource) implParts.push(implSource);
+      if (implAddress) implParts.push(`${implAddress.slice(0, 10)}...`);
+      return `${prefix} (proxy: ${source} → impl: ${implParts.join(", ")})`;
+    }
+    return `${prefix} (proxy → ${implAddress?.slice(0, 10) || ""}...)`;
+  }
+  return source ? `${prefix} (${source})` : prefix;
+};
+
 const formatAbiCompact = (abi) => {
   const hasNestedComponents = (params) => {
     return params?.some((p) => p.components && p.components.length > 0);
@@ -143,9 +162,12 @@ export function useAbi({
           : cached.contractName;
       setContractName(nameDisplay);
       setAbiSource(
-        cached.isProxy
-          ? `cached (proxy → ${cached.implAddress?.slice(0, 10)}...)`
-          : "cached",
+        formatAbiSourceLabel("cached", {
+          isProxy: cached.isProxy,
+          source: cached.source,
+          implSource: cached.implSource,
+          implAddress: cached.implAddress,
+        }),
       );
     } else {
       // Clear ABI when switching to uncached contract
@@ -263,6 +285,8 @@ export function useAbi({
         data.implAddress,
         data.contractName,
         data.implContractName,
+        data.source,
+        data.implSource,
       );
 
       // Update cached addresses list
@@ -275,9 +299,12 @@ export function useAbi({
           : data.contractName;
       setContractName(nameDisplay);
       setAbiSource(
-        data.isProxy
-          ? `fetched (proxy → ${data.implAddress?.slice(0, 10)}...)`
-          : "fetched",
+        formatAbiSourceLabel("fetched", {
+          isProxy: data.isProxy,
+          source: data.source,
+          implSource: data.implSource,
+          implAddress: data.implAddress,
+        }),
       );
       // Expand ABI when first fetched from remote
       setAbiCollapsed(false);
@@ -308,6 +335,8 @@ export function useAbi({
         existingCache?.implAddress || null,
         existingCache?.contractName || contractName,
         existingCache?.implContractName || null,
+        existingCache?.source || null,
+        existingCache?.implSource || null,
       );
       // Update cached addresses list
       setCachedAddresses(getCachedAddresses());

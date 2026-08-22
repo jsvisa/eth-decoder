@@ -109,6 +109,7 @@ describe("GET /api/fetch-abi", () => {
     expect(body.abi.length).toBeGreaterThan(0);
     expect(body.isProxy).toBe(false);
     expect(body.contractName).toBe("ERC20");
+    expect(body.source).toBe("etherscan");
   });
 
   it("detects a proxy via Etherscan and returns merged proxy + implementation ABI", async () => {
@@ -129,6 +130,8 @@ describe("GET /api/fetch-abi", () => {
     expect(fnNames).toContain("upgradeTo"); // from proxy ABI
     expect(fnNames).toContain("transfer"); // from implementation ABI
     expect(body.implContractName).toBe("ERC20Implementation");
+    expect(body.source).toBe("etherscan");
+    expect(body.implSource).toBe("etherscan");
   });
 
   it("returns 400 when both Etherscan and Sourcify fail", async () => {
