@@ -674,6 +674,46 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
   );
   const isWrite = selectedFn ? !isReadOnly(selectedFn) : true;
 
+  // Deploy mode needs only a from address + calldata (init code); no ABI, no
+  // function selector, no events. Shared block reused in both modes.
+  const calldataAndOptions = (
+    <>
+      <CalldataSection
+        expanded={true}
+        onToggle={() => {}}
+        value={fn.pasteCalldataValue}
+        onValueChange={fn.setPasteCalldataValue}
+        error={fn.pasteCalldataError}
+        onDecodeAndFill={fn.handleDecodeAndFill}
+        disabled={exec.loading}
+        noToggle
+        hideDecodeAndFill
+      />
+      <SimulationOptions
+        forkBlockNumber={simOpts.forkBlockNumber}
+        onForkBlockChange={simOpts.setForkBlockNumber}
+        fromAddress={simOpts.fromAddress}
+        onFromAddressChange={simOpts.setFromAddress}
+        cheatcodes={simOpts.cheatcodes}
+        onCheatcodesChange={simOpts.setCheatcodes}
+        balanceOverrides={simOpts.balanceOverrides}
+        onBalanceOverridesChange={simOpts.setBalanceOverrides}
+        storageOverrides={simOpts.storageOverrides}
+        onStorageOverridesChange={simOpts.setStorageOverrides}
+        fieldErrors={fn.fieldErrors}
+        onOpenBookmarkModal={bookmark.openBookmarkModal}
+        addressBook={bookmark.addressBook}
+        disabled={exec.loading}
+        ethValue={simOpts.ethValue}
+        onEthValueChange={simOpts.setEthValue}
+        ethValueUnit={simOpts.ethValueUnit}
+        onEthValueUnitChange={simOpts.handleEthValueUnitChange}
+        selectedFn={selectedFn}
+        isPayable={isPayable}
+      />
+    </>
+  );
+
   // --- Layout ---
   return (
     <>
@@ -755,108 +795,86 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
           )}
         </div>
 
-        <AbiPanel
-          abi={abi.abi}
-          onAbiChange={abi.setAbi}
-          parsedAbi={abi.parsedAbi}
-          abiSource={abi.abiSource}
-          abiSourceMeta={abi.abiSourceMeta}
-          abiSaved={abi.abiSaved}
-          onSaveAbi={abi.saveAbiToCache}
-          onRefetchAbi={() => abi.fetchAbi({ forceRefresh: true })}
-          loading={exec.loading}
-        />
+        {!deployMode && (
+          <AbiPanel
+            abi={abi.abi}
+            onAbiChange={abi.setAbi}
+            parsedAbi={abi.parsedAbi}
+            abiSource={abi.abiSource}
+            abiSourceMeta={abi.abiSourceMeta}
+            abiSaved={abi.abiSaved}
+            onSaveAbi={abi.saveAbiToCache}
+            onRefetchAbi={() => abi.fetchAbi({ forceRefresh: true })}
+            loading={exec.loading}
+          />
+        )}
 
-        <FunctionEventsTabs
-          activeTab={events.activeTab}
-          onTabChange={events.setActiveTab}
-          functionsCount={abi.functions.length}
-          eventsCount={
-            (abi.parsedAbi || []).filter((x) => x.type === "event").length
-          }
-          functionsContent={
-            <>
-              <FunctionSelector
-                functions={abi.functions}
-                selectedFunction={fn.selectedFunction}
-                onSelectFunction={fn.setSelectedFunction}
-                disabled={exec.loading}
+        {deployMode ? (
+          calldataAndOptions
+        ) : (
+          <FunctionEventsTabs
+            activeTab={events.activeTab}
+            onTabChange={events.setActiveTab}
+            functionsCount={abi.functions.length}
+            eventsCount={
+              (abi.parsedAbi || []).filter((x) => x.type === "event").length
+            }
+            functionsContent={
+              <>
+                <FunctionSelector
+                  functions={abi.functions}
+                  selectedFunction={fn.selectedFunction}
+                  onSelectFunction={fn.setSelectedFunction}
+                  disabled={exec.loading}
+                />
+                {calldataAndOptions}
+                <ArgsInput
+                  fn={selectedFn}
+                  args={fn.args}
+                  onArgsChange={fn.setArgs}
+                  fieldErrors={fn.fieldErrors}
+                  addressBook={bookmark.addressBook}
+                  onOpenBookmarkModal={bookmark.openBookmarkModal}
+                  blockNumber={fn.blockNumber}
+                  onReadBlockNumberChange={fn.setBlockNumber}
+                  disabled={exec.loading}
+                />
+              </>
+            }
+            eventsContent={
+              <EventsTab
+                events={(abi.parsedAbi || []).filter((x) => x.type === "event")}
+                selectedEvents={events.selectedEvents}
+                onToggleEvent={events.toggleEventSelection}
+                onSelectAll={events.selectAllEvents}
+                onClearSelection={events.clearEventSelection}
+                eventFilter={events.eventFilter}
+                onEventFilterChange={events.setEventFilter}
+                eventListCollapsed={events.eventListCollapsed}
+                onToggleEventList={() =>
+                  events.setEventListCollapsed((v) => !v)
+                }
+                logsFromBlock={events.logsFromBlock}
+                logsToBlock={events.logsToBlock}
+                onLogsFromBlockChange={events.setLogsFromBlock}
+                onLogsToBlockChange={events.setLogsToBlock}
+                logsPage={events.logsPage}
+                logsOffset={events.logsOffset}
+                onLogsPageChange={events.setLogsPage}
+                onLogsOffsetChange={events.setLogsOffset}
+                onFetchLogs={events.fetchLogs}
+                fetchingLogs={events.fetchingLogs}
+                logsError={events.logsError}
+                logsFetched={events.logsFetched}
+                eventLogs={events.eventLogs}
+                logsFilter={events.logsFilter}
+                onLogsFilterChange={events.setLogsFilter}
+                onDownloadCsv={events.downloadLogsAsCsv}
+                latestBlock={events.latestBlockCache}
               />
-              <CalldataSection
-                expanded={fn.pasteCalldataExpanded}
-                onToggle={() => fn.setPasteCalldataExpanded((v) => !v)}
-                value={fn.pasteCalldataValue}
-                onValueChange={fn.setPasteCalldataValue}
-                error={fn.pasteCalldataError}
-                onDecodeAndFill={fn.handleDecodeAndFill}
-                disabled={exec.loading}
-              />
-              <SimulationOptions
-                forkBlockNumber={simOpts.forkBlockNumber}
-                onForkBlockChange={simOpts.setForkBlockNumber}
-                fromAddress={simOpts.fromAddress}
-                onFromAddressChange={simOpts.setFromAddress}
-                cheatcodes={simOpts.cheatcodes}
-                onCheatcodesChange={simOpts.setCheatcodes}
-                balanceOverrides={simOpts.balanceOverrides}
-                onBalanceOverridesChange={simOpts.setBalanceOverrides}
-                storageOverrides={simOpts.storageOverrides}
-                onStorageOverridesChange={simOpts.setStorageOverrides}
-                fieldErrors={fn.fieldErrors}
-                onOpenBookmarkModal={bookmark.openBookmarkModal}
-                addressBook={bookmark.addressBook}
-                disabled={exec.loading}
-                ethValue={simOpts.ethValue}
-                onEthValueChange={simOpts.setEthValue}
-                ethValueUnit={simOpts.ethValueUnit}
-                onEthValueUnitChange={simOpts.handleEthValueUnitChange}
-                selectedFn={selectedFn}
-                isPayable={isPayable}
-              />
-              <ArgsInput
-                fn={selectedFn}
-                args={fn.args}
-                onArgsChange={fn.setArgs}
-                fieldErrors={fn.fieldErrors}
-                addressBook={bookmark.addressBook}
-                onOpenBookmarkModal={bookmark.openBookmarkModal}
-                blockNumber={fn.blockNumber}
-                onReadBlockNumberChange={fn.setBlockNumber}
-                disabled={exec.loading}
-              />
-            </>
-          }
-          eventsContent={
-            <EventsTab
-              events={(abi.parsedAbi || []).filter((x) => x.type === "event")}
-              selectedEvents={events.selectedEvents}
-              onToggleEvent={events.toggleEventSelection}
-              onSelectAll={events.selectAllEvents}
-              onClearSelection={events.clearEventSelection}
-              eventFilter={events.eventFilter}
-              onEventFilterChange={events.setEventFilter}
-              eventListCollapsed={events.eventListCollapsed}
-              onToggleEventList={() => events.setEventListCollapsed((v) => !v)}
-              logsFromBlock={events.logsFromBlock}
-              logsToBlock={events.logsToBlock}
-              onLogsFromBlockChange={events.setLogsFromBlock}
-              onLogsToBlockChange={events.setLogsToBlock}
-              logsPage={events.logsPage}
-              logsOffset={events.logsOffset}
-              onLogsPageChange={events.setLogsPage}
-              onLogsOffsetChange={events.setLogsOffset}
-              onFetchLogs={events.fetchLogs}
-              fetchingLogs={events.fetchingLogs}
-              logsError={events.logsError}
-              logsFetched={events.logsFetched}
-              eventLogs={events.eventLogs}
-              logsFilter={events.logsFilter}
-              onLogsFilterChange={events.setLogsFilter}
-              onDownloadCsv={events.downloadLogsAsCsv}
-              latestBlock={events.latestBlockCache}
-            />
-          }
-        />
+            }
+          />
+        )}
 
         <CallActionBar
           address={address}
