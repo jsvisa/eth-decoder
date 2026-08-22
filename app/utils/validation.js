@@ -1,3 +1,5 @@
+import { getAddress } from "viem";
+
 /**
  * Shared validation utilities for Ethereum addresses and other common types
  */
@@ -10,6 +12,21 @@
 export const isValidEthAddress = (address) => {
   if (!address) return false;
   return /^0x[a-fA-F0-9]{40}$/.test(address);
+};
+
+/**
+ * Checksum an Ethereum address to EIP-55 format.
+ * Returns the original string if it's not a valid address.
+ * @param {string} address - The address to checksum
+ * @returns {string} - The checksummed address, or the original if invalid
+ */
+export const checksumAddress = (address) => {
+  if (!address || !isValidEthAddress(address)) return address;
+  try {
+    return getAddress(address);
+  } catch {
+    return address;
+  }
 };
 
 /**
