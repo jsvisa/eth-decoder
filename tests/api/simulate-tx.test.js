@@ -50,6 +50,9 @@ const VALID_BODY = {
   blockNumber: "latest",
 };
 
+const CREATE_INIT_CODE = "0x600a600c600039600a6000f3602a60005260206000f3";
+const CREATED_ADDRESS = "0x1234567890123456789012345678901234567890";
+
 const SIM_RESULT = {
   success: true,
   simulated: true,
@@ -151,9 +154,21 @@ describe("POST /api/simulate-tx — validation", () => {
     expect((await res.json()).error).toMatch(/chainid/i);
   });
 
-  it("returns 400 when to is missing", async () => {
+  it("accepts a missing to as CREATE", async () => {
     const { to: _, ...body } = VALID_BODY;
-    const res = await POST(makeRequest(body));
+    const res = await POST(makeRequest({ ...body, data: CREATE_INIT_CODE }));
+    expect(res.status).toBe(200);
+  });
+
+  it("accepts a null to as CREATE", async () => {
+    const res = await POST(
+      makeRequest({ ...VALID_BODY, to: null, data: CREATE_INIT_CODE }),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("returns 400 when to is an empty string", async () => {
+    const res = await POST(makeRequest({ ...VALID_BODY, to: "" }));
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/to/i);
   });
@@ -362,6 +377,7 @@ describe("POST /api/simulate-tx — simulation", () => {
     expect(simulateWithTevm).toHaveBeenCalledWith(
       expect.objectContaining({
         chain: "ethereum",
+        isCreate: false,
         address: VALID_BODY.to,
         functionName: "unlockAsset",
         callData: VALID_BODY.data,
@@ -371,6 +387,29 @@ describe("POST /api/simulate-tx — simulation", () => {
         blockNumber: "latest",
       }),
     );
+  });
+
+  it("simulates CREATE without resolving a target ABI", async () => {
+    simulateWithTevm.mockResolvedValue({
+      ...SIM_RESULT,
+      createdAddress: CREATED_ADDRESS,
+    });
+    const { to: _, ...body } = VALID_BODY;
+    const res = await POST(makeRequest({ ...body, data: CREATE_INIT_CODE }));
+
+    expect(res.status).toBe(200);
+    expect(fetchAbi).not.toHaveBeenCalled();
+    expect(getAbiFromCache).not.toHaveBeenCalled();
+    expect(simulateWithTevm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isCreate: true,
+        address: null,
+        callData: CREATE_INIT_CODE,
+        functionName: null,
+        abi: null,
+      }),
+    );
+    expect((await res.json()).createdAddress).toBe(CREATED_ADDRESS);
   });
 
   it("returns 200 with the simulation result on success", async () => {
@@ -849,6 +888,32 @@ describe("POST /api/simulate-tx — session mode", () => {
       }),
     );
     expect(simulateWithTevm).not.toHaveBeenCalled();
+  });
+
+  it("supports CREATE entries and preserves the created address", async () => {
+    simulateWithClient.mockResolvedValue({
+      ...SIM_RESULT,
+      createdAddress: CREATED_ADDRESS,
+    });
+    const createCall = {
+      data: CREATE_INIT_CODE,
+      from: VALID_BODY.from,
+    };
+    const res = await POST(makeRequest({ chainId: 1, calls: [createCall] }));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(simulateWithClient).toHaveBeenCalledWith(
+      expect.anything(),
+      "latest",
+      expect.objectContaining({
+        isCreate: true,
+        address: null,
+        callData: CREATE_INIT_CODE,
+        persistState: true,
+      }),
+    );
+    expect(body.results[0].createdAddress).toBe(CREATED_ADDRESS);
   });
 
   it("passes the fork RPC and customChainId when rpcUrl is provided", async () => {

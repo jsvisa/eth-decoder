@@ -154,9 +154,13 @@ export function ensureTevmNodeCompat(client) {
 }
 
 // Wraps an HTTP transport to avoid eth_getProof, which is unsupported by many
-// public RPCs. Intercepts eth_getProof and emulates it with eth_getBalance +
-// eth_getCode only — nonce is omitted because it is irrelevant for CALL
-// simulation (only matters for CREATE address derivation, which is rare).
+// public RPCs. Intercepts eth_getProof and emulates account fields with simpler
+// RPC methods. The nonce is only fetched for the active CREATE sender — it is
+// otherwise unused (nonce only matters for CREATE address derivation), so
+// fetching it for every account on every simulation would be wasted RPC load.
+// The transport is shared across a session that may mix CALL and CREATE, so the
+// caller sets the current create sender via factory.setCreateSender() before
+// each call.
 // Storage slots are unaffected since tevm already uses eth_getStorageAt.
 function createProofFreeTransport(rpcUrl, batchSize = 1, collector = null) {
   const baseHttpFactory = makeHttp(rpcUrl, batchSize);
@@ -165,7 +169,8 @@ function createProofFreeTransport(rpcUrl, batchSize = 1, collector = null) {
   const wrappedFactory = collector
     ? collector.wrap(baseHttpFactory)
     : baseHttpFactory;
-  return (config) => {
+  let createSender = null;
+  const factory = (config) => {
     const base = wrappedFactory(config);
     return {
       ...base,
@@ -173,15 +178,24 @@ function createProofFreeTransport(rpcUrl, batchSize = 1, collector = null) {
         if (method === "eth_getProof") {
           const [address, , blockTag] = params ?? [];
           const tag = blockTag ?? "latest";
-          const [balance, code] = await Promise.all([
+          const needsNonce =
+            createSender &&
+            address.toLowerCase() === createSender.toLowerCase();
+          const [balance, code, nonce] = await Promise.all([
             base.request({ method: "eth_getBalance", params: [address, tag] }),
             base.request({ method: "eth_getCode", params: [address, tag] }),
+            needsNonce
+              ? base.request({
+                  method: "eth_getTransactionCount",
+                  params: [address, tag],
+                })
+              : "0x0",
           ]);
           return {
             address,
             accountProof: [],
             balance,
-            nonce: "0x0", // nonce unused in CALL simulation
+            nonce,
             codeHash: keccak256(code),
             storageHash:
               "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
@@ -193,6 +207,10 @@ function createProofFreeTransport(rpcUrl, batchSize = 1, collector = null) {
       },
     };
   };
+  factory.setCreateSender = (sender) => {
+    createSender = sender || null;
+  };
+  return factory;
 }
 
 // Batch-decode undecoded logs using the /api/decode-event server endpoint.
@@ -654,6 +672,11 @@ export async function createTevmClient(
   });
   ensureTevmNodeCompat(client);
 
+  // Expose a way to tell the shared fork transport which sender (if any) is the
+  // active CREATE sender for the current call, so the nonce is only fetched
+  // when CREATE address derivation needs it.
+  client.setCreateSender = forkTransport.setCreateSender;
+
   await client.tevmReady();
   if (blockTag === "latest") {
     forkBlockNumber = await client.getBlockNumber();
@@ -900,6 +923,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     persistState = false,
     gas = null,
     prefetch = true,
+    isCreate = false,
   } = params;
 
   // Validate inputs before the try/catch so callers receive a rejected promise
@@ -907,13 +931,13 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
   // When functionName is null, run a raw EVM call without decode/annotation
   // (the function selector might not be in the provided ABI).
   const isRawCall = !functionName;
-  if (!address) {
+  if (!isCreate && !address) {
     throw new Error("Missing required parameter: address");
   }
   if (!isRawCall && !abi) {
     throw new Error("Missing required parameters: address, functionName, abi");
   }
-  if (!isValidEthAddress(address)) {
+  if (!isCreate && !isValidEthAddress(address)) {
     throw new Error("Invalid address format");
   }
 
@@ -1058,7 +1082,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
         : String(pinnedBlock).trim();
 
     collector.markPhase("prefetch", "start");
-    if (prefetch) {
+    if (prefetch && !isCreate) {
       await prefetchAccountsFromAccessList({
         client,
         forkRpcUrl: rpcUrl || FORK_RPC_URLS[chain] || "",
@@ -1245,8 +1269,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       next?.();
     };
 
-    const callResult = await client.tevmCall({
-      to: address,
+    const callParams = {
       from: sender,
       data: callData,
       value: valueInWei,
@@ -1257,11 +1280,18 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       onBeforeMessage,
       onAfterMessage,
       onStep,
-    });
+    };
+    if (!isCreate) callParams.to = address;
+    client.setCreateSender?.(isCreate ? sender : null);
+    const callResult = await client.tevmCall(callParams);
 
     // Check for errors
     const success = !callResult.errors || callResult.errors.length === 0;
     const rawOutput = callResult.rawData || "0x";
+    const createdAddress =
+      success && callResult.createdAddress
+        ? callResult.createdAddress.toString()
+        : null;
 
     // Decode output if function has outputs and call succeeded
     let decodedOutputs = [];
@@ -1373,6 +1403,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     return finalize({
       success,
       simulated: true,
+      createdAddress,
       blockNumber: pinnedBlock,
       rawData: rawOutput,
       decoded: decodedOutputs,
@@ -1427,6 +1458,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     return finalize({
       success: false,
       simulated: true,
+      createdAddress: null,
       rawData: "0x",
       decoded: [],
       gasUsed: 0,

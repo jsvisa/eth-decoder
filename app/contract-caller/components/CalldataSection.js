@@ -15,6 +15,8 @@ import styles from "./CalldataSection.module.css";
  *   error           {string|null}         - decode error message
  *   onDecodeAndFill {() => void}          - run decode and fill function/args
  *   disabled        {boolean}             - disabled while loading
+ *   noToggle        {boolean}             - hide toggle, always show body
+ *   hideDecodeAndFill {boolean}           - hide Decode & fill button
  */
 export default function CalldataSection({
   expanded,
@@ -24,24 +26,29 @@ export default function CalldataSection({
   error,
   onDecodeAndFill,
   disabled,
+  noToggle,
+  hideDecodeAndFill,
 }) {
   const textareaClass = error
     ? `${styles.textarea} ${styles.inputError}`
     : styles.textarea;
 
+  const showBody = noToggle || expanded;
+
   return React.createElement(
     "div",
     { className: styles.pasteCalldataSection },
-    React.createElement(
-      "button",
-      {
-        type: "button",
-        className: styles.pasteCalldataToggle,
-        onClick: onToggle,
-      },
-      `${expanded ? "▼" : "▶"} Calldata`,
-    ),
-    expanded &&
+    !noToggle &&
+      React.createElement(
+        "button",
+        {
+          type: "button",
+          className: styles.pasteCalldataToggle,
+          onClick: onToggle,
+        },
+        `${expanded ? "▼" : "▶"} Calldata`,
+      ),
+    showBody &&
       React.createElement(
         "div",
         { className: styles.pasteCalldataBody },
@@ -59,16 +66,17 @@ export default function CalldataSection({
             { className: styles.pasteCalldataError },
             error,
           ),
-        React.createElement(
-          "button",
-          {
-            type: "button",
-            className: styles.pasteCalldataBtn,
-            onClick: onDecodeAndFill,
-            disabled: disabled || !value.trim(),
-          },
-          "Decode & fill",
-        ),
+        !hideDecodeAndFill &&
+          React.createElement(
+            "button",
+            {
+              type: "button",
+              className: styles.pasteCalldataBtn,
+              onClick: onDecodeAndFill,
+              disabled: disabled || !value.trim(),
+            },
+            "Decode & fill",
+          ),
       ),
   );
 }
