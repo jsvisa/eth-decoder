@@ -1043,6 +1043,37 @@ describe("simulateWithClient — CREATE fork nonce", () => {
       await fork.close();
     }
   });
+
+  it("does not fetch a nonce for ordinary CALL simulations", async () => {
+    const CONTRACT = "0x1111111111111111111111111111111111111111";
+    const fork = await createForkRpc({
+      code: STORAGE_READER_CODE,
+      balance: "0x0",
+    });
+
+    try {
+      const { client, blockNumber } = await createTevmClient(
+        "ethereum",
+        fork.url,
+        "0x10",
+        null,
+        1,
+      );
+      const result = await simulateWithClient(client, blockNumber, {
+        chain: "ethereum",
+        address: CONTRACT,
+        callData: "0x",
+        abi: null,
+        fromAddress: SENDER,
+        rpcUrl: fork.url,
+      });
+
+      expect(result.success).toBe(true);
+      expect(fork.requests).not.toContain("eth_getTransactionCount");
+    } finally {
+      await fork.close();
+    }
+  });
 });
 
 describe("simulateWithClient — session state vs prefetch (regression)", () => {
