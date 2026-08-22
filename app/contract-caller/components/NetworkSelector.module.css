@@ -29,7 +29,7 @@
   flex: 1;
   min-width: 0;
   padding: 0.6rem 0.4rem;
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   border: 2px solid var(--border-primary);
   border-radius: 6px;
   background-color: var(--bg-input);
