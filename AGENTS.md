@@ -1,87 +1,43 @@
 # AGENTS.md
 
-Guidance for AI coding agents working in this repository.
-
-See README.md for project overview, features, API keys, public API docs, and ABI resolution details.
+qNext.js 16 (App Router) EVM calldata decoder + contract caller, deployed to Vercel. All code is plain `.js` — there are **no `.jsx`/`.tsx`/`.ts` files**. JSX lives in `.js` files.
 
 ## Commands
 
 ```bash
-npm run dev           # Start dev server (http://localhost:3000)
-npm run build         # Production build
-npm run start         # Start production build
-npm run lint          # ESLint (app + tests)
-npm run format        # Prettier format — run after any code changes
-npm test              # Vitest unit + API tests (vitest run)
-npm run test:watch    # Vitest in watch mode
-npm run test:coverage # Vitest with v8 coverage
-npm run test:e2e      # Playwright e2e only
-./scripts/run-e2e.sh  # Full E2E: builds and starts Next.js, runs Playwright
+npm run dev              # dev server (port 3000)
+npm run build            # production build
+npm test                 # vitest run (unit + api projects)
+npm run test:coverage    # vitest with coverage (app/utils, app/api)
+npm run test:e2e         # playwright (needs a running server)
+npm run lint             # eslint app tests
+npm run format           # prettier --write
 ```
 
-**After any code change, always run:**
+CI order (must pass in this order): `prettier --check` → `npm run lint` → `npm run test:coverage` → `./scripts/run-e2e.sh`. `prettier --check` is a hard CI gate, so keep formatting consistent or `npm run format` before pushing.
 
-```bash
-npm run format && npm run lint && npm test && ./scripts/run-e2e.sh
-```
+## Tests
 
-## Tech Stack
+- **vitest** has two projects: `unit` (jsdom, `tests/unit/**`) and `api` (node, `tests/api/**`). Run one: `npx vitest run --project unit` or `--project api`. Single file: `npx vitest run tests/api/decode.test.js`.
+- `tests/unit/setup.js` shims a broken Node global `localStorage` — required by the `unit` project, don't remove.
+- API tests use fixtures in `tests/api/__fixtures__/` (excluded from run). Server-cache tests use `tests/utils/serverCacheTestEnv.js` (temp dirs keyed by pid).
+- **E2E** (`tests/e2e/**`, chromium): `playwright.config.js` auto-starts a **dev** server when run directly. CI instead uses `./scripts/run-e2e.sh`, which does `npm run build` then `npm run start` (prod). Local direct `npm run test:e2e` uses dev. Use `scripts/run-e2e.sh` to reproduce CI locally.
 
-- **Next.js 16 / React 19** — **JavaScript, no TypeScript**
-- **CSS Modules** — no Tailwind, no CSS-in-JS
-- **viem** — EVM ABI encoding/decoding, RPC calls, chain definitions
-- **tevm** — in-browser EVM simulation (forks chain state client-side)
-- **js-yaml** — YAML output formatting
+## Quirks
 
-## Test Framework
+- **JSX in `.js` files**: vitest needs the `jsx-in-js` plugin in `vitest.config.js` (already configured) to transform JSX in `app/**/*.js`. ESLint ignores PascalCase component vars via `varsIgnorePattern: '^[A-Z]'` in `app/**/*.js`.
+- **tevm pinned**: `tevm` is `1.0.0-next.148` and its entire transitive set is force-pinned via `overrides` in `package.json`. Keep all `@tevm/*` at the same version or the build breaks.
+- Node 24 is used in CI. `next.config.mjs` sets `allowedDevOrigins: ["127.0.0.1"]` and injects `NEXT_PUBLIC_APP_VERSION` from git SHA.
 
-**Vitest** for unit and API tests; **Playwright** for e2e. Vitest uses two projects (`unit` and `api`), configured in `vitest.config.js`.
+## Environment & caches
 
-```
-tests/
-  unit/   # jsdom environment — pure utils + React components
-  api/    # node environment — Next.js route handlers
-  e2e/    # Playwright — full browser flows
-```
+- `.env.example` → copy to `.env.local`. `BACKEND_URL` is **optional**; without it, `/api/v1/decode` and `/api/v1/decode-event` still work via Sourcify fallback. API keys (Etherscan/Routescan) are stored **client-side in localStorage** (keys `abi-{chain}-{address}` etc.), not env vars.
+- Server-side ABI cache lives at `~/.cache/eth-decoder/<chainId>/<address>.json` (Vercel: `/tmp/...`). Override base with `CACHE_DIR`. Delete a file to force a fresh fetch. `ETHERSCAN_API_KEY` / `ROUTESCAN_API_KEY` env vars are server-side fallbacks for `/api/fetch-abi`.
+- Simulation result links (`?simulationId=`) use Vercel Blob only when `BLOB_STORE_ENABLED=true`; otherwise filesystem. See README "Shared simulation result storage".
 
-API tests import route handlers directly and mock `global.fetch` via `vi.stubGlobal` to intercept RPC/external calls — no running server required.
+## Conventions
 
-## State
-
-All client state is React `useState` + `localStorage`. No external state library. Keys:
-
-- `evm_decoder_history`, `evm_event_decoder_history`, `contract_caller_history` — recent activity
-- `abi-{chain}-{address}` — cached contract ABIs
-- `address_book` — saved addresses
-- `api_keys_settings`, `rpc_settings`, `simulation_settings`, `custom_chains`, `theme_preference` — user settings
-
-Server-side caches: ABI/signature caches live under `app/utils/serverAbiCache.js` / `serverSigCache.js`; simulation results persist via Vercel Blob in production and the local filesystem in development (`simulationCache.js`, `serverCacheDir.js`).
-
-## Public API
-
-The app exposes a versioned public API under `app/api/v1/` (`decode`, `decode-event`, `fetch-abi`, `query`), documented in README.md. Non-versioned handlers under `app/api/` back the UI.
-
-## Key Patterns (Footguns)
-
-- **Chain configs are consolidated** in `app/utils/chains.js` — exports `CHAINS`, `BUILT_IN_CHAIN_IDS`, `DEFAULT_RPC_URLS`, `VIEM_CHAINS`, `getChainConfig()`, and more. Always import from here; don't redeclare locally.
-- **Proxy detection** in `fetch-abi/route.js` checks EIP-1967 implementation slot, EIP-1967 beacon slot, and OpenZeppelin legacy slot via `getStorageAt`.
-- **All pages are client components** (`'use client'`). Only the layout and API routes are server components.
-- **`contract-caller/page.js` is a thin orchestrator** (~900 lines) that composes hooks and components. Logic lives in `hooks/`, presentational rendering in `components/`. Don't inline state or effects into `page.js`.
-- **`contract-caller` layout** uses `main > div.container` (card, max-width 1200px) with `h1 "Contract Caller"` and a `div.form` flex column. First row is `div.row` with `div.networkField` (Network label + selector) and `ContractAddressInput` side by side. Match this pattern for new top-level sections.
-- **`ResultPanel`** (`components/ResultPanel.js`, ~1100 lines) handles all simulation result rendering. Don't split without explicit instruction.
-
-## Git Worktrees
-
-Create a worktree on a new branch from `main`:
-
-```bash
-git worktree add -b <branch-name> .worktrees/<branch-name> main
-```
-
-This creates the branch and worktree at `.worktrees/<branch-name>`. Work inside that directory, then remove it when done:
-
-```bash
-git worktree remove .worktrees/<branch-name>
-```
-
-The worktree shares `.git` and `node_modules` with the parent repo, so `npm` commands work directly inside it.
+- Styling: CSS Modules (`*.module.css` next to each component).
+- ABI/decoding uses `viem`; tevm for in-browser simulation.
+- Public versioned API under `app/api/v1/`. Multicall auto-detection is driven by a hardcoded selector table (README lists all selectors) — extend there when adding multicall variants.
+- Merging PRs: `/sgtm`/`/lgtm`/`/approve`/`/merge` comment auto-merges (squash); add `/deploy` to trigger production deploy after merge.
