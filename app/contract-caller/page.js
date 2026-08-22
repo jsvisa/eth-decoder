@@ -715,6 +715,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
           onAbiChange={abi.setAbi}
           parsedAbi={abi.parsedAbi}
           abiSource={abi.abiSource}
+          abiSourceMeta={abi.abiSourceMeta}
           abiSaved={abi.abiSaved}
           onSaveAbi={abi.saveAbiToCache}
           onRefetchAbi={() => abi.fetchAbi({ forceRefresh: true })}

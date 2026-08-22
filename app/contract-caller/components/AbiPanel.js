@@ -150,6 +150,7 @@ export default function AbiPanel({
   onAbiChange,
   parsedAbi,
   abiSource,
+  abiSourceMeta,
   abiSaved,
   onSaveAbi,
   onRefetchAbi,
@@ -203,7 +204,35 @@ export default function AbiPanel({
       ? React.createElement(
           "span",
           { className: styles.abiSource },
-          abiSource,
+          React.createElement(
+            "span",
+            { className: styles.abiSourceLabel },
+            abiSourceMeta?.prefix || abiSource,
+          ),
+          abiSourceMeta
+            ? React.createElement(
+                "span",
+                { className: styles.abiSourceTooltip },
+                abiSourceMeta.isProxy
+                  ? [
+                      React.createElement(
+                        "div",
+                        { key: "p" },
+                        "proxy: " + (abiSourceMeta.source || "?"),
+                      ),
+                      React.createElement(
+                        "div",
+                        { key: "i" },
+                        "imple: " +
+                          (abiSourceMeta.implSource || "?") +
+                          "(" +
+                          (abiSourceMeta.implAddress || "") +
+                          ")",
+                      ),
+                    ]
+                  : abiSourceMeta.source || "",
+              )
+            : null,
           React.createElement(
             "button",
             {

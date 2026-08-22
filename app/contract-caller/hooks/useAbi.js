@@ -127,6 +127,7 @@ export function useAbi({
   const [functions, setFunctions] = useState([]);
   const [fetchingAbi, setFetchingAbi] = useState(false);
   const [abiSource, setAbiSource] = useState(null);
+  const [abiSourceMeta, setAbiSourceMeta] = useState(null);
   const [contractName, setContractName] = useState(null);
   const [abiSaved, setAbiSaved] = useState(false);
   const [cachedAddresses, setCachedAddresses] = useState([]);
@@ -149,6 +150,7 @@ export function useAbi({
       setAbi("");
       setParsedAbi(null);
       setAbiSource(null);
+      setAbiSourceMeta(null);
       setContractName(null);
       return;
     }
@@ -169,11 +171,19 @@ export function useAbi({
           implAddress: cached.implAddress,
         }),
       );
+      setAbiSourceMeta({
+        prefix: "cached",
+        isProxy: cached.isProxy,
+        source: cached.source,
+        implSource: cached.implSource,
+        implAddress: cached.implAddress,
+      });
     } else {
       // Clear ABI when switching to uncached contract
       setAbi("");
       setParsedAbi(null);
       setAbiSource(null);
+      setAbiSourceMeta(null);
       setContractName(null);
     }
   }, [chain, address]);
@@ -237,11 +247,14 @@ export function useAbi({
             ? `${cached.contractName} → ${cached.implContractName}`
             : cached.contractName;
         setContractName(nameDisplay);
-        setAbiSource(
-          cached.isProxy
-            ? `cached (proxy → ${cached.implAddress?.slice(0, 10)}...)`
-            : "cached",
-        );
+        setAbiSource("cached");
+        setAbiSourceMeta({
+          prefix: "cached",
+          isProxy: cached.isProxy,
+          source: cached.source,
+          implSource: cached.implSource,
+          implAddress: cached.implAddress,
+        });
         return;
       }
     }
@@ -306,6 +319,13 @@ export function useAbi({
           implAddress: data.implAddress,
         }),
       );
+      setAbiSourceMeta({
+        prefix: "fetched",
+        isProxy: data.isProxy,
+        source: data.source,
+        implSource: data.implSource,
+        implAddress: data.implAddress,
+      });
       // Expand ABI when first fetched from remote
       setAbiCollapsed(false);
     } catch (err) {
@@ -346,6 +366,13 @@ export function useAbi({
       // Update source to indicate it's now cached
       if (!abiSource?.includes("cached")) {
         setAbiSource("cached (manual)");
+        setAbiSourceMeta({
+          prefix: "cached",
+          isProxy: false,
+          source: "manual",
+          implSource: null,
+          implAddress: null,
+        });
       }
     } catch (err) {
       if (onSetError) onSetError("Failed to save ABI: Invalid JSON format");
@@ -359,6 +386,7 @@ export function useAbi({
     functions,
     fetchingAbi,
     abiSource,
+    abiSourceMeta,
     contractName,
     abiSaved,
     cachedAddresses,
