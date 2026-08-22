@@ -37,7 +37,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  min-width: 130px;
+  min-width: 110px;
 }
 
 .label {
