@@ -51,7 +51,7 @@ test.describe("Contract Caller page", () => {
     await expect(addressInput()).toHaveValue("");
   });
 
-  test("deploy mode hides the target address and shows a deploy note", async ({
+  test("deploy mode hides target address, ABI, functions and events", async ({
     page,
   }) => {
     await page.goto("/contract-caller");
@@ -61,13 +61,26 @@ test.describe("Contract Caller page", () => {
     // Enter deploy mode
     await page.getByRole("button", { name: "Deploy", exact: true }).click();
 
-    // Target address field disappears, deploy note appears
+    // Target address, ABI fetch, and function/event tabs disappear
     await expect(addressInput).not.toBeVisible();
-    await expect(page.getByText(/deployment bytecode \(init code\)/i)).toBeVisible();
+    await expect(page.locator('[data-fetch-abi="true"]')).not.toBeVisible();
+    await expect(page.getByText("Functions (0)")).not.toBeVisible();
+    await expect(page.getByText("Events (0)")).not.toBeVisible();
+    await expect(
+      page.getByText(/deployment bytecode \(init code\)/i),
+    ).toBeVisible();
+
+    // Calldata section and from-address option remain for the deploy simulation
+    await expect(
+      page.getByPlaceholder("0x{4-byte selector}{encoded args}"),
+    ).toBeVisible();
+    await expect(page.getByPlaceholder("From (prank)")).toBeVisible();
 
     // Switching back to Call restores the address field
     await page.getByRole("button", { name: "Call", exact: true }).click();
     await expect(addressInput).toBeVisible();
-    await expect(page.getByText(/deployment bytecode \(init code\)/i)).not.toBeVisible();
+    await expect(
+      page.getByText(/deployment bytecode \(init code\)/i),
+    ).not.toBeVisible();
   });
 });
