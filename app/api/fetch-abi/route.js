@@ -286,10 +286,28 @@ async function getImplementationAddress(client, proxyAddress) {
 }
 
 // Get the facet addresses of an EIP-2535 diamond proxy.
-// Tries the standard DiamondLoupe facetAddresses() call first, then falls back
-// to reading the standard DiamondStorage.facetAddresses array from storage.
+// Cheap pre-check: a diamond always has >= 1 facet, so we read the standard
+// DiamondStorage.facetAddresses array length first. For a plain contract that
+// slot is 0, so this costs a single storage read and we bail out early.
+// Once confirmed as a diamond, try the standard DiamondLoupe facetAddresses()
+// call, then fall back to reading the storage array elements directly.
 async function getDiamondFacetAddresses(client, diamondAddress) {
-  // Try the standard loupe interface first
+  const arrSlot = BigInt(DIAMOND_STORAGE_SLOT) + 2n;
+
+  // Cheap pre-check on the standard DiamondStorage.facetAddresses length
+  let length;
+  try {
+    const lengthData = await client.getStorageAt({
+      address: diamondAddress,
+      slot: toHex(arrSlot, { size: 32 }),
+    });
+    length = parseInt(lengthData || "0x0", 16);
+  } catch (e) {
+    return [];
+  }
+  if (!length || length > 200) return [];
+
+  // It's a diamond. Try the standard loupe interface first
   try {
     const res = await client.call({
       address: diamondAddress,
@@ -308,16 +326,8 @@ async function getDiamondFacetAddresses(client, diamondAddress) {
     // Not a loupe diamond; fall through to storage reading
   }
 
-  // Fallback: read the standard DiamondStorage.facetAddresses array
+  // Fallback: read the standard DiamondStorage.facetAddresses array elements
   try {
-    const arrSlot = BigInt(DIAMOND_STORAGE_SLOT) + 2n;
-    const lengthData = await client.getStorageAt({
-      address: diamondAddress,
-      slot: toHex(arrSlot, { size: 32 }),
-    });
-    const length = parseInt(lengthData || "0x0", 16);
-    if (!length || length > 200) return [];
-
     const elementBase = BigInt(keccak256(toHex(arrSlot, { size: 32 })));
     const addresses = [];
     for (let i = 0; i < length; i++) {
@@ -441,7 +451,9 @@ export async function fetchAbi(
     );
   }
 
-  // Diamond proxy: discover all facets and fetch each of their ABIs
+  // Diamond proxy: discover all facets and fetch each of their ABIs.
+  // getDiamondFacetAddresses does a cheap storage-length pre-check so plain
+  // (non-diamond) contracts cost a single RPC call.
   let facetAddresses = [];
   let facetInfos = [];
   if (client) {

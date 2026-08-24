@@ -17,7 +17,9 @@ const h = React.createElement;
  *   cachedAddresses     {Array<{chain, address, contractName, implContractName, isProxy}>}
  *   contractName        {string|null}
  *   onFetchAbi          {(opts?) => void}
+ *   onCancelFetchAbi    {() => void}
  *   fetchingAbi         {boolean}
+ *   fetchingElapsed     {number} seconds elapsed while fetching
  *   onSaveAbiBackend    {(opts?) => void}
  *   savingAbiBackend    {boolean}
  *   canSaveAbiBackend   {boolean}
@@ -33,7 +35,9 @@ export default function ContractAddressInput({
   cachedAddresses,
   contractName,
   onFetchAbi,
+  onCancelFetchAbi,
   fetchingAbi,
+  fetchingElapsed,
   onSaveAbiBackend,
   savingAbiBackend,
   canSaveAbiBackend,
@@ -192,8 +196,42 @@ export default function ContractAddressInput({
             disabled: disabled || fetchingAbi,
             "data-fetch-abi": "true",
           },
-          fetchingAbi ? "Fetching..." : "Fetch ABI",
+          fetchingAbi
+            ? h(
+                "span",
+                { className: styles.fetchButtonContent, role: "status" },
+                [
+                  h(
+                    "span",
+                    { className: styles.fetchButtonText, key: "text" },
+                    `Fetching... (${fetchingElapsed}s)`,
+                  ),
+                  h(
+                    "span",
+                    {
+                      className: styles.fetchButtonTrack,
+                      key: "track",
+                    },
+                    h("span", { className: styles.fetchButtonBar, key: "bar" }),
+                  ),
+                ],
+              )
+            : "Fetch ABI",
         ),
+        fetchingAbi
+          ? h(
+              "button",
+              {
+                type: "button",
+                onClick: onCancelFetchAbi,
+                className: styles.cancelButton,
+                disabled,
+                "data-cancel-fetch-abi": "true",
+                title: "Cancel ABI fetch",
+              },
+              "Cancel",
+            )
+          : null,
         onSaveAbiBackend
           ? h(
               "button",

@@ -4,6 +4,7 @@ import etherscanErc20 from "./__fixtures__/etherscan-erc20.json";
 import etherscanProxy from "./__fixtures__/etherscan-proxy.json";
 import etherscanImpl from "./__fixtures__/etherscan-impl.json";
 import sourcifyV2 from "./__fixtures__/sourcify-v2.json";
+import { keccak256, toHex } from "viem";
 
 const VALID_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
 
@@ -245,9 +246,26 @@ describe("GET /api/fetch-abi", () => {
     const zeroSlot =
       "0x0000000000000000000000000000000000000000000000000000000000000000";
 
+    // standard DiamondStorage.facetAddresses array: length slot + element slots
+    const storageSlot = BigInt(
+      keccak256(toHex("diamond.standard.diamond.storage")),
+    );
+    const arrSlot = toHex(storageSlot + 2n, { size: 32 });
+    const elementBase = BigInt(
+      keccak256(toHex(storageSlot + 2n, { size: 32 })),
+    );
+    const len2 = "0x" + 2n.toString(16).padStart(64, "0");
+
     mockFetchWithRpc(
       {
-        eth_getStorageAt: () => zeroSlot,
+        eth_getStorageAt: (req) => {
+          const slot = req.params[1];
+          if (slot === arrSlot) return len2; // facet array length
+          if (slot === toHex(elementBase, { size: 32 })) return pad(FACET1);
+          if (slot === toHex(elementBase + 1n, { size: 32 }))
+            return pad(FACET2);
+          return zeroSlot;
+        },
         eth_getCode: () => "0x",
         eth_call: (req) => {
           const data = req.params[0].data;

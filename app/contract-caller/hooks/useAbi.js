@@ -126,6 +126,7 @@ export function useAbi({
   const [parsedAbi, setParsedAbi] = useState(null);
   const [functions, setFunctions] = useState([]);
   const [fetchingAbi, setFetchingAbi] = useState(false);
+  const [fetchingElapsed, setFetchingElapsed] = useState(0);
   const [abiSource, setAbiSource] = useState(null);
   const [abiSourceMeta, setAbiSourceMeta] = useState(null);
   const [contractName, setContractName] = useState(null);
@@ -136,6 +137,7 @@ export function useAbi({
   const [abiFilter, setAbiFilter] = useState("");
   const [abiCopiedItem, setAbiCopiedItem] = useState(null);
   const fetchAbiRequestId = useRef(0);
+  const fetchAbiController = useRef(null);
 
   useEffect(() => {
     setCachedAddresses(getCachedAddresses());
@@ -227,6 +229,15 @@ export function useAbi({
     }
   }, [abi]);
 
+  // Tick elapsed time while an ABI fetch is in flight so the UI can show
+  // that work is still progressing (diamond proxies with many facets take a while).
+  useEffect(() => {
+    if (!fetchingAbi) return;
+    setFetchingElapsed(0);
+    const id = setInterval(() => setFetchingElapsed((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [fetchingAbi]);
+
   // -------------------------------------------------------------------------
   // Callback: fetchAbi (lines 1847–1934)
   // -------------------------------------------------------------------------
@@ -260,7 +271,10 @@ export function useAbi({
     }
 
     setFetchingAbi(true);
+    setFetchingElapsed(0);
     if (onSetError) onSetError(null);
+    const controller = new AbortController();
+    fetchAbiController.current = controller;
 
     try {
       const params = new URLSearchParams({ address, chain });
@@ -279,7 +293,9 @@ export function useAbi({
       }
       params.set("detectProxy", "true");
 
-      const response = await fetch(`/api/fetch-abi?${params}`);
+      const response = await fetch(`/api/fetch-abi?${params}`, {
+        signal: controller.signal,
+      });
       const data = await response.json();
 
       // Ignore stale responses from a previous address/chain
@@ -330,12 +346,21 @@ export function useAbi({
       setAbiCollapsed(false);
     } catch (err) {
       if (requestId !== fetchAbiRequestId.current) return;
+      if (err.name === "AbortError") return; // user cancelled; no error shown
       if (onSetError) onSetError(err.message);
     } finally {
+      if (fetchAbiController.current === controller) {
+        fetchAbiController.current = null;
+      }
       if (requestId === fetchAbiRequestId.current) {
         setFetchingAbi(false);
       }
     }
+  };
+
+  // Cancel an in-flight ABI fetch (e.g. long diamond proxy fetches).
+  const cancelFetchAbi = () => {
+    fetchAbiController.current?.abort();
   };
 
   // -------------------------------------------------------------------------
@@ -385,6 +410,7 @@ export function useAbi({
     parsedAbi,
     functions,
     fetchingAbi,
+    fetchingElapsed,
     abiSource,
     abiSourceMeta,
     contractName,
@@ -401,6 +427,7 @@ export function useAbi({
     getCachedAddresses,
     setCachedAddressesState: setCachedAddresses,
     fetchAbi,
+    cancelFetchAbi,
     saveAbiToCache,
   };
 }
