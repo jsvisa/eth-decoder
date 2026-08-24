@@ -687,7 +687,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
         onDecodeAndFill={fn.handleDecodeAndFill}
         disabled={exec.loading}
         noToggle
-        hideDecodeAndFill
+        hideDecodeAndFill={deployMode}
       />
       <SimulationOptions
         forkBlockNumber={simOpts.forkBlockNumber}
