@@ -192,7 +192,9 @@ export default function Tabs({
                 aria-label={`Close ${tab.title}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  closeTab(tab.id);
+                  if (window.confirm(`Close tab "${tab.title}"?`)) {
+                    closeTab(tab.id);
+                  }
                 }}
                 onDoubleClick={(e) => e.stopPropagation()}
               >

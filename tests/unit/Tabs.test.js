@@ -45,6 +45,7 @@ function click(container, el) {
 
 beforeEach(() => {
   localStorage.clear();
+  vi.restoreAllMocks();
 });
 
 describe("Tabs", () => {
@@ -90,6 +91,7 @@ describe("Tabs", () => {
   });
 
   it("closes a tab and keeps the rest", () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
     const { container, cleanup } = renderTabs();
     const addBtn = Array.from(container.querySelectorAll("button")).find(
       (b) => b.textContent === "+ Add Tab",
@@ -97,7 +99,22 @@ describe("Tabs", () => {
     click(container, addBtn);
     const closeBtn = container.querySelector('[role="tab"] button');
     click(container, closeBtn);
+    expect(window.confirm).toHaveBeenCalled();
     expect(container.querySelectorAll('[role="tab"]').length).toBe(1);
+    cleanup();
+  });
+
+  it("keeps the tab when the close confirm is cancelled", () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    const { container, cleanup } = renderTabs();
+    const addBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent === "+ Add Tab",
+    );
+    click(container, addBtn);
+    const closeBtn = container.querySelector('[role="tab"] button');
+    click(container, closeBtn);
+    expect(window.confirm).toHaveBeenCalled();
+    expect(container.querySelectorAll('[role="tab"]').length).toBe(2);
     cleanup();
   });
 
