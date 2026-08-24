@@ -78,6 +78,10 @@
   white-space: nowrap;
 }
 
+.abiAddress {
+  font-family: "SF Mono", Monaco, "Cascadia Code", "Consolas", monospace;
+}
+
 .abiSource:hover .abiSourceTooltip,
 .abiSourceTooltip:hover {
   visibility: visible;
