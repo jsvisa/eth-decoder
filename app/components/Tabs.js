@@ -61,6 +61,11 @@ export default function Tabs({
   const [editingId, setEditingId] = useState(null);
   const bootTabIdRef = useRef(defaultTabId);
   const storageLoadedRef = useRef(false);
+  // Ref of manually-renamed tab ids, read at call time by onRename so the
+  // workspace's mount-time auto-rename can't clobber a persisted custom title
+  // with a stale closure captured before persisted state was loaded.
+  const renamedRef = useRef(new Set());
+  renamedRef.current = new Set(tabs.filter((t) => t.renamed).map((t) => t.id));
 
   // Load persisted tab list on mount (effect, not initializer, to stay SSR-safe).
   useEffect(() => {
@@ -69,6 +74,9 @@ export default function Tabs({
     const stored = loadTabState(storageKey);
     if (!stored) return;
     bootTabIdRef.current = stored.activeId;
+    renamedRef.current = new Set(
+      stored.tabs.filter((t) => t.renamed).map((t) => t.id),
+    );
     setTabs(stored.tabs);
     setActiveId(stored.activeId);
     setMountedIds(new Set([stored.activeId]));
@@ -127,10 +135,10 @@ export default function Tabs({
   // themselves, so a custom title isn't overwritten on the next render.
   const onRename = useCallback(
     (id, title) => {
-      if (tabs.find((t) => t.id === id)?.renamed) return;
+      if (renamedRef.current.has(id)) return;
       renameTab(id, title);
     },
-    [tabs, renameTab],
+    [renameTab],
   );
 
   const commitRename = useCallback((id, title) => {
