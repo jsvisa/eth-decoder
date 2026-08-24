@@ -39,8 +39,8 @@ jobs:
 
       - name: Update PRO_RPC_CONFIG env var
         run: |
-          echo "${{ steps.build.outputs.config }}" | vercel env update PRO_RPC_CONFIG production --stdin --sensitive --yes 2>/dev/null || \
-            echo "${{ steps.build.outputs.config }}" | vercel env add PRO_RPC_CONFIG production --stdin --sensitive
+          echo "${{ steps.build.outputs.config }}" | vercel env update PRO_RPC_CONFIG production --sensitive --yes 2>/dev/null || \
+            echo "${{ steps.build.outputs.config }}" | vercel env add PRO_RPC_CONFIG production --sensitive
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
