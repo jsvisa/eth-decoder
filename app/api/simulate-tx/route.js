@@ -426,6 +426,7 @@ export async function POST(request) {
     gas = null,
     blockNumber = "latest",
     apiKeys = {},
+    proApiKey,
     rpcUrl = null,
     balanceOverrides = [],
     storageOverrides = [],
