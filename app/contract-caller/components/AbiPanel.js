@@ -233,7 +233,7 @@ export default function AbiPanel({
                         ? React.createElement(
                             "div",
                             { key: "f" },
-                            "facets:",
+                            "facets (" + abiSourceMeta.facets.length + "):",
                             React.createElement(
                               "ul",
                               { className: styles.facetList },
@@ -242,7 +242,7 @@ export default function AbiPanel({
                                   "li",
                                   { key: f.address },
                                   f.name
-                                    ? f.name + " (" + f.address + ")"
+                                    ? f.address + " (" + f.name + ")"
                                     : f.address,
                                 ),
                               ),
