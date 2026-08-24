@@ -3,6 +3,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./Tabs.module.css";
 
+// Soft pastel backgrounds so adjacent tabs are visually distinct. Keyed by a
+// hash of the tab id so each tab keeps its color across reloads.
+const TAB_COLORS = [
+  "rgba(255, 179, 186, 0.4)",
+  "rgba(186, 225, 255, 0.4)",
+  "rgba(186, 255, 201, 0.4)",
+  "rgba(255, 244, 179, 0.4)",
+  "rgba(224, 186, 255, 0.4)",
+  "rgba(255, 204, 179, 0.4)",
+  "rgba(179, 255, 247, 0.4)",
+  "rgba(255, 179, 224, 0.4)",
+];
+
+function tabColor(id) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  }
+  return TAB_COLORS[hash % TAB_COLORS.length];
+}
+
 function loadTabState(storageKey) {
   try {
     const raw = localStorage.getItem(storageKey);
@@ -14,6 +35,7 @@ function loadTabState(storageKey) {
       .map((t) => ({
         id: t.id,
         title: typeof t.title === "string" ? t.title : "Tab",
+        renamed: t.renamed === true,
       }));
     if (tabs.length === 0) return null;
     return {
@@ -53,12 +75,18 @@ export default function Tabs({
   renderTab,
 }) {
   const [tabs, setTabs] = useState(() => [
-    { id: defaultTabId, title: newTabTitle },
+    { id: defaultTabId, title: newTabTitle, renamed: false },
   ]);
   const [activeId, setActiveId] = useState(defaultTabId);
   const [mountedIds, setMountedIds] = useState(() => new Set([defaultTabId]));
+  const [editingId, setEditingId] = useState(null);
   const bootTabIdRef = useRef(defaultTabId);
   const storageLoadedRef = useRef(false);
+  // Ref of manually-renamed tab ids, read at call time by onRename so the
+  // workspace's mount-time auto-rename can't clobber a persisted custom title
+  // with a stale closure captured before persisted state was loaded.
+  const renamedRef = useRef(new Set());
+  renamedRef.current = new Set(tabs.filter((t) => t.renamed).map((t) => t.id));
 
   // Load persisted tab list on mount (effect, not initializer, to stay SSR-safe).
   useEffect(() => {
@@ -67,6 +95,9 @@ export default function Tabs({
     const stored = loadTabState(storageKey);
     if (!stored) return;
     bootTabIdRef.current = stored.activeId;
+    renamedRef.current = new Set(
+      stored.tabs.filter((t) => t.renamed).map((t) => t.id),
+    );
     setTabs(stored.tabs);
     setActiveId(stored.activeId);
     setMountedIds(new Set([stored.activeId]));
@@ -79,7 +110,7 @@ export default function Tabs({
       localStorage.setItem(
         storageKey,
         JSON.stringify({
-          tabs: tabs.map(({ id, title }) => ({ id, title })),
+          tabs: tabs.map(({ id, title, renamed }) => ({ id, title, renamed })),
           activeId,
         }),
       );
@@ -96,7 +127,7 @@ export default function Tabs({
       typeof crypto !== "undefined" && crypto.randomUUID
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    setTabs((prev) => [...prev, { id, title: newTabTitle }]);
+    setTabs((prev) => [...prev, { id, title: newTabTitle, renamed: false }]);
     setActiveId(id);
     setMountedIds((prev) => new Set(prev).add(id));
   }, [newTabTitle]);
@@ -121,6 +152,27 @@ export default function Tabs({
     setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, title } : t)));
   }, []);
 
+  // Auto-rename from workspace content is skipped once the user renames a tab
+  // themselves, so a custom title isn't overwritten on the next render.
+  const onRename = useCallback(
+    (id, title) => {
+      if (renamedRef.current.has(id)) return;
+      renameTab(id, title);
+    },
+    [renameTab],
+  );
+
+  const commitRename = useCallback((id, title) => {
+    const trimmed = title.trim();
+    setEditingId(null);
+    if (!trimmed) return;
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === id ? { ...t, title: trimmed, renamed: true } : t,
+      ),
+    );
+  }, []);
+
   return (
     <>
       <div className={styles.tabBar} role="tablist">
@@ -130,9 +182,35 @@ export default function Tabs({
             role="tab"
             aria-selected={tab.id === activeId}
             className={`${styles.tab}${tab.id === activeId ? ` ${styles.active}` : ""}`}
+            style={
+              tab.id === activeId
+                ? undefined
+                : { backgroundColor: tabColor(tab.id) }
+            }
             onClick={() => selectTab(tab.id)}
+            onDoubleClick={() => setEditingId(tab.id)}
+            title="Double-click to rename"
           >
-            <span className={styles.tabTitle}>{tab.title}</span>
+            {editingId === tab.id ? (
+              <input
+                type="text"
+                autoFocus
+                defaultValue={tab.title}
+                className={styles.tabInput}
+                onFocus={(e) => e.target.select()}
+                onClick={(e) => e.stopPropagation()}
+                onBlur={(e) => commitRename(tab.id, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    commitRename(tab.id, e.target.value);
+                  } else if (e.key === "Escape") {
+                    setEditingId(null);
+                  }
+                }}
+              />
+            ) : (
+              <span className={styles.tabTitle}>{tab.title}</span>
+            )}
             {tabs.length > 1 && (
               <button
                 type="button"
@@ -140,8 +218,11 @@ export default function Tabs({
                 aria-label={`Close ${tab.title}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  closeTab(tab.id);
+                  if (window.confirm(`Close tab "${tab.title}"?`)) {
+                    closeTab(tab.id);
+                  }
                 }}
+                onDoubleClick={(e) => e.stopPropagation()}
               >
                 ✕
               </button>
@@ -167,7 +248,7 @@ export default function Tabs({
               {renderTab(tab, {
                 isActive: tab.id === activeId,
                 hydrateFromUrl: tab.id === bootTabIdRef.current,
-                onRename: (title) => renameTab(tab.id, title),
+                onRename: (title) => onRename(tab.id, title),
               })}
             </div>
           ))}

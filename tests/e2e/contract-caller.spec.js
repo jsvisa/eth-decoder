@@ -83,4 +83,28 @@ test.describe("Contract Caller page", () => {
       page.getByText(/deployment bytecode \(init code\)/i),
     ).not.toBeVisible();
   });
+
+  test("a manually renamed tab keeps its name across a reload", async ({
+    page,
+  }) => {
+    await page.goto("/contract-caller");
+
+    const tab = page.getByRole("tab").first();
+    await expect(tab).toContainText("New Call");
+
+    await tab.dblclick();
+    const input = page.locator('input[class*="tabInput"]');
+    await expect(input).toBeVisible();
+    await input.fill("My Custom Name");
+    await input.press("Enter");
+
+    await expect(tab).toContainText("My Custom Name");
+
+    // The workspace auto-rename (default "New Call") must not clobber the
+    // user's custom title on reload.
+    await page.reload();
+
+    const tabAfter = page.getByRole("tab").first();
+    await expect(tabAfter).toContainText("My Custom Name");
+  });
 });
