@@ -779,7 +779,9 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
               cachedAddresses={abi.cachedAddresses}
               contractName={abi.contractName}
               onFetchAbi={abi.fetchAbi}
+              onCancelFetchAbi={abi.cancelFetchAbi}
               fetchingAbi={abi.fetchingAbi}
+              fetchingElapsed={abi.fetchingElapsed}
               onSaveAbiBackend={handleSaveAbiBackend}
               savingAbiBackend={savingAbiBackend}
               canSaveAbiBackend={

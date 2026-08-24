@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server";
-import { createPublicClient, http, defineChain } from "viem";
+import {
+  createPublicClient,
+  http,
+  defineChain,
+  decodeAbiParameters,
+  getAddress,
+  keccak256,
+  toHex,
+} from "viem";
 import { isValidEthAddress, isValidHttpUrl } from "../../utils/validation";
 import { fetchContractInfoFromSourcify } from "../../utils/sourcify";
 import {
@@ -20,6 +28,19 @@ const EIP1967_BEACON_SLOT =
 // OpenZeppelin legacy implementation slot
 const OZ_IMPL_SLOT =
   "0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3";
+
+// EIP-2535 DiamondLoupe facetAddresses() selector
+const DIAMOND_FACET_ADDRESSES_SELECTOR = "0x52ef6b2c";
+
+// EIP-2535 DiamondStorage struct layout (0-indexed):
+//   0: selectorToFacetAndPosition (mapping)
+//   1: facetFunctionSelectors (mapping)
+//   2: facetAddresses (address[])
+//   3: supportedInterfaces (mapping)
+//   4: contractOwner (address)
+const DIAMOND_STORAGE_SLOT = keccak256(
+  toHex("diamond.standard.diamond.storage"),
+);
 
 // Fetch ABI and contract name from Etherscan
 async function fetchContractInfoFromEtherscan(address, chainId, apiKey) {
@@ -264,8 +285,66 @@ async function getImplementationAddress(client, proxyAddress) {
   return null;
 }
 
-// Merge two ABIs, preferring items from the second ABI for duplicates
-function mergeAbis(proxyAbi, implAbi) {
+// Get the facet addresses of an EIP-2535 diamond proxy.
+// Cheap pre-check: a diamond always has >= 1 facet, so we read the standard
+// DiamondStorage.facetAddresses array length first. For a plain contract that
+// slot is 0, so this costs a single storage read and we bail out early.
+// Once confirmed as a diamond, try the standard DiamondLoupe facetAddresses()
+// call, then fall back to reading the storage array elements directly.
+async function getDiamondFacetAddresses(client, diamondAddress) {
+  const arrSlot = BigInt(DIAMOND_STORAGE_SLOT) + 2n;
+
+  // Cheap pre-check on the standard DiamondStorage.facetAddresses length
+  let length;
+  try {
+    const lengthData = await client.getStorageAt({
+      address: diamondAddress,
+      slot: toHex(arrSlot, { size: 32 }),
+    });
+    length = parseInt(lengthData || "0x0", 16);
+  } catch (e) {
+    return [];
+  }
+  if (!length || length > 200) return [];
+
+  // It's a diamond. Try the standard loupe interface first
+  try {
+    const res = await client.call({
+      address: diamondAddress,
+      data: DIAMOND_FACET_ADDRESSES_SELECTOR,
+    });
+    if (res.data && res.data.length > 2) {
+      const [addresses] = decodeAbiParameters(
+        [{ type: "address[]" }],
+        res.data,
+      );
+      if (addresses.length > 0) {
+        return addresses.map(getAddress);
+      }
+    }
+  } catch (e) {
+    // Not a loupe diamond; fall through to storage reading
+  }
+
+  // Fallback: read the standard DiamondStorage.facetAddresses array elements
+  try {
+    const elementBase = BigInt(keccak256(toHex(arrSlot, { size: 32 })));
+    const addresses = [];
+    for (let i = 0; i < length; i++) {
+      const elementData = await client.getStorageAt({
+        address: diamondAddress,
+        slot: toHex(elementBase + BigInt(i), { size: 32 }),
+      });
+      addresses.push(getAddress("0x" + elementData.slice(-40)));
+    }
+    return addresses;
+  } catch (e) {
+    return [];
+  }
+}
+
+// Merge multiple ABIs, preferring items from earlier arguments for duplicates.
+function mergeAbis(...abiList) {
   const seen = new Map();
 
   // Helper to create a unique key for ABI items
@@ -284,21 +363,34 @@ function mergeAbis(proxyAbi, implAbi) {
     }
     return `${item.type}:${item.name || ""}`;
   };
-  // Add implementation ABI items first (they take priority)
-  for (const item of implAbi) {
-    const key = getKey(item);
-    seen.set(key, item);
-  }
-
-  // Add proxy ABI items (only if not already present)
-  for (const item of proxyAbi) {
-    const key = getKey(item);
-    if (!seen.has(key)) {
-      seen.set(key, item);
+  // Add items from each ABI in order; earlier arguments take priority
+  for (const abi of abiList) {
+    if (!abi) continue;
+    for (const item of abi) {
+      const key = getKey(item);
+      if (!seen.has(key)) {
+        seen.set(key, item);
+      }
     }
   }
 
   return Array.from(seen.values());
+}
+
+// Run an async mapper over items with at most `limit` concurrent tasks.
+async function mapWithConcurrency(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const idx = next++;
+      results[idx] = await fn(items[idx], idx);
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, worker),
+  );
+  return results;
 }
 
 /**
@@ -334,35 +426,80 @@ export async function fetchAbi(
   );
   if (!proxyInfo || !proxyInfo.abi) return null;
 
-  let implAddress = null;
-  if (proxyInfo.isProxy && proxyInfo.implementation) {
-    implAddress = proxyInfo.implementation;
-  } else if (detectProxy && viemChain && rpcUrl) {
-    const client = createPublicClient({
+  let client = null;
+  if (detectProxy && viemChain && rpcUrl) {
+    client = createPublicClient({
       chain: viemChain,
       transport: http(rpcUrl),
     });
+  }
+
+  let implAddress = null;
+  if (proxyInfo.isProxy && proxyInfo.implementation) {
+    implAddress = proxyInfo.implementation;
+  } else if (client) {
     implAddress = await getImplementationAddress(client, address);
   }
 
+  let implInfo = null;
   if (implAddress) {
-    const implInfo = await fetchContractInfo(
+    implInfo = await fetchContractInfo(
       implAddress,
       chainId,
       etherscanKey,
       routescanKey,
     );
-    if (implInfo && implInfo.abi) {
-      return {
-        abi: mergeAbis(proxyInfo.abi, implInfo.abi),
-        contractName: proxyInfo.contractName,
-        implContractName: implInfo.contractName,
-        isProxy: true,
-        implAddress,
-        source: proxyInfo.source,
-        implSource: implInfo.source,
-      };
+  }
+
+  // Diamond proxy: discover all facets and fetch each of their ABIs.
+  // getDiamondFacetAddresses does a cheap storage-length pre-check so plain
+  // (non-diamond) contracts cost a single RPC call.
+  let facetAddresses = [];
+  let facetInfos = [];
+  if (client) {
+    facetAddresses = await getDiamondFacetAddresses(client, address);
+    if (facetAddresses.length > 0) {
+      facetInfos = await mapWithConcurrency(facetAddresses, 5, (facet) =>
+        fetchContractInfo(facet, chainId, etherscanKey, routescanKey),
+      );
     }
+  }
+
+  if (facetAddresses.length > 0) {
+    // Merge order: implementation, proxy, then facets (earlier wins)
+    const abisToMerge = [];
+    if (implInfo && implInfo.abi) abisToMerge.push(implInfo.abi);
+    abisToMerge.push(proxyInfo.abi);
+    for (const fi of facetInfos) {
+      if (fi && fi.abi) abisToMerge.push(fi.abi);
+    }
+    return {
+      abi: mergeAbis(...abisToMerge),
+      contractName: proxyInfo.contractName,
+      implContractName: implInfo?.contractName ?? null,
+      isProxy: true,
+      isDiamond: true,
+      implAddress,
+      facetAddresses,
+      facets: facetInfos.map((fi, i) => ({
+        address: facetAddresses[i],
+        name: fi?.contractName ?? null,
+      })),
+      source: proxyInfo.source,
+      implSource: implInfo?.source ?? null,
+    };
+  }
+
+  if (implInfo && implInfo.abi) {
+    return {
+      abi: mergeAbis(implInfo.abi, proxyInfo.abi),
+      contractName: proxyInfo.contractName,
+      implContractName: implInfo.contractName,
+      isProxy: true,
+      implAddress,
+      source: proxyInfo.source,
+      implSource: implInfo.source,
+    };
   }
 
   return {

@@ -49,6 +49,8 @@ export const getCachedAbi = (chain, address) => {
  * @param {string|null} implContractName - Implementation contract name if proxy
  * @param {string|null} source - Provider the ABI came from (etherscan/sourcify/routescan)
  * @param {string|null} implSource - Provider the implementation ABI came from, if proxy
+ * @param {string[]} [facetAddresses] - Facet addresses if this is an EIP-2535 diamond
+ * @param {Array<{address:string,name:string|null}>} [facets] - Facets with names
  */
 export const setCachedAbi = (
   chain,
@@ -60,6 +62,8 @@ export const setCachedAbi = (
   implContractName = null,
   source = null,
   implSource = null,
+  facetAddresses = null,
+  facets = null,
 ) => {
   if (typeof window === "undefined") return;
 
@@ -75,6 +79,8 @@ export const setCachedAbi = (
         implContractName,
         source,
         implSource,
+        facetAddresses,
+        facets,
         timestamp: Date.now(),
       }),
     );
