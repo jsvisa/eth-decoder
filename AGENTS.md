@@ -1,6 +1,6 @@
 # AGENTS.md
 
-qNext.js 16 (App Router) EVM calldata decoder + contract caller, deployed to Vercel. All code is plain `.js` — there are **no `.jsx`/`.tsx`/`.ts` files**. JSX lives in `.js` files.
+Next.js 16 (App Router) EVM calldata decoder + contract caller, deployed to Vercel. All code is plain `.js` — there are **no `.jsx`/`.tsx`/`.ts` files**. JSX lives in `.js` files.
 
 ## Commands
 
