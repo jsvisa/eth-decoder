@@ -33,7 +33,7 @@ import {
 } from "../../utils/tokenTransfers";
 
 function isCreateCall(call) {
-  return call.to === undefined || call.to === null;
+  return call.to === undefined || call.to === null || call.to === "";
 }
 
 /**

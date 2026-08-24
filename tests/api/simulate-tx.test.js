@@ -167,10 +167,10 @@ describe("POST /api/simulate-tx — validation", () => {
     expect(res.status).toBe(200);
   });
 
-  it("returns 400 when to is an empty string", async () => {
+  it("accepts an empty string to as CREATE", async () => {
     const res = await POST(makeRequest({ ...VALID_BODY, to: "" }));
-    expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/to/i);
+    expect(res.status).toBe(200);
+    expect((await res.json()).success).toBe(true);
   });
 
   it("returns 400 when data is missing", async () => {
