@@ -229,26 +229,26 @@ export default function AbiPanel({
                           (abiSourceMeta.implAddress || "") +
                           ")",
                       ),
-                      abiSourceMeta.facets?.length
-                        ? React.createElement(
-                            "div",
-                            { key: "f" },
-                            "facets:",
+abiSourceMeta.facets?.length
+                    ? React.createElement(
+                        "div",
+                        { key: "f" },
+                        "facets (" + abiSourceMeta.facets.length + "):",
+                        React.createElement(
+                          "ul",
+                          { className: styles.facetList },
+                          abiSourceMeta.facets.map((f) =>
                             React.createElement(
-                              "ul",
-                              { className: styles.facetList },
-                              abiSourceMeta.facets.map((f) =>
-                                React.createElement(
-                                  "li",
-                                  { key: f.address },
-                                  f.name
-                                    ? f.name + " (" + f.address + ")"
-                                    : f.address,
-                                ),
-                              ),
+                              "li",
+                              { key: f.address },
+                              f.name
+                                ? f.address + " (" + f.name + ")"
+                                : f.address,
                             ),
-                          )
-                        : null,
+                          ),
+                        ),
+                      )
+                    : null,
                     ]
                   : abiSourceMeta.source || "",
               )
