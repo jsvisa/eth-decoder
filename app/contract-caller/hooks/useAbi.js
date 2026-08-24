@@ -179,6 +179,8 @@ export function useAbi({
         source: cached.source,
         implSource: cached.implSource,
         implAddress: cached.implAddress,
+        facetAddresses: cached.facetAddresses,
+        facets: cached.facets,
       });
     } else {
       // Clear ABI when switching to uncached contract
@@ -265,6 +267,8 @@ export function useAbi({
           source: cached.source,
           implSource: cached.implSource,
           implAddress: cached.implAddress,
+          facetAddresses: cached.facetAddresses,
+          facets: cached.facets,
         });
         return;
       }
@@ -316,6 +320,8 @@ export function useAbi({
         data.implContractName,
         data.source,
         data.implSource,
+        data.facetAddresses,
+        data.facets,
       );
 
       // Update cached addresses list
@@ -341,6 +347,8 @@ export function useAbi({
         source: data.source,
         implSource: data.implSource,
         implAddress: data.implAddress,
+        facetAddresses: data.facetAddresses,
+        facets: data.facets,
       });
       // Expand ABI when first fetched from remote
       setAbiCollapsed(false);
@@ -382,6 +390,8 @@ export function useAbi({
         existingCache?.implContractName || null,
         existingCache?.source || null,
         existingCache?.implSource || null,
+        existingCache?.facetAddresses || null,
+        existingCache?.facets || null,
       );
       // Update cached addresses list
       setCachedAddresses(getCachedAddresses());

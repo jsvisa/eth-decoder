@@ -46,7 +46,7 @@
   margin-top: 0;
   background: #333;
   color: #fff;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   padding: 0.4rem 0.6rem;
   border-radius: 4px;
   white-space: nowrap;
@@ -54,7 +54,9 @@
   line-height: 1.5;
   pointer-events: none;
   user-select: text;
-  transition: opacity 0.1s ease, visibility 0.1s ease;
+  transition:
+    opacity 0.1s ease,
+    visibility 0.1s ease;
 }
 
 .abiSourceTooltip::before {
@@ -64,6 +66,16 @@
   left: 0;
   right: 0;
   height: 8px;
+}
+
+.facetList {
+  margin: 0.15rem 0 0;
+  padding-left: 1rem;
+  white-space: nowrap;
+}
+
+.facetList li {
+  white-space: nowrap;
 }
 
 .abiSource:hover .abiSourceTooltip,
@@ -266,7 +278,7 @@
   gap: 0.5rem;
   padding: 0.4rem 0.75rem;
   font-size: 0.8rem;
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
   border-bottom: 1px solid #f3f4f6;
   transition: background-color 0.1s ease;
 }
@@ -348,7 +360,7 @@
 .textarea {
   padding: 1rem;
   font-size: 0.9rem;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
   border: 2px solid var(--border-primary);
   border-radius: 6px;
   resize: vertical;

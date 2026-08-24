@@ -481,6 +481,10 @@ export async function fetchAbi(
       isDiamond: true,
       implAddress,
       facetAddresses,
+      facets: facetInfos.map((fi, i) => ({
+        address: facetAddresses[i],
+        name: fi?.contractName ?? null,
+      })),
       source: proxyInfo.source,
       implSource: implInfo?.source ?? null,
     };

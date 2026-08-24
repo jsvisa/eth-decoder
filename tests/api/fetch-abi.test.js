@@ -296,6 +296,10 @@ describe("GET /api/fetch-abi", () => {
     expect(body.isDiamond).toBe(true);
     expect(body.contractName).toBe("DiamondProxy");
     expect(body.facetAddresses).toEqual([FACET1, FACET2]);
+    expect(body.facets).toEqual([
+      { address: FACET1, name: "MintFacet" },
+      { address: FACET2, name: "BurnFacet" },
+    ]);
 
     const fnNames = body.abi.map((item) => item.name);
     expect(fnNames).toContain("facets"); // from diamond's own ABI
