@@ -23,6 +23,8 @@ function encodeBase64(str) {
 function maskKey(url) {
   return url.replace(ALCHEMY_API_KEY, "***");
 }
+
+let existingConfig = {};
 try {
   if (PRO_RPC_CONFIG) {
     existingConfig = JSON.parse(decodeBase64(PRO_RPC_CONFIG));
