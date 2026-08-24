@@ -45,6 +45,7 @@ function click(container, el) {
 
 beforeEach(() => {
   localStorage.clear();
+  vi.restoreAllMocks();
 });
 
 describe("Tabs", () => {
@@ -90,6 +91,7 @@ describe("Tabs", () => {
   });
 
   it("closes a tab and keeps the rest", () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
     const { container, cleanup } = renderTabs();
     const addBtn = Array.from(container.querySelectorAll("button")).find(
       (b) => b.textContent === "+ Add Tab",
@@ -97,7 +99,22 @@ describe("Tabs", () => {
     click(container, addBtn);
     const closeBtn = container.querySelector('[role="tab"] button');
     click(container, closeBtn);
+    expect(window.confirm).toHaveBeenCalled();
     expect(container.querySelectorAll('[role="tab"]').length).toBe(1);
+    cleanup();
+  });
+
+  it("keeps the tab when the close confirm is cancelled", () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    const { container, cleanup } = renderTabs();
+    const addBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent === "+ Add Tab",
+    );
+    click(container, addBtn);
+    const closeBtn = container.querySelector('[role="tab"] button');
+    click(container, closeBtn);
+    expect(window.confirm).toHaveBeenCalled();
+    expect(container.querySelectorAll('[role="tab"]').length).toBe(2);
     cleanup();
   });
 
@@ -163,5 +180,55 @@ describe("Tabs", () => {
       "myTitle",
     );
     cleanup();
+  });
+
+  it("keeps a manually renamed tab across a refresh even when auto-rename fires", () => {
+    // Simulate the workspace auto-renaming on every mount (e.g. contract name),
+    // the way ContractCallerWorkspace's useEffect calls onRename on mount.
+    const AutoRenameWorkspace = ({ tab, ctx }) => {
+      const { useEffect } = React;
+      useEffect(() => {
+        ctx.onRename("AutoName");
+      }, []);
+      return React.createElement(
+        "div",
+        { "data-testid": `tab-${tab.id}` },
+        tab.title,
+      );
+    };
+    const renderTab = vi.fn((tab, ctx) =>
+      React.createElement(AutoRenameWorkspace, { tab, ctx }),
+    );
+
+    // 1. Mount, then the user manually renames via double-click + inline edit.
+    const first = renderTabs({ renderTab });
+    const tabEl = first.container.querySelector('[role="tab"]');
+    act(() => {
+      tabEl.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    });
+    const input = first.container.querySelector("input");
+    expect(input).toBeTruthy();
+    act(() => {
+      input.value = "My Custom Name";
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+    });
+    expect(first.container.querySelector('[role="tab"]').textContent).toContain(
+      "My Custom Name",
+    );
+    // Persisted tab list carries the renamed flag.
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    expect(saved.tabs[0].renamed).toBe(true);
+    expect(saved.tabs[0].title).toBe("My Custom Name");
+    first.cleanup();
+
+    // 2. "Refresh" — remount with the same auto-renaming renderTab.
+    const second = renderTabs({ renderTab });
+    // Auto-rename must NOT clobber the user's custom title.
+    expect(
+      second.container.querySelector('[role="tab"]').textContent,
+    ).toContain("My Custom Name");
+    second.cleanup();
   });
 });

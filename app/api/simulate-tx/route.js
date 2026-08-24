@@ -15,6 +15,7 @@ import {
   collectAllCallAddresses,
 } from "../../utils/tevmSimulator";
 import { isValidEthAddress, isValidHttpUrl } from "../../utils/validation";
+import { getProRpcUrl } from "../../utils/proKeys";
 import {
   saveSimulationResult,
   pruneExpiredResults,
@@ -436,6 +437,8 @@ export async function POST(request) {
     calls,
   } = body;
 
+  const proApiKey = request.headers.get("x-pro-key") || body.proApiKey;
+
   if (!chainId) {
     return NextResponse.json(
       { error: "Missing required field: chainId" },
@@ -478,16 +481,25 @@ export async function POST(request) {
   }
 
   const numericChainId = Number(chainId);
-  const chain = rpcUrl
+
+  const proRpcUrl = rpcUrl ? null : getProRpcUrl(proApiKey, numericChainId);
+
+  let chain = rpcUrl
     ? buildCustomChainConfig(numericChainId, rpcUrl)
     : getChainConfigByChainId(numericChainId);
   if (!chain) {
-    return NextResponse.json(
-      {
-        error: `Unsupported chainId: ${chainId}. Provide an rpcUrl to simulate on a non-builtin chain.`,
-      },
-      { status: 400 },
-    );
+    if (proRpcUrl) {
+      chain = buildCustomChainConfig(numericChainId, proRpcUrl);
+    } else {
+      return NextResponse.json(
+        {
+          error: `Unsupported chainId: ${chainId}. Provide an rpcUrl to simulate on a non-builtin chain.`,
+        },
+        { status: 400 },
+      );
+    }
+  } else if (proRpcUrl) {
+    chain = { ...chain, forkRpcUrl: proRpcUrl };
   }
 
   const etherscanKey = apiKeys.etherscan || process.env.ETHERSCAN_API_KEY || "";
@@ -497,7 +509,9 @@ export async function POST(request) {
 
   const abiCacheMap = new Map();
   const abiEntryCache = new Map();
-  const customChainId = rpcUrl ? numericChainId : null;
+  const isBuiltInChain = !!getChainConfigByChainId(numericChainId);
+  const customChainId =
+    rpcUrl || (proRpcUrl && !isBuiltInChain) ? numericChainId : null;
 
   const singleCallContext = {
     request,
@@ -505,7 +519,7 @@ export async function POST(request) {
     numericChainId,
     etherscanKey,
     routescanKey,
-    rpcUrl,
+    rpcUrl: rpcUrl || (proRpcUrl && !isBuiltInChain ? proRpcUrl : null),
     abiEntryCache,
     abiCacheMap,
     customChainId,

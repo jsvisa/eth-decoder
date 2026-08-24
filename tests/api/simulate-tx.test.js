@@ -115,6 +115,7 @@ function makeRequest(body) {
   return {
     url: "https://eth-decoder.vercel.app/api/simulate-tx",
     json: async () => body,
+    headers: new Map(),
   };
 }
 
