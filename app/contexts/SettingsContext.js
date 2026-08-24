@@ -21,6 +21,7 @@ export function SettingsProvider({ children }) {
     CHAINS.reduce((acc, c) => ({ ...acc, [c.id]: "" }), {}),
   );
   const [rpcBatchSize, setRpcBatchSize] = useState(1);
+  const [fetchAbiConcurrency, setFetchAbiConcurrency] = useState(1);
   const [customChains, setCustomChains] = useState([]);
 
   // Load all settings from localStorage on mount
@@ -39,6 +40,11 @@ export function SettingsProvider({ children }) {
         const parsed = JSON.parse(s);
         if (typeof parsed.rpcBatchSize === "number" && parsed.rpcBatchSize >= 1)
           setRpcBatchSize(parsed.rpcBatchSize);
+        if (
+          typeof parsed.fetchAbiConcurrency === "number" &&
+          parsed.fetchAbiConcurrency >= 1
+        )
+          setFetchAbiConcurrency(parsed.fetchAbiConcurrency);
       }
     } catch {}
     try {
@@ -68,6 +74,20 @@ export function SettingsProvider({ children }) {
         SIMULATION_SETTINGS_KEY,
         JSON.stringify({
           rpcBatchSize: batchSize,
+          fetchAbiConcurrency,
+        }),
+      );
+    } catch {}
+  };
+
+  const saveFetchAbiConcurrency = (concurrency) => {
+    setFetchAbiConcurrency(concurrency);
+    try {
+      localStorage.setItem(
+        SIMULATION_SETTINGS_KEY,
+        JSON.stringify({
+          rpcBatchSize,
+          fetchAbiConcurrency: concurrency,
         }),
       );
     } catch {}
@@ -106,6 +126,8 @@ export function SettingsProvider({ children }) {
         saveRpcSettings,
         rpcBatchSize,
         saveSimulationSettings,
+        fetchAbiConcurrency,
+        saveFetchAbiConcurrency,
         customChains,
         saveCustomChains,
         isEtherscanConfigured,

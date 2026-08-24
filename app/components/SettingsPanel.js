@@ -25,6 +25,8 @@ export default function SettingsPanel() {
     saveRpcSettings,
     rpcBatchSize,
     saveSimulationSettings,
+    fetchAbiConcurrency,
+    saveFetchAbiConcurrency,
     customChains,
     isEtherscanConfigured,
     isRoutescanConfigured,
@@ -228,6 +230,8 @@ export default function SettingsPanel() {
             >
               Etherscan
             </a>
+            . Supports multiple keys separated by commas (e.g.{" "}
+            <code>key1,key2,key3</code>) — one is picked randomly per request.
           </p>
           <div className={styles.settingsFieldWithTest}>
             <input
@@ -345,6 +349,27 @@ export default function SettingsPanel() {
                   className={styles.settingInput}
                   onChange={(e) =>
                     saveSimulationSettings(
+                      Math.max(1, parseInt(e.target.value) || 1),
+                    )
+                  }
+                />
+              </label>
+            </div>
+            <div className={styles.settingRow}>
+              <label className={styles.settingLabel}>
+                Fetch ABI Concurrency
+                <span className={styles.settingHint}>
+                  {" "}
+                  (1 = serial; higher = parallel facet fetches)
+                </span>
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={fetchAbiConcurrency}
+                  className={styles.settingInput}
+                  onChange={(e) =>
+                    saveFetchAbiConcurrency(
                       Math.max(1, parseInt(e.target.value) || 1),
                     )
                   }
