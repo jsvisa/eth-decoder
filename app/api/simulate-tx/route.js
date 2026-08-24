@@ -426,7 +426,6 @@ export async function POST(request) {
     gas = null,
     blockNumber = "latest",
     apiKeys = {},
-    proApiKey,
     rpcUrl = null,
     balanceOverrides = [],
     storageOverrides = [],
@@ -437,6 +436,8 @@ export async function POST(request) {
     includeMetrics = false,
     calls,
   } = body;
+
+  const proApiKey = request.headers.get("x-pro-key") || body.proApiKey;
 
   if (!chainId) {
     return NextResponse.json(
