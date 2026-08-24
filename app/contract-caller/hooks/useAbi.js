@@ -117,6 +117,7 @@ export function useAbi({
   address,
   apiKeys = {},
   rpcSettings = {},
+  fetchAbiConcurrency = 1,
   getChainId = () => null,
   onAbiParsed = null,
   onAbiError = null,
@@ -296,6 +297,9 @@ export function useAbi({
         params.set("chainId", chainIdForApi.toString());
       }
       params.set("detectProxy", "true");
+      if (fetchAbiConcurrency > 1) {
+        params.set("concurrency", fetchAbiConcurrency.toString());
+      }
 
       const response = await fetch(`/api/fetch-abi?${params}`, {
         signal: controller.signal,

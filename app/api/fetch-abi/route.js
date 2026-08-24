@@ -42,14 +42,34 @@ const DIAMOND_STORAGE_SLOT = keccak256(
   toHex("diamond.standard.diamond.storage"),
 );
 
+// Default max concurrent explorer fetches when resolving a diamond proxy's
+// facets. Serial (1) by default to stay well within API rate limits; can be
+// raised via a `concurrency` query parameter.
+const DEFAULT_FETCH_CONCURRENCY = 1;
+
+// Pick a random key from a possibly comma-separated list of API keys
+// (e.g. "a,b,c"). Returns "" when no valid key is configured.
+function pickApiKey(keys) {
+  if (!keys) return "";
+  const list = String(keys)
+    .split(",")
+    .map((k) => k.trim())
+    .filter(Boolean);
+  if (list.length === 0) return "";
+  return list[Math.floor(Math.random() * list.length)];
+}
+
 // Fetch ABI and contract name from Etherscan
 async function fetchContractInfoFromEtherscan(address, chainId, apiKey) {
+  const key = pickApiKey(apiKey);
+  if (!key) return null;
+
   const params = new URLSearchParams({
     chainid: chainId,
     module: "contract",
     action: "getsourcecode",
     address: address,
-    apikey: apiKey,
+    apikey: key,
   });
 
   const response = await fetch(`${ETHERSCAN_V2_API}?${params}`);
@@ -81,12 +101,13 @@ async function fetchContractInfoFromEtherscan(address, chainId, apiKey) {
 
 // Fetch ABI and contract name from RouteScan
 async function fetchContractInfoFromRouteScan(address, chainId, apiKey) {
+  const key = pickApiKey(apiKey);
   const params = new URLSearchParams({
     module: "contract",
     action: "getsourcecode",
     address: address,
   });
-  if (apiKey) params.set("apikey", apiKey);
+  if (key) params.set("apikey", key);
 
   const url = `${ROUTESCAN_API_BASE}/${chainId}/etherscan/api?${params}`;
   const response = await fetch(url);
@@ -416,6 +437,7 @@ export async function fetchAbi(
     viemChain = null,
     rpcUrl = null,
     detectProxy = true,
+    concurrency = DEFAULT_FETCH_CONCURRENCY,
   } = {},
 ) {
   const proxyInfo = await fetchContractInfo(
@@ -459,8 +481,11 @@ export async function fetchAbi(
   if (client) {
     facetAddresses = await getDiamondFacetAddresses(client, address);
     if (facetAddresses.length > 0) {
-      facetInfos = await mapWithConcurrency(facetAddresses, 5, (facet) =>
-        fetchContractInfo(facet, chainId, etherscanKey, routescanKey),
+      facetInfos = await mapWithConcurrency(
+        facetAddresses,
+        concurrency,
+        (facet) =>
+          fetchContractInfo(facet, chainId, etherscanKey, routescanKey),
       );
     }
   }
@@ -577,6 +602,10 @@ export async function GET(request) {
       process.env.ROUTESCAN_API_KEY ||
       "";
     const detectProxy = searchParams.get("detectProxy") === "true";
+    const concurrency = Math.max(
+      1,
+      parseInt(searchParams.get("concurrency") || "1", 10) || 1,
+    );
 
     const result = await fetchAbi(address, chainId, {
       etherscanKey: etherscanApiKey,
@@ -584,6 +613,7 @@ export async function GET(request) {
       viemChain: chainConfig,
       rpcUrl,
       detectProxy,
+      concurrency,
     });
 
     if (!result || !result.abi) {

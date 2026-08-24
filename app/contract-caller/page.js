@@ -175,6 +175,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
   // --- Settings ---
   const {
     rpcBatchSize,
+    fetchAbiConcurrency,
     apiKeys,
     rpcSettings,
     getChainId,
@@ -274,6 +275,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     address,
     apiKeys,
     rpcSettings,
+    fetchAbiConcurrency,
     getChainId,
     onAbiParsed: handleAbiParsed,
     onAbiError: handleAbiError,

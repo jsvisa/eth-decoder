@@ -151,6 +151,7 @@ async function runSingleSimulation({
           viemChain: chain.viemChain,
           rpcUrl: chain.rpcUrl,
           detectProxy: true,
+          concurrency: 1,
         });
         if (fetched?.abi) {
           abiEntry = { ...fetched, fetchedAt: Date.now() };
@@ -267,6 +268,7 @@ async function runSingleSimulation({
                 viemChain: chain.viemChain,
                 rpcUrl: chain.rpcUrl,
                 detectProxy: true,
+                concurrency: 1,
               });
               if (fetched?.abi) {
                 extraAbis.set(addr, fetched.abi);
