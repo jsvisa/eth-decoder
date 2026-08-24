@@ -3,6 +3,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./Tabs.module.css";
 
+// Soft pastel backgrounds so adjacent tabs are visually distinct. Keyed by a
+// hash of the tab id so each tab keeps its color across reloads.
+const TAB_COLORS = [
+  "rgba(255, 179, 186, 0.4)",
+  "rgba(186, 225, 255, 0.4)",
+  "rgba(186, 255, 201, 0.4)",
+  "rgba(255, 244, 179, 0.4)",
+  "rgba(224, 186, 255, 0.4)",
+  "rgba(255, 204, 179, 0.4)",
+  "rgba(179, 255, 247, 0.4)",
+  "rgba(255, 179, 224, 0.4)",
+];
+
+function tabColor(id) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  }
+  return TAB_COLORS[hash % TAB_COLORS.length];
+}
+
 function loadTabState(storageKey) {
   try {
     const raw = localStorage.getItem(storageKey);
@@ -161,6 +182,11 @@ export default function Tabs({
             role="tab"
             aria-selected={tab.id === activeId}
             className={`${styles.tab}${tab.id === activeId ? ` ${styles.active}` : ""}`}
+            style={
+              tab.id === activeId
+                ? undefined
+                : { backgroundColor: tabColor(tab.id) }
+            }
             onClick={() => selectTab(tab.id)}
             onDoubleClick={() => setEditingId(tab.id)}
             title="Double-click to rename"
