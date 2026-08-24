@@ -223,11 +223,15 @@ export default function AbiPanel({
                       React.createElement(
                         "div",
                         { key: "i" },
-                        "imple: " +
+                        "imple: ",
+                        React.createElement(
+                          "span",
+                          { className: styles.abiAddress },
                           (abiSourceMeta.implSource || "?") +
-                          "(" +
-                          (abiSourceMeta.implAddress || "") +
-                          ")",
+                            "(" +
+                            (abiSourceMeta.implAddress || "") +
+                            ")",
+                        ),
                       ),
                       abiSourceMeta.facets?.length
                         ? React.createElement(
@@ -242,8 +246,21 @@ export default function AbiPanel({
                                   "li",
                                   { key: f.address },
                                   f.name
-                                    ? f.address + " (" + f.name + ")"
-                                    : f.address,
+                                    ? React.createElement(
+                                        React.Fragment,
+                                        null,
+                                        React.createElement(
+                                          "span",
+                                          { className: styles.abiAddress },
+                                          f.address,
+                                        ),
+                                        " (" + f.name + ")",
+                                      )
+                                    : React.createElement(
+                                        "span",
+                                        { className: styles.abiAddress },
+                                        f.address,
+                                      ),
                                 ),
                               ),
                             ),
