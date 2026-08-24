@@ -41,6 +41,18 @@
   text-overflow: ellipsis;
 }
 
+.tabInput {
+  width: 140px;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--accent-blue);
+  border-radius: 4px;
+  outline: none;
+}
+
 .tabClose {
   flex-shrink: 0;
   background: none;
