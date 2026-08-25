@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GET as decodeGET } from "../../app/api/v1/decode/route.js";
 import { GET as decodeEventGET } from "../../app/api/v1/decode-event/route.js";
-import { GET as fetchAbiGET } from "../../app/api/v1/fetch-abi/route.js";
+import { POST as fetchAbiPOST } from "../../app/api/v1/fetch-abi/route.js";
 import etherscanErc20 from "./__fixtures__/etherscan-erc20.json";
 import {
   serverCacheTestDir,
@@ -17,6 +17,14 @@ function makeRequest(base, params) {
     url.searchParams.set(k, String(v));
   }
   return { url: url.toString() };
+}
+
+function makePostRequest(base, params) {
+  return new Request(`http://localhost${base}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
 }
 
 beforeEach(async () => {
@@ -108,10 +116,10 @@ describe("GET /api/v1/decode-event", () => {
   });
 });
 
-describe("GET /api/v1/fetch-abi", () => {
+describe("POST /api/v1/fetch-abi", () => {
   it("returns 400 when address param is missing", async () => {
-    const res = await fetchAbiGET(
-      makeRequest("/api/v1/fetch-abi", { etherscanApiKey: "test" }),
+    const res = await fetchAbiPOST(
+      makePostRequest("/api/v1/fetch-abi", { etherscanApiKey: "test" }),
     );
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -130,8 +138,8 @@ describe("GET /api/v1/fetch-abi", () => {
         status: 404,
         statusText: "Not Found",
       }); // RouteScan
-    const res = await fetchAbiGET(
-      makeRequest("/api/v1/fetch-abi", {
+    const res = await fetchAbiPOST(
+      makePostRequest("/api/v1/fetch-abi", {
         address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
       }),
     );
@@ -145,8 +153,8 @@ describe("GET /api/v1/fetch-abi", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => etherscanErc20 }) // Etherscan
       .mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // Sourcify: no abi
 
-    const res = await fetchAbiGET(
-      makeRequest("/api/v1/fetch-abi", {
+    const res = await fetchAbiPOST(
+      makePostRequest("/api/v1/fetch-abi", {
         address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
         etherscanApiKey: "test-key",
       }),

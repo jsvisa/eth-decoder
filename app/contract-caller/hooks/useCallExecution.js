@@ -850,14 +850,18 @@ async function prefetchSourceCodeForTrace(
     [...resolvedAddresses].map(async (addr) => {
       if (getCachedSource(chain, addr)) return;
       try {
-        const srcParams = new URLSearchParams({ address: addr, chain });
-        if (apiKeys?.etherscan)
-          srcParams.set("etherscanApiKey", apiKeys.etherscan);
-        if (apiKeys?.routescan)
-          srcParams.set("routescanApiKey", apiKeys.routescan);
-        if (rpcSettings?.[chain]) srcParams.set("rpcUrl", rpcSettings[chain]);
-        if (chainId) srcParams.set("chainId", chainId.toString());
-        const res = await fetch(`/api/fetch-source?${srcParams}`);
+        const res = await fetch(`/api/fetch-source`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            address: addr,
+            chain,
+            etherscanApiKey: apiKeys?.etherscan || undefined,
+            routescanApiKey: apiKeys?.routescan || undefined,
+            rpcUrl: rpcSettings?.[chain] || undefined,
+            chainId: chainId || undefined,
+          }),
+        });
         if (res.ok) {
           const data = await res.json();
           if (data.sourceCode) {

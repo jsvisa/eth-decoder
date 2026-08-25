@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { GET } from "../../app/api/fetch-abi/route.js";
+import { POST } from "../../app/api/fetch-abi/route.js";
 import etherscanErc20 from "./__fixtures__/etherscan-erc20.json";
 import etherscanProxy from "./__fixtures__/etherscan-proxy.json";
 import etherscanImpl from "./__fixtures__/etherscan-impl.json";
@@ -13,11 +13,11 @@ const FACET1 = "0x1111111111111111111111111111111111111111";
 const FACET2 = "0x2222222222222222222222222222222222222222";
 
 function makeRequest(params) {
-  const url = new URL("http://localhost/api/fetch-abi");
-  for (const [k, v] of Object.entries(params)) {
-    url.searchParams.set(k, String(v));
-  }
-  return { url: url.toString() };
+  return new Request("http://localhost/api/fetch-abi", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
 }
 
 function mockFetch(responses) {
@@ -29,14 +29,20 @@ function mockFetch(responses) {
   return mock;
 }
 
-// Stub global.fetch to route JSON-RPC POSTs (viem) to rpcHandlers and all other
-// requests (Etherscan getsourcecode) to etherscanByAddress keyed by lowercase address.
+// Stub global.fetch: RPC JSON-RPC POSTs go to rpcHandlers; explorer API
+// GET requests (Etherscan, Sourcify, RouteScan) go to etherscanByAddress.
 function mockFetchWithRpc(rpcHandlers, etherscanByAddress) {
   vi.stubGlobal(
     "fetch",
     vi.fn().mockImplementation(async (url, options) => {
-      if (options && options.body) {
-        const body = JSON.parse(options.body);
+      const urlStr = typeof url === "string" ? url : url?.url || "";
+      const body = options?.body ? JSON.parse(options.body) : null;
+      // RPC calls: JSON body with a "method" field, going to a non-API http URL
+      if (
+        urlStr.startsWith("http") &&
+        !urlStr.includes("/api/") &&
+        body?.method
+      ) {
         const reqs = Array.isArray(body) ? body : [body];
         const responses = reqs.map((req) => {
           const handler = rpcHandlers[req.method];
@@ -55,7 +61,10 @@ function mockFetchWithRpc(rpcHandlers, etherscanByAddress) {
           json: async () => responseData,
         };
       }
-      const address = new URL(url).searchParams.get("address").toLowerCase();
+      // Explorer API calls (Etherscan / Sourcify / RouteScan — GET with query params)
+      const address = new URL(urlStr).searchParams
+        .get("address")
+        ?.toLowerCase();
       const info = etherscanByAddress[address];
       return { ok: true, json: async () => info };
     }),
@@ -72,10 +81,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("GET /api/fetch-abi", () => {
+describe("POST /api/fetch-abi", () => {
   it("returns 400 when the address param is missing", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    const res = await GET(makeRequest({ etherscanApiKey: "test-key" }));
+    const res = await POST(makeRequest({ etherscanApiKey: "test-key" }));
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toMatch(/missing address/i);
@@ -83,7 +92,7 @@ describe("GET /api/fetch-abi", () => {
 
   it("returns 400 when the address is not a valid Ethereum address", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    const res = await GET(
+    const res = await POST(
       makeRequest({ address: "not-an-address", etherscanApiKey: "test-key" }),
     );
     expect(res.status).toBe(400);
@@ -93,7 +102,7 @@ describe("GET /api/fetch-abi", () => {
 
   it("returns 400 when the custom rpcUrl is not an http(s) URL", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    const res = await GET(
+    const res = await POST(
       makeRequest({
         address: VALID_ADDRESS,
         chain: "custom-chain",
@@ -112,7 +121,7 @@ describe("GET /api/fetch-abi", () => {
       { status: "404" }, // Sourcify
       etherscanErc20, // RouteScan (keyless)
     ]);
-    const res = await GET(makeRequest({ address: VALID_ADDRESS }));
+    const res = await POST(makeRequest({ address: VALID_ADDRESS }));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.abi).toBeDefined();
@@ -122,7 +131,7 @@ describe("GET /api/fetch-abi", () => {
     // {} → Etherscan: no abi/status → null; sourcifyV2 → Sourcify: success
     mockFetch([{}, sourcifyV2]);
 
-    const res = await GET(
+    const res = await POST(
       makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
     );
     expect(res.status).toBe(200);
@@ -137,7 +146,7 @@ describe("GET /api/fetch-abi", () => {
     // Etherscan succeeds first (Sourcify/RouteScan never consulted)
     mockFetch([etherscanErc20]);
 
-    const res = await GET(
+    const res = await POST(
       makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
     );
     expect(res.status).toBe(200);
@@ -154,7 +163,7 @@ describe("GET /api/fetch-abi", () => {
     // Etherscan proxy info, then Etherscan impl info (Sourcify/RouteScan never consulted)
     mockFetch([etherscanProxy, etherscanImpl]);
 
-    const res = await GET(
+    const res = await POST(
       makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
     );
     expect(res.status).toBe(200);
@@ -280,13 +289,13 @@ describe("GET /api/fetch-abi", () => {
       },
     );
 
-    const res = await GET(
+    const res = await POST(
       makeRequest({
         address: DIAMOND_ADDRESS,
         chain: "ethereum",
         rpcUrl: "https://eth.llamarpc.com",
         etherscanApiKey: "test-key",
-        detectProxy: "true",
+        detectProxy: true,
       }),
     );
     expect(res.status).toBe(200);
@@ -323,7 +332,7 @@ describe("GET /api/fetch-abi", () => {
       }); // RouteScan
     vi.stubGlobal("fetch", failFetch);
 
-    const res = await GET(
+    const res = await POST(
       makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
     );
     expect(res.status).toBe(400);
@@ -334,7 +343,7 @@ describe("GET /api/fetch-abi", () => {
   it("returns sourceCode from Etherscan for a single-file contract", async () => {
     mockFetch([etherscanErc20]);
 
-    const res = await GET(
+    const res = await POST(
       makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
     );
     expect(res.status).toBe(200);
@@ -348,7 +357,7 @@ describe("GET /api/fetch-abi", () => {
   it("returns sourceCode from Sourcify when not on Etherscan", async () => {
     mockFetch([{}, sourcifyV2]);
 
-    const res = await GET(
+    const res = await POST(
       makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
     );
     expect(res.status).toBe(200);
@@ -362,7 +371,7 @@ describe("GET /api/fetch-abi", () => {
   it("returns sourceCode from proxy implementation when detected", async () => {
     mockFetch([etherscanProxy, etherscanImpl]);
 
-    const res = await GET(
+    const res = await POST(
       makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
     );
     expect(res.status).toBe(200);
