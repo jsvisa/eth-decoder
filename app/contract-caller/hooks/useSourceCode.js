@@ -115,7 +115,7 @@ export function useSourceCode(chain, address) {
         }
         return data;
       })
-      .catch(() => null)
+      .catch((err) => err)
       .finally(() => {
         FETCHING.delete(key);
       });
@@ -123,14 +123,14 @@ export function useSourceCode(chain, address) {
     FETCHING.set(key, promise);
     promise.then((data) => {
       if (!mountedRef.current) return;
-      if (data && data.sourceCode) {
-        applyData(data);
-      } else {
+      if (data instanceof Error) {
         setState((prev) => ({
           ...prev,
           loading: false,
-          error: "Failed to fetch source code",
+          error: data.message,
         }));
+      } else {
+        applyData(data);
       }
     });
   }, [chain, address]);
