@@ -144,4 +144,23 @@ describe("SourceCodeViewer", () => {
     expect(container.textContent).toContain("3");
     cleanup();
   });
+
+  it("highlights executed lines when highlightLines prop is provided", () => {
+    mockHookValue = {
+      sources: { "Token.sol": "line1\nline2\nline3\nline4\nline5" },
+      compilerVersion: null,
+      loading: false,
+      error: null,
+    };
+    const { container, cleanup } = renderComponent({
+      ...BASE_PROPS,
+      highlightLines: [2, 3, 4],
+    });
+    expect(container.textContent).toContain("1");
+    expect(container.textContent).toContain("2");
+    expect(container.textContent).toContain("3");
+    expect(container.textContent).toContain("4");
+    expect(container.textContent).toContain("5");
+    cleanup();
+  });
 });

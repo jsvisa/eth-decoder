@@ -19,6 +19,7 @@ import {
   simulateWithClient,
   collectAllCallAddresses,
   populateTraceToNames,
+  resolveTraceSourceLines,
 } from "../../app/utils/tevmSimulator.js";
 
 // Pre-encoded revert payloads (selector + ABI-encoded args).
@@ -1164,4 +1165,57 @@ describe("simulateWithClient — session state vs prefetch (regression)", () => 
       await fork.close();
     }
   }, 30000);
+});
+
+describe("resolveTraceSourceLines", () => {
+  const sourceMap = new Map([
+    [0, { s: 0, l: 0, f: 0, j: "-", m: 0 }],
+    [1, { s: 0, l: 1, f: 0, j: "-", m: 0 }],
+    [2, { s: 0, l: 2, f: 0, j: "-", m: 0 }],
+    [3, { s: 0, l: 5, f: 1, j: "-", m: 0 }],
+  ]);
+  const sourceFiles = { "Token.sol": "", "Lib.sol": "" };
+
+  it("sets sourceLines and sourceFile on a node with PCs", () => {
+    const node = { pcs: [0, 1, 2], calls: [] };
+    resolveTraceSourceLines(node, sourceMap, sourceFiles);
+    expect(node.sourceLines).toEqual([1, 2, 3]);
+    expect(node.sourceFile).toBe("Token.sol");
+  });
+
+  it("returns undefined for node with no source mapping", () => {
+    const node = { pcs: [], calls: [] };
+    resolveTraceSourceLines(node, sourceMap, sourceFiles);
+    expect(node.sourceLines).toBeUndefined();
+  });
+
+  it("does not crash on null node", () => {
+    expect(() =>
+      resolveTraceSourceLines(null, sourceMap, sourceFiles),
+    ).not.toThrow();
+  });
+
+  it("does not crash when sourceMap is null", () => {
+    const node = { pcs: [0, 1], calls: [] };
+    expect(() =>
+      resolveTraceSourceLines(node, null, sourceFiles),
+    ).not.toThrow();
+    expect(node.sourceLines).toBeUndefined();
+  });
+
+  it("recursively processes child nodes", () => {
+    const node = {
+      pcs: [0],
+      calls: [{ pcs: [1, 2], calls: [] }],
+    };
+    resolveTraceSourceLines(node, sourceMap, sourceFiles);
+    expect(node.sourceLines).toEqual([1]);
+    expect(node.calls[0].sourceLines).toEqual([2, 3]);
+  });
+
+  it("handles PC mapping to a different file index", () => {
+    const node = { pcs: [3], calls: [] };
+    resolveTraceSourceLines(node, sourceMap, sourceFiles);
+    expect(node.sourceFile).toBe("Lib.sol");
+  });
 });

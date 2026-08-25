@@ -21,6 +21,7 @@ import {
   serializeBigInts,
   getFunctionSelector,
 } from "../contract-caller/utils/functionArgs";
+import { pcsToLines, getSourceFile } from "./sourceMap";
 
 export { createArbSysPrecompile } from "./precompiles";
 
@@ -1140,6 +1141,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
         errorReason: null,
         logs: [],
         calls: [],
+        pcs: [],
       };
       if (message.depth === 0) {
         callTraceRoot = node;
@@ -1231,6 +1233,15 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       }
 
       const opName = step.opcode?.name;
+
+      // Track program counter on the current frame for source map mapping
+      if (callStack.length > 0) {
+        const currentFrame = callStack[callStack.length - 1];
+        if (step.pc !== undefined) {
+          currentFrame.pcs.push(step.pc);
+        }
+      }
+
       if (opName && LOG_OPCODES.has(opName)) {
         const numTopics = parseInt(opName[3]); // 0..4
         const stack = step.stack; // BigInt[], last = top of stack
@@ -1387,6 +1398,9 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     for (const addr of collectUndecodedCallAddresses(callTraceRoot)) {
       undecodedAddresses.add(addr);
     }
+
+    // Deduplicate PCs on every trace node (they were collected raw from onStep)
+    deduplicatePcs(callTraceRoot);
 
     const callTraceTree = callTraceRoot;
 
@@ -1582,6 +1596,38 @@ export function populateTraceToNames(node, resolveName) {
   }
   for (const child of node.calls || []) {
     populateTraceToNames(child, resolveName);
+  }
+}
+
+/**
+ * Deduplicate and sort PCs on every trace node.
+ * PCs are collected raw from onStep and may have duplicates.
+ */
+function deduplicatePcs(node) {
+  if (!node) return;
+  if (node.pcs && node.pcs.length > 0) {
+    node.pcs = [...new Set(node.pcs)].sort((a, b) => a - b);
+  }
+  for (const child of node.calls || []) {
+    deduplicatePcs(child);
+  }
+}
+
+/**
+ * Walk the call trace tree and resolve PCs to source lines using a source map.
+ * Sets sourceLines and sourceFile on each node.
+ * @param {object} node - Call trace node (mutated in place)
+ * @param {Map} sourceMap - PC → {s, l, f, j, m} map from parseSourceMap()
+ * @param {Object<string,string>} sourceFiles - Map of file name to source content
+ */
+export function resolveTraceSourceLines(node, sourceMap, sourceFiles) {
+  if (!node || !sourceMap) return;
+  if (node.pcs && node.pcs.length > 0) {
+    node.sourceLines = pcsToLines(new Set(node.pcs), sourceMap);
+    node.sourceFile = getSourceFile(node.pcs[0], sourceMap, sourceFiles);
+  }
+  for (const child of node.calls || []) {
+    resolveTraceSourceLines(child, sourceMap, sourceFiles);
   }
 }
 

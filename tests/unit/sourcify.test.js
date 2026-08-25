@@ -7,6 +7,7 @@ import {
   sigToFunctionAbi,
   sigToEventAbi,
   fetchContractInfoFromSourcify,
+  fetchContractOutput,
 } from "../../app/utils/sourcify.js";
 import {
   serverCacheTestDir,
@@ -278,5 +279,75 @@ describe("fetchContractInfoFromSourcify", () => {
     const result = await fetchContractInfoFromSourcify("0xabc", 1);
     expect(result.sourceCode).toEqual({ "Main.sol": "contract Main {}" });
     expect(result.compilerVersion).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchContractOutput
+// ---------------------------------------------------------------------------
+
+describe("fetchContractOutput", () => {
+  it("returns sourceMap and sources on success", async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        evm: {
+          deployedBytecode: {
+            sourceMap: "0:1:0:0:0;1:2:0:0:0;2:3:0:0:0",
+          },
+        },
+        sources: {
+          "Token.sol": { content: "contract Token {}" },
+        },
+      }),
+    });
+
+    const result = await fetchContractOutput("0xabc", 1);
+    expect(result.sourceMap).toBe("0:1:0:0:0;1:2:0:0:0;2:3:0:0:0");
+    expect(result.sources).toEqual({ "Token.sol": "contract Token {}" });
+  });
+
+  it("returns null when fetch fails", async () => {
+    global.fetch.mockResolvedValueOnce({ ok: false });
+    const result = await fetchContractOutput("0xabc", 1);
+    expect(result).toBeNull();
+  });
+
+  it("returns null when response has no data", async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => null,
+    });
+    const result = await fetchContractOutput("0xabc", 1);
+    expect(result).toBeNull();
+  });
+
+  it("handles missing sourceMap gracefully", async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        evm: {},
+        sources: { "Main.sol": { content: "contract Main {}" } },
+      }),
+    });
+    const result = await fetchContractOutput("0xabc", 1);
+    expect(result.sourceMap).toBeNull();
+    expect(result.sources).toEqual({ "Main.sol": "contract Main {}" });
+  });
+
+  it("handles missing sources gracefully", async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        evm: {
+          deployedBytecode: {
+            sourceMap: "0:0:0:0:0",
+          },
+        },
+      }),
+    });
+    const result = await fetchContractOutput("0xabc", 1);
+    expect(result.sourceMap).toBe("0:0:0:0:0");
+    expect(result.sources).toBeNull();
   });
 });

@@ -212,6 +212,7 @@ function TraceTooltip({ items, onCopy }) {
 function CallTraceNode({ trace, depth, chain }) {
   const [hideTooltip, setHideTooltip] = useState(false);
   const [debugAddr, setDebugAddr] = useState(null);
+  const [debugHighlightLines, setDebugHighlightLines] = useState(null);
 
   if (!trace) return null;
   if (trace.type === "STATICCALL") return null;
@@ -322,6 +323,7 @@ function CallTraceNode({ trace, depth, chain }) {
                   onClick={(e) => {
                     e.stopPropagation();
                     setDebugAddr(contractAddress);
+                    setDebugHighlightLines(trace.sourceLines || null);
                   }}
                   type="button"
                   title="View source code"
@@ -398,7 +400,11 @@ function CallTraceNode({ trace, depth, chain }) {
           address={debugAddr}
           chain={chain}
           functionName={functionLabel || undefined}
-          onClose={() => setDebugAddr(null)}
+          highlightLines={debugHighlightLines}
+          onClose={() => {
+            setDebugAddr(null);
+            setDebugHighlightLines(null);
+          }}
         />
       )}
     </div>

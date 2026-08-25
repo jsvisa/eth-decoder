@@ -70,6 +70,7 @@ export default function SourceCodeViewer({
   address,
   chain,
   functionName,
+  highlightLines,
   onClose,
 }) {
   const { sources, compilerVersion, loading, error } = useSourceCode(
@@ -180,14 +181,23 @@ export default function SourceCodeViewer({
                 <tbody>
                   {lines.map((line, i) => {
                     const lineNum = i + 1;
-                    const isHighlighted = lineNum === highlightLine;
+                    const isFunctionLine = lineNum === highlightLine;
+                    const isExecutedLine =
+                      highlightLines && highlightLines.includes(lineNum);
+                    const lineClass = [
+                      styles.codeLine,
+                      isFunctionLine ? styles.codeLineHighlight : "",
+                      isExecutedLine ? styles.codeLineExecuted : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ");
                     return (
                       <tr
                         key={i}
                         ref={(el) => {
                           lineRefs.current[lineNum] = el;
                         }}
-                        className={`${styles.codeLine} ${isHighlighted ? styles.codeLineHighlight : ""}`}
+                        className={lineClass}
                       >
                         <td className={styles.lineNum}>{lineNum}</td>
                         <td
