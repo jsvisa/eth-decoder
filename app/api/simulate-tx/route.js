@@ -4,7 +4,7 @@ import {
   getChainConfigByChainId,
   buildCustomChainConfig,
 } from "../../utils/chains";
-import { fetchAbi } from "../fetch-abi/route";
+import { fetchAbi } from "../../utils/fetchContract";
 import { getAbiFromCache, setAbiInCache } from "../../utils/serverAbiBlobCache";
 import {
   simulateWithTevm,

@@ -80,7 +80,7 @@ describe("SourceCodeViewer", () => {
 
   it("shows the contract address", () => {
     const { container, cleanup } = renderComponent(BASE_PROPS);
-    expect(container.textContent).toContain("0x12345678...");
+    expect(container.textContent).toContain("0x12345678");
     cleanup();
   });
 

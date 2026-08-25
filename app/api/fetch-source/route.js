@@ -1,90 +1,56 @@
 import { NextResponse } from "next/server";
+import { createPublicClient, http, defineChain } from "viem";
 import { isValidEthAddress } from "../../utils/validation";
-
+import { VIEM_CHAINS, DEFAULT_RPC_URLS } from "../../utils/chains";
 import {
-  ETHERSCAN_V2_API,
-  ROUTESCAN_API_BASE,
-  pickApiKey,
-  parseEtherscanSourceCode,
-} from "../../utils/etherscan";
+  fetchContractInfoFromEtherscan,
+  fetchSourceFromSourcify,
+  fetchContractInfoFromRouteScan,
+  getDiamondFacetAddresses,
+  resolveChainId,
+} from "../../utils/fetchContract";
 
-async function fetchFromEtherscan(address, chainId, apiKey) {
-  const key = pickApiKey(apiKey);
-  if (!key) return null;
-
-  const params = new URLSearchParams({
-    chainid: chainId,
-    module: "contract",
-    action: "getsourcecode",
-    address: address,
-    apikey: key,
-  });
-
-  const response = await fetch(`${ETHERSCAN_V2_API}?${params}`);
-  if (!response.ok) return null;
-
-  const data = await response.json();
-  if (data.status !== "1" || !data.result || !data.result[0]) return null;
-
-  const result = data.result[0];
-  const sourceCode = parseEtherscanSourceCode(result.SourceCode);
-  return {
-    sourceCode,
-    compilerVersion: result.CompilerVersion || null,
-    source: "etherscan",
-  };
-}
-
-async function fetchFromSourcify(address, chainId) {
-  try {
-    const response = await fetch(
-      `https://sourcify.dev/server/v2/contract/${chainId}/${address}?fields=sources,metadata`,
+async function fetchSourceForAddress(
+  address,
+  chainId,
+  etherscanApiKey,
+  routescanApiKey,
+) {
+  if (etherscanApiKey) {
+    const result = await fetchContractInfoFromEtherscan(
+      address,
+      chainId,
+      etherscanApiKey,
     );
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    const sources = data.sources
-      ? Object.fromEntries(
-          Object.entries(data.sources).map(([file, info]) => [
-            file,
-            typeof info === "object" ? info.content || "" : info,
-          ]),
-        )
-      : null;
-
-    return {
-      sourceCode: sources,
-      compilerVersion: data.metadata?.compiler?.version || null,
-      source: "sourcify",
-    };
-  } catch {
-    return null;
+    if (result?.sourceCode)
+      return {
+        sourceCode: result.sourceCode,
+        compilerVersion: result.compilerVersion,
+        source: result.source,
+      };
   }
-}
 
-async function fetchFromRouteScan(address, chainId, apiKey) {
-  const key = pickApiKey(apiKey);
-  const params = new URLSearchParams({
-    module: "contract",
-    action: "getsourcecode",
-    address: address,
-  });
-  if (key) params.set("apikey", key);
+  const sourcifyResult = await fetchSourceFromSourcify(address, chainId);
+  if (sourcifyResult?.sourceCode)
+    return {
+      sourceCode: sourcifyResult.sourceCode,
+      compilerVersion: sourcifyResult.compilerVersion,
+      source: sourcifyResult.source,
+    };
 
-  const url = `${ROUTESCAN_API_BASE}/${chainId}/etherscan/api?${params}`;
-  const response = await fetch(url);
-  if (!response.ok) return null;
+  const routescanResult = await fetchContractInfoFromRouteScan(
+    address,
+    chainId,
+    routescanApiKey,
+  );
+  if (routescanResult?.sourceCode)
+    return {
+      sourceCode: routescanResult.sourceCode,
+      compilerVersion: routescanResult.compilerVersion,
+      source: routescanResult.source,
+    };
 
-  const data = await response.json();
-  if (data.status !== "1" || !data.result || !data.result[0]) return null;
-
-  const result = data.result[0];
-  const sourceCode = parseEtherscanSourceCode(result.SourceCode);
-  return {
-    sourceCode,
-    compilerVersion: result.CompilerVersion || null,
-    source: "routescan",
-  };
+  return null;
 }
 
 export async function GET(request) {
@@ -107,8 +73,7 @@ export async function GET(request) {
       );
     }
 
-    const { BUILT_IN_CHAIN_IDS } = await import("../../utils/chains");
-    const chainId = BUILT_IN_CHAIN_IDS[chain];
+    const chainId = await resolveChainId(chain, searchParams);
     if (!chainId) {
       return NextResponse.json(
         { error: `Unsupported chain: ${chain}` },
@@ -125,21 +90,65 @@ export async function GET(request) {
       process.env.ROUTESCAN_API_KEY ||
       "";
 
-    let result = null;
+    let result = await fetchSourceForAddress(
+      address,
+      chainId,
+      etherscanApiKey,
+      routescanApiKey,
+    );
 
-    if (etherscanApiKey) {
-      result = await fetchFromEtherscan(address, chainId, etherscanApiKey);
-      if (result?.sourceCode) {
-        return NextResponse.json(result);
+    // Diamond proxy: discover facets and fetch their source code
+    const customRpcUrl = searchParams.get("rpcUrl");
+    let configChain = VIEM_CHAINS[chain];
+    let rpcUrl = customRpcUrl || DEFAULT_RPC_URLS[chain];
+    const customChainIdParam = searchParams.get("chainId");
+
+    if (!configChain && customChainIdParam && customRpcUrl) {
+      configChain = defineChain({
+        id: chainId,
+        name: chain,
+        nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+        rpcUrls: { default: { http: [customRpcUrl] } },
+      });
+      rpcUrl = customRpcUrl;
+    }
+
+    if (configChain && rpcUrl) {
+      const client = createPublicClient({
+        chain: configChain,
+        transport: http(rpcUrl),
+      });
+      const facetAddresses = await getDiamondFacetAddresses(client, address);
+      if (facetAddresses.length > 0) {
+        const facetSources = {};
+        let facetCompilerVersion = null;
+        for (const facet of facetAddresses) {
+          const facetResult = await fetchSourceForAddress(
+            facet,
+            chainId,
+            etherscanApiKey,
+            routescanApiKey,
+          );
+          if (facetResult?.sourceCode) {
+            Object.assign(facetSources, facetResult.sourceCode);
+            if (!facetCompilerVersion)
+              facetCompilerVersion = facetResult.compilerVersion;
+          }
+        }
+        if (Object.keys(facetSources).length > 0) {
+          const mergedSources = result?.sourceCode
+            ? { ...facetSources, ...result.sourceCode }
+            : facetSources;
+          return NextResponse.json({
+            sourceCode: mergedSources,
+            compilerVersion:
+              result?.compilerVersion || facetCompilerVersion || null,
+            source: "diamond",
+          });
+        }
       }
     }
 
-    result = await fetchFromSourcify(address, chainId);
-    if (result?.sourceCode) {
-      return NextResponse.json(result);
-    }
-
-    result = await fetchFromRouteScan(address, chainId, routescanApiKey);
     if (result?.sourceCode) {
       return NextResponse.json(result);
     }

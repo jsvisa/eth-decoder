@@ -13,45 +13,39 @@ function highlightSolidity(source) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
-  const keywords =
-    /\b(pragma|import|contract|library|interface|function|modifier|event|error|struct|enum|mapping|address|uint|int|bool|string|bytes|var|public|private|internal|external|constant|immutable|view|pure|payable|virtual|override|abstract|returns|return|if|else|for|while|do|break|continue|require|revert|emit|delete|new|is|using|constructor|fallback|receive|assembly|unchecked|try|catch|type|calldata|memory|storage|indexed|anonymous|override|virtual)\b/g;
+  const tokenRe = new RegExp(
+    `(\\/\\/\\/\\s*@(?:notice|dev|param|return|title|author|custom:)\\b.*$)|` +
+      `(\\/\\*[\\s\\S]*?\\*\\/)|` +
+      `(\\/\\/.*$)|` +
+      `("(?:\\\\.|[^"\\\\])*")|` +
+      `('(?:\\\\.|[^'\\\\])*')|` +
+      `(\\b(?:pragma|import|contract|library|interface|function|modifier|event|error|struct|enum|mapping|address|uint|int|bool|string|bytes|var|public|private|internal|external|constant|immutable|view|pure|payable|virtual|override|abstract|returns|return|if|else|for|while|do|break|continue|require|revert|emit|delete|new|is|using|constructor|fallback|receive|assembly|unchecked|try|catch|type|calldata|memory|storage|indexed|anonymous|override|virtual)\\b)|` +
+      `(\\b(?:0x[0-9a-fA-F]+|\\d+\\.?\\d*)\\b)`,
+    "gm",
+  );
 
-  const patterns = [
-    { re: /\/\/.*$/gm, cls: "comment" },
-    { re: /\/\*[\s\S]*?\*\//g, cls: "comment" },
-    { re: /"(\\.|[^"\\])*"/g, cls: "string" },
-    { re: /'(\\.|[^'\\])*'/g, cls: "string" },
-    { re: keywords, cls: "keyword" },
-    { re: /\b(0x[0-9a-fA-F]+|\d+\.?\d*)\b/g, cls: "number" },
-    {
-      re: /\/\/\/\s*@(notice|dev|param|return|title|author|custom:)\b.*$/gm,
-      cls: "natspec",
-    },
-  ];
-
-  let result = escaped;
-  for (const { re, cls } of patterns) {
-    result = result.replace(re, (match) => {
-      if (cls === "comment") {
+  return escaped.replace(
+    tokenRe,
+    (
+      match,
+      natspec,
+      blockComment,
+      lineComment,
+      dqString,
+      sqString,
+      keyword,
+      number,
+    ) => {
+      if (natspec) return `<span class="${styles.hlNatspec}">${match}</span>`;
+      if (blockComment || lineComment)
         return `<span class="${styles.hlComment}">${match}</span>`;
-      }
-      if (cls === "string") {
+      if (dqString || sqString)
         return `<span class="${styles.hlString}">${match}</span>`;
-      }
-      if (cls === "keyword") {
-        return `<span class="${styles.hlKeyword}">${match}</span>`;
-      }
-      if (cls === "number") {
-        return `<span class="${styles.hlNumber}">${match}</span>`;
-      }
-      if (cls === "natspec") {
-        return `<span class="${styles.hlNatspec}">${match}</span>`;
-      }
+      if (keyword) return `<span class="${styles.hlKeyword}">${match}</span>`;
+      if (number) return `<span class="${styles.hlNumber}">${match}</span>`;
       return match;
-    });
-  }
-
-  return result;
+    },
+  );
 }
 
 export default function SourceCodeViewer({
@@ -147,9 +141,7 @@ export default function SourceCodeViewer({
                 solc {compilerVersion}
               </span>
             )}
-            <span className={styles.address}>
-              {address?.slice(0, 10)}...{address?.slice(-8)}
-            </span>
+            <span className={styles.address}>{address}</span>
           </div>
           <button className={styles.closeBtn} onClick={onClose} type="button">
             ✕
