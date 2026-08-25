@@ -7,13 +7,14 @@ const FETCHING = new Set();
 
 export function useSourceCode(chain, address) {
   const [state, setState] = useState(() => {
-    if (!address)
+    if (!address) {
       return {
         sources: null,
         compilerVersion: null,
         loading: false,
         error: null,
       };
+    }
     const cached = getCachedSource(chain, address);
     if (cached) {
       return {
@@ -70,8 +71,11 @@ export function useSourceCode(chain, address) {
     const etherscanApiKey = localStorage.getItem("etherscanApiKey") || "";
     if (etherscanApiKey) params.set("etherscanApiKey", etherscanApiKey);
 
-    fetch(`/api/fetch-abi?${params}`)
-      .then((res) => res.json())
+    fetch(`/api/fetch-source?${params}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Source code not found");
+        return res.json();
+      })
       .then((data) => {
         if (!mountedRef.current) return;
         if (data.sourceCode) {

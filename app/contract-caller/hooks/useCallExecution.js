@@ -16,6 +16,8 @@ import {
   buildAbiCacheFromStorage,
   fetchAbisForAddresses,
   getCachedAbi,
+  getCachedSource,
+  setCachedSource,
 } from "../../utils/abiCache";
 import { parseSourceMap } from "../../utils/sourceMap";
 import {
@@ -456,6 +458,10 @@ export function useCallExecution({
               chainIdForSimulation,
             );
           }
+
+          // Pre-fetch and cache source code for all trace addresses in the
+          // background so the source viewer loads instantly when the user clicks 🔍.
+          prefetchSourceCodeForTrace(data.callTrace, chain).catch(() => {});
         }
 
         await decodeLogsViaServer(data.logs);
@@ -741,5 +747,35 @@ function resolveSourceLinesForNode(node, sourceMapsByAddr) {
 
   for (const child of node.calls || []) {
     resolveSourceLinesForNode(child, sourceMapsByAddr);
+  }
+}
+
+/**
+ * Pre-fetch and cache source code for all unique addresses in the trace tree
+ * so the source viewer loads instantly when the user clicks 🔍.
+ */
+async function prefetchSourceCodeForTrace(callTrace, chain) {
+  if (!callTrace) return;
+  const addresses = collectAllCallAddresses(callTrace);
+  for (const addr of addresses) {
+    if (getCachedSource(chain, addr)) continue;
+    try {
+      const res = await fetch(
+        `/api/fetch-source?address=${addr}&chain=${chain}`,
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.sourceCode) {
+          setCachedSource(
+            chain,
+            addr,
+            data.sourceCode,
+            data.compilerVersion || null,
+          );
+        }
+      }
+    } catch {
+      // Background fetch, ignore errors
+    }
   }
 }

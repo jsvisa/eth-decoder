@@ -19,6 +19,8 @@ vi.mock("../../../app/utils/abiCache.js", () => ({
   buildAbiCacheFromStorage: vi.fn(() => new Map()),
   fetchAbisForAddresses: vi.fn(async () => new Map()),
   getCachedAbi: vi.fn(() => null),
+  getCachedSource: vi.fn(() => null),
+  setCachedSource: vi.fn(),
 }));
 
 // ── helpers ────────────────────────────────────────────────────────────────
