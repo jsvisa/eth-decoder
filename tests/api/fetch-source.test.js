@@ -10,7 +10,26 @@ function makeRequest(params) {
 }
 
 beforeEach(() => {
-  vi.stubGlobal("fetch", vi.fn());
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockImplementation(async (url) => {
+      const urlStr = typeof url === "string" ? url : url?.url || "";
+      // Return a JSON-RPC error for any RPC call so viem clients don't hang
+      if (
+        urlStr.startsWith("https://") &&
+        !urlStr.includes("etherscan") &&
+        !urlStr.includes("sourcify") &&
+        !urlStr.includes("routescan")
+      ) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ error: { code: -32000, message: "mock" } }),
+        };
+      }
+      return { ok: false, status: 404 };
+    }),
+  );
 });
 
 afterEach(() => {
@@ -36,13 +55,15 @@ describe("POST /api/fetch-source", () => {
 
   it("returns source code from Etherscan with key", async () => {
     process.env.ETHERSCAN_API_KEY = "test-key";
+    // Etherscan call
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         status: "1",
         result: [
           {
-            SourceCode: "pragma solidity ^0.8.0;\ncontract Foo {}",
+            SourceCode:
+              "// File: Contract.sol\npragma solidity ^0.8.0;\ncontract Foo {}",
             CompilerVersion: "v0.8.0+commit.c7d74943",
           },
         ],
@@ -58,7 +79,8 @@ describe("POST /api/fetch-source", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.sourceCode).toEqual({
-      "Contract.sol": "pragma solidity ^0.8.0;\ncontract Foo {}",
+      "Contract.sol":
+        "// File: Contract.sol\npragma solidity ^0.8.0;\ncontract Foo {}",
     });
     expect(body.compilerVersion).toBe("v0.8.0+commit.c7d74943");
     expect(body.source).toBe("etherscan");
@@ -87,7 +109,10 @@ describe("POST /api/fetch-source", () => {
   });
 
   it("returns 404 when no source is found", async () => {
-    vi.mocked(fetch).mockResolvedValue({ ok: false, status: 404 });
+    vi.mocked(fetch).mockImplementation(async () => ({
+      ok: false,
+      status: 404,
+    }));
 
     const res = await POST(
       makeRequest({
@@ -148,5 +173,66 @@ describe("POST /api/fetch-source", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.source).toBe("sourcify");
+  });
+
+  it("merges implementation source code when proxy is detected via Etherscan", async () => {
+    process.env.ETHERSCAN_API_KEY = "test-key";
+    vi.mocked(fetch).mockImplementation(async (url) => {
+      const urlStr = typeof url === "string" ? url : url?.url || "";
+      if (urlStr.includes("etherscan.io")) {
+        if (urlStr.includes("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")) {
+          return {
+            ok: true,
+            json: async () => ({
+              status: "1",
+              result: [
+                {
+                  SourceCode:
+                    "// File: Proxy.sol\npragma solidity ^0.6.12;\ncontract Proxy {}",
+                  CompilerVersion: "v0.6.12+commit.27d51765",
+                  Proxy: "1",
+                  Implementation: "0x0000000000000000000000000000000000000001",
+                },
+              ],
+            }),
+          };
+        }
+        if (urlStr.includes("0x0000000000000000000000000000000000000001")) {
+          return {
+            ok: true,
+            json: async () => ({
+              status: "1",
+              result: [
+                {
+                  SourceCode:
+                    "// File: Impl.sol\npragma solidity ^0.8.0;\ncontract Impl {}",
+                  CompilerVersion: "v0.8.0+commit.c7d74943",
+                  Proxy: "0",
+                  Implementation: "",
+                },
+              ],
+            }),
+          };
+        }
+      }
+      return { ok: false, status: 500 };
+    });
+
+    const res = await POST(
+      makeRequest({
+        address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        chain: "ethereum",
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.sourceCode).toEqual({
+      "Proxy.sol":
+        "// File: Proxy.sol\npragma solidity ^0.6.12;\ncontract Proxy {}",
+      "Impl.sol":
+        "// File: Impl.sol\npragma solidity ^0.8.0;\ncontract Impl {}",
+    });
+    expect(body.compilerVersion).toBe("v0.8.0+commit.c7d74943");
+    expect(body.source).toBe("proxy");
   });
 });
