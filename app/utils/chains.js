@@ -157,7 +157,7 @@ export const CGC_CHAIN_SLUGS = {
 // Chain IDs whose native token is ETH — used to fetch the "ethereum" CoinGecko
 // price for native tokens instead of the chain-specific CoinGecko platform slug.
 export const ETH_NATIVE_CHAIN_IDS = new Set([
-  1, 10, 42161, 8453, 324, 59144, 534352, 81457, 34443, 1088,
+  1, 10, 42161, 8453, 324, 480, 59144, 534352, 81457, 34443, 1088,
 ]);
 
 // CoinGecko native-coin slugs for chains whose native token is not ETH.
@@ -165,6 +165,14 @@ export const NATIVE_COIN_IDS = {
   56: "binancecoin",
   137: "matic-network",
 };
+
+// Known WETH addresses across L2s — these should resolve to ETH price
+// since WETH is always 1:1 with the native token.
+export const WETH_ADDRESSES = new Set([
+  "0x4200000000000000000000000000000000000006", // Optimism, Base, Blast, many OP-stack L2s
+  "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // Arbitrum
+  "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", // Ethereum mainnet
+]);
 
 /**
  * Build a chain config object for a non-built-in chain when a custom RPC URL
