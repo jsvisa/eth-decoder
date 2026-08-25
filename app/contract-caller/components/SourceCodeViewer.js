@@ -78,6 +78,7 @@ export default function SourceCodeViewer({
 
   const [searchQuery, setSearchQuery] = useState("");
   const [matchIndex, setMatchIndex] = useState(0);
+  const [copied, setCopied] = useState(false);
 
   const sourceContent = activeFile ? sources?.[activeFile] || "" : "";
 
@@ -242,13 +243,17 @@ export default function SourceCodeViewer({
                 solc {compilerVersion}
               </span>
             )}
-            <span
-              className={styles.address}
-              onClick={() => navigator.clipboard.writeText(address)}
-              title={`Click to copy: ${address}`}
-            >
-              {address.slice(0, 6)}...{address.slice(-4)}
-            </span>
+<span
+  className={`${styles.address} ${copied ? styles.addressCopied : ""}`}
+  onClick={() => {
+    navigator.clipboard.writeText(address);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }}
+  title={`Click to copy: ${address}`}
+>
+  {copied ? "Copied!" : `${address.slice(0, 6)}...${address.slice(-4)}`}
+</span>
             <div className={styles.headerSearch}>
               <input
                 ref={searchInputRef}

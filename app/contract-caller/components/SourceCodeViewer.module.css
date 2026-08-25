@@ -64,6 +64,11 @@
   color: #569cd6;
   cursor: pointer;
   white-space: nowrap;
+  transition: color 0.2s;
+}
+
+.addressCopied {
+  color: #4caf50;
 }
 
 .headerSearch {
