@@ -31,17 +31,23 @@ vi.mock("../../../app/contract-caller/hooks/useSourceCode.js", () => ({
   useSourceCode: () => mockHookValue,
 }));
 
-vi.mock("../../../app/contract-caller/components/SourceCodeViewer.module.css", () => ({
-  default: new Proxy(
-    {},
-    { get: (_t, prop) => (typeof prop === "string" ? prop : undefined) },
-  ),
-}));
+vi.mock(
+  "../../../app/contract-caller/components/SourceCodeViewer.module.css",
+  () => ({
+    default: new Proxy(
+      {},
+      { get: (_t, prop) => (typeof prop === "string" ? prop : undefined) },
+    ),
+  }),
+);
 
 beforeEach(() => {
   localStorage.clear();
   mockHookValue = {
-    sources: { "Token.sol": "contract Token {\n  function transfer(address to, uint256 amount) external {}\n}" },
+    sources: {
+      "Token.sol":
+        "contract Token {\n  function transfer(address to, uint256 amount) external {}\n}",
+    },
     compilerVersion: "0.8.19",
     loading: false,
     error: null,
@@ -86,14 +92,24 @@ describe("SourceCodeViewer", () => {
   });
 
   it("shows loading state", () => {
-    mockHookValue = { sources: null, compilerVersion: null, loading: true, error: null };
+    mockHookValue = {
+      sources: null,
+      compilerVersion: null,
+      loading: true,
+      error: null,
+    };
     const { container, cleanup } = renderComponent(BASE_PROPS);
     expect(container.textContent).toContain("Loading source code");
     cleanup();
   });
 
   it("shows error state", () => {
-    mockHookValue = { sources: null, compilerVersion: null, loading: false, error: "No source code available" };
+    mockHookValue = {
+      sources: null,
+      compilerVersion: null,
+      loading: false,
+      error: "No source code available",
+    };
     const { container, cleanup } = renderComponent(BASE_PROPS);
     expect(container.textContent).toContain("No source code available");
     cleanup();
@@ -101,7 +117,10 @@ describe("SourceCodeViewer", () => {
 
   it("renders file tabs for multi-file contracts", () => {
     mockHookValue = {
-      sources: { "Token.sol": "contract Token {}", "Lib.sol": "library Lib {}" },
+      sources: {
+        "Token.sol": "contract Token {}",
+        "Lib.sol": "library Lib {}",
+      },
       compilerVersion: "0.8.19",
       loading: false,
       error: null,
