@@ -115,7 +115,7 @@ export default function SourceCodeViewer({
 
   useEffect(() => {
     if (highlightLine > 0 && lineRefs.current[highlightLine]) {
-      lineRefs.current[highlightLine].scrollIntoView({
+      lineRefs.current[highlightLine]?.scrollIntoView?.({
         block: "center",
         behavior: "smooth",
       });
