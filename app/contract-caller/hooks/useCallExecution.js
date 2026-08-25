@@ -696,14 +696,19 @@ async function resolveSourceLinesForTrace(callTrace, chain, chainId) {
 
   // Resolve proxy addresses to implementation addresses for source mapping.
   // DELEGATECALL nodes show the proxy address but execute the impl's code.
-  const resolvedAddresses = new Set(addresses);
+  // The proxy's own bytecode has a useless source map (just constructor/fallback).
+  const resolvedAddresses = new Set();
   for (const addr of addresses) {
     try {
       const cached = getCachedAbi(chain, addr);
       if (cached?.isProxy && cached.implAddress) {
         resolvedAddresses.add(cached.implAddress.toLowerCase());
+      } else {
+        resolvedAddresses.add(addr);
       }
-    } catch {}
+    } catch {
+      resolvedAddresses.add(addr);
+    }
   }
 
   const sourceMapsByAddr = new Map();
@@ -758,18 +763,21 @@ function resolveSourceLinesForNode(
 
   if (node.pcs && node.pcs.length > 0 && node.to) {
     const addr = node.to.toLowerCase();
-    let sourceMap = sourceMapsByAddr.get(addr);
-    let sourceFiles = sourceFilesByAddr.get(addr);
+    let sourceMap = null;
+    let sourceFiles = null;
+
+    try {
+      const cached = getCachedAbi(chain, addr);
+      if (cached?.isProxy && cached.implAddress) {
+        const implAddr = cached.implAddress.toLowerCase();
+        sourceMap = sourceMapsByAddr.get(implAddr);
+        sourceFiles = sourceFilesByAddr.get(implAddr);
+      }
+    } catch {} // ignore if getCachedAbi throws
 
     if (!sourceMap) {
-      try {
-        const cached = getCachedAbi(chain, addr);
-        if (cached?.isProxy && cached.implAddress) {
-          const implAddr = cached.implAddress.toLowerCase();
-          sourceMap = sourceMapsByAddr.get(implAddr);
-          sourceFiles = sourceFilesByAddr.get(implAddr);
-        }
-      } catch {} // ignore if getCachedAbi throws
+      sourceMap = sourceMapsByAddr.get(addr);
+      sourceFiles = sourceFilesByAddr.get(addr);
     }
     if (sourceMap) {
       const lines = new Set();
@@ -812,14 +820,18 @@ async function prefetchSourceCodeForTrace(callTrace, chain) {
   const addresses = collectAllCallAddresses(callTrace);
   if (callTrace.to) addresses.add(callTrace.to.toLowerCase());
 
-  const resolvedAddresses = new Set(addresses);
+  const resolvedAddresses = new Set();
   for (const addr of addresses) {
     try {
       const cached = getCachedAbi(chain, addr);
       if (cached?.isProxy && cached.implAddress) {
         resolvedAddresses.add(cached.implAddress.toLowerCase());
+      } else {
+        resolvedAddresses.add(addr);
       }
-    } catch {}
+    } catch {
+      resolvedAddresses.add(addr);
+    }
   }
 
   await Promise.all(
