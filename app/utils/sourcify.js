@@ -116,7 +116,7 @@ export function sigToEventAbi(sig, numIndexed = 0) {
 export async function fetchContractInfoFromSourcify(address, chainId) {
   try {
     const response = await fetch(
-      `https://sourcify.dev/server/v2/contract/${chainId}/${address}?fields=abi,metadata`,
+      `https://sourcify.dev/server/v2/contract/${chainId}/${address}?fields=abi,metadata,sources`,
     );
 
     if (!response.ok) {
@@ -134,10 +134,23 @@ export async function fetchContractInfoFromSourcify(address, chainId) {
       ? Object.values(data.metadata.settings.compilationTarget)[0]
       : null;
 
+    const sourceCode = data.sources
+      ? Object.fromEntries(
+          Object.entries(data.sources).map(([file, info]) => [
+            file,
+            typeof info === "object" ? (info.content || "") : info,
+          ]),
+        )
+      : null;
+
+    const compilerVersion = data.metadata?.compiler?.version || null;
+
     return {
       abi,
       contractName,
       source: "sourcify",
+      sourceCode,
+      compilerVersion,
     };
   } catch (e) {
     console.error("Sourcify fetch error:", e);

@@ -59,6 +59,57 @@ function pickApiKey(keys) {
   return list[Math.floor(Math.random() * list.length)];
 }
 
+// Parse Etherscan's SourceCode field into a { fileName: content } map.
+// Etherscan returns raw Solidity for single-file contracts, or
+// JSON-encoded multi-file sources wrapped in double braces: {{"A.sol":{...}}}
+function parseEtherscanSourceCode(sourceCode) {
+  if (!sourceCode || sourceCode === "Contract source code not verified") {
+    return null;
+  }
+
+  const trimmed = sourceCode.trim();
+
+  // Multi-file: JSON-encoded, often wrapped in {{...}}
+  if (trimmed.startsWith("{{")) {
+    try {
+      const parsed = JSON.parse(trimmed.slice(1, -1));
+      if (parsed && typeof parsed === "object") {
+        const sources = {};
+        for (const [file, info] of Object.entries(parsed)) {
+          sources[file] = typeof info === "object" ? (info.content || "") : info;
+        }
+        return sources;
+      }
+    } catch {
+      // fall through to raw source
+    }
+  } else if (trimmed.startsWith("{")) {
+    // Some explorers return single-brace JSON
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const sources = {};
+        for (const [file, info] of Object.entries(parsed)) {
+          sources[file] = typeof info === "object" ? (info.content || "") : info;
+        }
+        return sources;
+      }
+    } catch {
+      // fall through to raw source
+    }
+  }
+
+  // Single-file: raw Solidity source
+  return { [fileNameFromSource(sourceCode) || "Contract.sol"]: sourceCode };
+}
+
+// Guess a file name from pragma or first line of source code.
+function fileNameFromSource(source) {
+  const firstLine = source.split("\n")[0].trim();
+  const m = firstLine.match(/\/\/\s*File:\s*(\S+)/);
+  return m ? m[1] : null;
+}
+
 // Fetch ABI and contract name from Etherscan
 async function fetchContractInfoFromEtherscan(address, chainId, apiKey) {
   const key = pickApiKey(apiKey);
@@ -96,6 +147,8 @@ async function fetchContractInfoFromEtherscan(address, chainId, apiKey) {
     isProxy: result.Proxy === "1",
     implementation: result.Implementation || null,
     source: "etherscan",
+    sourceCode: parseEtherscanSourceCode(result.SourceCode),
+    compilerVersion: result.CompilerVersion || null,
   };
 }
 
@@ -134,6 +187,8 @@ async function fetchContractInfoFromRouteScan(address, chainId, apiKey) {
     isProxy: result.Proxy === "1",
     implementation: result.Implementation || null,
     source: "routescan",
+    sourceCode: parseEtherscanSourceCode(result.SourceCode),
+    compilerVersion: result.CompilerVersion || null,
   };
 }
 
@@ -498,6 +553,10 @@ export async function fetchAbi(
     for (const fi of facetInfos) {
       if (fi && fi.abi) abisToMerge.push(fi.abi);
     }
+    const facetSources = {};
+    for (const fi of facetInfos) {
+      if (fi?.sourceCode) Object.assign(facetSources, fi.sourceCode);
+    }
     return {
       abi: mergeAbis(...abisToMerge),
       contractName: proxyInfo.contractName,
@@ -512,6 +571,8 @@ export async function fetchAbi(
       })),
       source: proxyInfo.source,
       implSource: implInfo?.source ?? null,
+      sourceCode: implInfo?.sourceCode || proxyInfo.sourceCode || null,
+      compilerVersion: implInfo?.compilerVersion || proxyInfo.compilerVersion || null,
     };
   }
 
@@ -524,6 +585,8 @@ export async function fetchAbi(
       implAddress,
       source: proxyInfo.source,
       implSource: implInfo.source,
+      sourceCode: implInfo.sourceCode || proxyInfo.sourceCode || null,
+      compilerVersion: implInfo.compilerVersion || proxyInfo.compilerVersion || null,
     };
   }
 
@@ -535,6 +598,8 @@ export async function fetchAbi(
     implAddress: null,
     source: proxyInfo.source,
     implSource: null,
+    sourceCode: proxyInfo.sourceCode || null,
+    compilerVersion: proxyInfo.compilerVersion || null,
   };
 }
 
