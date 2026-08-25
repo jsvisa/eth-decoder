@@ -138,7 +138,7 @@ export async function fetchContractInfoFromSourcify(address, chainId) {
       ? Object.fromEntries(
           Object.entries(data.sources).map(([file, info]) => [
             file,
-            typeof info === "object" ? (info.content || "") : info,
+            typeof info === "object" ? info.content || "" : info,
           ]),
         )
       : null;

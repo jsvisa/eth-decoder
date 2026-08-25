@@ -275,7 +275,12 @@ export const getCachedSource = (chain, address) => {
  * @param {Object<string,string>} sources - Map of file name to source content
  * @param {string|null} compilerVersion - Solidity compiler version
  */
-export const setCachedSource = (chain, address, sources, compilerVersion = null) => {
+export const setCachedSource = (
+  chain,
+  address,
+  sources,
+  compilerVersion = null,
+) => {
   if (typeof window === "undefined") return;
 
   try {

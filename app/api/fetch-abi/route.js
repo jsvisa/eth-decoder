@@ -76,7 +76,7 @@ function parseEtherscanSourceCode(sourceCode) {
       if (parsed && typeof parsed === "object") {
         const sources = {};
         for (const [file, info] of Object.entries(parsed)) {
-          sources[file] = typeof info === "object" ? (info.content || "") : info;
+          sources[file] = typeof info === "object" ? info.content || "" : info;
         }
         return sources;
       }
@@ -90,7 +90,7 @@ function parseEtherscanSourceCode(sourceCode) {
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
         const sources = {};
         for (const [file, info] of Object.entries(parsed)) {
-          sources[file] = typeof info === "object" ? (info.content || "") : info;
+          sources[file] = typeof info === "object" ? info.content || "" : info;
         }
         return sources;
       }
@@ -572,7 +572,8 @@ export async function fetchAbi(
       source: proxyInfo.source,
       implSource: implInfo?.source ?? null,
       sourceCode: implInfo?.sourceCode || proxyInfo.sourceCode || null,
-      compilerVersion: implInfo?.compilerVersion || proxyInfo.compilerVersion || null,
+      compilerVersion:
+        implInfo?.compilerVersion || proxyInfo.compilerVersion || null,
     };
   }
 
@@ -586,7 +587,8 @@ export async function fetchAbi(
       source: proxyInfo.source,
       implSource: implInfo.source,
       sourceCode: implInfo.sourceCode || proxyInfo.sourceCode || null,
-      compilerVersion: implInfo.compilerVersion || proxyInfo.compilerVersion || null,
+      compilerVersion:
+        implInfo.compilerVersion || proxyInfo.compilerVersion || null,
     };
   }
 

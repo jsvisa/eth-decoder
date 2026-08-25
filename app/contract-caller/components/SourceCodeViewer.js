@@ -34,7 +34,10 @@ function highlightSolidity(source) {
     { re: /'(\\.|[^'\\])*'/g, cls: "string" },
     { re: keywords, cls: "keyword" },
     { re: /\b(0x[0-9a-fA-F]+|\d+\.?\d*)\b/g, cls: "number" },
-    { re: /\/\/\/\s*@(notice|dev|param|return|title|author|custom:)\b.*$/gm, cls: "natspec" },
+    {
+      re: /\/\/\/\s*@(notice|dev|param|return|title|author|custom:)\b.*$/gm,
+      cls: "natspec",
+    },
   ];
 
   let result = escaped;
@@ -135,9 +138,13 @@ export default function SourceCodeViewer({
           <div className={styles.headerInfo}>
             <span className={styles.title}>Source Code</span>
             {compilerVersion && (
-              <span className={styles.compilerBadge}>solc {compilerVersion}</span>
+              <span className={styles.compilerBadge}>
+                solc {compilerVersion}
+              </span>
             )}
-            <span className={styles.address}>{address?.slice(0, 10)}...{address?.slice(-8)}</span>
+            <span className={styles.address}>
+              {address?.slice(0, 10)}...{address?.slice(-8)}
+            </span>
           </div>
           <button className={styles.closeBtn} onClick={onClose} type="button">
             ✕
@@ -166,11 +173,7 @@ export default function SourceCodeViewer({
               Loading source code...
             </div>
           )}
-          {error && (
-            <div className={styles.statusError}>
-              {error}
-            </div>
-          )}
+          {error && <div className={styles.statusError}>{error}</div>}
           {!loading && !error && lines.length > 0 && (
             <div className={styles.codeContainer}>
               <table className={styles.codeTable}>
@@ -181,7 +184,9 @@ export default function SourceCodeViewer({
                     return (
                       <tr
                         key={i}
-                        ref={(el) => { lineRefs.current[lineNum] = el; }}
+                        ref={(el) => {
+                          lineRefs.current[lineNum] = el;
+                        }}
                         className={`${styles.codeLine} ${isHighlighted ? styles.codeLineHighlight : ""}`}
                       >
                         <td className={styles.lineNum}>{lineNum}</td>
