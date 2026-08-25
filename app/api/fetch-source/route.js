@@ -7,6 +7,7 @@ import {
   fetchSourceFromSourcify,
   fetchContractInfoFromRouteScan,
   getDiamondFacetAddresses,
+  getImplementationAddress,
   resolveChainId,
 } from "../../utils/fetchContract";
 
@@ -27,6 +28,8 @@ async function fetchSourceForAddress(
         sourceCode: result.sourceCode,
         compilerVersion: result.compilerVersion,
         source: result.source,
+        isProxy: result.isProxy,
+        implementation: result.implementation,
       };
   }
 
@@ -48,6 +51,8 @@ async function fetchSourceForAddress(
       sourceCode: routescanResult.sourceCode,
       compilerVersion: routescanResult.compilerVersion,
       source: routescanResult.source,
+      isProxy: routescanResult.isProxy,
+      implementation: routescanResult.implementation,
     };
 
   return null;
@@ -147,6 +152,42 @@ export async function POST(request) {
             compilerVersion:
               result?.compilerVersion || facetCompilerVersion || null,
             source: "diamond",
+          });
+        }
+      }
+    }
+
+    // Regular proxy: when Etherscan or Routescan reports this as a proxy,
+    // fetch the implementation's source code and merge it in.
+    if (result?.isProxy && result?.implementation && configChain && rpcUrl) {
+      const client = createPublicClient({
+        chain: configChain,
+        transport: http(rpcUrl),
+      });
+
+      let implAddress = null;
+      if (result?.implementation && result?.isProxy) {
+        implAddress = result.implementation;
+      } else {
+        implAddress = await getImplementationAddress(client, address);
+      }
+
+      if (implAddress) {
+        const implResult = await fetchSourceForAddress(
+          implAddress,
+          chainId,
+          etherscanApiKey,
+          routescanApiKey,
+        );
+        if (implResult?.sourceCode) {
+          const mergedSources = result?.sourceCode
+            ? { ...result.sourceCode, ...implResult.sourceCode }
+            : implResult.sourceCode;
+          return NextResponse.json({
+            sourceCode: mergedSources,
+            compilerVersion:
+              implResult.compilerVersion || result?.compilerVersion,
+            source: "proxy",
           });
         }
       }
