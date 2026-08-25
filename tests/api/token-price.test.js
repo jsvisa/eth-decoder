@@ -87,7 +87,9 @@ describe("GET /api/token-price", () => {
   });
 
   it("returns null for WETH on an unsupported non-ETH chain", async () => {
-    const res = await GET(makeRequest({ token: OP_STACK_WETH, chainId: 999999 }));
+    const res = await GET(
+      makeRequest({ token: OP_STACK_WETH, chainId: 999999 }),
+    );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.price).toBeNull();
