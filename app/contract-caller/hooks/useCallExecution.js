@@ -17,6 +17,7 @@ import {
   fetchAbisForAddresses,
   getCachedAbi,
 } from "../../utils/abiCache";
+import { parseSourceMap } from "../../utils/sourceMap";
 import {
   isValidEthAddress,
   isValidForkBlock,
@@ -446,6 +447,15 @@ export function useCallExecution({
               ? cached.implContractName || cached.contractName || null
               : null;
           });
+
+          // Resolve source lines for every trace node using Sourcify source maps
+          if (chainIdForSimulation) {
+            await resolveSourceLinesForTrace(
+              data.callTrace,
+              chain,
+              chainIdForSimulation,
+            );
+          }
         }
 
         await decodeLogsViaServer(data.logs);
@@ -661,4 +671,75 @@ export function useCallExecution({
     handleSaveSimulation,
     setSaveExtra,
   };
+}
+
+// ── source map resolution ─────────────────────────────────────────────────
+
+const SOURCE_MAP_CACHE = new Map();
+
+/**
+ * Fetch source maps for all unique addresses in the trace tree from Sourcify,
+ * then resolve each node's PCs to source lines using its own address's map.
+ */
+async function resolveSourceLinesForTrace(callTrace, chain, chainId) {
+  if (!callTrace) return;
+
+  const addresses = collectAllCallAddresses(callTrace);
+  if (addresses.size === 0) return;
+
+  const sourceMapsByAddr = new Map();
+
+  for (const addr of addresses) {
+    const cacheKey = `${chainId}-${addr}`;
+    let sourceMapData = SOURCE_MAP_CACHE.get(cacheKey);
+
+    if (!sourceMapData) {
+      try {
+        const res = await fetch(
+          `/api/fetch-source-map?address=${addr}&chainId=${chainId}`,
+        );
+        if (res.ok) {
+          sourceMapData = await res.json();
+          SOURCE_MAP_CACHE.set(cacheKey, sourceMapData);
+        }
+      } catch {
+        // Ignore fetch errors
+      }
+    }
+
+    if (sourceMapData?.sourceMap) {
+      sourceMapsByAddr.set(
+        addr.toLowerCase(),
+        parseSourceMap(sourceMapData.sourceMap),
+      );
+    }
+  }
+
+  if (sourceMapsByAddr.size === 0) return;
+
+  resolveSourceLinesForNode(callTrace, sourceMapsByAddr);
+}
+
+function resolveSourceLinesForNode(node, sourceMapsByAddr) {
+  if (!node) return;
+
+  if (node.pcs && node.pcs.length > 0 && node.to) {
+    const sourceMap = sourceMapsByAddr.get(node.to.toLowerCase());
+    if (sourceMap) {
+      const lines = new Set();
+      for (const pc of node.pcs) {
+        const mapping = sourceMap.get(pc);
+        if (mapping && mapping.l >= 0) {
+          lines.add(mapping.l + 1);
+        }
+      }
+      if (lines.size > 0) {
+        node.sourceLines = [...lines].sort((a, b) => a - b);
+      }
+    }
+  }
+
+  for (const child of node.calls || []) {
+    resolveSourceLinesForNode(child, sourceMapsByAddr);
+  }
 }
