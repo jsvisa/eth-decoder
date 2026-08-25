@@ -8,7 +8,7 @@ import {
   importContractsFromCSV,
 } from "../utils/contractsCache";
 import { CHAIN_META } from "../utils/chains";
-import { getCachedSource } from "../utils/abiCache";
+import { getCachedSource, getSourceCacheKey } from "../utils/abiCache";
 import SourceCodeViewer from "../contract-caller/components/SourceCodeViewer";
 
 const CUSTOM_CHAINS_KEY = "custom_chains";
@@ -116,10 +116,12 @@ const getCachedContracts = (customChains) => {
   return contracts.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 };
 
-// Delete a cached contract
+// Delete a cached contract (both ABI and source code cache)
 const deleteCachedContract = (key) => {
   try {
     localStorage.removeItem(key);
+    const srcKey = key.replace(ABI_CACHE_PREFIX, "src-");
+    localStorage.removeItem(srcKey);
     return true;
   } catch (err) {
     console.error("Failed to delete cached contract:", err);
