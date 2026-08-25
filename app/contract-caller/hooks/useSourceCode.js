@@ -69,7 +69,13 @@ export function useSourceCode(chain, address) {
     // always run (they live in the shared promise below, not here).
     const applyData = (data) => {
       if (!mountedRef.current) return;
-      if (data && data.sourceCode) {
+      if (data instanceof Error) {
+        setState((prev) => ({
+          ...prev,
+          loading: false,
+          error: data.message,
+        }));
+      } else if (data && data.sourceCode) {
         setState({
           sources: data.sourceCode,
           compilerVersion: data.compilerVersion || null,
@@ -121,18 +127,7 @@ export function useSourceCode(chain, address) {
       });
 
     FETCHING.set(key, promise);
-    promise.then((data) => {
-      if (!mountedRef.current) return;
-      if (data instanceof Error) {
-        setState((prev) => ({
-          ...prev,
-          loading: false,
-          error: data.message,
-        }));
-      } else {
-        applyData(data);
-      }
-    });
+    promise.then(applyData);
   }, [chain, address]);
 
   return state;
