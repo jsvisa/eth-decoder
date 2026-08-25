@@ -1,8 +1,35 @@
 import { NextResponse } from "next/server";
+import {
+  createPublicClient,
+  http,
+  defineChain,
+  decodeAbiParameters,
+  getAddress,
+  keccak256,
+  toHex,
+} from "viem";
 import { isValidEthAddress } from "../../utils/validation";
+import {
+  BUILT_IN_CHAIN_IDS as CHAINS,
+  VIEM_CHAINS,
+  DEFAULT_RPC_URLS,
+} from "../../utils/chains";
 
 const ETHERSCAN_V2_API = "https://api.etherscan.io/v2/api";
 const ROUTESCAN_API_BASE = "https://api.routescan.io/v2/network/mainnet/evm";
+
+// EIP-2535 DiamondLoupe facetAddresses() selector
+const DIAMOND_FACET_ADDRESSES_SELECTOR = "0x52ef6b2c";
+
+// EIP-2535 DiamondStorage struct layout (0-indexed):
+//   0: selectorToFacetAndPosition (mapping)
+//   1: facetFunctionSelectors (mapping)
+//   2: facetAddresses (address[])
+//   3: supportedInterfaces (mapping)
+//   4: contractOwner (address)
+const DIAMOND_STORAGE_SLOT = keccak256(
+  toHex("diamond.standard.diamond.storage"),
+);
 
 function pickApiKey(keys) {
   if (!keys) return "";
@@ -144,8 +171,7 @@ async function fetchFromRouteScan(address, chainId, apiKey) {
 }
 
 async function resolveChainId(chain, searchParams) {
-  const { BUILT_IN_CHAIN_IDS } = await import("../../utils/chains");
-  let id = BUILT_IN_CHAIN_IDS[chain];
+  let id = CHAINS[chain];
   if (id) return id;
 
   id = parseInt(chain, 10);
@@ -161,6 +187,70 @@ async function resolveChainId(chain, searchParams) {
     id = parseInt(chain.slice(6), 10);
     if (Number.isFinite(id)) return id;
   }
+
+  return null;
+}
+
+async function getDiamondFacetAddresses(client, diamondAddress) {
+  const arrSlot = BigInt(DIAMOND_STORAGE_SLOT) + 2n;
+
+  let length;
+  try {
+    const lengthData = await client.getStorageAt({
+      address: diamondAddress,
+      slot: toHex(arrSlot, { size: 32 }),
+    });
+    length = parseInt(lengthData || "0x0", 16);
+  } catch {
+    return [];
+  }
+  if (!length || length > 200) return [];
+
+  try {
+    const res = await client.call({
+      address: diamondAddress,
+      data: DIAMOND_FACET_ADDRESSES_SELECTOR,
+    });
+    if (res.data && res.data.length > 2) {
+      const [addresses] = decodeAbiParameters(
+        [{ type: "address[]" }],
+        res.data,
+      );
+      if (addresses.length > 0) {
+        return addresses.map(getAddress);
+      }
+    }
+  } catch {
+    // fall through to storage reading
+  }
+
+  try {
+    const elementBase = BigInt(keccak256(toHex(arrSlot, { size: 32 })));
+    const addresses = [];
+    for (let i = 0; i < length; i++) {
+      const elementData = await client.getStorageAt({
+        address: diamondAddress,
+        slot: toHex(elementBase + BigInt(i), { size: 32 }),
+      });
+      addresses.push(getAddress("0x" + elementData.slice(-40)));
+    }
+    return addresses;
+  } catch {
+    return [];
+  }
+}
+
+async function fetchSourceForAddress(address, chainId, etherscanApiKey, routescanApiKey) {
+  if (etherscanApiKey) {
+    const result = await fetchFromEtherscan(address, chainId, etherscanApiKey);
+    if (result?.sourceCode) return result;
+  }
+
+  const sourcifyResult = await fetchFromSourcify(address, chainId);
+  if (sourcifyResult?.sourceCode) return sourcifyResult;
+
+  const routescanResult = await fetchFromRouteScan(address, chainId, routescanApiKey);
+  if (routescanResult?.sourceCode) return routescanResult;
 
   return null;
 }
@@ -202,21 +292,53 @@ export async function GET(request) {
       process.env.ROUTESCAN_API_KEY ||
       "";
 
-    let result = null;
+    let result = await fetchSourceForAddress(address, chainId, etherscanApiKey, routescanApiKey);
 
-    if (etherscanApiKey) {
-      result = await fetchFromEtherscan(address, chainId, etherscanApiKey);
-      if (result?.sourceCode) {
-        return NextResponse.json(result);
+    // Diamond proxy: discover facets and fetch their source code
+    const customRpcUrl = searchParams.get("rpcUrl");
+    let configChain = VIEM_CHAINS[chain];
+    let rpcUrl = customRpcUrl || DEFAULT_RPC_URLS[chain];
+    const customChainIdParam = searchParams.get("chainId");
+
+    if (!configChain && customChainIdParam && customRpcUrl) {
+      configChain = defineChain({
+        id: chainId,
+        name: chain,
+        nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+        rpcUrls: { default: { http: [customRpcUrl] } },
+      });
+      rpcUrl = customRpcUrl;
+    }
+
+    if (configChain && rpcUrl) {
+      const client = createPublicClient({
+        chain: configChain,
+        transport: http(rpcUrl),
+      });
+      const facetAddresses = await getDiamondFacetAddresses(client, address);
+      if (facetAddresses.length > 0) {
+        const facetSources = {};
+        let facetCompilerVersion = null;
+        for (const facet of facetAddresses) {
+          const facetResult = await fetchSourceForAddress(facet, chainId, etherscanApiKey, routescanApiKey);
+          if (facetResult?.sourceCode) {
+            Object.assign(facetSources, facetResult.sourceCode);
+            if (!facetCompilerVersion) facetCompilerVersion = facetResult.compilerVersion;
+          }
+        }
+        if (Object.keys(facetSources).length > 0) {
+          const mergedSources = result?.sourceCode
+            ? { ...facetSources, ...result.sourceCode }
+            : facetSources;
+          return NextResponse.json({
+            sourceCode: mergedSources,
+            compilerVersion: result?.compilerVersion || facetCompilerVersion || null,
+            source: "diamond",
+          });
+        }
       }
     }
 
-    result = await fetchFromSourcify(address, chainId);
-    if (result?.sourceCode) {
-      return NextResponse.json(result);
-    }
-
-    result = await fetchFromRouteScan(address, chainId, routescanApiKey);
     if (result?.sourceCode) {
       return NextResponse.json(result);
     }
