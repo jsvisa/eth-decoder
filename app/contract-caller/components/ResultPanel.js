@@ -13,6 +13,7 @@ import { CHAINS } from "../../utils/chains";
 import styles from "./ResultPanel.module.css";
 import MetricsPanel from "./MetricsPanel";
 import SimulatedEventLogs from "./SimulatedEventLogs";
+import SourceCodeViewer from "./SourceCodeViewer";
 import { getBookmarkedAddress } from "../../utils/addressBook";
 import { getCachedAbi } from "../../utils/abiCache";
 
@@ -210,6 +211,7 @@ function TraceTooltip({ items, onCopy }) {
 
 function CallTraceNode({ trace, depth, chain }) {
   const [hideTooltip, setHideTooltip] = useState(false);
+  const [debugAddr, setDebugAddr] = useState(null);
 
   if (!trace) return null;
   if (trace.type === "STATICCALL") return null;
@@ -314,6 +316,19 @@ function CallTraceNode({ trace, depth, chain }) {
                   </button>
                 </span>
               )}
+              {contractAddress && (
+                <button
+                  className={styles.debugBtn}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDebugAddr(contractAddress);
+                  }}
+                  type="button"
+                  title="View source code"
+                >
+                  🔍
+                </button>
+              )}
             </span>
           )}
           <span className={styles.traceParams}>({inputParams})</span>
@@ -375,6 +390,16 @@ function CallTraceNode({ trace, depth, chain }) {
             />
           ))}
         </div>
+      )}
+
+      {debugAddr && (
+        <SourceCodeViewer
+          open={true}
+          address={debugAddr}
+          chain={chain}
+          functionName={functionLabel || undefined}
+          onClose={() => setDebugAddr(null)}
+        />
       )}
     </div>
   );
