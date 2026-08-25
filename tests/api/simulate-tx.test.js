@@ -75,7 +75,7 @@ const TRANSFER_TOPIC =
   "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
 
-vi.mock("../../app/api/fetch-abi/route.js", () => ({
+vi.mock("../../app/utils/fetchContract.js", () => ({
   fetchAbi: vi.fn(),
 }));
 vi.mock("../../app/utils/serverAbiBlobCache.js", () => ({

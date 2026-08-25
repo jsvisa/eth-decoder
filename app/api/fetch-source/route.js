@@ -1,188 +1,14 @@
 import { NextResponse } from "next/server";
-import {
-  createPublicClient,
-  http,
-  defineChain,
-  decodeAbiParameters,
-  getAddress,
-  keccak256,
-  toHex,
-} from "viem";
+import { createPublicClient, http, defineChain } from "viem";
 import { isValidEthAddress } from "../../utils/validation";
+import { VIEM_CHAINS, DEFAULT_RPC_URLS } from "../../utils/chains";
 import {
-  BUILT_IN_CHAIN_IDS as CHAINS,
-  VIEM_CHAINS,
-  DEFAULT_RPC_URLS,
-} from "../../utils/chains";
-
-import {
-  ETHERSCAN_V2_API,
-  ROUTESCAN_API_BASE,
-  pickApiKey,
-  parseEtherscanSourceCode,
-} from "../../utils/etherscan";
-
-// EIP-2535 DiamondLoupe facetAddresses() selector
-const DIAMOND_FACET_ADDRESSES_SELECTOR = "0x52ef6b2c";
-
-// EIP-2535 DiamondStorage struct layout (0-indexed):
-//   0: selectorToFacetAndPosition (mapping)
-//   1: facetFunctionSelectors (mapping)
-//   2: facetAddresses (address[])
-//   3: supportedInterfaces (mapping)
-//   4: contractOwner (address)
-const DIAMOND_STORAGE_SLOT = keccak256(
-  toHex("diamond.standard.diamond.storage"),
-);
-
-async function fetchFromEtherscan(address, chainId, apiKey) {
-  const key = pickApiKey(apiKey);
-  if (!key) return null;
-
-  const params = new URLSearchParams({
-    chainid: chainId,
-    module: "contract",
-    action: "getsourcecode",
-    address: address,
-    apikey: key,
-  });
-
-  const response = await fetch(`${ETHERSCAN_V2_API}?${params}`);
-  if (!response.ok) return null;
-
-  const data = await response.json();
-  if (data.status !== "1" || !data.result || !data.result[0]) return null;
-
-  const result = data.result[0];
-  const sourceCode = parseEtherscanSourceCode(result.SourceCode);
-  return {
-    sourceCode,
-    compilerVersion: result.CompilerVersion || null,
-    source: "etherscan",
-  };
-}
-
-async function fetchFromSourcify(address, chainId) {
-  try {
-    const response = await fetch(
-      `https://sourcify.dev/server/v2/contract/${chainId}/${address}?fields=sources,metadata`,
-    );
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    const sources = data.sources
-      ? Object.fromEntries(
-          Object.entries(data.sources).map(([file, info]) => [
-            file,
-            typeof info === "object" ? info.content || "" : info,
-          ]),
-        )
-      : null;
-
-    return {
-      sourceCode: sources,
-      compilerVersion: data.metadata?.compiler?.version || null,
-      source: "sourcify",
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function fetchFromRouteScan(address, chainId, apiKey) {
-  const key = pickApiKey(apiKey);
-  const params = new URLSearchParams({
-    module: "contract",
-    action: "getsourcecode",
-    address: address,
-  });
-  if (key) params.set("apikey", key);
-
-  const url = `${ROUTESCAN_API_BASE}/${chainId}/etherscan/api?${params}`;
-  const response = await fetch(url);
-  if (!response.ok) return null;
-
-  const data = await response.json();
-  if (data.status !== "1" || !data.result || !data.result[0]) return null;
-
-  const result = data.result[0];
-  const sourceCode = parseEtherscanSourceCode(result.SourceCode);
-  return {
-    sourceCode,
-    compilerVersion: result.CompilerVersion || null,
-    source: "routescan",
-  };
-}
-
-async function resolveChainId(chain, searchParams) {
-  let id = CHAINS[chain];
-  if (id) return id;
-
-  id = parseInt(chain, 10);
-  if (Number.isFinite(id)) return id;
-
-  const customChainIdParam = searchParams.get("chainId");
-  if (customChainIdParam) {
-    id = parseInt(customChainIdParam, 10);
-    if (Number.isFinite(id)) return id;
-  }
-
-  if (chain.startsWith("chain-")) {
-    id = parseInt(chain.slice(6), 10);
-    if (Number.isFinite(id)) return id;
-  }
-
-  return null;
-}
-
-async function getDiamondFacetAddresses(client, diamondAddress) {
-  const arrSlot = BigInt(DIAMOND_STORAGE_SLOT) + 2n;
-
-  let length;
-  try {
-    const lengthData = await client.getStorageAt({
-      address: diamondAddress,
-      slot: toHex(arrSlot, { size: 32 }),
-    });
-    length = parseInt(lengthData || "0x0", 16);
-  } catch {
-    return [];
-  }
-  if (!length || length > 200) return [];
-
-  try {
-    const res = await client.call({
-      address: diamondAddress,
-      data: DIAMOND_FACET_ADDRESSES_SELECTOR,
-    });
-    if (res.data && res.data.length > 2) {
-      const [addresses] = decodeAbiParameters(
-        [{ type: "address[]" }],
-        res.data,
-      );
-      if (addresses.length > 0) {
-        return addresses.map(getAddress);
-      }
-    }
-  } catch {
-    // fall through to storage reading
-  }
-
-  try {
-    const elementBase = BigInt(keccak256(toHex(arrSlot, { size: 32 })));
-    const addresses = [];
-    for (let i = 0; i < length; i++) {
-      const elementData = await client.getStorageAt({
-        address: diamondAddress,
-        slot: toHex(elementBase + BigInt(i), { size: 32 }),
-      });
-      addresses.push(getAddress("0x" + elementData.slice(-40)));
-    }
-    return addresses;
-  } catch {
-    return [];
-  }
-}
+  fetchContractInfoFromEtherscan,
+  fetchSourceFromSourcify,
+  fetchContractInfoFromRouteScan,
+  getDiamondFacetAddresses,
+  resolveChainId,
+} from "../../utils/fetchContract";
 
 async function fetchSourceForAddress(
   address,
@@ -191,19 +17,38 @@ async function fetchSourceForAddress(
   routescanApiKey,
 ) {
   if (etherscanApiKey) {
-    const result = await fetchFromEtherscan(address, chainId, etherscanApiKey);
-    if (result?.sourceCode) return result;
+    const result = await fetchContractInfoFromEtherscan(
+      address,
+      chainId,
+      etherscanApiKey,
+    );
+    if (result?.sourceCode)
+      return {
+        sourceCode: result.sourceCode,
+        compilerVersion: result.compilerVersion,
+        source: result.source,
+      };
   }
 
-  const sourcifyResult = await fetchFromSourcify(address, chainId);
-  if (sourcifyResult?.sourceCode) return sourcifyResult;
+  const sourcifyResult = await fetchSourceFromSourcify(address, chainId);
+  if (sourcifyResult?.sourceCode)
+    return {
+      sourceCode: sourcifyResult.sourceCode,
+      compilerVersion: sourcifyResult.compilerVersion,
+      source: sourcifyResult.source,
+    };
 
-  const routescanResult = await fetchFromRouteScan(
+  const routescanResult = await fetchContractInfoFromRouteScan(
     address,
     chainId,
     routescanApiKey,
   );
-  if (routescanResult?.sourceCode) return routescanResult;
+  if (routescanResult?.sourceCode)
+    return {
+      sourceCode: routescanResult.sourceCode,
+      compilerVersion: routescanResult.compilerVersion,
+      source: routescanResult.source,
+    };
 
   return null;
 }
