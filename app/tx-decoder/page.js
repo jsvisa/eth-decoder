@@ -44,8 +44,9 @@ async function decodeInnerCallsAsync(innerCalls, setResult) {
           updated[idx] = { ...updated[idx], decoded };
           return { ...prev, inner_calls: updated };
         });
-      } catch {
+      } catch (err) {
         // best-effort — leave call as-is
+        console.error("Failed to decode inner call:", err);
       }
     }),
   );
@@ -253,7 +254,7 @@ function DecoderWorkspace({ tabId, hydrateFromUrl, onRename }) {
         } else if (/null/.test(match)) {
           cls = styles.jsonNull;
         }
-        return `<span class="${cls}">${match}</span>`;
+        return `<span class="${cls}">${match.replace(/"/g, "&quot;").replace(/'/g, "&#39;")}</span>`;
       },
     );
   };
@@ -263,7 +264,9 @@ function DecoderWorkspace({ tabId, hydrateFromUrl, onRename }) {
       return str
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
     };
 
     // Process line by line

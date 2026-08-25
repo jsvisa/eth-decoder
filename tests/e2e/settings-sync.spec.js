@@ -152,7 +152,10 @@ test.describe("Export settings", () => {
 test.describe("Import settings", () => {
   /** Write a JSON payload to a temp file and return its path. */
   function writeTempJson(data) {
-    const file = path.join(os.tmpdir(), `evm-import-${Date.now()}.json`);
+    const file = path.join(
+      os.tmpdir(),
+      `evm-import-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`,
+    );
     fs.writeFileSync(file, JSON.stringify(data));
     return file;
   }
@@ -216,10 +219,8 @@ test.describe("Import settings", () => {
     const tmpFile = writeTempJson(payload);
 
     const fileInput = page.locator('input[type="file"][accept=".json"]');
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: "domcontentloaded" }),
-      fileInput.setInputFiles(tmpFile),
-    ]);
+    await fileInput.setInputFiles(tmpFile);
+    await page.waitForEvent("domcontentloaded");
 
     // Imported key is present
     const apiKeys = JSON.parse(
@@ -246,10 +247,8 @@ test.describe("Import settings", () => {
     const tmpFile = writeTempJson(payload);
 
     const fileInput = page.locator('input[type="file"][accept=".json"]');
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: "domcontentloaded" }),
-      fileInput.setInputFiles(tmpFile),
-    ]);
+    await fileInput.setInputFiles(tmpFile);
+    await page.waitForEvent("domcontentloaded");
 
     const apiKeys = JSON.parse(
       await page.evaluate(() => localStorage.getItem("api_keys_settings")),
