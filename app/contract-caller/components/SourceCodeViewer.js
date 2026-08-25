@@ -2,23 +2,8 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useSourceCode } from "../hooks/useSourceCode";
+import { findFunctionSource } from "../../utils/solidityParser";
 import styles from "./SourceCodeViewer.module.css";
-
-function regexEscape(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function findFunctionLine(source, functionName) {
-  if (!functionName) return -1;
-  const baseName = functionName.split("(")[0];
-  if (!baseName) return -1;
-  const lines = source.split("\n");
-  const pattern = new RegExp(`\\bfunction\\s+${regexEscape(baseName)}\\s*\\(`);
-  for (let i = 0; i < lines.length; i++) {
-    if (pattern.test(lines[i])) return i + 1;
-  }
-  return -1;
-}
 
 function highlightSolidity(source) {
   const escaped = source
@@ -115,14 +100,13 @@ export default function SourceCodeViewer({
     return html.split("\n");
   }, [sourceContent]);
 
-  // Memoize function search: only recompute when sources or functionName changes.
+  // Memoize function search via Solidity AST parser — O(1) lookup after first parse.
   const { foundFile, foundLine } = useMemo(() => {
     if (!functionName || !sources) return { foundFile: null, foundLine: -1 };
-    for (const [file, content] of Object.entries(sources)) {
-      const line = findFunctionLine(content, functionName);
-      if (line > 0) return { foundFile: file, foundLine: line };
-    }
-    return { foundFile: null, foundLine: -1 };
+    const result = findFunctionSource(functionName, sources);
+    return result
+      ? { foundFile: result.file, foundLine: result.line }
+      : { foundFile: null, foundLine: -1 };
   }, [sources, functionName]);
 
   useEffect(() => {
