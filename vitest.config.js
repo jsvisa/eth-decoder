@@ -49,6 +49,13 @@ export default defineConfig({
           environment: "node",
         },
       },
+      {
+        name: "integration",
+        test: {
+          include: ["tests/integration/**"],
+          environment: "node",
+        },
+      },
     ],
   },
 });
