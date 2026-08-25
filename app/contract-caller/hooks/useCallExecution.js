@@ -692,6 +692,7 @@ async function resolveSourceLinesForTrace(callTrace, chain, chainId) {
   if (addresses.size === 0) return;
 
   const sourceMapsByAddr = new Map();
+  const sourceFilesByAddr = new Map();
 
   const fetchPromises = [...addresses].map(async (addr) => {
     const cacheKey = `${chainId}-${addr}`;
@@ -716,6 +717,7 @@ async function resolveSourceLinesForTrace(callTrace, chain, chainId) {
         addr.toLowerCase(),
         parseSourceMap(sourceMapData.sourceMap),
       );
+      sourceFilesByAddr.set(addr.toLowerCase(), sourceMapData.sources || null);
     }
   });
 
@@ -723,30 +725,43 @@ async function resolveSourceLinesForTrace(callTrace, chain, chainId) {
 
   if (sourceMapsByAddr.size === 0) return;
 
+  resolveSourceLinesForNode(callTrace, sourceMapsByAddr, sourceFilesByAddr);
+
+  if (sourceMapsByAddr.size === 0) return;
+
   resolveSourceLinesForNode(callTrace, sourceMapsByAddr);
 }
 
-function resolveSourceLinesForNode(node, sourceMapsByAddr) {
+function resolveSourceLinesForNode(node, sourceMapsByAddr, sourceFilesByAddr) {
   if (!node) return;
 
   if (node.pcs && node.pcs.length > 0 && node.to) {
     const sourceMap = sourceMapsByAddr.get(node.to.toLowerCase());
+    const sourceFiles = sourceFilesByAddr.get(node.to.toLowerCase());
     if (sourceMap) {
       const lines = new Set();
+      let firstF = -1;
       for (const pc of node.pcs) {
         const mapping = sourceMap.get(pc);
         if (mapping && mapping.l >= 0) {
           lines.add(mapping.l + 1);
+          if (firstF < 0 && mapping.f >= 0) firstF = mapping.f;
         }
       }
       if (lines.size > 0) {
         node.sourceLines = [...lines].sort((a, b) => a - b);
       }
+      if (firstF >= 0 && sourceFiles) {
+        const keys = Object.keys(sourceFiles);
+        if (firstF < keys.length) {
+          node.sourceFile = keys[firstF];
+        }
+      }
     }
   }
 
   for (const child of node.calls || []) {
-    resolveSourceLinesForNode(child, sourceMapsByAddr);
+    resolveSourceLinesForNode(child, sourceMapsByAddr, sourceFilesByAddr);
   }
 }
 

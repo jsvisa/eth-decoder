@@ -73,6 +73,7 @@ export default function SourceCodeViewer({
   chain,
   functionName,
   highlightLines,
+  sourceFile,
   onClose,
 }) {
   const { sources, compilerVersion, loading, error } = useSourceCode(
@@ -90,9 +91,13 @@ export default function SourceCodeViewer({
 
   useEffect(() => {
     if (fileNames.length > 0 && !fileNames.includes(activeFile)) {
-      setActiveFile(fileNames[0]);
+      setActiveFile(
+        sourceFile && fileNames.includes(sourceFile)
+          ? sourceFile
+          : fileNames[0],
+      );
     }
-  }, [fileNames, activeFile]);
+  }, [fileNames, activeFile, sourceFile]);
 
   useEffect(() => {
     if (!open) {
@@ -108,13 +113,25 @@ export default function SourceCodeViewer({
   );
 
   useEffect(() => {
-    if (!sourceContent || !functionName) {
+    if (!functionName || !sources) {
       setHighlightLine(-1);
       return;
     }
-    const line = findFunctionLine(sourceContent, functionName);
-    setHighlightLine(line);
-  }, [sourceContent, functionName]);
+    let foundFile = null;
+    let foundLine = -1;
+    for (const [file, content] of Object.entries(sources)) {
+      const line = findFunctionLine(content, functionName);
+      if (line > 0) {
+        foundFile = file;
+        foundLine = line;
+        break;
+      }
+    }
+    if (foundFile && foundFile !== activeFile) {
+      setActiveFile(foundFile);
+    }
+    setHighlightLine(foundLine);
+  }, [sources, functionName]);
 
   useEffect(() => {
     if (highlightLine > 0 && lineRefs.current[highlightLine]) {
@@ -123,7 +140,7 @@ export default function SourceCodeViewer({
         behavior: "smooth",
       });
     }
-  }, [highlightLine]);
+  }, [highlightLine, activeFile]);
 
   if (!open) return null;
 
