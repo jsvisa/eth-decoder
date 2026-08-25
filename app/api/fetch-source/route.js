@@ -21,27 +21,43 @@ function parseEtherscanSourceCode(sourceCode) {
 
   const trimmed = sourceCode.trim();
 
+  function hasSolFiles(obj) {
+    return Object.keys(obj).some((k) => k.endsWith(".sol"));
+  }
+
+  function extractSources(obj) {
+    const sources = {};
+    for (const [file, info] of Object.entries(obj)) {
+      sources[file] = typeof info === "object" ? info.content || "" : info;
+    }
+    return sources;
+  }
+
   if (trimmed.startsWith("{{")) {
     try {
       const parsed = JSON.parse(trimmed.slice(1, -1));
       if (parsed && typeof parsed === "object") {
-        const sources = {};
-        for (const [file, info] of Object.entries(parsed)) {
-          sources[file] = typeof info === "object" ? info.content || "" : info;
+        if (hasSolFiles(parsed)) {
+          return extractSources(parsed);
         }
-        return sources;
+        if (parsed.sources && typeof parsed.sources === "object" && hasSolFiles(parsed.sources)) {
+          return extractSources(parsed.sources);
+        }
       }
+      return null;
     } catch {}
   } else if (trimmed.startsWith("{")) {
     try {
       const parsed = JSON.parse(trimmed);
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        const sources = {};
-        for (const [file, info] of Object.entries(parsed)) {
-          sources[file] = typeof info === "object" ? info.content || "" : info;
+        if (hasSolFiles(parsed)) {
+          return extractSources(parsed);
         }
-        return sources;
+        if (parsed.sources && typeof parsed.sources === "object" && hasSolFiles(parsed.sources)) {
+          return extractSources(parsed.sources);
+        }
       }
+      return null;
     } catch {}
   }
 
