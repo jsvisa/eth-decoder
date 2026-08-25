@@ -34,6 +34,7 @@ export function useSourceCode(chain, address) {
 
   const mountedRef = useRef(true);
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
     };
@@ -63,29 +64,34 @@ export function useSourceCode(chain, address) {
 
     const key = `${chain}-${address.toLowerCase()}`;
 
-    if (FETCHING.has(key)) {
-      FETCHING.get(key).then((data) => {
-        if (!mountedRef.current) return;
-        if (data) {
-          setState({
-            sources: data.sourceCode,
-            compilerVersion: data.compilerVersion || null,
-            loading: false,
-            error: null,
-          });
-        } else {
-          setState({
-            sources: null,
-            compilerVersion: null,
-            loading: false,
-            error: "No source code available",
-          });
-        }
-      });
-      return;
-    }
+    // Resolve state from the shared fetch result. Guarded by mountedRef so an
+    // unmounted instance never calls setState, but the fetch/cache side effects
+    // always run (they live in the shared promise below, not here).
+    const applyData = (data) => {
+      if (!mountedRef.current) return;
+      if (data && data.sourceCode) {
+        setState({
+          sources: data.sourceCode,
+          compilerVersion: data.compilerVersion || null,
+          loading: false,
+          error: null,
+        });
+      } else {
+        setState({
+          sources: null,
+          compilerVersion: null,
+          loading: false,
+          error: "No source code available",
+        });
+      }
+    };
 
     setState((prev) => ({ ...prev, loading: true, error: null }));
+
+    if (FETCHING.has(key)) {
+      FETCHING.get(key).then(applyData);
+      return;
+    }
 
     const params = new URLSearchParams({ address, chain });
     const etherscanApiKey = localStorage.getItem("etherscanApiKey") || "";
@@ -97,44 +103,36 @@ export function useSourceCode(chain, address) {
         return res.json();
       })
       .then((data) => {
-        if (!mountedRef.current) return null;
-        if (data.sourceCode) {
+        // Cache side effect must run regardless of mount status so other
+        // subscribers (and future mounts) get the data.
+        if (data && data.sourceCode) {
           setCachedSource(
             chain,
             address,
             data.sourceCode,
             data.compilerVersion || null,
           );
-          setState({
-            sources: data.sourceCode,
-            compilerVersion: data.compilerVersion || null,
-            loading: false,
-            error: null,
-          });
-        } else {
-          setState({
-            sources: null,
-            compilerVersion: null,
-            loading: false,
-            error: "No source code available",
-          });
         }
         return data;
       })
-      .catch((err) => {
-        if (!mountedRef.current) return null;
-        setState((prev) => ({
-          ...prev,
-          loading: false,
-          error: err.message || "Failed to fetch source code",
-        }));
-        return null;
-      })
+      .catch(() => null)
       .finally(() => {
         FETCHING.delete(key);
       });
 
     FETCHING.set(key, promise);
+    promise.then((data) => {
+      if (!mountedRef.current) return;
+      if (data && data.sourceCode) {
+        applyData(data);
+      } else {
+        setState((prev) => ({
+          ...prev,
+          loading: false,
+          error: "Failed to fetch source code",
+        }));
+      }
+    });
   }, [chain, address]);
 
   return state;

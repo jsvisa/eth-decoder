@@ -1,54 +1,9 @@
-import { parse } from "@solidity-parser/parser";
-
 const cache = new Map();
 
-function walkNode(node, functions, fileName) {
-  if (!node || typeof node !== "object") return;
-
-  if (node.type === "FunctionDefinition") {
-    if (!node.name) return; // skip receive/fallback
-    functions.push({
-      name: node.name,
-      file: fileName,
-      line: node.loc?.start?.line || 0,
-    });
-    return;
-  }
-
-  if (node.type === "EventDefinition" && node.name) {
-    functions.push({
-      name: node.name,
-      file: fileName,
-      line: node.loc?.start?.line || 0,
-    });
-    return;
-  }
-
-  if (node.type === "CustomErrorDefinition" && node.name) {
-    functions.push({
-      name: node.name,
-      file: fileName,
-      line: node.loc?.start?.line || 0,
-    });
-    return;
-  }
-
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      walkNode(item, functions, fileName);
-    }
-    return;
-  }
-
-  // Walk children for container nodes (ContractDefinition, SourceUnit, etc.)
-  for (const key of Object.keys(node)) {
-    if (key === "parent" || key === "loc" || key === "range") continue;
-    const child = node[key];
-    if (child && typeof child === "object") {
-      walkNode(child, functions, fileName);
-    }
-  }
-}
+// Matches a Solidity definition at the start of a (trimmed) line:
+//   function foo(...)  |  event Foo(...)  |  error Foo(...)
+// Non-global so it can only match once per line — no exec loop, no backtracking risk.
+const DEF_RE = /^(?:function|event|error)\s+([A-Za-z_$][A-Za-z0-9_$]*)/;
 
 export function buildFunctionMap(sources) {
   if (!sources) return null;
@@ -62,17 +17,12 @@ export function buildFunctionMap(sources) {
 
   const map = new Map();
   for (const [file, content] of Object.entries(sources)) {
-    try {
-      const ast = parse(content, { loc: true, range: true });
-      const fns = [];
-      walkNode(ast, fns, file);
-      for (const fn of fns) {
-        if (!map.has(fn.name)) {
-          map.set(fn.name, fn);
-        }
+    const lines = content.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const m = DEF_RE.exec(lines[i].trim());
+      if (m && !map.has(m[1])) {
+        map.set(m[1], { name: m[1], file, line: i + 1 });
       }
-    } catch {
-      // Skip invalid files
     }
   }
 

@@ -323,7 +323,19 @@ function CallTraceNode({ trace, depth, chain }) {
                   className={styles.debugBtn}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setDebugAddr(contractAddress);
+                    // For proxies, DELEGATECALL executes the implementation's
+                    // code, so show the impl source (where the function lives),
+                    // not the proxy's own source.
+                    let sourceAddr = contractAddress;
+                    try {
+                      const cachedAbi = getCachedAbi(chain, contractAddress);
+                      if (cachedAbi?.isProxy && cachedAbi.implAddress) {
+                        sourceAddr = cachedAbi.implAddress;
+                      }
+                    } catch {
+                      // fall back to the contract address
+                    }
+                    setDebugAddr(sourceAddr);
                     setDebugHighlightLines(trace.sourceLines || null);
                     setDebugSourceFile(trace.sourceFile || null);
                   }}
