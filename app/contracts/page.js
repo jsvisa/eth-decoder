@@ -8,7 +8,7 @@ import {
   importContractsFromCSV,
 } from "../utils/contractsCache";
 import { CHAIN_META } from "../utils/chains";
-import { getCachedSource, getSourceCacheKey } from "../utils/abiCache";
+import { getCachedSource } from "../utils/abiCache";
 import SourceCodeViewer from "../contract-caller/components/SourceCodeViewer";
 
 const CUSTOM_CHAINS_KEY = "custom_chains";
