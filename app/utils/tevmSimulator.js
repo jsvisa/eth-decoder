@@ -1554,7 +1554,7 @@ export function redecodeCallTrace(callTrace, abiCache) {
   if (!callTrace) return callTrace;
   const eventAbisByAddress = buildEventAbiMap(abiCache);
   const selectorMap = buildSelectorMap([], abiCache);
-  const tree = redecodeTreeNode(callTrace, eventAbisByAddress);
+  const tree = redecodeTreeNode(callTrace, eventAbisByAddress, abiCache);
   // Re-run sub-call decoding with the updated selector map so newly fetched
   // ABIs can decode function names/inputs that were null on the first pass.
   decodeSubCallNodes(tree, selectorMap);
@@ -1570,16 +1570,23 @@ function buildEventAbiMap(abiCache) {
   return map;
 }
 
-function redecodeTreeNode(node, eventAbisByAddress) {
-  return {
-    ...node,
-    logs: (node.logs || []).map((log) =>
-      log.decoded ? log : tryDecodeLog(log, eventAbisByAddress),
-    ),
-    calls: (node.calls || []).map((child) =>
-      redecodeTreeNode(child, eventAbisByAddress),
-    ),
-  };
+function redecodeTreeNode(node, eventAbisByAddress, abiCache) {
+  const newNode = { ...node };
+  // Re-decode revert reason for nodes that errored but couldn't be decoded
+  // on the first pass (sub-call ABI wasn't available yet at simulation time).
+  if (newNode.error && !newNode.errorReason && newNode.output?.length >= 10) {
+    const nodeAbi = abiCache?.get(newNode.to?.toLowerCase());
+    if (nodeAbi) {
+      newNode.errorReason = decodeRevertData(newNode.output, nodeAbi);
+    }
+  }
+  newNode.logs = (node.logs || []).map((log) =>
+    log.decoded ? log : tryDecodeLog(log, eventAbisByAddress),
+  );
+  newNode.calls = (node.calls || []).map((child) =>
+    redecodeTreeNode(child, eventAbisByAddress, abiCache),
+  );
+  return newNode;
 }
 
 /**

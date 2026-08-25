@@ -15,6 +15,7 @@ import {
   decodeRevertData,
   ensureTevmNodeCompat,
   findRootCause,
+  redecodeCallTrace,
   sanitizeForkRpcResult,
   simulateWithClient,
   collectAllCallAddresses,
@@ -1217,5 +1218,76 @@ describe("resolveTraceSourceLines", () => {
     const node = { pcs: [3], calls: [] };
     resolveTraceSourceLines(node, sourceMap, sourceFiles);
     expect(node.sourceFile).toBe("Lib.sol");
+  });
+});
+
+describe("redecodeCallTrace", () => {
+  it("re-decodes revert reasons for nodes with error but no errorReason", () => {
+    const abiCache = new Map([
+      ["0x1234567890123456789012345678901234567890", [...UNAUTHORIZED_ABI]],
+    ]);
+    const trace = {
+      error: "revert",
+      errorReason: null,
+      output: "0x82b42900", // Unauthorized() selector — root, no ABI entry
+      calls: [
+        {
+          to: "0x1234567890123456789012345678901234567890",
+          error: "revert",
+          errorReason: null,
+          output: "0xdeadbeef", // won't match any error in the ABI
+          logs: [],
+          calls: [],
+        },
+        {
+          to: "0x1234567890123456789012345678901234567890",
+          error: "revert",
+          errorReason: null,
+          output: HEX.unauthorized, // 0x82b42900 — matches Unauthorized
+          logs: [],
+          calls: [],
+        },
+      ],
+    };
+    const result = redecodeCallTrace(trace, abiCache);
+    // Root: no ABI for its address — stays null
+    expect(result.errorReason).toBeNull();
+    // First child: output doesn't match any error in the ABI — stays null
+    expect(result.calls[0].errorReason).toBeNull();
+    // Second child: output matches Unauthorized in the ABI — decoded
+    expect(result.calls[1].errorReason).toBe("Unauthorized");
+  });
+
+  it("skips nodes without error", () => {
+    const abiCache = new Map();
+    const trace = {
+      error: null,
+      output: "0x82b42900",
+      calls: [],
+    };
+    const result = redecodeCallTrace(trace, abiCache);
+    expect(result.errorReason).toBeUndefined();
+  });
+
+  it("skips nodes with already-set errorReason", () => {
+    const abiCache = new Map([
+      [
+        "0x1234567890123456789012345678901234567890",
+        [{ type: "error", name: "InvalidOutputToken", inputs: [] }],
+      ],
+    ]);
+    const trace = {
+      to: "0x1234567890123456789012345678901234567890",
+      error: "revert",
+      errorReason: "AlreadyDecoded",
+      output: "0x82b42900",
+      calls: [],
+    };
+    const result = redecodeCallTrace(trace, abiCache);
+    expect(result.errorReason).toBe("AlreadyDecoded");
+  });
+
+  it("returns null trace unchanged", () => {
+    expect(redecodeCallTrace(null, new Map())).toBeNull();
   });
 });

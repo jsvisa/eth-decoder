@@ -459,7 +459,13 @@ export function useCallExecution({
               chainIdForSimulation,
             ).catch(() => {});
           }
-          prefetchSourceCodeForTrace(data.callTrace, chain).catch(() => {});
+          prefetchSourceCodeForTrace(
+            data.callTrace,
+            chain,
+            apiKeys,
+            rpcSettings,
+            chainIdForSimulation,
+          ).catch(() => {});
         }
 
         await decodeLogsViaServer(data.logs);
@@ -815,7 +821,13 @@ function resolveSourceLinesForNode(
  * Pre-fetch and cache source code for all unique addresses in the trace tree
  * so the source viewer loads instantly when the user clicks 🔍.
  */
-async function prefetchSourceCodeForTrace(callTrace, chain) {
+async function prefetchSourceCodeForTrace(
+  callTrace,
+  chain,
+  apiKeys,
+  rpcSettings,
+  chainId,
+) {
   if (!callTrace) return;
   const addresses = collectAllCallAddresses(callTrace);
   if (callTrace.to) addresses.add(callTrace.to.toLowerCase());
@@ -838,9 +850,14 @@ async function prefetchSourceCodeForTrace(callTrace, chain) {
     [...resolvedAddresses].map(async (addr) => {
       if (getCachedSource(chain, addr)) return;
       try {
-        const res = await fetch(
-          `/api/fetch-source?address=${addr}&chain=${chain}`,
-        );
+        const srcParams = new URLSearchParams({ address: addr, chain });
+        if (apiKeys?.etherscan)
+          srcParams.set("etherscanApiKey", apiKeys.etherscan);
+        if (apiKeys?.routescan)
+          srcParams.set("routescanApiKey", apiKeys.routescan);
+        if (rpcSettings?.[chain]) srcParams.set("rpcUrl", rpcSettings[chain]);
+        if (chainId) srcParams.set("chainId", chainId.toString());
+        const res = await fetch(`/api/fetch-source?${srcParams}`);
         if (res.ok) {
           const data = await res.json();
           if (data.sourceCode) {
