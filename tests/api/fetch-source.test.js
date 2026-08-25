@@ -15,7 +15,12 @@ beforeEach(() => {
     vi.fn().mockImplementation(async (url) => {
       const urlStr = typeof url === "string" ? url : url?.url || "";
       // Return a JSON-RPC error for any RPC call so viem clients don't hang
-      if (urlStr.startsWith("https://") && !urlStr.includes("etherscan") && !urlStr.includes("sourcify") && !urlStr.includes("routescan")) {
+      if (
+        urlStr.startsWith("https://") &&
+        !urlStr.includes("etherscan") &&
+        !urlStr.includes("sourcify") &&
+        !urlStr.includes("routescan")
+      ) {
         return {
           ok: true,
           status: 200,
@@ -57,7 +62,8 @@ describe("POST /api/fetch-source", () => {
         status: "1",
         result: [
           {
-            SourceCode: "// File: Contract.sol\npragma solidity ^0.8.0;\ncontract Foo {}",
+            SourceCode:
+              "// File: Contract.sol\npragma solidity ^0.8.0;\ncontract Foo {}",
             CompilerVersion: "v0.8.0+commit.c7d74943",
           },
         ],
@@ -73,7 +79,8 @@ describe("POST /api/fetch-source", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.sourceCode).toEqual({
-      "Contract.sol": "// File: Contract.sol\npragma solidity ^0.8.0;\ncontract Foo {}",
+      "Contract.sol":
+        "// File: Contract.sol\npragma solidity ^0.8.0;\ncontract Foo {}",
     });
     expect(body.compilerVersion).toBe("v0.8.0+commit.c7d74943");
     expect(body.source).toBe("etherscan");
@@ -184,8 +191,7 @@ describe("POST /api/fetch-source", () => {
                     "// File: Proxy.sol\npragma solidity ^0.6.12;\ncontract Proxy {}",
                   CompilerVersion: "v0.6.12+commit.27d51765",
                   Proxy: "1",
-                  Implementation:
-                    "0x0000000000000000000000000000000000000001",
+                  Implementation: "0x0000000000000000000000000000000000000001",
                 },
               ],
             }),
@@ -221,8 +227,10 @@ describe("POST /api/fetch-source", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.sourceCode).toEqual({
-      "Proxy.sol": "// File: Proxy.sol\npragma solidity ^0.6.12;\ncontract Proxy {}",
-      "Impl.sol": "// File: Impl.sol\npragma solidity ^0.8.0;\ncontract Impl {}",
+      "Proxy.sol":
+        "// File: Proxy.sol\npragma solidity ^0.6.12;\ncontract Proxy {}",
+      "Impl.sol":
+        "// File: Impl.sol\npragma solidity ^0.8.0;\ncontract Impl {}",
     });
     expect(body.compilerVersion).toBe("v0.8.0+commit.c7d74943");
     expect(body.source).toBe("proxy");
