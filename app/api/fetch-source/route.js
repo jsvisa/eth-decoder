@@ -127,6 +127,28 @@ async function fetchFromRouteScan(address, chainId, apiKey) {
   };
 }
 
+async function resolveChainId(chain, searchParams) {
+  const { BUILT_IN_CHAIN_IDS } = await import("../../utils/chains");
+  let id = BUILT_IN_CHAIN_IDS[chain];
+  if (id) return id;
+
+  id = parseInt(chain, 10);
+  if (Number.isFinite(id)) return id;
+
+  const customChainIdParam = searchParams.get("chainId");
+  if (customChainIdParam) {
+    id = parseInt(customChainIdParam, 10);
+    if (Number.isFinite(id)) return id;
+  }
+
+  if (chain.startsWith("chain-")) {
+    id = parseInt(chain.slice(6), 10);
+    if (Number.isFinite(id)) return id;
+  }
+
+  return null;
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -147,8 +169,7 @@ export async function GET(request) {
       );
     }
 
-    const { BUILT_IN_CHAIN_IDS } = await import("../../utils/chains");
-    const chainId = BUILT_IN_CHAIN_IDS[chain];
+    const chainId = await resolveChainId(chain, searchParams);
     if (!chainId) {
       return NextResponse.json(
         { error: `Unsupported chain: ${chain}` },

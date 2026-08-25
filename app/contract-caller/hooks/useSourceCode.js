@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { getCachedSource, setCachedSource } from "../../utils/abiCache";
+import { BUILT_IN_CHAIN_IDS } from "../../utils/chains";
 
 const FETCHING = new Map();
 
@@ -100,8 +101,36 @@ export function useSourceCode(chain, address) {
     }
 
     const params = new URLSearchParams({ address, chain });
-    const etherscanApiKey = localStorage.getItem("etherscanApiKey") || "";
-    if (etherscanApiKey) params.set("etherscanApiKey", etherscanApiKey);
+    const apiKeys = (() => {
+      try {
+        return JSON.parse(localStorage.getItem("api_keys_settings") || "{}");
+      } catch {
+        return {};
+      }
+    })();
+    if (apiKeys.etherscan) params.set("etherscanApiKey", apiKeys.etherscan);
+    if (apiKeys.routescan) params.set("routescanApiKey", apiKeys.routescan);
+    const rpcSettings = (() => {
+      try {
+        return JSON.parse(localStorage.getItem("rpc_settings") || "{}");
+      } catch {
+        return {};
+      }
+    })();
+    if (rpcSettings[chain]) params.set("rpcUrl", rpcSettings[chain]);
+    const chainId =
+      BUILT_IN_CHAIN_IDS[chain] ||
+      (() => {
+        try {
+          const custom = JSON.parse(
+            localStorage.getItem("custom_chains") || "[]",
+          );
+          return custom.find((c) => c.id === chain)?.chainId;
+        } catch {
+          return null;
+        }
+      })();
+    if (chainId) params.set("chainId", chainId.toString());
 
     const promise = fetch(`/api/fetch-source?${params}`)
       .then((res) => {

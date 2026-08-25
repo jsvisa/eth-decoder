@@ -139,6 +139,16 @@ export const buildAbiCacheFromStorage = (chain) => {
  * @param {string} opts.routescanApiKey - RouteScan API key (fallback)
  * @returns {Promise<Array|null>} The ABI array or null if fetch failed
  */
+
+/** True if the source code map contains at least one Solidity file entry */
+function hasSolFiles(sourceCode) {
+  return (
+    sourceCode &&
+    typeof sourceCode === "object" &&
+    Object.keys(sourceCode).some((k) => k.endsWith(".sol"))
+  );
+}
+
 export const fetchAndCacheAbi = async (
   chain,
   address,
@@ -189,16 +199,31 @@ export const fetchAndCacheAbi = async (
       data.implContractName || null,
       data.source || null,
       data.implSource || null,
+      data.facetAddresses || null,
+      data.facets || null,
     );
 
     // Also cache source code so the source viewer loads instantly
-    if (data.sourceCode) {
+    // Only cache when the source code actually contains Solidity file entries
+    // (not just Standard JSON Input metadata like {language, sources, settings})
+    if (data.sourceCode && hasSolFiles(data.sourceCode)) {
       setCachedSource(
         chain,
         address,
         data.sourceCode,
         data.compilerVersion || null,
       );
+      // For diamond proxies, also cache source under each facet address
+      if (data.facetAddresses) {
+        for (const facet of data.facetAddresses) {
+          setCachedSource(
+            chain,
+            facet,
+            data.sourceCode,
+            data.compilerVersion || null,
+          );
+        }
+      }
     }
 
     return data.abi;
@@ -270,7 +295,11 @@ export const getCachedSource = (chain, address) => {
     const key = getSourceCacheKey(chain, address);
     const cached = localStorage.getItem(key);
     if (cached) {
-      return JSON.parse(cached);
+      const parsed = JSON.parse(cached);
+      if (parsed && parsed.sources && hasSolFiles(parsed.sources)) {
+        return parsed;
+      }
+      localStorage.removeItem(key);
     }
   } catch (err) {
     console.error("Failed to load cached source:", err);
