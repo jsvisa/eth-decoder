@@ -8,10 +8,10 @@ Next.js 16 (App Router) EVM calldata decoder + contract caller, deployed to Verc
 npm run dev              # dev server (port 3000)
 npm run build            # production build
 npm test                 # vitest run (unit + api projects)
-npm run test:coverage    # vitest with coverage (app/utils, app/api)
+npm run test:coverage    # vitest run --coverage (covers app/utils, app/api)
 npm run test:e2e         # playwright (needs a running server)
 npm run lint             # eslint app tests
-npm run format           # prettier --write
+npm run format           # prettier --write (app/**/*.{js,json}, tests/**/*.js, **/*.md, *.json)
 ```
 
 CI order (must pass in this order): `prettier --check` → `npm run lint` → `npm run test:coverage` → `./scripts/run-e2e.sh`. `prettier --check` is a hard CI gate, so keep formatting consistent or `npm run format` before pushing.
@@ -31,9 +31,10 @@ CI order (must pass in this order): `prettier --check` → `npm run lint` → `n
 
 ## Environment & caches
 
-- `.env.example` → copy to `.env.local`. `BACKEND_URL` is **optional**; without it, `/api/v1/decode` and `/api/v1/decode-event` still work via Sourcify fallback. API keys (Etherscan/Routescan) are stored **client-side in localStorage** (keys `abi-{chain}-{address}` etc.), not env vars.
+- `.env.example` → copy to `.env.local`. `BACKEND_URL` is **optional**; without it, `/api/v1/decode` and `/api/v1/decode-event` still work via Sourcify fallback. API keys (Etherscan/Routescan) are stored **client-side in localStorage** (keys `abi-{chain}-{address}` with a lowercased address; sources use the `src-` prefix), not env vars.
 - Server-side ABI cache lives at `~/.cache/eth-decoder/<chainId>/<address>.json` (Vercel: `/tmp/...`). Override base with `CACHE_DIR`. Delete a file to force a fresh fetch. `ETHERSCAN_API_KEY` / `ROUTESCAN_API_KEY` env vars are server-side fallbacks for `/api/fetch-abi`.
 - Simulation result links (`?simulationId=`) use Vercel Blob only when `BLOB_STORE_ENABLED=true`; otherwise filesystem. See README "Shared simulation result storage".
+- `/api/simulate-tx` pro access: `PRO_API_KEYS` (comma-separated valid keys) and `PRO_RPC_CONFIG` (base64-encoded JSON map of `chainId` → RPC URL, auto-managed by `.github/workflows/update-pro-rpc.yml` via `scripts/update-pro-rpc-config.js`).
 
 ## Conventions
 
