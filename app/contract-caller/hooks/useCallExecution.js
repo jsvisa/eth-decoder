@@ -691,10 +691,25 @@ async function resolveSourceLinesForTrace(callTrace, chain, chainId) {
   const addresses = collectAllCallAddresses(callTrace);
   if (addresses.size === 0) return;
 
+  // Also include the root node's address
+  if (callTrace.to) addresses.add(callTrace.to.toLowerCase());
+
+  // Resolve proxy addresses to implementation addresses for source mapping.
+  // DELEGATECALL nodes show the proxy address but execute the impl's code.
+  const resolvedAddresses = new Set(addresses);
+  for (const addr of addresses) {
+    try {
+      const cached = getCachedAbi(chain, addr);
+      if (cached?.isProxy && cached.implAddress) {
+        resolvedAddresses.add(cached.implAddress.toLowerCase());
+      }
+    } catch {}
+  }
+
   const sourceMapsByAddr = new Map();
   const sourceFilesByAddr = new Map();
 
-  const fetchPromises = [...addresses].map(async (addr) => {
+  const fetchPromises = [...resolvedAddresses].map(async (addr) => {
     const cacheKey = `${chainId}-${addr}`;
     let sourceMapData = SOURCE_MAP_CACHE.get(cacheKey);
 
@@ -725,19 +740,37 @@ async function resolveSourceLinesForTrace(callTrace, chain, chainId) {
 
   if (sourceMapsByAddr.size === 0) return;
 
-  resolveSourceLinesForNode(callTrace, sourceMapsByAddr, sourceFilesByAddr);
-
-  if (sourceMapsByAddr.size === 0) return;
-
-  resolveSourceLinesForNode(callTrace, sourceMapsByAddr);
+  resolveSourceLinesForNode(
+    callTrace,
+    chain,
+    sourceMapsByAddr,
+    sourceFilesByAddr,
+  );
 }
 
-function resolveSourceLinesForNode(node, sourceMapsByAddr, sourceFilesByAddr) {
+function resolveSourceLinesForNode(
+  node,
+  chain,
+  sourceMapsByAddr,
+  sourceFilesByAddr,
+) {
   if (!node) return;
 
   if (node.pcs && node.pcs.length > 0 && node.to) {
-    const sourceMap = sourceMapsByAddr.get(node.to.toLowerCase());
-    const sourceFiles = sourceFilesByAddr.get(node.to.toLowerCase());
+    const addr = node.to.toLowerCase();
+    let sourceMap = sourceMapsByAddr.get(addr);
+    let sourceFiles = sourceFilesByAddr.get(addr);
+
+    if (!sourceMap) {
+      try {
+        const cached = getCachedAbi(chain, addr);
+        if (cached?.isProxy && cached.implAddress) {
+          const implAddr = cached.implAddress.toLowerCase();
+          sourceMap = sourceMapsByAddr.get(implAddr);
+          sourceFiles = sourceFilesByAddr.get(implAddr);
+        }
+      } catch {} // ignore if getCachedAbi throws
+    }
     if (sourceMap) {
       const lines = new Set();
       let firstF = -1;
@@ -761,7 +794,12 @@ function resolveSourceLinesForNode(node, sourceMapsByAddr, sourceFilesByAddr) {
   }
 
   for (const child of node.calls || []) {
-    resolveSourceLinesForNode(child, sourceMapsByAddr, sourceFilesByAddr);
+    resolveSourceLinesForNode(
+      child,
+      chain,
+      sourceMapsByAddr,
+      sourceFilesByAddr,
+    );
   }
 }
 
@@ -772,8 +810,20 @@ function resolveSourceLinesForNode(node, sourceMapsByAddr, sourceFilesByAddr) {
 async function prefetchSourceCodeForTrace(callTrace, chain) {
   if (!callTrace) return;
   const addresses = collectAllCallAddresses(callTrace);
+  if (callTrace.to) addresses.add(callTrace.to.toLowerCase());
+
+  const resolvedAddresses = new Set(addresses);
+  for (const addr of addresses) {
+    try {
+      const cached = getCachedAbi(chain, addr);
+      if (cached?.isProxy && cached.implAddress) {
+        resolvedAddresses.add(cached.implAddress.toLowerCase());
+      }
+    } catch {}
+  }
+
   await Promise.all(
-    [...addresses].map(async (addr) => {
+    [...resolvedAddresses].map(async (addr) => {
       if (getCachedSource(chain, addr)) return;
       try {
         const res = await fetch(
