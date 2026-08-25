@@ -93,6 +93,8 @@ function makeProps(overrides = {}) {
     blockNumber: "",
     onReadBlockNumberChange: vi.fn(),
     disabled: false,
+    expanded: true,
+    onToggle: vi.fn(),
     ...overrides,
   };
 }

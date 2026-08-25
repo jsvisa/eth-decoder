@@ -28,7 +28,7 @@ export function useFunctionSelection({
   const [functionFilter, setFunctionFilter] = useState("");
   const [showFunctionList, setShowFunctionList] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
-  const [pasteCalldataExpanded, setPasteCalldataExpanded] = useState(false);
+  const [pasteCalldataExpanded, setPasteCalldataExpanded] = useState(true);
   const [pasteCalldataValue, setPasteCalldataValue] = useState("");
   const [pasteCalldataError, setPasteCalldataError] = useState(null);
   const [blockNumber, setBlockNumber] = useState("");

@@ -52,30 +52,34 @@ export default function CalldataSection({
       React.createElement(
         "div",
         { className: styles.pasteCalldataBody },
-        React.createElement("textarea", {
-          className: textareaClass,
-          value: value,
-          onChange: (e) => onValueChange(e.target.value),
-          placeholder: "0x{4-byte selector}{encoded args}",
-          rows: 3,
-          disabled: disabled,
-        }),
+        React.createElement(
+          "div",
+          { className: styles.pasteCalldataRow },
+          React.createElement("textarea", {
+            className: textareaClass,
+            value: value,
+            onChange: (e) => onValueChange(e.target.value),
+            placeholder: "0x{4-byte selector}{encoded args}",
+            rows: 3,
+            disabled: disabled,
+          }),
+          !hideDecodeAndFill &&
+            React.createElement(
+              "button",
+              {
+                type: "button",
+                className: styles.pasteCalldataBtn,
+                onClick: onDecodeAndFill,
+                disabled: disabled || !value.trim(),
+              },
+              "Decode & fill",
+            ),
+        ),
         error &&
           React.createElement(
             "span",
             { className: styles.pasteCalldataError },
             error,
-          ),
-        !hideDecodeAndFill &&
-          React.createElement(
-            "button",
-            {
-              type: "button",
-              className: styles.pasteCalldataBtn,
-              onClick: onDecodeAndFill,
-              disabled: disabled || !value.trim(),
-            },
-            "Decode & fill",
           ),
       ),
   );

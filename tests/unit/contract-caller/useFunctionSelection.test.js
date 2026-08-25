@@ -76,7 +76,7 @@ describe("useFunctionSelection — initial state", () => {
     expect(result.current.functionFilter).toBe("");
     expect(result.current.showFunctionList).toBe(false);
     expect(result.current.fieldErrors).toEqual({});
-    expect(result.current.pasteCalldataExpanded).toBe(false);
+    expect(result.current.pasteCalldataExpanded).toBe(true);
     expect(result.current.pasteCalldataValue).toBe("");
     expect(result.current.pasteCalldataError).toBeNull();
     expect(result.current.blockNumber).toBe("");

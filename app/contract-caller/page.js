@@ -197,6 +197,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
   const [deployMode, setDeployMode] = useState(false);
   const [savingAbiBackend, setSavingAbiBackend] = useState(false);
   const [saveAbiBackendMsg, setSaveAbiBackendMsg] = useState(null);
+  const [argsExpanded, setArgsExpanded] = useState(true);
 
   const allChains = [...CHAINS, ...customChains];
   const nativeTokenSymbol =
@@ -681,14 +682,13 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
   const calldataAndOptions = (
     <>
       <CalldataSection
-        expanded={true}
-        onToggle={() => {}}
+        expanded={fn.pasteCalldataExpanded}
+        onToggle={() => fn.setPasteCalldataExpanded((v) => !v)}
         value={fn.pasteCalldataValue}
         onValueChange={fn.setPasteCalldataValue}
         error={fn.pasteCalldataError}
         onDecodeAndFill={fn.handleDecodeAndFill}
         disabled={exec.loading}
-        noToggle
         hideDecodeAndFill={deployMode}
       />
       <SimulationOptions
@@ -842,6 +842,8 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
                   blockNumber={fn.blockNumber}
                   onReadBlockNumberChange={fn.setBlockNumber}
                   disabled={exec.loading}
+                  expanded={argsExpanded}
+                  onToggle={() => setArgsExpanded((v) => !v)}
                 />
               </>
             }

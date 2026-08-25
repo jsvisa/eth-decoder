@@ -20,6 +20,8 @@ import { isReadOnly } from "../utils/functionArgs";
  *   onBlockNumberChange    {(s: string) => void}       - set historical block-number
  *   disabled               {boolean}                   - disabled while loading
  *   ArgInputComponent      {React.Component|undefined} - optional arg input component
+ *   expanded               {boolean}                   - section expanded/collapsed
+ *   onToggle               {() => void}                - toggle expanded
  */
 export default function ArgsInput({
   fn,
@@ -32,6 +34,8 @@ export default function ArgsInput({
   onBlockNumberChange,
   disabled,
   ArgInputComponent,
+  expanded,
+  onToggle,
 }) {
   if (!fn) return null;
 
@@ -92,6 +96,16 @@ export default function ArgsInput({
         )
       : null;
 
+    const argsToggle = React.createElement(
+      "button",
+      {
+        type: "button",
+        className: styles.argsToggle,
+        onClick: onToggle,
+      },
+      `${expanded ? "▼" : "▶"} Arguments`,
+    );
+
     children.push(
       React.createElement(
         "div",
@@ -99,14 +113,10 @@ export default function ArgsInput({
         React.createElement(
           "div",
           { className: styles.argsSectionHeader },
-          React.createElement(
-            "label",
-            { className: styles.label },
-            "Arguments",
-          ),
+          argsToggle,
           blockInline,
         ),
-        ...argFields,
+        ...(expanded ? argFields : []),
       ),
     );
   }
