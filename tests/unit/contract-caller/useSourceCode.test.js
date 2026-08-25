@@ -7,9 +7,8 @@ beforeEach(async () => {
   localStorage.clear();
   vi.restoreAllMocks();
   vi.resetModules();
-  const mod = await import(
-    "../../../app/contract-caller/hooks/useSourceCode.js"
-  );
+  const mod =
+    await import("../../../app/contract-caller/hooks/useSourceCode.js");
   useSourceCode = mod.useSourceCode;
 });
 
@@ -168,8 +167,12 @@ describe("useSourceCode", () => {
     await waitFor(() => expect(result1.current.loading).toBe(false));
     await waitFor(() => expect(result2.current.loading).toBe(false));
 
-    expect(result1.current.sources).toEqual({ "Dedup.sol": "contract Dedup {}" });
-    expect(result2.current.sources).toEqual({ "Dedup.sol": "contract Dedup {}" });
+    expect(result1.current.sources).toEqual({
+      "Dedup.sol": "contract Dedup {}",
+    });
+    expect(result2.current.sources).toEqual({
+      "Dedup.sol": "contract Dedup {}",
+    });
     expect(result1.current.compilerVersion).toBe("0.8.21");
     expect(result2.current.compilerVersion).toBe("0.8.21");
   });
