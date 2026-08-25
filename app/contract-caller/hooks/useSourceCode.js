@@ -100,7 +100,6 @@ export function useSourceCode(chain, address) {
       return;
     }
 
-    const params = new URLSearchParams({ address, chain });
     const apiKeys = (() => {
       try {
         return JSON.parse(localStorage.getItem("api_keys_settings") || "{}");
@@ -108,8 +107,6 @@ export function useSourceCode(chain, address) {
         return {};
       }
     })();
-    if (apiKeys.etherscan) params.set("etherscanApiKey", apiKeys.etherscan);
-    if (apiKeys.routescan) params.set("routescanApiKey", apiKeys.routescan);
     const rpcSettings = (() => {
       try {
         return JSON.parse(localStorage.getItem("rpc_settings") || "{}");
@@ -117,7 +114,6 @@ export function useSourceCode(chain, address) {
         return {};
       }
     })();
-    if (rpcSettings[chain]) params.set("rpcUrl", rpcSettings[chain]);
     const chainId =
       BUILT_IN_CHAIN_IDS[chain] ||
       (() => {
@@ -130,9 +126,19 @@ export function useSourceCode(chain, address) {
           return null;
         }
       })();
-    if (chainId) params.set("chainId", chainId.toString());
 
-    const promise = fetch(`/api/fetch-source?${params}`)
+    const promise = fetch(`/api/fetch-source`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        address,
+        chain,
+        etherscanApiKey: apiKeys.etherscan || undefined,
+        routescanApiKey: apiKeys.routescan || undefined,
+        rpcUrl: rpcSettings[chain] || undefined,
+        chainId: chainId || undefined,
+      }),
+    })
       .then((res) => {
         if (!res.ok) throw new Error("Source code not found");
         return res.json();

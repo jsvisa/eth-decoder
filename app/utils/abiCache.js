@@ -163,25 +163,19 @@ export const fetchAndCacheAbi = async (
       return cached.abi;
     }
 
-    // Build API params
-    const params = new URLSearchParams({ address, chain });
-    if (etherscanApiKey) {
-      params.set("etherscanApiKey", etherscanApiKey);
-    }
-    if (routescanApiKey) {
-      params.set("routescanApiKey", routescanApiKey);
-    }
-    if (rpcUrl) {
-      params.set("rpcUrl", rpcUrl);
-    }
-    if (chainId) {
-      params.set("chainId", chainId.toString());
-    }
-    if (detectProxy) {
-      params.set("detectProxy", "true");
-    }
-
-    const response = await fetch(`/api/fetch-abi?${params}`);
+    const response = await fetch(`/api/fetch-abi`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        address,
+        chain,
+        etherscanApiKey: etherscanApiKey || undefined,
+        routescanApiKey: routescanApiKey || undefined,
+        rpcUrl: rpcUrl || undefined,
+        chainId: chainId || undefined,
+        detectProxy: detectProxy || undefined,
+      }),
+    });
     const data = await response.json();
 
     if (!response.ok || !data.abi) {

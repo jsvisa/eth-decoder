@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { GET } from "../../app/api/fetch-source/route.js";
+import { POST } from "../../app/api/fetch-source/route.js";
 
 function makeRequest(params) {
-  const url = new URL("http://localhost/api/fetch-source");
-  for (const [k, v] of Object.entries(params)) {
-    url.searchParams.set(k, String(v));
-  }
-  return { url: url.toString() };
+  return new Request("http://localhost/api/fetch-source", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
 }
 
 beforeEach(() => {
@@ -19,16 +19,16 @@ afterEach(() => {
   delete process.env.ROUTESCAN_API_KEY;
 });
 
-describe("GET /api/fetch-source", () => {
+describe("POST /api/fetch-source", () => {
   it("returns 400 when address is missing", async () => {
-    const res = await GET(makeRequest({}));
+    const res = await POST(makeRequest({}));
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toMatch(/missing address/i);
   });
 
   it("returns 400 for invalid address", async () => {
-    const res = await GET(makeRequest({ address: "not-an-address" }));
+    const res = await POST(makeRequest({ address: "not-an-address" }));
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toMatch(/invalid address/i);
@@ -49,7 +49,7 @@ describe("GET /api/fetch-source", () => {
       }),
     });
 
-    const res = await GET(
+    const res = await POST(
       makeRequest({
         address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
         chain: "ethereum",
@@ -73,7 +73,7 @@ describe("GET /api/fetch-source", () => {
       }),
     });
 
-    const res = await GET(
+    const res = await POST(
       makeRequest({
         address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
         chain: "ethereum",
@@ -89,7 +89,7 @@ describe("GET /api/fetch-source", () => {
   it("returns 404 when no source is found", async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false, status: 404 });
 
-    const res = await GET(
+    const res = await POST(
       makeRequest({
         address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
         chain: "ethereum",
@@ -99,7 +99,7 @@ describe("GET /api/fetch-source", () => {
   });
 
   it("returns 400 for unsupported chain", async () => {
-    const res = await GET(
+    const res = await POST(
       makeRequest({
         address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
         chain: "unknown-chain",
@@ -119,7 +119,7 @@ describe("GET /api/fetch-source", () => {
       }),
     });
 
-    const res = await GET(
+    const res = await POST(
       makeRequest({
         address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
         chain: "480",
@@ -139,7 +139,7 @@ describe("GET /api/fetch-source", () => {
       }),
     });
 
-    const res = await GET(
+    const res = await POST(
       makeRequest({
         address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
         chain: "chain-480",

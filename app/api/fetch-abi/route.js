@@ -10,11 +10,16 @@ import { fetchAbi } from "../../utils/fetchContract";
 
 export { fetchAbi };
 
-export async function GET(request) {
+export async function POST(request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const address = searchParams.get("address");
-    const chain = searchParams.get("chain") || "ethereum";
+    const body = await request.json();
+    const {
+      address,
+      chain: rawChain,
+      rpcUrl: customRpcUrl,
+      chainId: customChainIdParam,
+    } = body;
+    const chain = rawChain || "ethereum";
 
     if (!address) {
       return NextResponse.json(
@@ -29,9 +34,6 @@ export async function GET(request) {
         { status: 400 },
       );
     }
-
-    const customRpcUrl = searchParams.get("rpcUrl");
-    const customChainIdParam = searchParams.get("chainId");
 
     // Only allow http(s) URLs for user-supplied RPC endpoints
     if (customRpcUrl && !isValidHttpUrl(customRpcUrl)) {
@@ -66,18 +68,11 @@ export async function GET(request) {
     }
 
     const etherscanApiKey =
-      searchParams.get("etherscanApiKey") ||
-      process.env.ETHERSCAN_API_KEY ||
-      "";
+      body.etherscanApiKey || process.env.ETHERSCAN_API_KEY || "";
     const routescanApiKey =
-      searchParams.get("routescanApiKey") ||
-      process.env.ROUTESCAN_API_KEY ||
-      "";
-    const detectProxy = searchParams.get("detectProxy") === "true";
-    const concurrency = Math.max(
-      1,
-      parseInt(searchParams.get("concurrency") || "1", 10) || 1,
-    );
+      body.routescanApiKey || process.env.ROUTESCAN_API_KEY || "";
+    const detectProxy = body.detectProxy === true;
+    const concurrency = Math.max(1, parseInt(body.concurrency || "1", 10) || 1);
 
     const result = await fetchAbi(address, chainId, {
       etherscanKey: etherscanApiKey,

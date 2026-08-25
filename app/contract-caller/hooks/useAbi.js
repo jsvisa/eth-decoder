@@ -286,26 +286,22 @@ export function useAbi({
     fetchAbiController.current = controller;
 
     try {
-      const params = new URLSearchParams({ address, chain });
-      if (apiKeys.etherscan) {
-        params.set("etherscanApiKey", apiKeys.etherscan);
-      }
-      if (apiKeys.routescan) {
-        params.set("routescanApiKey", apiKeys.routescan);
-      }
-      if (rpcSettings[chain]) {
-        params.set("rpcUrl", rpcSettings[chain]);
-      }
       const chainIdForApi = getChainId(chain);
-      if (chainIdForApi) {
-        params.set("chainId", chainIdForApi.toString());
-      }
-      params.set("detectProxy", "true");
-      if (fetchAbiConcurrency > 1) {
-        params.set("concurrency", fetchAbiConcurrency.toString());
-      }
 
-      const response = await fetch(`/api/fetch-abi?${params}`, {
+      const response = await fetch(`/api/fetch-abi`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          address,
+          chain,
+          etherscanApiKey: apiKeys.etherscan || undefined,
+          routescanApiKey: apiKeys.routescan || undefined,
+          rpcUrl: rpcSettings[chain] || undefined,
+          chainId: chainIdForApi || undefined,
+          detectProxy: true,
+          concurrency:
+            fetchAbiConcurrency > 1 ? fetchAbiConcurrency : undefined,
+        }),
         signal: controller.signal,
       });
       const data = await response.json();
