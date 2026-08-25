@@ -80,7 +80,7 @@
 .headerSearch {
   display: flex;
   align-items: center;
-  gap: 0.15rem;
+  gap: 0;
   flex-shrink: 0;
 }
 
@@ -256,7 +256,7 @@
 }
 
 .searchInput {
-  max-width: 180px;
+  max-width: 240px;
   padding: 0.2rem 0.4rem;
   background-color: #3c3c3c;
   border: 1px solid #555;
@@ -274,8 +274,8 @@
 .searchCount {
   color: #808080;
   font-size: 0.7rem;
-  min-width: 3rem;
   text-align: center;
+  padding: 0 0.2rem;
 }
 
 .searchNavBtn {

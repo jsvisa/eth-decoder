@@ -333,6 +333,8 @@ export default function SourceCodeViewer({
                 ? "Copied!"
                 : `${address.slice(0, 6)}...${address.slice(-4)}`}
             </span>
+          </div>
+          <div className={styles.headerActions}>
             <div className={styles.headerSearch}>
               <input
                 ref={searchInputRef}
@@ -378,8 +380,6 @@ export default function SourceCodeViewer({
                 ▼
               </button>
             </div>
-          </div>
-          <div className={styles.headerActions}>
             <button
               className={styles.downloadBtn}
               onClick={handleDownload}
