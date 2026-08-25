@@ -6,6 +6,7 @@
  */
 
 const ABI_CACHE_PREFIX = "abi-";
+const SOURCE_CACHE_PREFIX = "src-";
 
 /**
  * Generate localStorage key for ABI cache
@@ -190,6 +191,16 @@ export const fetchAndCacheAbi = async (
       data.implSource || null,
     );
 
+    // Also cache source code so the source viewer loads instantly
+    if (data.sourceCode) {
+      setCachedSource(
+        chain,
+        address,
+        data.sourceCode,
+        data.compilerVersion || null,
+      );
+    }
+
     return data.abi;
   } catch (err) {
     console.error(`Failed to fetch ABI for ${address}:`, err);
@@ -234,4 +245,65 @@ export const fetchAbisForAddresses = async (
   await Promise.all(fetchPromises);
 
   return results;
+};
+
+/**
+ * Generate localStorage key for source code cache
+ * @param {string} chain - Chain identifier
+ * @param {string} address - Contract address
+ * @returns {string} Cache key
+ */
+export const getSourceCacheKey = (chain, address) => {
+  return `${SOURCE_CACHE_PREFIX}${chain}-${address.toLowerCase()}`;
+};
+
+/**
+ * Retrieve cached source code from localStorage
+ * @param {string} chain - Chain identifier
+ * @param {string} address - Contract address
+ * @returns {{sources:Object<string,string>, compilerVersion:string|null}|null}
+ */
+export const getCachedSource = (chain, address) => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const key = getSourceCacheKey(chain, address);
+    const cached = localStorage.getItem(key);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (err) {
+    console.error("Failed to load cached source:", err);
+  }
+  return null;
+};
+
+/**
+ * Store source code in localStorage cache
+ * @param {string} chain - Chain identifier
+ * @param {string} address - Contract address
+ * @param {Object<string,string>} sources - Map of file name to source content
+ * @param {string|null} compilerVersion - Solidity compiler version
+ */
+export const setCachedSource = (
+  chain,
+  address,
+  sources,
+  compilerVersion = null,
+) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    const key = getSourceCacheKey(chain, address);
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        sources,
+        compilerVersion,
+        timestamp: Date.now(),
+      }),
+    );
+  } catch (err) {
+    console.error("Failed to cache source:", err);
+  }
 };

@@ -16,7 +16,10 @@ import {
   buildAbiCacheFromStorage,
   fetchAbisForAddresses,
   getCachedAbi,
+  getCachedSource,
+  setCachedSource,
 } from "../../utils/abiCache";
+import { parseSourceMap } from "../../utils/sourceMap";
 import {
   isValidEthAddress,
   isValidForkBlock,
@@ -446,6 +449,17 @@ export function useCallExecution({
               ? cached.implContractName || cached.contractName || null
               : null;
           });
+
+          // Resolve source lines and pre-fetch source code in background.
+          // The source viewer opens instantly from localStorage cache.
+          if (chainIdForSimulation) {
+            resolveSourceLinesForTrace(
+              data.callTrace,
+              chain,
+              chainIdForSimulation,
+            ).catch(() => {});
+          }
+          prefetchSourceCodeForTrace(data.callTrace, chain).catch(() => {});
         }
 
         await decodeLogsViaServer(data.logs);
@@ -661,4 +675,186 @@ export function useCallExecution({
     handleSaveSimulation,
     setSaveExtra,
   };
+}
+
+// ── source map resolution ─────────────────────────────────────────────────
+
+const SOURCE_MAP_CACHE = new Map();
+
+/**
+ * Fetch source maps for all unique addresses in the trace tree from Sourcify,
+ * then resolve each node's PCs to source lines using its own address's map.
+ */
+async function resolveSourceLinesForTrace(callTrace, chain, chainId) {
+  if (!callTrace) return;
+
+  const addresses = collectAllCallAddresses(callTrace);
+  if (addresses.size === 0) return;
+
+  // Also include the root node's address
+  if (callTrace.to) addresses.add(callTrace.to.toLowerCase());
+
+  // Resolve proxy addresses to implementation addresses for source mapping.
+  // DELEGATECALL nodes show the proxy address but execute the impl's code.
+  // The proxy's own bytecode has a useless source map (just constructor/fallback).
+  const resolvedAddresses = new Set();
+  for (const addr of addresses) {
+    try {
+      const cached = getCachedAbi(chain, addr);
+      if (cached?.isProxy && cached.implAddress) {
+        resolvedAddresses.add(cached.implAddress.toLowerCase());
+      } else {
+        resolvedAddresses.add(addr);
+      }
+    } catch {
+      resolvedAddresses.add(addr);
+    }
+  }
+
+  const sourceMapsByAddr = new Map();
+  const sourceFilesByAddr = new Map();
+
+  const fetchPromises = [...resolvedAddresses].map(async (addr) => {
+    const cacheKey = `${chainId}-${addr}`;
+    let sourceMapData = SOURCE_MAP_CACHE.get(cacheKey);
+
+    if (!sourceMapData) {
+      try {
+        const res = await fetch(
+          `/api/fetch-source-map?address=${addr}&chainId=${chainId}`,
+        );
+        if (res.ok) {
+          sourceMapData = await res.json();
+          SOURCE_MAP_CACHE.set(cacheKey, sourceMapData);
+        }
+      } catch {
+        // Ignore fetch errors
+      }
+    }
+
+    if (sourceMapData?.sourceMap) {
+      sourceMapsByAddr.set(
+        addr.toLowerCase(),
+        parseSourceMap(sourceMapData.sourceMap),
+      );
+      sourceFilesByAddr.set(addr.toLowerCase(), sourceMapData.sources || null);
+    }
+  });
+
+  await Promise.all(fetchPromises);
+
+  if (sourceMapsByAddr.size === 0) return;
+
+  resolveSourceLinesForNode(
+    callTrace,
+    chain,
+    sourceMapsByAddr,
+    sourceFilesByAddr,
+  );
+}
+
+function resolveSourceLinesForNode(
+  node,
+  chain,
+  sourceMapsByAddr,
+  sourceFilesByAddr,
+) {
+  if (!node) return;
+
+  if (node.pcs && node.pcs.length > 0 && node.to) {
+    const addr = node.to.toLowerCase();
+    let sourceMap = null;
+    let sourceFiles = null;
+
+    try {
+      const cached = getCachedAbi(chain, addr);
+      if (cached?.isProxy && cached.implAddress) {
+        const implAddr = cached.implAddress.toLowerCase();
+        sourceMap = sourceMapsByAddr.get(implAddr);
+        sourceFiles = sourceFilesByAddr.get(implAddr);
+      }
+    } catch {} // ignore if getCachedAbi throws
+
+    if (!sourceMap) {
+      sourceMap = sourceMapsByAddr.get(addr);
+      sourceFiles = sourceFilesByAddr.get(addr);
+    }
+    if (sourceMap) {
+      const lines = new Set();
+      let firstF = -1;
+      for (const pc of node.pcs) {
+        const mapping = sourceMap.get(pc);
+        if (mapping && mapping.l >= 0) {
+          lines.add(mapping.l + 1);
+          if (firstF < 0 && mapping.f >= 0) firstF = mapping.f;
+        }
+      }
+      if (lines.size > 0) {
+        node.sourceLines = [...lines].sort((a, b) => a - b);
+      }
+      if (firstF >= 0 && sourceFiles) {
+        const keys = Object.keys(sourceFiles);
+        if (firstF < keys.length) {
+          node.sourceFile = keys[firstF];
+        }
+      }
+    }
+  }
+
+  for (const child of node.calls || []) {
+    resolveSourceLinesForNode(
+      child,
+      chain,
+      sourceMapsByAddr,
+      sourceFilesByAddr,
+    );
+  }
+}
+
+/**
+ * Pre-fetch and cache source code for all unique addresses in the trace tree
+ * so the source viewer loads instantly when the user clicks 🔍.
+ */
+async function prefetchSourceCodeForTrace(callTrace, chain) {
+  if (!callTrace) return;
+  const addresses = collectAllCallAddresses(callTrace);
+  if (callTrace.to) addresses.add(callTrace.to.toLowerCase());
+
+  const resolvedAddresses = new Set();
+  for (const addr of addresses) {
+    try {
+      const cached = getCachedAbi(chain, addr);
+      if (cached?.isProxy && cached.implAddress) {
+        resolvedAddresses.add(cached.implAddress.toLowerCase());
+      } else {
+        resolvedAddresses.add(addr);
+      }
+    } catch {
+      resolvedAddresses.add(addr);
+    }
+  }
+
+  await Promise.all(
+    [...resolvedAddresses].map(async (addr) => {
+      if (getCachedSource(chain, addr)) return;
+      try {
+        const res = await fetch(
+          `/api/fetch-source?address=${addr}&chain=${chain}`,
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (data.sourceCode) {
+            setCachedSource(
+              chain,
+              addr,
+              data.sourceCode,
+              data.compilerVersion || null,
+            );
+          }
+        }
+      } catch {
+        // Background fetch, ignore errors
+      }
+    }),
+  );
 }

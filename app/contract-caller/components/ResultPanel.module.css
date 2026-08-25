@@ -1281,3 +1281,19 @@
 .jsonNull {
   color: #569cd6;
 }
+
+.debugBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0 0.25rem;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.debugBtn:hover {
+  opacity: 1;
+}

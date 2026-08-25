@@ -13,6 +13,7 @@ import { CHAINS } from "../../utils/chains";
 import styles from "./ResultPanel.module.css";
 import MetricsPanel from "./MetricsPanel";
 import SimulatedEventLogs from "./SimulatedEventLogs";
+import SourceCodeViewer from "./SourceCodeViewer";
 import { getBookmarkedAddress } from "../../utils/addressBook";
 import { getCachedAbi } from "../../utils/abiCache";
 
@@ -210,6 +211,9 @@ function TraceTooltip({ items, onCopy }) {
 
 function CallTraceNode({ trace, depth, chain }) {
   const [hideTooltip, setHideTooltip] = useState(false);
+  const [debugAddr, setDebugAddr] = useState(null);
+  const [debugHighlightLines, setDebugHighlightLines] = useState(null);
+  const [debugSourceFile, setDebugSourceFile] = useState(null);
 
   if (!trace) return null;
   if (trace.type === "STATICCALL") return null;
@@ -314,6 +318,33 @@ function CallTraceNode({ trace, depth, chain }) {
                   </button>
                 </span>
               )}
+              {contractAddress && (
+                <button
+                  className={styles.debugBtn}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // For proxies, DELEGATECALL executes the implementation's
+                    // code, so show the impl source (where the function lives),
+                    // not the proxy's own source.
+                    let sourceAddr = contractAddress;
+                    try {
+                      const cachedAbi = getCachedAbi(chain, contractAddress);
+                      if (cachedAbi?.isProxy && cachedAbi.implAddress) {
+                        sourceAddr = cachedAbi.implAddress;
+                      }
+                    } catch {
+                      // fall back to the contract address
+                    }
+                    setDebugAddr(sourceAddr);
+                    setDebugHighlightLines(trace.sourceLines || null);
+                    setDebugSourceFile(trace.sourceFile || null);
+                  }}
+                  type="button"
+                  title="View source code"
+                >
+                  🔍
+                </button>
+              )}
             </span>
           )}
           <span className={styles.traceParams}>({inputParams})</span>
@@ -375,6 +406,22 @@ function CallTraceNode({ trace, depth, chain }) {
             />
           ))}
         </div>
+      )}
+
+      {debugAddr && (
+        <SourceCodeViewer
+          open={true}
+          address={debugAddr}
+          chain={chain}
+          functionName={functionLabel || undefined}
+          highlightLines={debugHighlightLines}
+          sourceFile={debugSourceFile}
+          onClose={() => {
+            setDebugAddr(null);
+            setDebugHighlightLines(null);
+            setDebugSourceFile(null);
+          }}
+        />
       )}
     </div>
   );

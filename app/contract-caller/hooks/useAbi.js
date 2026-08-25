@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import { isValidEthAddress } from "../../utils/validation";
-import { getCachedAbi, setCachedAbi } from "../../utils/abiCache";
+import {
+  getCachedAbi,
+  setCachedAbi,
+  setCachedSource,
+} from "../../utils/abiCache";
 import { isReadOnly } from "../utils/functionArgs";
 
 const ABI_CACHE_PREFIX = "abi-";
@@ -327,6 +331,16 @@ export function useAbi({
         data.facetAddresses,
         data.facets,
       );
+
+      // Cache source code alongside the ABI so the source viewer loads instantly
+      if (data.sourceCode) {
+        setCachedSource(
+          chain,
+          address,
+          data.sourceCode,
+          data.compilerVersion || null,
+        );
+      }
 
       // Update cached addresses list
       setCachedAddresses(getCachedAddresses());

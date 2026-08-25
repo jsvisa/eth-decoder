@@ -9,8 +9,16 @@
     }
   ],
   "metadata": {
+    "compiler": {
+      "version": "0.8.19"
+    },
     "settings": {
       "compilationTarget": { "contracts/Token.sol": "SourcifyToken" }
+    }
+  },
+  "sources": {
+    "contracts/Token.sol": {
+      "content": "pragma solidity ^0.8.19;\ncontract SourcifyToken {\n    function decimals() external pure returns (uint8) { return 18; }\n}"
     }
   }
 }

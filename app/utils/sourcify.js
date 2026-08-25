@@ -116,7 +116,7 @@ export function sigToEventAbi(sig, numIndexed = 0) {
 export async function fetchContractInfoFromSourcify(address, chainId) {
   try {
     const response = await fetch(
-      `https://sourcify.dev/server/v2/contract/${chainId}/${address}?fields=abi,metadata`,
+      `https://sourcify.dev/server/v2/contract/${chainId}/${address}?fields=abi,metadata,sources`,
     );
 
     if (!response.ok) {
@@ -134,13 +134,70 @@ export async function fetchContractInfoFromSourcify(address, chainId) {
       ? Object.values(data.metadata.settings.compilationTarget)[0]
       : null;
 
+    const sourceCode = data.sources
+      ? Object.fromEntries(
+          Object.entries(data.sources).map(([file, info]) => [
+            file,
+            typeof info === "object" ? info.content || "" : info,
+          ]),
+        )
+      : null;
+
+    const compilerVersion = data.metadata?.compiler?.version || null;
+
     return {
       abi,
       contractName,
       source: "sourcify",
+      sourceCode,
+      compilerVersion,
     };
   } catch (e) {
     console.error("Sourcify fetch error:", e);
+    return null;
+  }
+}
+
+/**
+ * Fetch the full compiler output from Sourcify's /files endpoint,
+ * which includes the source map for the deployed bytecode.
+ *
+ * @param {string} address - Contract address
+ * @param {number|string} chainId - Numeric chain ID
+ * @returns {Promise<{sourceMap: string, sources: Object<string,string>}|null>}
+ */
+export async function fetchContractOutput(address, chainId) {
+  try {
+    const response = await fetch(
+      `https://sourcify.dev/server/v2/contract/${chainId}/${address}/files`,
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (!data) {
+      return null;
+    }
+
+    // The /files endpoint returns the full Standard JSON compiler output.
+    // The deployed bytecode source map is at evm.deployedBytecode.sourceMap.
+    const sourceMap = data?.evm?.deployedBytecode?.sourceMap || null;
+
+    // Extract source code from the metadata sources
+    let sources = null;
+    if (data?.sources) {
+      sources = {};
+      for (const [file, info] of Object.entries(data.sources)) {
+        sources[file] = typeof info === "object" ? info.content || "" : info;
+      }
+    }
+
+    return { sourceMap, sources };
+  } catch (e) {
+    console.error("Sourcify /files fetch error:", e);
     return null;
   }
 }
