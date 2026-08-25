@@ -48,15 +48,9 @@ function highlightSolidity(source) {
   );
 }
 
-function highlightSearchMatches(htmlLine, query, isCurrentMatch, styles_) {
-  if (!query) return htmlLine;
-  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const re = new RegExp(`(${escapedQuery})`, "gi");
+function highlightSearchMatch(htmlLine, isCurrentMatch, styles_) {
   const cls = isCurrentMatch ? styles_.searchMatchCurrent : styles_.searchMatch;
-  return htmlLine.replace(
-    re,
-    (match) => `<mark class="${cls}">${match}</mark>`,
-  );
+  return `<mark class="${cls}">${htmlLine}</mark>`;
 }
 
 export default function SourceCodeViewer({
@@ -84,23 +78,32 @@ export default function SourceCodeViewer({
 
   const [searchQuery, setSearchQuery] = useState("");
   const [matchIndex, setMatchIndex] = useState(0);
-  const [showSearch, setShowSearch] = useState(false);
 
   const sourceContent = activeFile ? sources?.[activeFile] || "" : "";
 
+  function fuzzyMatch(line, query) {
+    let qi = 0;
+    const lowerLine = line.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    let start = -1;
+    for (let i = 0; i < lowerLine.length && qi < lowerQuery.length; i++) {
+      if (lowerLine[i] === lowerQuery[qi]) {
+        if (qi === 0) start = i;
+        qi++;
+      }
+    }
+    if (qi === lowerQuery.length) return start;
+    return -1;
+  }
+
   const searchMatches = useMemo(() => {
     if (!searchQuery || !sourceContent) return [];
-    const lowerQuery = searchQuery.toLowerCase();
     const lines = sourceContent.split("\n");
     const matches = [];
     lines.forEach((line, i) => {
-      let idx = 0;
-      const lowerLine = line.toLowerCase();
-      while (idx < line.length) {
-        const pos = lowerLine.indexOf(lowerQuery, idx);
-        if (pos === -1) break;
-        matches.push({ line: i + 1, col: pos, length: searchQuery.length });
-        idx = pos + 1;
+      const col = fuzzyMatch(line, searchQuery);
+      if (col !== -1) {
+        matches.push({ line: i + 1, col, length: searchQuery.length });
       }
     });
     return matches;
@@ -124,14 +127,13 @@ export default function SourceCodeViewer({
   useEffect(() => {
     setSearchQuery("");
     setMatchIndex(0);
-    setShowSearch(false);
   }, [activeFile]);
 
   useEffect(() => {
-    if (showSearch && searchInputRef.current) {
+    if (searchInputRef.current) {
       searchInputRef.current.focus();
     }
-  }, [showSearch]);
+  }, []);
 
   useEffect(() => {
     if (fileNames.length > 0 && !fileNames.includes(activeFile)) {
@@ -190,17 +192,12 @@ export default function SourceCodeViewer({
       onClick={onClose}
       onKeyDown={(e) => {
         if (e.key === "Escape") {
-          if (showSearch) {
-            setShowSearch(false);
-            setSearchQuery("");
-          } else {
-            onClose();
-          }
+          onClose();
           return;
         }
         if ((e.ctrlKey || e.metaKey) && e.key === "f") {
           e.preventDefault();
-          setShowSearch(true);
+          searchInputRef.current?.focus();
           return;
         }
         if ((e.ctrlKey || e.metaKey) && e.key === "a") {
@@ -225,9 +222,11 @@ export default function SourceCodeViewer({
           return;
         }
         if (e.key === "Enter") {
-          e.preventDefault();
-          if (searchMatches.length > 0) {
-            setMatchIndex((prev) => (prev + 1) % searchMatches.length);
+          if (e.target === searchInputRef.current) {
+            e.preventDefault();
+            if (searchMatches.length > 0) {
+              setMatchIndex((prev) => (prev + 1) % searchMatches.length);
+            }
           }
           return;
         }
@@ -265,67 +264,51 @@ export default function SourceCodeViewer({
           </div>
         )}
 
-        {showSearch && (
-          <div className={styles.searchBar}>
-            <input
-              ref={searchInputRef}
-              className={styles.searchInput}
-              type="text"
-              placeholder="Find in source…"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setMatchIndex(0);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                  setShowSearch(false);
-                  setSearchQuery("");
-                }
-                e.stopPropagation();
-              }}
-            />
-            <span className={styles.searchCount}>
-              {searchMatches.length > 0
-                ? `${safeMatchIndex + 1} / ${searchMatches.length}`
-                : searchQuery
-                  ? "0 / 0"
-                  : ""}
-            </span>
-            <button
-              className={styles.searchNavBtn}
-              onClick={() =>
-                setMatchIndex((prev) =>
-                  prev <= 0 ? searchMatches.length - 1 : prev - 1,
-                )
-              }
-              type="button"
-              disabled={searchMatches.length === 0}
-            >
-              ▲
-            </button>
-            <button
-              className={styles.searchNavBtn}
-              onClick={() =>
-                setMatchIndex((prev) => (prev + 1) % searchMatches.length)
-              }
-              type="button"
-              disabled={searchMatches.length === 0}
-            >
-              ▼
-            </button>
-            <button
-              className={styles.searchCloseBtn}
-              onClick={() => {
-                setShowSearch(false);
-                setSearchQuery("");
-              }}
-              type="button"
-            >
-              ✕
-            </button>
-          </div>
-        )}
+        <div className={styles.searchBar}>
+          <input
+            ref={searchInputRef}
+            className={styles.searchInput}
+            type="text"
+            placeholder="Fuzzy search source…"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setMatchIndex(0);
+            }}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+            }}
+          />
+          <span className={styles.searchCount}>
+            {searchMatches.length > 0
+              ? `${safeMatchIndex + 1} / ${searchMatches.length}`
+              : searchQuery
+                ? "0 / 0"
+                : ""}
+          </span>
+          <button
+            className={styles.searchNavBtn}
+            onClick={() =>
+              setMatchIndex((prev) =>
+                prev <= 0 ? searchMatches.length - 1 : prev - 1,
+              )
+            }
+            type="button"
+            disabled={searchMatches.length === 0}
+          >
+            ▲
+          </button>
+          <button
+            className={styles.searchNavBtn}
+            onClick={() =>
+              setMatchIndex((prev) => (prev + 1) % searchMatches.length)
+            }
+            type="button"
+            disabled={searchMatches.length === 0}
+          >
+            ▼
+          </button>
+        </div>
 
         <div className={styles.body}>
           {error && !highlightedLines.length && (
@@ -359,14 +342,17 @@ export default function SourceCodeViewer({
                       safeMatchIndex >= 0
                         ? searchMatches[safeMatchIndex]
                         : null;
-                    const displayHtml = searchQuery
-                      ? highlightSearchMatches(
-                          htmlLine,
-                          searchQuery,
-                          currentMatch && currentMatch.line === lineNum,
-                          styles,
-                        )
-                      : htmlLine;
+                    const isSearchMatch = searchMatches.some(
+                      (m) => m.line === lineNum,
+                    );
+                    const displayHtml =
+                      searchQuery && isSearchMatch
+                        ? highlightSearchMatch(
+                            htmlLine,
+                            currentMatch && currentMatch.line === lineNum,
+                            styles,
+                          )
+                        : htmlLine;
                     return (
                       <tr
                         key={i}
