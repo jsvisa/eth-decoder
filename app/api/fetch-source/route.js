@@ -184,7 +184,12 @@ async function getDiamondFacetAddresses(client, diamondAddress) {
   }
 }
 
-async function fetchSourceForAddress(address, chainId, etherscanApiKey, routescanApiKey) {
+async function fetchSourceForAddress(
+  address,
+  chainId,
+  etherscanApiKey,
+  routescanApiKey,
+) {
   if (etherscanApiKey) {
     const result = await fetchFromEtherscan(address, chainId, etherscanApiKey);
     if (result?.sourceCode) return result;
@@ -193,7 +198,11 @@ async function fetchSourceForAddress(address, chainId, etherscanApiKey, routesca
   const sourcifyResult = await fetchFromSourcify(address, chainId);
   if (sourcifyResult?.sourceCode) return sourcifyResult;
 
-  const routescanResult = await fetchFromRouteScan(address, chainId, routescanApiKey);
+  const routescanResult = await fetchFromRouteScan(
+    address,
+    chainId,
+    routescanApiKey,
+  );
   if (routescanResult?.sourceCode) return routescanResult;
 
   return null;
@@ -236,7 +245,12 @@ export async function GET(request) {
       process.env.ROUTESCAN_API_KEY ||
       "";
 
-    let result = await fetchSourceForAddress(address, chainId, etherscanApiKey, routescanApiKey);
+    let result = await fetchSourceForAddress(
+      address,
+      chainId,
+      etherscanApiKey,
+      routescanApiKey,
+    );
 
     // Diamond proxy: discover facets and fetch their source code
     const customRpcUrl = searchParams.get("rpcUrl");
@@ -264,10 +278,16 @@ export async function GET(request) {
         const facetSources = {};
         let facetCompilerVersion = null;
         for (const facet of facetAddresses) {
-          const facetResult = await fetchSourceForAddress(facet, chainId, etherscanApiKey, routescanApiKey);
+          const facetResult = await fetchSourceForAddress(
+            facet,
+            chainId,
+            etherscanApiKey,
+            routescanApiKey,
+          );
           if (facetResult?.sourceCode) {
             Object.assign(facetSources, facetResult.sourceCode);
-            if (!facetCompilerVersion) facetCompilerVersion = facetResult.compilerVersion;
+            if (!facetCompilerVersion)
+              facetCompilerVersion = facetResult.compilerVersion;
           }
         }
         if (Object.keys(facetSources).length > 0) {
@@ -276,7 +296,8 @@ export async function GET(request) {
             : facetSources;
           return NextResponse.json({
             sourceCode: mergedSources,
-            compilerVersion: result?.compilerVersion || facetCompilerVersion || null,
+            compilerVersion:
+              result?.compilerVersion || facetCompilerVersion || null,
             source: "diamond",
           });
         }

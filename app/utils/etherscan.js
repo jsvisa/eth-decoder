@@ -43,7 +43,11 @@ function parseEtherscanSourceCode(sourceCode, fallbackFileName) {
         if (hasSolFiles(parsed)) {
           return extractSources(parsed);
         }
-        if (parsed.sources && typeof parsed.sources === "object" && hasSolFiles(parsed.sources)) {
+        if (
+          parsed.sources &&
+          typeof parsed.sources === "object" &&
+          hasSolFiles(parsed.sources)
+        ) {
           return extractSources(parsed.sources);
         }
       }
@@ -58,7 +62,11 @@ function parseEtherscanSourceCode(sourceCode, fallbackFileName) {
         if (hasSolFiles(parsed)) {
           return extractSources(parsed);
         }
-        if (parsed.sources && typeof parsed.sources === "object" && hasSolFiles(parsed.sources)) {
+        if (
+          parsed.sources &&
+          typeof parsed.sources === "object" &&
+          hasSolFiles(parsed.sources)
+        ) {
           return extractSources(parsed.sources);
         }
       }
