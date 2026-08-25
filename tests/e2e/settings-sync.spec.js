@@ -152,7 +152,10 @@ test.describe("Export settings", () => {
 test.describe("Import settings", () => {
   /** Write a JSON payload to a temp file and return its path. */
   function writeTempJson(data) {
-    const file = path.join(os.tmpdir(), `evm-import-${Date.now()}.json`);
+    const file = path.join(
+      os.tmpdir(),
+      `evm-import-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`,
+    );
     fs.writeFileSync(file, JSON.stringify(data));
     return file;
   }
@@ -217,7 +220,7 @@ test.describe("Import settings", () => {
 
     const fileInput = page.locator('input[type="file"][accept=".json"]');
     await Promise.all([
-      page.waitForNavigation({ waitUntil: "domcontentloaded" }),
+      page.waitForLoadState("domcontentloaded"),
       fileInput.setInputFiles(tmpFile),
     ]);
 
@@ -247,7 +250,7 @@ test.describe("Import settings", () => {
 
     const fileInput = page.locator('input[type="file"][accept=".json"]');
     await Promise.all([
-      page.waitForNavigation({ waitUntil: "domcontentloaded" }),
+      page.waitForLoadState("domcontentloaded"),
       fileInput.setInputFiles(tmpFile),
     ]);
 
