@@ -191,6 +191,16 @@ export const fetchAndCacheAbi = async (
       data.implSource || null,
     );
 
+    // Also cache source code so the source viewer loads instantly
+    if (data.sourceCode) {
+      setCachedSource(
+        chain,
+        address,
+        data.sourceCode,
+        data.compilerVersion || null,
+      );
+    }
+
     return data.abi;
   } catch (err) {
     console.error(`Failed to fetch ABI for ${address}:`, err);
