@@ -413,10 +413,13 @@ export function useCallExecution({
 
         // Fetch ABIs for ALL call trace addresses (not just undecoded ones)
         // so that contract labels appear on inner call frames.
+        // Skip the from address — it's the sender (typically an EOA), not a
+        // contract, and fetching its ABI would always be a wasted 404.
         if (data.callTrace) {
           const allTraceAddrs = collectAllCallAddresses(data.callTrace);
+          const fromAddrLower = fromAddress?.toLowerCase();
           const uncachedAddrs = [...allTraceAddrs].filter(
-            (addr) => !initialAbiCache.has(addr),
+            (addr) => addr !== fromAddrLower && !initialAbiCache.has(addr),
           );
           if (uncachedAddrs.length > 0) {
             const newAbis = await fetchAbisForAddresses(
@@ -457,6 +460,7 @@ export function useCallExecution({
               data.callTrace,
               chain,
               chainIdForSimulation,
+              fromAddress,
             ).catch(() => {});
           }
           prefetchSourceCodeForTrace(
@@ -465,6 +469,7 @@ export function useCallExecution({
             apiKeys,
             rpcSettings,
             chainIdForSimulation,
+            fromAddress,
           ).catch(() => {});
         }
 
@@ -691,7 +696,12 @@ const SOURCE_MAP_CACHE = new Map();
  * Fetch source maps for all unique addresses in the trace tree from Sourcify,
  * then resolve each node's PCs to source lines using its own address's map.
  */
-async function resolveSourceLinesForTrace(callTrace, chain, chainId) {
+async function resolveSourceLinesForTrace(
+  callTrace,
+  chain,
+  chainId,
+  fromAddress,
+) {
   if (!callTrace) return;
 
   const addresses = collectAllCallAddresses(callTrace);
@@ -699,6 +709,9 @@ async function resolveSourceLinesForTrace(callTrace, chain, chainId) {
 
   // Also include the root node's address
   if (callTrace.to) addresses.add(callTrace.to.toLowerCase());
+
+  // Skip the from address — it's the sender (typically an EOA), not a contract
+  if (fromAddress) addresses.delete(fromAddress.toLowerCase());
 
   // Resolve proxy addresses to implementation addresses for source mapping.
   // DELEGATECALL nodes show the proxy address but execute the impl's code.
@@ -721,6 +734,17 @@ async function resolveSourceLinesForTrace(callTrace, chain, chainId) {
   const sourceFilesByAddr = new Map();
 
   const fetchPromises = [...resolvedAddresses].map(async (addr) => {
+    // Only Sourcify provides source maps. Skip the fetch if we already know
+    // the contract's ABI came from a different source (Etherscan/RouteScan).
+    try {
+      const cached = getCachedAbi(chain, addr);
+      if (cached?.source && cached.source !== "sourcify") {
+        return;
+      }
+    } catch {
+      // If we can't check the cache, try the fetch anyway
+    }
+
     const cacheKey = `${chainId}-${addr}`;
     let sourceMapData = SOURCE_MAP_CACHE.get(cacheKey);
 
@@ -827,10 +851,14 @@ async function prefetchSourceCodeForTrace(
   apiKeys,
   rpcSettings,
   chainId,
+  fromAddress,
 ) {
   if (!callTrace) return;
   const addresses = collectAllCallAddresses(callTrace);
   if (callTrace.to) addresses.add(callTrace.to.toLowerCase());
+
+  // Skip the from address — it's the sender (typically an EOA), not a contract
+  if (fromAddress) addresses.delete(fromAddress.toLowerCase());
 
   const resolvedAddresses = new Set();
   for (const addr of addresses) {
