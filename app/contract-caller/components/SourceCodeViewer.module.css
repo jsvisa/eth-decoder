@@ -33,6 +33,12 @@
   flex-shrink: 0;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .headerInfo {
   display: flex;
   align-items: center;
@@ -75,6 +81,29 @@
 .closeBtn:hover {
   background-color: #333;
   color: #d4d4d4;
+}
+
+.downloadBtn {
+  background: none;
+  border: 1px solid #444;
+  color: #808080;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  line-height: 1;
+  transition: all 0.15s;
+}
+
+.downloadBtn:hover {
+  background-color: #333;
+  color: #d4d4d4;
+  border-color: #666;
+}
+
+.downloadBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .fileTabs {

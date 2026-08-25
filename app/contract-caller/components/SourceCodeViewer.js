@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useSourceCode } from "../hooks/useSourceCode";
 import { findFunctionSource } from "../../utils/solidityParser";
+import { BUILT_IN_CHAIN_IDS } from "../../utils/chains";
+import { getCachedAbi } from "../../utils/abiCache";
+import JSZip from "jszip";
 import styles from "./SourceCodeViewer.module.css";
 
 function highlightSolidity(source) {
@@ -121,6 +124,72 @@ export default function SourceCodeViewer({
     }
   }, [highlightLine, activeFile]);
 
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = useCallback(async () => {
+    if (!sources || downloading) return;
+
+    const chainId =
+      BUILT_IN_CHAIN_IDS[chain] ||
+      (() => {
+        try {
+          const custom = JSON.parse(
+            localStorage.getItem("custom_chains") || "[]",
+          );
+          return custom.find((c) => c.id === chain)?.chainId;
+        } catch {
+          return null;
+        }
+      })();
+
+    if (!chainId) return;
+
+    setDownloading(true);
+    try {
+      const cached = getCachedAbi(chain, address);
+      const sourceFiles = Object.keys(sources);
+      const meta = {
+        chainId,
+        address: address.toLowerCase(),
+        ...(cached?.contractName && { contractName: cached.contractName }),
+        ...(cached?.isProxy && { isProxy: true }),
+        ...(cached?.implAddress && { implAddress: cached.implAddress.toLowerCase() }),
+        ...(cached?.implContractName && { implContractName: cached.implContractName }),
+        ...(cached?.facetAddresses?.length && { facetAddresses: cached.facetAddresses.map((a) => a.toLowerCase()) }),
+        ...(cached?.facets?.length && {
+          facets: Object.fromEntries(
+            cached.facets.map((f) => [f.address.toLowerCase(), f.name]),
+          ),
+        }),
+        sourceFiles: {
+          [address.toLowerCase()]: sourceFiles,
+          ...(cached?.implAddress && { [cached.implAddress.toLowerCase()]: sourceFiles }),
+          ...(cached?.facetAddresses?.length &&
+            Object.fromEntries(
+              cached.facetAddresses.map((a) => [a.toLowerCase(), sourceFiles]),
+            )),
+        },
+      };
+
+      const zip = new JSZip();
+      zip.file("meta.json", JSON.stringify(meta, null, 2));
+      for (const [fileName, content] of Object.entries(sources)) {
+        zip.file(fileName, content);
+      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${chainId}-${address.toLowerCase()}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(false);
+    }
+  }, [sources, chain, address, downloading]);
+
   if (!open) return null;
 
   return (
@@ -143,9 +212,20 @@ export default function SourceCodeViewer({
             )}
             <span className={styles.address}>{address}</span>
           </div>
-          <button className={styles.closeBtn} onClick={onClose} type="button">
-            ✕
-          </button>
+          <div className={styles.headerActions}>
+            <button
+              className={styles.downloadBtn}
+              onClick={handleDownload}
+              disabled={!sources || downloading}
+              type="button"
+              title="Download source as ZIP"
+            >
+              {downloading ? "..." : "⬇"}
+            </button>
+            <button className={styles.closeBtn} onClick={onClose} type="button">
+              ✕
+            </button>
+          </div>
         </div>
 
         {fileNames.length > 1 && (
