@@ -242,7 +242,13 @@ export default function SourceCodeViewer({
                 solc {compilerVersion}
               </span>
             )}
-            <span className={styles.address}>{address}</span>
+            <span
+              className={styles.address}
+              onClick={() => navigator.clipboard.writeText(address)}
+              title={`Click to copy: ${address}`}
+            >
+              {address.slice(0, 6)}...{address.slice(-4)}
+            </span>
             <div className={styles.headerSearch}>
               <input
                 ref={searchInputRef}
