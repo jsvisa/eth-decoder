@@ -153,9 +153,15 @@ export default function SourceCodeViewer({
         address: address.toLowerCase(),
         ...(cached?.contractName && { contractName: cached.contractName }),
         ...(cached?.isProxy && { isProxy: true }),
-        ...(cached?.implAddress && { implAddress: cached.implAddress.toLowerCase() }),
-        ...(cached?.implContractName && { implContractName: cached.implContractName }),
-        ...(cached?.facetAddresses?.length && { facetAddresses: cached.facetAddresses.map((a) => a.toLowerCase()) }),
+        ...(cached?.implAddress && {
+          implAddress: cached.implAddress.toLowerCase(),
+        }),
+        ...(cached?.implContractName && {
+          implContractName: cached.implContractName,
+        }),
+        ...(cached?.facetAddresses?.length && {
+          facetAddresses: cached.facetAddresses.map((a) => a.toLowerCase()),
+        }),
         ...(cached?.facets?.length && {
           facets: Object.fromEntries(
             cached.facets.map((f) => [f.address.toLowerCase(), f.name]),
@@ -163,7 +169,9 @@ export default function SourceCodeViewer({
         }),
         sourceFiles: {
           [address.toLowerCase()]: sourceFiles,
-          ...(cached?.implAddress && { [cached.implAddress.toLowerCase()]: sourceFiles }),
+          ...(cached?.implAddress && {
+            [cached.implAddress.toLowerCase()]: sourceFiles,
+          }),
           ...(cached?.facetAddresses?.length &&
             Object.fromEntries(
               cached.facetAddresses.map((a) => [a.toLowerCase(), sourceFiles]),
