@@ -219,10 +219,8 @@ test.describe("Import settings", () => {
     const tmpFile = writeTempJson(payload);
 
     const fileInput = page.locator('input[type="file"][accept=".json"]');
-    await Promise.all([
-      page.waitForLoadState("domcontentloaded"),
-      fileInput.setInputFiles(tmpFile),
-    ]);
+    await fileInput.setInputFiles(tmpFile);
+    await page.waitForEvent("domcontentloaded");
 
     // Imported key is present
     const apiKeys = JSON.parse(
@@ -249,10 +247,8 @@ test.describe("Import settings", () => {
     const tmpFile = writeTempJson(payload);
 
     const fileInput = page.locator('input[type="file"][accept=".json"]');
-    await Promise.all([
-      page.waitForLoadState("domcontentloaded"),
-      fileInput.setInputFiles(tmpFile),
-    ]);
+    await fileInput.setInputFiles(tmpFile);
+    await page.waitForEvent("domcontentloaded");
 
     const apiKeys = JSON.parse(
       await page.evaluate(() => localStorage.getItem("api_keys_settings")),
