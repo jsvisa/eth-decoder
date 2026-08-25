@@ -51,8 +51,6 @@ const DIAMOND_STORAGE_SLOT = keccak256(
 // raised via a `concurrency` query parameter.
 const DEFAULT_FETCH_CONCURRENCY = 1;
 
-
-
 // Fetch ABI and contract name from Etherscan
 async function fetchContractInfoFromEtherscan(address, chainId, apiKey) {
   const key = pickApiKey(apiKey);

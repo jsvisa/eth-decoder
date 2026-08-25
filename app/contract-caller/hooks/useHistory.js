@@ -159,7 +159,7 @@ export function useHistory({
           args: parsedArgs,
           timestamp: Date.now(),
         };
-setPendingHistory(pendingSelection);
+        setPendingHistory(pendingSelection);
         if (typeof applyPendingArgs === "function") {
           applyPendingArgs(pendingSelection);
         }

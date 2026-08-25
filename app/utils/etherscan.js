@@ -57,4 +57,9 @@ function parseEtherscanSourceCode(sourceCode, fallbackFileName) {
   return { [file]: sourceCode };
 }
 
-export { ETHERSCAN_V2_API, ROUTESCAN_API_BASE, pickApiKey, parseEtherscanSourceCode };
+export {
+  ETHERSCAN_V2_API,
+  ROUTESCAN_API_BASE,
+  pickApiKey,
+  parseEtherscanSourceCode,
+};
