@@ -60,6 +60,12 @@ export function useHistory({
   // Store pending args to handle race conditions when switching contracts.
   // Shape: { functionSig, args, timestamp }
   const pendingHistoryRef = useRef(null);
+  const [pendingHistoryVersion, setPendingHistoryVersion] = useState(0);
+
+  function setPendingHistory(value) {
+    pendingHistoryRef.current = value;
+    setPendingHistoryVersion((v) => v + 1);
+  }
 
   // ── Effect 1 (lines 840-852): clear stale pending history after 5 s ──────
   useEffect(() => {
@@ -69,12 +75,12 @@ export function useHistory({
           pendingHistoryRef.current &&
           Date.now() - pendingHistoryRef.current.timestamp > 5000
         ) {
-          pendingHistoryRef.current = null;
+          setPendingHistory(null);
         }
       }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [pendingHistoryRef.current?.timestamp]);
+  }, [pendingHistoryVersion]);
 
   // ── Effect 2 (lines 1391-1419): load history from localStorage on mount ──
   useEffect(() => {
@@ -153,7 +159,7 @@ export function useHistory({
           args: parsedArgs,
           timestamp: Date.now(),
         };
-        pendingHistoryRef.current = pendingSelection;
+setPendingHistory(pendingSelection);
         if (typeof applyPendingArgs === "function") {
           applyPendingArgs(pendingSelection);
         }
@@ -301,7 +307,7 @@ export function useHistory({
         args: historyArgs,
         timestamp: Date.now(),
       };
-      pendingHistoryRef.current = pendingSelection;
+      setPendingHistory(pendingSelection);
       if (typeof applyPendingArgs === "function") {
         applyPendingArgs(pendingSelection);
       }
@@ -346,7 +352,7 @@ export function useHistory({
   const consumePendingArgs = useCallback(() => {
     const pending = pendingHistoryRef.current;
     if (!pending) return null;
-    pendingHistoryRef.current = null;
+    setPendingHistory(null);
     return pending;
   }, []);
 
