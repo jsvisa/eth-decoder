@@ -15,8 +15,12 @@ import {
   DEFAULT_RPC_URLS,
 } from "../../utils/chains";
 
-const ETHERSCAN_V2_API = "https://api.etherscan.io/v2/api";
-const ROUTESCAN_API_BASE = "https://api.routescan.io/v2/network/mainnet/evm";
+import {
+  ETHERSCAN_V2_API,
+  ROUTESCAN_API_BASE,
+  pickApiKey,
+  parseEtherscanSourceCode,
+} from "../../utils/etherscan";
 
 // EIP-2535 DiamondLoupe facetAddresses() selector
 const DIAMOND_FACET_ADDRESSES_SELECTOR = "0x52ef6b2c";
@@ -30,66 +34,6 @@ const DIAMOND_FACET_ADDRESSES_SELECTOR = "0x52ef6b2c";
 const DIAMOND_STORAGE_SLOT = keccak256(
   toHex("diamond.standard.diamond.storage"),
 );
-
-function pickApiKey(keys) {
-  if (!keys) return "";
-  const list = String(keys)
-    .split(",")
-    .map((k) => k.trim())
-    .filter(Boolean);
-  if (list.length === 0) return "";
-  return list[Math.floor(Math.random() * list.length)];
-}
-
-function parseEtherscanSourceCode(sourceCode) {
-  if (!sourceCode || sourceCode === "Contract source code not verified") {
-    return null;
-  }
-
-  const trimmed = sourceCode.trim();
-
-  function hasSolFiles(obj) {
-    return Object.keys(obj).some((k) => k.endsWith(".sol"));
-  }
-
-  function extractSources(obj) {
-    const sources = {};
-    for (const [file, info] of Object.entries(obj)) {
-      sources[file] = typeof info === "object" ? info.content || "" : info;
-    }
-    return sources;
-  }
-
-  if (trimmed.startsWith("{{")) {
-    try {
-      const parsed = JSON.parse(trimmed.slice(1, -1));
-      if (parsed && typeof parsed === "object") {
-        if (hasSolFiles(parsed)) {
-          return extractSources(parsed);
-        }
-        if (parsed.sources && typeof parsed.sources === "object" && hasSolFiles(parsed.sources)) {
-          return extractSources(parsed.sources);
-        }
-      }
-      return null;
-    } catch {}
-  } else if (trimmed.startsWith("{")) {
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        if (hasSolFiles(parsed)) {
-          return extractSources(parsed);
-        }
-        if (parsed.sources && typeof parsed.sources === "object" && hasSolFiles(parsed.sources)) {
-          return extractSources(parsed.sources);
-        }
-      }
-      return null;
-    } catch {}
-  }
-
-  return { "Contract.sol": sourceCode };
-}
 
 async function fetchFromEtherscan(address, chainId, apiKey) {
   const key = pickApiKey(apiKey);

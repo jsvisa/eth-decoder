@@ -127,8 +127,8 @@ test.describe("Decoder page", () => {
     await expect(tabs.nth(1)).toContainText("B");
     await expect(tabs.nth(2)).toContainText("C");
 
-    // Dispatch an HTML5 drag sequence deterministically: dragstart on the
-    // source tab, dragover on the target tab, then dragend.
+    // Dispatch an HTML5 drag sequence: dragstart on source, dragover on target,
+    // then dragend on source. Each event uses the same DataTransfer instance.
     const drag = async (sourceIndex, targetIndex, ratio) => {
       await page.evaluate(
         ({ sourceIndex, targetIndex, ratio }) => {
@@ -145,9 +145,12 @@ test.describe("Decoder page", () => {
               bubbles: true,
               clientX: rect.left + rect.width * ratio,
               clientY: rect.top + rect.height / 2,
+              dataTransfer,
             }),
           );
-          target.dispatchEvent(new DragEvent("dragend", { bubbles: true }));
+          source.dispatchEvent(
+            new DragEvent("dragend", { bubbles: true, dataTransfer }),
+          );
         },
         { sourceIndex, targetIndex, ratio },
       );

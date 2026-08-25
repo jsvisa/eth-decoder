@@ -197,10 +197,11 @@ async function loadHistoryResult(page) {
   const historyItem = page.locator("[class*=historyItem]").first();
   await historyItem.waitFor({ state: "visible", timeout: 10000 });
   await historyItem.click();
-  // Wait for the Balance Changes table section to appear
   await page.locator("[class*=bdSection]").waitFor({ timeout: 5000 });
-  // Allow async decimals/price/symbol fetches to complete
-  await page.waitForTimeout(5000);
+  // Wait for token metadata (symbols/decimals) to be fetched and rendered
+  await expect(
+    page.locator("[class*=bdSection] [class*=bdTokenName]").first(),
+  ).toBeVisible({ timeout: 5000 });
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
@@ -445,26 +446,18 @@ test.describe("Balance Changes role badges", () => {
     await page.goto("/contract-caller");
     await page.locator("[class*=historyItem]").first().click();
     await page.locator("[class*=bdSection]").waitFor({ timeout: 5000 });
-    await page.waitForTimeout(2000);
+    await expect(
+      page.locator("[class*=bdSection] [class*=bdTokenName]").first(),
+    ).toBeVisible({ timeout: 5000 });
 
     // TO_ADDR is neither fromAddress nor address, so no badge cell next to it
-    // Verify TO_ADDR row exists but doesn't contain Sender or Receiver
     const rows = page.locator("[class*=bdRow]");
-    const count = await rows.count();
-    let toAddrRowHasBadge = false;
-    for (let i = 0; i < count; i++) {
-      const rowText = await rows.nth(i).textContent();
-      const shortTo = TO_ADDR.slice(0, 10) + "…" + TO_ADDR.slice(-8);
-      if (
-        rowText.includes(shortTo) ||
-        rowText.toLowerCase().includes(TO_ADDR.toLowerCase())
-      ) {
-        if (rowText.includes("Sender") || rowText.includes("Receiver")) {
-          toAddrRowHasBadge = true;
-        }
-      }
-    }
-    expect(toAddrRowHasBadge).toBe(false);
+    const shortTo = TO_ADDR.slice(0, 10) + "…" + TO_ADDR.slice(-8);
+    const toAddrRow = rows.filter({ hasText: shortTo }).first();
+    await expect(toAddrRow).toBeVisible();
+    const rowText = await toAddrRow.textContent();
+    expect(rowText).not.toContain("Sender");
+    expect(rowText).not.toContain("Receiver");
   });
 });
 
@@ -509,7 +502,9 @@ test.describe("Balance Changes click-to-expand", () => {
     await page.goto("/contract-caller");
     await page.locator("[class*=historyItem]").first().click();
     await page.locator("[class*=bdSection]").waitFor({ timeout: 5000 });
-    await page.waitForTimeout(2000); // wait for symbol fetch
+    await expect(
+      page.locator("[class*=bdSection] [class*=bdTokenName]").first(),
+    ).toBeVisible({ timeout: 5000 });
 
     const section = page.locator("[class*=bdSection]");
 

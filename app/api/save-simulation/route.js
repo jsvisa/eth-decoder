@@ -20,7 +20,9 @@ export async function POST(request) {
     );
   }
 
-  pruneExpiredResults().catch(() => {});
+  pruneExpiredResults().catch((err) =>
+    console.error("Failed to prune expired simulation results:", err),
+  );
 
   try {
     const simulationId = await saveSimulationResult(body);

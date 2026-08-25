@@ -24,7 +24,7 @@ export default function EventDecoder() {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) setHistory(JSON.parse(stored));
     } catch {
-      /* ignore */
+      console.error("Failed to load event decoder history");
     }
   }, []);
 
@@ -55,7 +55,7 @@ export default function EventDecoder() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     } catch {
-      /* ignore */
+      console.error("Failed to save event decoder history");
     }
   };
 
@@ -133,7 +133,7 @@ export default function EventDecoder() {
           cls = /:$/.test(match) ? styles.jsonKey : styles.jsonString;
         else if (/true|false/.test(match)) cls = styles.jsonBoolean;
         else if (/null/.test(match)) cls = styles.jsonNull;
-        return `<span class="${cls}">${match}</span>`;
+        return `<span class="${cls}">${match.replace(/"/g, "&quot;").replace(/'/g, "&#39;")}</span>`;
       },
     );
   };
@@ -155,7 +155,7 @@ export default function EventDecoder() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      /* ignore */
+      console.error("Failed to copy to clipboard");
     }
   };
 

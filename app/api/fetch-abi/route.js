@@ -16,8 +16,12 @@ import {
   DEFAULT_RPC_URLS,
 } from "../../utils/chains";
 
-const ETHERSCAN_V2_API = "https://api.etherscan.io/v2/api";
-const ROUTESCAN_API_BASE = "https://api.routescan.io/v2/network/mainnet/evm";
+import {
+  ETHERSCAN_V2_API,
+  ROUTESCAN_API_BASE,
+  pickApiKey,
+  parseEtherscanSourceCode,
+} from "../../utils/etherscan";
 
 // EIP-1967 implementation slot
 const EIP1967_IMPL_SLOT =
@@ -46,88 +50,6 @@ const DIAMOND_STORAGE_SLOT = keccak256(
 // facets. Serial (1) by default to stay well within API rate limits; can be
 // raised via a `concurrency` query parameter.
 const DEFAULT_FETCH_CONCURRENCY = 1;
-
-// Pick a random key from a possibly comma-separated list of API keys
-// (e.g. "a,b,c"). Returns "" when no valid key is configured.
-function pickApiKey(keys) {
-  if (!keys) return "";
-  const list = String(keys)
-    .split(",")
-    .map((k) => k.trim())
-    .filter(Boolean);
-  if (list.length === 0) return "";
-  return list[Math.floor(Math.random() * list.length)];
-}
-
-// Parse Etherscan's SourceCode field into a { fileName: content } map.
-// Etherscan returns raw Solidity for single-file contracts, or
-// JSON-encoded multi-file sources wrapped in double braces: {{"A.sol":{...}}}
-function parseEtherscanSourceCode(sourceCode) {
-  if (!sourceCode || sourceCode === "Contract source code not verified") {
-    return null;
-  }
-
-  const trimmed = sourceCode.trim();
-
-  function hasSolFiles(obj) {
-    return Object.keys(obj).some((k) => k.endsWith(".sol"));
-  }
-
-  function extractSources(obj) {
-    const sources = {};
-    for (const [file, info] of Object.entries(obj)) {
-      sources[file] = typeof info === "object" ? info.content || "" : info;
-    }
-    return sources;
-  }
-
-  // Multi-file: JSON-encoded, often wrapped in {{...}}
-  if (trimmed.startsWith("{{")) {
-    try {
-      const parsed = JSON.parse(trimmed.slice(1, -1));
-      if (parsed && typeof parsed === "object") {
-        if (hasSolFiles(parsed)) {
-          return extractSources(parsed);
-        }
-        if (parsed.sources && typeof parsed.sources === "object" && hasSolFiles(parsed.sources)) {
-          return extractSources(parsed.sources);
-        }
-      }
-      // Parsed JSON but no .sol files found — not valid source code
-      return null;
-    } catch {
-      // fall through to raw source
-    }
-  } else if (trimmed.startsWith("{")) {
-    // Some explorers return single-brace JSON
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        if (hasSolFiles(parsed)) {
-          return extractSources(parsed);
-        }
-        // Standard JSON Input format: { language, sources: { "File.sol": { content: "..." } }, settings }
-        if (parsed.sources && typeof parsed.sources === "object" && hasSolFiles(parsed.sources)) {
-          return extractSources(parsed.sources);
-        }
-      }
-      // Parsed JSON but no .sol files found — not valid source code
-      return null;
-    } catch {
-      // fall through to raw source
-    }
-  }
-
-  // Single-file: raw Solidity source
-  return { [fileNameFromSource(sourceCode) || "Contract.sol"]: sourceCode };
-}
-
-// Guess a file name from pragma or first line of source code.
-function fileNameFromSource(source) {
-  const firstLine = source.split("\n")[0].trim();
-  const m = firstLine.match(/\/\/\s*File:\s*(\S+)/);
-  return m ? m[1] : null;
-}
 
 // Fetch ABI and contract name from Etherscan
 async function fetchContractInfoFromEtherscan(address, chainId, apiKey) {
