@@ -136,9 +136,12 @@ export const CGC_CHAIN_SLUGS = {
   56: "binance-smart-chain",
   100: "xdai",
   137: "polygon-pos",
+  169: "manta-pacific",
   250: "fantom",
+  255: "kroma",
   324: "zksync",
   1088: "metis-andromeda",
+  1101: "polygon-zkevm",
   1284: "moonbeam",
   1285: "moonriver",
   2222: "kava",
@@ -150,6 +153,7 @@ export const CGC_CHAIN_SLUGS = {
   43114: "avalanche",
   59144: "linea",
   81457: "blast",
+  167000: "taiko",
   534352: "scroll",
   1313161554: "aurora",
 };
@@ -157,7 +161,8 @@ export const CGC_CHAIN_SLUGS = {
 // Chain IDs whose native token is ETH — used to fetch the "ethereum" CoinGecko
 // price for native tokens instead of the chain-specific CoinGecko platform slug.
 export const ETH_NATIVE_CHAIN_IDS = new Set([
-  1, 10, 42161, 8453, 324, 480, 59144, 534352, 81457, 34443, 1088,
+  1, 10, 169, 255, 324, 480, 1088, 1101, 42161, 8453, 59144, 534352, 81457,
+  34443, 167000, 1313161554,
 ]);
 
 // CoinGecko native-coin slugs for chains whose native token is not ETH.
