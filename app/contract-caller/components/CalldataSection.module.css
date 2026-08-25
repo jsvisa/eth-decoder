@@ -25,7 +25,14 @@
   margin-top: 0.5rem;
 }
 
+.pasteCalldataRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
 .textarea {
+  flex: 1;
   padding: 1rem;
   font-size: 0.82rem;
   font-family: "Consolas", "Monaco", "Courier New", monospace;
@@ -67,7 +74,9 @@
 }
 
 .pasteCalldataBtn {
-  align-self: flex-start;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
   padding: 0.3rem 0.75rem;
   font-size: 0.82rem;
   font-weight: 600;
