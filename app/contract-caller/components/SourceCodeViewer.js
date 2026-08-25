@@ -48,6 +48,17 @@ function highlightSolidity(source) {
   );
 }
 
+function highlightSearchMatches(htmlLine, query, isCurrentMatch, styles_) {
+  if (!query) return htmlLine;
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(${escapedQuery})`, "gi");
+  const cls = isCurrentMatch ? styles_.searchMatchCurrent : styles_.searchMatch;
+  return htmlLine.replace(
+    re,
+    (match) => `<mark class="${cls}">${match}</mark>`,
+  );
+}
+
 export default function SourceCodeViewer({
   open,
   address,
@@ -69,6 +80,58 @@ export default function SourceCodeViewer({
   const [activeFile, setActiveFile] = useState(null);
   const [highlightLine, setHighlightLine] = useState(-1);
   const lineRefs = useRef({});
+  const searchInputRef = useRef(null);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [matchIndex, setMatchIndex] = useState(0);
+  const [showSearch, setShowSearch] = useState(false);
+
+  const sourceContent = activeFile ? sources?.[activeFile] || "" : "";
+
+  const searchMatches = useMemo(() => {
+    if (!searchQuery || !sourceContent) return [];
+    const lowerQuery = searchQuery.toLowerCase();
+    const lines = sourceContent.split("\n");
+    const matches = [];
+    lines.forEach((line, i) => {
+      let idx = 0;
+      const lowerLine = line.toLowerCase();
+      while (idx < line.length) {
+        const pos = lowerLine.indexOf(lowerQuery, idx);
+        if (pos === -1) break;
+        matches.push({ line: i + 1, col: pos, length: searchQuery.length });
+        idx = pos + 1;
+      }
+    });
+    return matches;
+  }, [searchQuery, sourceContent]);
+
+  const safeMatchIndex = useMemo(() => {
+    if (searchMatches.length === 0) return -1;
+    return Math.min(matchIndex, searchMatches.length - 1);
+  }, [matchIndex, searchMatches]);
+
+  useEffect(() => {
+    const match = safeMatchIndex >= 0 ? searchMatches[safeMatchIndex] : null;
+    if (match && lineRefs.current[match.line]) {
+      lineRefs.current[match.line]?.scrollIntoView?.({
+        block: "center",
+        behavior: "smooth",
+      });
+    }
+  }, [safeMatchIndex, searchMatches, activeFile]);
+
+  useEffect(() => {
+    setSearchQuery("");
+    setMatchIndex(0);
+    setShowSearch(false);
+  }, [activeFile]);
+
+  useEffect(() => {
+    if (showSearch && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [showSearch]);
 
   useEffect(() => {
     if (fileNames.length > 0 && !fileNames.includes(activeFile)) {
@@ -86,8 +149,6 @@ export default function SourceCodeViewer({
       setActiveFile(null);
     }
   }, [open]);
-
-  const sourceContent = activeFile ? sources?.[activeFile] || "" : "";
 
   // Highlight the entire file once, then split into lines — avoids per-line regex.
   const highlightedLines = useMemo(() => {
@@ -128,7 +189,48 @@ export default function SourceCodeViewer({
       className={styles.overlay}
       onClick={onClose}
       onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
+        if (e.key === "Escape") {
+          if (showSearch) {
+            setShowSearch(false);
+            setSearchQuery("");
+          } else {
+            onClose();
+          }
+          return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+          e.preventDefault();
+          setShowSearch(true);
+          return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === "a") {
+          e.preventDefault();
+          const selection = window.getSelection();
+          const range = document.createRange();
+          const codeContainer = e.currentTarget.querySelector(
+            `.${styles.codeContainer}`,
+          );
+          if (codeContainer) {
+            range.selectNodeContents(codeContainer);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+          return;
+        }
+        if (e.key === "F3" || (e.key === "Enter" && (e.ctrlKey || e.metaKey))) {
+          e.preventDefault();
+          if (searchMatches.length > 0) {
+            setMatchIndex((prev) => (prev + 1) % searchMatches.length);
+          }
+          return;
+        }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (searchMatches.length > 0) {
+            setMatchIndex((prev) => (prev + 1) % searchMatches.length);
+          }
+          return;
+        }
       }}
       tabIndex={-1}
     >
@@ -163,6 +265,68 @@ export default function SourceCodeViewer({
           </div>
         )}
 
+        {showSearch && (
+          <div className={styles.searchBar}>
+            <input
+              ref={searchInputRef}
+              className={styles.searchInput}
+              type="text"
+              placeholder="Find in source…"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setMatchIndex(0);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setShowSearch(false);
+                  setSearchQuery("");
+                }
+                e.stopPropagation();
+              }}
+            />
+            <span className={styles.searchCount}>
+              {searchMatches.length > 0
+                ? `${safeMatchIndex + 1} / ${searchMatches.length}`
+                : searchQuery
+                  ? "0 / 0"
+                  : ""}
+            </span>
+            <button
+              className={styles.searchNavBtn}
+              onClick={() =>
+                setMatchIndex((prev) =>
+                  prev <= 0 ? searchMatches.length - 1 : prev - 1,
+                )
+              }
+              type="button"
+              disabled={searchMatches.length === 0}
+            >
+              ▲
+            </button>
+            <button
+              className={styles.searchNavBtn}
+              onClick={() =>
+                setMatchIndex((prev) => (prev + 1) % searchMatches.length)
+              }
+              type="button"
+              disabled={searchMatches.length === 0}
+            >
+              ▼
+            </button>
+            <button
+              className={styles.searchCloseBtn}
+              onClick={() => {
+                setShowSearch(false);
+                setSearchQuery("");
+              }}
+              type="button"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         <div className={styles.body}>
           {error && !highlightedLines.length && (
             <div className={styles.statusError}>{error}</div>
@@ -191,6 +355,18 @@ export default function SourceCodeViewer({
                     ]
                       .filter(Boolean)
                       .join(" ");
+                    const currentMatch =
+                      safeMatchIndex >= 0
+                        ? searchMatches[safeMatchIndex]
+                        : null;
+                    const displayHtml = searchQuery
+                      ? highlightSearchMatches(
+                          htmlLine,
+                          searchQuery,
+                          currentMatch && currentMatch.line === lineNum,
+                          styles,
+                        )
+                      : htmlLine;
                     return (
                       <tr
                         key={i}
@@ -201,9 +377,9 @@ export default function SourceCodeViewer({
                       >
                         <td className={styles.lineNum}>{lineNum}</td>
                         <td
-                          className={styles.lineCode}
+                          className={styles.codeCell}
                           dangerouslySetInnerHTML={{
-                            __html: htmlLine || " ",
+                            __html: displayHtml || " ",
                           }}
                         />
                       </tr>

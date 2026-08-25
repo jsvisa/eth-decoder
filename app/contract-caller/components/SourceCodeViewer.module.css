@@ -203,10 +203,92 @@
   white-space: nowrap;
 }
 
-.lineCode {
+.codeCell {
   padding: 0 0.75rem;
   white-space: pre;
   color: #d4d4d4;
+}
+
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background-color: #252526;
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.searchInput {
+  flex: 1;
+  max-width: 300px;
+  padding: 0.3rem 0.5rem;
+  background-color: #3c3c3c;
+  border: 1px solid #555;
+  border-radius: 3px;
+  color: #d4d4d4;
+  font-size: 0.8rem;
+  font-family: inherit;
+  outline: none;
+}
+
+.searchInput:focus {
+  border-color: #0070f3;
+}
+
+.searchCount {
+  color: #808080;
+  font-size: 0.75rem;
+  min-width: 4rem;
+  text-align: center;
+}
+
+.searchNavBtn {
+  background: none;
+  border: 1px solid #555;
+  color: #d4d4d4;
+  cursor: pointer;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.searchNavBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.searchNavBtn:hover:not(:disabled) {
+  background-color: #3c3c3c;
+}
+
+.searchCloseBtn {
+  background: none;
+  border: none;
+  color: #808080;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0.15rem 0.3rem;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.searchCloseBtn:hover {
+  background-color: #333;
+  color: #d4d4d4;
+}
+
+.searchMatch {
+  background-color: #6b4a00;
+  color: inherit;
+  border-radius: 2px;
+}
+
+.searchMatchCurrent {
+  background-color: #e2b714;
+  color: #1e1e1e;
+  border-radius: 2px;
 }
 
 .hlComment {
