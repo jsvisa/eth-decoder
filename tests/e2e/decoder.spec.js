@@ -105,6 +105,66 @@ test.describe("Decoder page", () => {
     await page.getByRole("tab").nth(0).click();
     await expect(inputOf()).toHaveValue("0xaaaa");
   });
+
+  test("reorders tabs by dragging", async ({ page }) => {
+    await page.goto(DECODER_PATH);
+
+    const rename = async (tab, name) => {
+      await tab.dblclick();
+      await page.locator('input[class*="tabInput"]').fill(name);
+      await page.locator('input[class*="tabInput"]').press("Enter");
+    };
+
+    const tabs = page.getByRole("tab");
+    await page.getByRole("button", { name: "+ Add Tab" }).click();
+    await page.getByRole("button", { name: "+ Add Tab" }).click();
+    await expect(tabs).toHaveCount(3);
+
+    await rename(tabs.nth(0), "A");
+    await rename(tabs.nth(1), "B");
+    await rename(tabs.nth(2), "C");
+    await expect(tabs.nth(0)).toContainText("A");
+    await expect(tabs.nth(1)).toContainText("B");
+    await expect(tabs.nth(2)).toContainText("C");
+
+    // Dispatch an HTML5 drag sequence deterministically: dragstart on the
+    // source tab, dragover on the target tab, then dragend.
+    const drag = async (sourceIndex, targetIndex, ratio) => {
+      await page.evaluate(
+        ({ sourceIndex, targetIndex, ratio }) => {
+          const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+          const source = tabs[sourceIndex];
+          const target = tabs[targetIndex];
+          const rect = target.getBoundingClientRect();
+          const dataTransfer = new DataTransfer();
+          source.dispatchEvent(
+            new DragEvent("dragstart", { bubbles: true, dataTransfer }),
+          );
+          target.dispatchEvent(
+            new DragEvent("dragover", {
+              bubbles: true,
+              clientX: rect.left + rect.width * ratio,
+              clientY: rect.top + rect.height / 2,
+            }),
+          );
+          target.dispatchEvent(new DragEvent("dragend", { bubbles: true }));
+        },
+        { sourceIndex, targetIndex, ratio },
+      );
+    };
+
+    // Drag C onto the left half of A → C, A, B
+    await drag(2, 0, 0.1);
+    await expect(tabs.nth(0)).toContainText("C");
+    await expect(tabs.nth(1)).toContainText("A");
+    await expect(tabs.nth(2)).toContainText("B");
+
+    // Drag A (now index 2) onto the left half of B → C, B, A
+    await drag(2, 1, 0.1);
+    await expect(tabs.nth(0)).toContainText("C");
+    await expect(tabs.nth(1)).toContainText("B");
+    await expect(tabs.nth(2)).toContainText("A");
+  });
 });
 
 test.describe("Encode back", () => {
