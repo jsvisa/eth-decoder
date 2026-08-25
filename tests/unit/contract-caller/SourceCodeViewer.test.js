@@ -78,9 +78,9 @@ describe("SourceCodeViewer", () => {
     cleanup();
   });
 
-  it("shows the contract address", () => {
+  it("shows the contract address (truncated)", () => {
     const { container, cleanup } = renderComponent(BASE_PROPS);
-    expect(container.textContent).toContain("0x12345678");
+    expect(container.textContent).toContain("0x1234...5678");
     cleanup();
   });
 
