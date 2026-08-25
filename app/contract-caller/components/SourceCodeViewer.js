@@ -243,6 +243,51 @@ export default function SourceCodeViewer({
               </span>
             )}
             <span className={styles.address}>{address}</span>
+            <div className={styles.headerSearch}>
+              <input
+                ref={searchInputRef}
+                className={styles.searchInput}
+                type="text"
+                placeholder="Fuzzy search…"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setMatchIndex(0);
+                }}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                }}
+              />
+              <span className={styles.searchCount}>
+                {searchMatches.length > 0
+                  ? `${safeMatchIndex + 1} / ${searchMatches.length}`
+                  : searchQuery
+                    ? "0 / 0"
+                    : ""}
+              </span>
+              <button
+                className={styles.searchNavBtn}
+                onClick={() =>
+                  setMatchIndex((prev) =>
+                    prev <= 0 ? searchMatches.length - 1 : prev - 1,
+                  )
+                }
+                type="button"
+                disabled={searchMatches.length === 0}
+              >
+                ▲
+              </button>
+              <button
+                className={styles.searchNavBtn}
+                onClick={() =>
+                  setMatchIndex((prev) => (prev + 1) % searchMatches.length)
+                }
+                type="button"
+                disabled={searchMatches.length === 0}
+              >
+                ▼
+              </button>
+            </div>
           </div>
           <button className={styles.closeBtn} onClick={onClose} type="button">
             ✕
@@ -263,52 +308,6 @@ export default function SourceCodeViewer({
             ))}
           </div>
         )}
-
-        <div className={styles.searchBar}>
-          <input
-            ref={searchInputRef}
-            className={styles.searchInput}
-            type="text"
-            placeholder="Fuzzy search source…"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setMatchIndex(0);
-            }}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-            }}
-          />
-          <span className={styles.searchCount}>
-            {searchMatches.length > 0
-              ? `${safeMatchIndex + 1} / ${searchMatches.length}`
-              : searchQuery
-                ? "0 / 0"
-                : ""}
-          </span>
-          <button
-            className={styles.searchNavBtn}
-            onClick={() =>
-              setMatchIndex((prev) =>
-                prev <= 0 ? searchMatches.length - 1 : prev - 1,
-              )
-            }
-            type="button"
-            disabled={searchMatches.length === 0}
-          >
-            ▲
-          </button>
-          <button
-            className={styles.searchNavBtn}
-            onClick={() =>
-              setMatchIndex((prev) => (prev + 1) % searchMatches.length)
-            }
-            type="button"
-            disabled={searchMatches.length === 0}
-          >
-            ▼
-          </button>
-        </div>
 
         <div className={styles.body}>
           {error && !highlightedLines.length && (
