@@ -505,7 +505,9 @@ export async function POST(request) {
   const etherscanKey = apiKeys.etherscan || process.env.ETHERSCAN_API_KEY || "";
   const routescanKey = apiKeys.routescan || process.env.ROUTESCAN_API_KEY || "";
 
-  pruneExpiredResults().catch(() => {});
+  pruneExpiredResults().catch((err) =>
+    console.error("Failed to prune expired simulation results:", err),
+  );
 
   const abiCacheMap = new Map();
   const abiEntryCache = new Map();

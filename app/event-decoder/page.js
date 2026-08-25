@@ -24,7 +24,7 @@ export default function EventDecoder() {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) setHistory(JSON.parse(stored));
     } catch {
-      /* ignore */
+      console.error("Failed to load event decoder history");
     }
   }, []);
 
@@ -55,7 +55,7 @@ export default function EventDecoder() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     } catch {
-      /* ignore */
+      console.error("Failed to save event decoder history");
     }
   };
 
@@ -155,7 +155,7 @@ export default function EventDecoder() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      /* ignore */
+      console.error("Failed to copy to clipboard");
     }
   };
 

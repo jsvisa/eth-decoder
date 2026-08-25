@@ -57,7 +57,8 @@ function getCachedTokenSymbol(chain, address) {
   try {
     const key = `${TOKEN_SYMBOL_CACHE_PREFIX}${chain}-${address.toLowerCase()}`;
     return localStorage.getItem(key);
-  } catch {
+  } catch (err) {
+    console.error("Failed to read token symbol from localStorage:", err);
     return null;
   }
 }
@@ -68,7 +69,8 @@ function getCachedTokenDecimals(chain, address) {
     const key = `${TOKEN_DECIMALS_CACHE_PREFIX}${chain}-${address.toLowerCase()}`;
     const val = localStorage.getItem(key);
     return val !== null ? Number(val) : null;
-  } catch {
+  } catch (err) {
+    console.error("Failed to read token symbol from localStorage:", err);
     return null;
   }
 }
@@ -76,7 +78,8 @@ function getCachedTokenDecimals(chain, address) {
 function parseBigIntOrNull(value) {
   try {
     return BigInt(String(value));
-  } catch {
+  } catch (err) {
+    console.error("Failed to read token symbol from localStorage:", err);
     return null;
   }
 }

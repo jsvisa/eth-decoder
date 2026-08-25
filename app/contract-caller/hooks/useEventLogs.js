@@ -25,7 +25,8 @@ function decodeLog(log, parsedAbi) {
       decodedName: decoded.eventName,
       decodedArgs: decoded.args,
     };
-  } catch {
+  } catch (err) {
+    console.error("Failed to decode log:", err);
     return { ...log, decodedName: null, decodedArgs: null };
   }
 }

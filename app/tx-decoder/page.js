@@ -44,8 +44,9 @@ async function decodeInnerCallsAsync(innerCalls, setResult) {
           updated[idx] = { ...updated[idx], decoded };
           return { ...prev, inner_calls: updated };
         });
-      } catch {
+      } catch (err) {
         // best-effort — leave call as-is
+        console.error("Failed to decode inner call:", err);
       }
     }),
   );
