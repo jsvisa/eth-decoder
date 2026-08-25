@@ -3,6 +3,8 @@ import { GET } from "../../app/api/token-price/route.js";
 
 const ETH = "0x0000000000000000000000000000000000000000";
 const USDC = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+const OP_STACK_WETH = "0x4200000000000000000000000000000000000006";
+const ARB_WETH = "0x82aF49447D8a07e3BD95BD0d56f35241523fBab1";
 
 function makeRequest(params) {
   const url = new URL("http://localhost/api/token-price");
@@ -49,6 +51,48 @@ describe("GET /api/token-price", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.price).toBe(3000);
+  });
+
+  it("returns price for native ETH on Worldchain (no CGC slug)", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ethereum: { usd: 2500 } }),
+    });
+    const res = await GET(makeRequest({ token: ETH, chainId: 480 }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.price).toBe(2500);
+  });
+
+  it("returns ETH price for OP-stack WETH on Base", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ethereum: { usd: 1800 } }),
+    });
+    const res = await GET(makeRequest({ token: OP_STACK_WETH, chainId: 8453 }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.price).toBe(1800);
+  });
+
+  it("returns ETH price for Arbitrum WETH on Arbitrum", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ethereum: { usd: 1800 } }),
+    });
+    const res = await GET(makeRequest({ token: ARB_WETH, chainId: 42161 }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.price).toBe(1800);
+  });
+
+  it("returns null for WETH on an unsupported non-ETH chain", async () => {
+    const res = await GET(
+      makeRequest({ token: OP_STACK_WETH, chainId: 999999 }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.price).toBeNull();
   });
 
   it("returns price for an ERC-20 token on Ethereum", async () => {

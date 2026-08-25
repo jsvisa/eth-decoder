@@ -40,6 +40,10 @@
   flex-shrink: 0;
 }
 
+.tab[draggable="true"] {
+  cursor: grab;
+}
+
 .tab:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
@@ -85,6 +89,11 @@
 .tabClose:hover {
   opacity: 1;
   background: rgba(127, 127, 127, 0.2);
+}
+
+.dragging {
+  opacity: 0.6;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .addTab {

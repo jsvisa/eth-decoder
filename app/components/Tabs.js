@@ -80,8 +80,14 @@ export default function Tabs({
   const [activeId, setActiveId] = useState(defaultTabId);
   const [mountedIds, setMountedIds] = useState(() => new Set([defaultTabId]));
   const [editingId, setEditingId] = useState(null);
+  const [dragId, setDragId] = useState(null);
   const bootTabIdRef = useRef(defaultTabId);
   const storageLoadedRef = useRef(false);
+  // DOM refs + drag state for reordering tabs by dragging (macOS-style).
+  const tabRefs = useRef(new Map());
+  const dragIdRef = useRef(null);
+  // Snapshot of pre-move positions used to FLIP-animate tabs into place.
+  const fromRectsRef = useRef(null);
   // Ref of manually-renamed tab ids, read at call time by onRename so the
   // workspace's mount-time auto-rename can't clobber a persisted custom title
   // with a stale closure captured before persisted state was loaded.
@@ -152,6 +158,80 @@ export default function Tabs({
     setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, title } : t)));
   }, []);
 
+  const moveTabTo = useCallback((id, targetIndex) => {
+    const from = new Map();
+    tabRefs.current.forEach((el, tabId) => {
+      const r = el.getBoundingClientRect();
+      from.set(tabId, { left: r.left, top: r.top });
+    });
+    fromRectsRef.current = from;
+    setTabs((prev) => {
+      const idx = prev.findIndex((t) => t.id === id);
+      if (idx === -1 || targetIndex === idx) {
+        fromRectsRef.current = null;
+        return prev;
+      }
+      const next = [...prev];
+      const [tab] = next.splice(idx, 1);
+      next.splice(targetIndex, 0, tab);
+      return next;
+    });
+    // Animate tabs from their old positions to their new ones after the
+    // reordered layout is committed.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const prev = fromRectsRef.current;
+        fromRectsRef.current = null;
+        if (!prev) return;
+        tabRefs.current.forEach((el, tabId) => {
+          const before = prev.get(tabId);
+          if (!before) return;
+          const rect = el.getBoundingClientRect();
+          const dx = before.left - rect.left;
+          const dy = before.top - rect.top;
+          if (dx === 0 && dy === 0) return;
+          el.style.transition = "none";
+          el.style.transform = `translate(${dx}px, ${dy}px)`;
+          el.style.willChange = "transform";
+          void el.offsetHeight;
+          el.style.transition = "transform 200ms ease";
+          el.style.transform = "translate(0, 0)";
+        });
+      });
+    });
+  }, []);
+
+  // Live-reorder while dragging over a neighbouring tab.
+  const handleDragOver = useCallback(
+    (e, overId) => {
+      e.preventDefault();
+      const dragged = dragIdRef.current;
+      if (!dragged || dragged === overId) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const insertBefore = e.clientX < rect.left + rect.width / 2;
+      const draggedIdx = tabs.findIndex((t) => t.id === dragged);
+      const targetIdx = tabs.findIndex((t) => t.id === overId);
+      let insertIdx = insertBefore ? targetIdx : targetIdx + 1;
+      if (draggedIdx < insertIdx) insertIdx -= 1;
+      if (insertIdx !== draggedIdx) moveTabTo(dragged, insertIdx);
+    },
+    [tabs, moveTabTo],
+  );
+
+  const handleDragStart = useCallback((e, id) => {
+    dragIdRef.current = id;
+    setDragId(id);
+    e.dataTransfer.effectAllowed = "move";
+    try {
+      e.dataTransfer.setData("text/plain", id);
+    } catch {}
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    dragIdRef.current = null;
+    setDragId(null);
+  }, []);
+
   // Auto-rename from workspace content is skipped once the user renames a tab
   // themselves, so a custom title isn't overwritten on the next render.
   const onRename = useCallback(
@@ -181,14 +261,22 @@ export default function Tabs({
             key={tab.id}
             role="tab"
             aria-selected={tab.id === activeId}
-            className={`${styles.tab}${tab.id === activeId ? ` ${styles.active}` : ""}`}
+            className={`${styles.tab}${tab.id === activeId ? ` ${styles.active}` : ""}${dragId === tab.id ? ` ${styles.dragging}` : ""}`}
             style={
               tab.id === activeId
                 ? undefined
                 : { backgroundColor: tabColor(tab.id) }
             }
+            draggable={editingId !== tab.id}
+            ref={(el) => {
+              if (el) tabRefs.current.set(tab.id, el);
+              else tabRefs.current.delete(tab.id);
+            }}
             onClick={() => selectTab(tab.id)}
             onDoubleClick={() => setEditingId(tab.id)}
+            onDragStart={(e) => handleDragStart(e, tab.id)}
+            onDragOver={(e) => handleDragOver(e, tab.id)}
+            onDragEnd={handleDragEnd}
             title="Double-click to rename"
           >
             {editingId === tab.id ? (

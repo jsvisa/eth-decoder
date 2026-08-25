@@ -97,7 +97,9 @@ describe("Tabs", () => {
       (b) => b.textContent === "+ Add Tab",
     );
     click(container, addBtn);
-    const closeBtn = container.querySelector('[role="tab"] button');
+    const closeBtn = container.querySelector(
+      '[role="tab"] [aria-label="Close New"]',
+    );
     click(container, closeBtn);
     expect(window.confirm).toHaveBeenCalled();
     expect(container.querySelectorAll('[role="tab"]').length).toBe(1);
@@ -111,7 +113,9 @@ describe("Tabs", () => {
       (b) => b.textContent === "+ Add Tab",
     );
     click(container, addBtn);
-    const closeBtn = container.querySelector('[role="tab"] button');
+    const closeBtn = container.querySelector(
+      '[role="tab"] [aria-label="Close New"]',
+    );
     click(container, closeBtn);
     expect(window.confirm).toHaveBeenCalled();
     expect(container.querySelectorAll('[role="tab"]').length).toBe(2);
@@ -127,6 +131,82 @@ describe("Tabs", () => {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
     expect(stored.tabs.length).toBe(2);
     expect(stored.activeId).toBeTruthy();
+    cleanup();
+  });
+
+  it("reorders tabs by dragging", () => {
+    const renderTab = (tab) =>
+      React.createElement("div", { "data-testid": `tab-${tab.id}` }, tab.id);
+    const { container, cleanup } = renderTabs({ renderTab });
+    const addBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent === "+ Add Tab",
+    );
+    click(container, addBtn);
+    click(container, addBtn);
+
+    // Actual tab IDs in DOM order. Newly added tabs get UUIDs, so capture
+    // them from the rendered panels rather than assuming tab-2/tab-3.
+    const order = () =>
+      Array.from(
+        container.querySelectorAll('[role="tabpanel"] [data-testid]'),
+      ).map((el) => el.textContent.trim());
+
+    const initial = order();
+    expect(initial.length).toBe(3);
+    expect(initial[0]).toBe("tab-1");
+
+    const tabEls = () => Array.from(container.querySelectorAll('[role="tab"]'));
+
+    const stubGeometry = () =>
+      tabEls().forEach((el, i) => {
+        el.getBoundingClientRect = () => ({
+          left: i * 100,
+          top: 0,
+          width: 100,
+          height: 40,
+          right: (i + 1) * 100,
+          bottom: 40,
+        });
+      });
+
+    const dragStart = (el) => {
+      const ev = new MouseEvent("dragstart", { bubbles: true });
+      ev.dataTransfer = { effectAllowed: "", setData() {} };
+      act(() => {
+        el.dispatchEvent(ev);
+      });
+    };
+    const dragOver = (el, ratio) => {
+      const rect = el.getBoundingClientRect();
+      act(() => {
+        el.dispatchEvent(
+          new MouseEvent("dragover", {
+            bubbles: true,
+            clientX: rect.left + rect.width * ratio,
+          }),
+        );
+      });
+    };
+    const dragEnd = (el) => {
+      act(() => {
+        el.dispatchEvent(new MouseEvent("dragend", { bubbles: true }));
+      });
+    };
+
+    // Drag the last tab over the left half of the first → [c, a, b]
+    stubGeometry();
+    dragStart(tabEls()[2]);
+    dragOver(tabEls()[0], 0.1);
+    dragEnd(tabEls()[0]);
+    expect(order()).toEqual([initial[2], initial[0], initial[1]]);
+
+    // Drag tab-1 (now index 1) over the right half of the last tab → [c, b, a]
+    stubGeometry();
+    dragStart(tabEls()[1]);
+    dragOver(tabEls()[2], 0.9);
+    dragEnd(tabEls()[2]);
+    expect(order()).toEqual([initial[2], initial[1], initial[0]]);
+
     cleanup();
   });
 
