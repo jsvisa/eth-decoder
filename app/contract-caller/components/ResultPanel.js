@@ -179,7 +179,7 @@ function syntaxHighlight(obj, cssClasses) {
       } else if (/null/.test(match)) {
         cls = cssClasses.jsonNull;
       }
-      return `<span class="${cls}">${match}</span>`;
+      return `<span class="${cls}">${match.replace(/"/g, "&quot;").replace(/'/g, "&#39;")}</span>`;
     },
   );
 }

@@ -133,7 +133,7 @@ export default function EventDecoder() {
           cls = /:$/.test(match) ? styles.jsonKey : styles.jsonString;
         else if (/true|false/.test(match)) cls = styles.jsonBoolean;
         else if (/null/.test(match)) cls = styles.jsonNull;
-        return `<span class="${cls}">${match}</span>`;
+        return `<span class="${cls}">${match.replace(/"/g, "&quot;").replace(/'/g, "&#39;")}</span>`;
       },
     );
   };

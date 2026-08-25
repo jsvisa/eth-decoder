@@ -253,7 +253,7 @@ function DecoderWorkspace({ tabId, hydrateFromUrl, onRename }) {
         } else if (/null/.test(match)) {
           cls = styles.jsonNull;
         }
-        return `<span class="${cls}">${match}</span>`;
+        return `<span class="${cls}">${match.replace(/"/g, "&quot;").replace(/'/g, "&#39;")}</span>`;
       },
     );
   };
@@ -263,7 +263,9 @@ function DecoderWorkspace({ tabId, hydrateFromUrl, onRename }) {
       return str
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
     };
 
     // Process line by line
