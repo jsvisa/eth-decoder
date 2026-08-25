@@ -330,4 +330,46 @@ describe("GET /api/fetch-abi", () => {
     const body = await res.json();
     expect(body.error).toMatch(/failed to fetch abi/i);
   });
+
+  it("returns sourceCode from Etherscan for a single-file contract", async () => {
+    mockFetch([etherscanErc20]);
+
+    const res = await GET(
+      makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.sourceCode).toEqual({
+      "Contract.sol": expect.stringContaining("pragma solidity"),
+    });
+    expect(body.compilerVersion).toBe("v0.8.20+commit.a1b79de6");
+  });
+
+  it("returns sourceCode from Sourcify when not on Etherscan", async () => {
+    mockFetch([{}, sourcifyV2]);
+
+    const res = await GET(
+      makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.sourceCode).toEqual({
+      "contracts/Token.sol": expect.stringContaining("pragma solidity"),
+    });
+    expect(body.compilerVersion).toBe("0.8.19");
+  });
+
+  it("returns sourceCode from proxy implementation when detected", async () => {
+    mockFetch([etherscanProxy, etherscanImpl]);
+
+    const res = await GET(
+      makeRequest({ address: VALID_ADDRESS, etherscanApiKey: "test-key" }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.sourceCode).toEqual({
+      "Contract.sol": expect.stringContaining("ERC20Implementation"),
+    });
+    expect(body.compilerVersion).toBe("v0.8.20+commit.a1b79de6");
+  });
 });

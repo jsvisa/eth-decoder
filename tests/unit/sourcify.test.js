@@ -6,6 +6,7 @@ import {
   lookupEventSignatures,
   sigToFunctionAbi,
   sigToEventAbi,
+  fetchContractInfoFromSourcify,
 } from "../../app/utils/sourcify.js";
 import {
   serverCacheTestDir,
@@ -199,5 +200,83 @@ describe("sigToEventAbi", () => {
 
   it("sets anonymous to false", () => {
     expect(sigToEventAbi("Foo(uint256)", 0).anonymous).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchContractInfoFromSourcify
+// ---------------------------------------------------------------------------
+
+describe("fetchContractInfoFromSourcify", () => {
+  it("returns abi, contractName, sourceCode, and compilerVersion on success", async () => {
+    const mockResponse = {
+      abi: [{ type: "function", name: "transfer" }],
+      metadata: {
+        compiler: { version: "0.8.19" },
+        settings: {
+          compilationTarget: { "Token.sol": "Token" },
+        },
+      },
+      sources: {
+        "Token.sol": { content: "contract Token {}" },
+        "Lib.sol": { content: "library Lib {}" },
+      },
+    };
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    });
+
+    const result = await fetchContractInfoFromSourcify("0xabc", 1);
+    expect(result.abi).toEqual([{ type: "function", name: "transfer" }]);
+    expect(result.contractName).toBe("Token");
+    expect(result.source).toBe("sourcify");
+    expect(result.sourceCode).toEqual({
+      "Token.sol": "contract Token {}",
+      "Lib.sol": "library Lib {}",
+    });
+    expect(result.compilerVersion).toBe("0.8.19");
+  });
+
+  it("returns null when fetch fails", async () => {
+    global.fetch.mockResolvedValueOnce({ ok: false });
+    const result = await fetchContractInfoFromSourcify("0xabc", 1);
+    expect(result).toBeNull();
+  });
+
+  it("returns null when no ABI in response", async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ abi: null, metadata: {} }),
+    });
+    const result = await fetchContractInfoFromSourcify("0xabc", 1);
+    expect(result).toBeNull();
+  });
+
+  it("handles missing sources gracefully", async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        abi: [],
+        metadata: { compiler: { version: "0.8.0" } },
+      }),
+    });
+    const result = await fetchContractInfoFromSourcify("0xabc", 1);
+    expect(result.sourceCode).toBeNull();
+    expect(result.compilerVersion).toBe("0.8.0");
+  });
+
+  it("handles missing compiler version", async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        abi: [],
+        metadata: {},
+        sources: { "Main.sol": { content: "contract Main {}" } },
+      }),
+    });
+    const result = await fetchContractInfoFromSourcify("0xabc", 1);
+    expect(result.sourceCode).toEqual({ "Main.sol": "contract Main {}" });
+    expect(result.compilerVersion).toBeNull();
   });
 });

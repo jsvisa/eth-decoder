@@ -4,6 +4,9 @@ import {
   getCachedAbi,
   setCachedAbi,
   buildAbiCacheFromStorage,
+  getSourceCacheKey,
+  getCachedSource,
+  setCachedSource,
 } from "../../app/utils/abiCache.js";
 
 // jsdom provides localStorage. Clear between tests.
@@ -80,5 +83,56 @@ describe("buildAbiCacheFromStorage", () => {
   it("does not throw on malformed JSON entries", () => {
     localStorage.setItem("abi-ethereum-0xbad", "not-valid-json{{{");
     expect(() => buildAbiCacheFromStorage("ethereum")).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Source code cache
+// ---------------------------------------------------------------------------
+
+describe("getSourceCacheKey", () => {
+  it("produces the correct src-{chain}-{address} format", () => {
+    expect(getSourceCacheKey("ethereum", "0xAbCd")).toBe("src-ethereum-0xabcd");
+  });
+
+  it("lowercases the address", () => {
+    expect(getSourceCacheKey("base", "0xDEADBEEF")).toBe("src-base-0xdeadbeef");
+  });
+});
+
+describe("setCachedSource / getCachedSource", () => {
+  const sources = {
+    "Token.sol": "contract Token {}",
+    "Lib.sol": "library Lib {}",
+  };
+
+  it("round-trips source code through localStorage", () => {
+    setCachedSource("ethereum", "0x1234", sources);
+    const result = getCachedSource("ethereum", "0x1234");
+    expect(result.sources).toEqual(sources);
+    expect(result.compilerVersion).toBeNull();
+  });
+
+  it("stores compiler version", () => {
+    setCachedSource("base", "0xabcd", sources, "0.8.19");
+    const result = getCachedSource("base", "0xabcd");
+    expect(result.sources).toEqual(sources);
+    expect(result.compilerVersion).toBe("0.8.19");
+  });
+
+  it("stores a timestamp", () => {
+    const before = Date.now();
+    setCachedSource("ethereum", "0x1234", sources);
+    const result = getCachedSource("ethereum", "0x1234");
+    expect(result.timestamp).toBeGreaterThanOrEqual(before);
+  });
+
+  it("returns null for a missing key", () => {
+    expect(getCachedSource("ethereum", "0xunknown")).toBeNull();
+  });
+
+  it("does not mix with ABI cache", () => {
+    setCachedSource("ethereum", "0x1234", sources);
+    expect(getCachedAbi("ethereum", "0x1234")).toBeNull();
   });
 });

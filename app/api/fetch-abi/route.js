@@ -469,6 +469,16 @@ async function mapWithConcurrency(items, limit, fn) {
   return results;
 }
 
+// Merge multiple source code maps. Later sources overwrite earlier ones on
+// filename collision (implementation source should take priority).
+function mergeSources(...sourceList) {
+  const merged = {};
+  for (const sources of sourceList) {
+    if (sources) Object.assign(merged, sources);
+  }
+  return Object.keys(merged).length > 0 ? merged : null;
+}
+
 /**
  * Fetch and resolve the ABI for a contract address.
  * Handles proxy detection and ABI merging.
@@ -571,7 +581,11 @@ export async function fetchAbi(
       })),
       source: proxyInfo.source,
       implSource: implInfo?.source ?? null,
-      sourceCode: implInfo?.sourceCode || proxyInfo.sourceCode || null,
+      sourceCode: mergeSources(
+        proxyInfo.sourceCode,
+        facetSources,
+        implInfo?.sourceCode,
+      ),
       compilerVersion:
         implInfo?.compilerVersion || proxyInfo.compilerVersion || null,
     };
@@ -586,7 +600,7 @@ export async function fetchAbi(
       implAddress,
       source: proxyInfo.source,
       implSource: implInfo.source,
-      sourceCode: implInfo.sourceCode || proxyInfo.sourceCode || null,
+      sourceCode: mergeSources(proxyInfo.sourceCode, implInfo?.sourceCode),
       compilerVersion:
         implInfo.compilerVersion || proxyInfo.compilerVersion || null,
     };
