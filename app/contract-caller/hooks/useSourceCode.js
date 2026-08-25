@@ -121,7 +121,12 @@ export function useSourceCode(chain, address) {
         }
         return data;
       })
-      .catch((err) => err)
+      .catch((err) => {
+        if (err instanceof SyntaxError) {
+          return new Error("Failed to parse server response");
+        }
+        return err;
+      })
       .finally(() => {
         FETCHING.delete(key);
       });

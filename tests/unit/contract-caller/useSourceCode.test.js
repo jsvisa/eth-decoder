@@ -1,10 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
-import { useSourceCode } from "../../../app/contract-caller/hooks/useSourceCode.js";
 
-beforeEach(() => {
+let useSourceCode;
+
+beforeEach(async () => {
   localStorage.clear();
   vi.restoreAllMocks();
+  vi.resetModules();
+  const mod = await import(
+    "../../../app/contract-caller/hooks/useSourceCode.js"
+  );
+  useSourceCode = mod.useSourceCode;
 });
 
 describe("useSourceCode", () => {
@@ -106,5 +112,65 @@ describe("useSourceCode", () => {
     expect(cached.sources).toEqual({ "C.sol": "contract C {}" });
     expect(cached.compilerVersion).toBe("0.8.0");
     expect(cached.timestamp).toBeGreaterThan(0);
+  });
+
+  it("dedup path: both instances receive same error message on failure", async () => {
+    let rejectFetch;
+    const fetchPromise = new Promise((_, reject) => {
+      rejectFetch = reject;
+    });
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(fetchPromise));
+
+    const { result: result1 } = renderHook(() =>
+      useSourceCode("ethereum", "0xdedupErr"),
+    );
+    const { result: result2 } = renderHook(() =>
+      useSourceCode("ethereum", "0xdedupErr"),
+    );
+
+    expect(result1.current.loading).toBe(true);
+    expect(result2.current.loading).toBe(true);
+
+    rejectFetch(new Error("Network error"));
+
+    await waitFor(() => expect(result1.current.loading).toBe(false));
+    await waitFor(() => expect(result2.current.loading).toBe(false));
+
+    expect(result1.current.error).toBe("Network error");
+    expect(result2.current.error).toBe("Network error");
+  });
+
+  it("dedup path: both instances receive same source code on success", async () => {
+    let resolveFetch;
+    const fetchPromise = new Promise((resolve) => {
+      resolveFetch = resolve;
+    });
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(fetchPromise));
+
+    const { result: result1 } = renderHook(() =>
+      useSourceCode("ethereum", "0xdedupOk"),
+    );
+    const { result: result2 } = renderHook(() =>
+      useSourceCode("ethereum", "0xdedupOk"),
+    );
+
+    expect(result1.current.loading).toBe(true);
+    expect(result2.current.loading).toBe(true);
+
+    resolveFetch({
+      ok: true,
+      json: async () => ({
+        sourceCode: { "Dedup.sol": "contract Dedup {}" },
+        compilerVersion: "0.8.21",
+      }),
+    });
+
+    await waitFor(() => expect(result1.current.loading).toBe(false));
+    await waitFor(() => expect(result2.current.loading).toBe(false));
+
+    expect(result1.current.sources).toEqual({ "Dedup.sol": "contract Dedup {}" });
+    expect(result2.current.sources).toEqual({ "Dedup.sol": "contract Dedup {}" });
+    expect(result1.current.compilerVersion).toBe("0.8.21");
+    expect(result2.current.compilerVersion).toBe("0.8.21");
   });
 });
