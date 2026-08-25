@@ -198,11 +198,11 @@ export default function SourceCodeViewer({
   }, [sources, functionName]);
 
   useEffect(() => {
-    if (foundFile && foundFile !== activeFile) {
+    if (foundFile) {
       setActiveFile(foundFile);
     }
     setHighlightLine(foundLine);
-  }, [foundFile, foundLine, activeFile]);
+  }, [foundFile, foundLine]);
 
   useEffect(() => {
     if (highlightLine > 0 && lineRefs.current[highlightLine]) {
@@ -229,14 +229,6 @@ export default function SourceCodeViewer({
           setActiveFile(result.file);
         }
         setHighlightLine(result.line);
-        setTimeout(() => {
-          if (result.line > 0 && lineRefs.current[result.line]) {
-            lineRefs.current[result.line]?.scrollIntoView?.({
-              block: "center",
-              behavior: "smooth",
-            });
-          }
-        }, 50);
       }
     },
     [sources, activeFile],
