@@ -8,6 +8,8 @@ import {
   importContractsFromCSV,
 } from "../utils/contractsCache";
 import { CHAIN_META } from "../utils/chains";
+import { getCachedSource } from "../utils/abiCache";
+import SourceCodeViewer from "../contract-caller/components/SourceCodeViewer";
 
 const CUSTOM_CHAINS_KEY = "custom_chains";
 
@@ -99,6 +101,7 @@ const getCachedContracts = (customChains) => {
           implAddress: cached.implAddress,
           isProxy: cached.isProxy,
           timestamp: cached.timestamp,
+          hasSource: !!getCachedSource(chain, address),
           functionCount:
             cached.abi?.filter((item) => item.type === "function").length || 0,
           eventCount:
@@ -133,6 +136,7 @@ export default function Contracts() {
   const [error, setError] = useState(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importOverwrite, setImportOverwrite] = useState(false);
+  const [sourceViewer, setSourceViewer] = useState(null);
   const fileInputRef = useRef(null);
 
   // Load contracts and custom chains on mount
@@ -481,6 +485,18 @@ export default function Contracts() {
                         Open
                       </a>
                       <button
+                        onClick={() =>
+                          setSourceViewer({
+                            chain: contract.chain,
+                            address: contract.address,
+                          })
+                        }
+                        className={styles.sourceButton}
+                        title="View source code"
+                      >
+                        Source
+                      </button>
+                      <button
                         onClick={() => handleDelete(contract)}
                         className={styles.deleteButton}
                         title="Delete cached ABI"
@@ -552,6 +568,15 @@ export default function Contracts() {
             </div>
           </div>
         </div>
+      )}
+
+      {sourceViewer && (
+        <SourceCodeViewer
+          open={true}
+          address={sourceViewer.address}
+          chain={sourceViewer.chain}
+          onClose={() => setSourceViewer(null)}
+        />
       )}
     </main>
   );
