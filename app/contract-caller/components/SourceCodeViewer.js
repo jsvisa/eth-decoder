@@ -4,14 +4,16 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useSourceCode } from "../hooks/useSourceCode";
 import styles from "./SourceCodeViewer.module.css";
 
+function regexEscape(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function findFunctionLine(source, functionName) {
   if (!functionName) return -1;
   const baseName = functionName.split("(")[0];
   if (!baseName) return -1;
   const lines = source.split("\n");
-  const pattern = new RegExp(
-    `\\bfunction\\s+${baseName.replace(/[.*+?^${}()|[\]\\]/g, "\\$\\(")}\\s*\\(`,
-  );
+  const pattern = new RegExp(`\\bfunction\\s+${regexEscape(baseName)}\\s*\\(`);
   for (let i = 0; i < lines.length; i++) {
     if (pattern.test(lines[i])) return i + 1;
   }
@@ -168,17 +170,21 @@ export default function SourceCodeViewer({
         )}
 
         <div className={styles.body}>
-          {loading && (
-            <div className={styles.status}>
-              <span className={styles.spinner} />
-              Loading source code...
-            </div>
+          {error && !lines.length && (
+            <div className={styles.statusError}>{error}</div>
           )}
-          {error && <div className={styles.statusError}>{error}</div>}
-          {!loading && !error && lines.length > 0 && (
+          {lines.length > 0 || loading ? (
             <div className={styles.codeContainer}>
               <table className={styles.codeTable}>
                 <tbody>
+                  {loading && (
+                    <tr>
+                      <td colSpan={2} className={styles.loadingLine}>
+                        <span className={styles.spinner} /> Loading source
+                        code...
+                      </td>
+                    </tr>
+                  )}
                   {lines.map((line, i) => {
                     const lineNum = i + 1;
                     const isFunctionLine = lineNum === highlightLine;
@@ -212,9 +218,10 @@ export default function SourceCodeViewer({
                 </tbody>
               </table>
             </div>
-          )}
-          {!loading && !error && lines.length === 0 && (
-            <div className={styles.status}>No source code available</div>
+          ) : (
+            !error && (
+              <div className={styles.status}>No source code available</div>
+            )
           )}
         </div>
       </div>

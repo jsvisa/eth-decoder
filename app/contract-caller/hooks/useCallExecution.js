@@ -450,17 +450,15 @@ export function useCallExecution({
               : null;
           });
 
-          // Resolve source lines for every trace node using Sourcify source maps
+          // Resolve source lines and pre-fetch source code in background.
+          // The source viewer opens instantly from localStorage cache.
           if (chainIdForSimulation) {
-            await resolveSourceLinesForTrace(
+            resolveSourceLinesForTrace(
               data.callTrace,
               chain,
               chainIdForSimulation,
-            );
+            ).catch(() => {});
           }
-
-          // Pre-fetch and cache source code for all trace addresses in the
-          // background so the source viewer loads instantly when the user clicks 🔍.
           prefetchSourceCodeForTrace(data.callTrace, chain).catch(() => {});
         }
 
@@ -695,7 +693,7 @@ async function resolveSourceLinesForTrace(callTrace, chain, chainId) {
 
   const sourceMapsByAddr = new Map();
 
-  for (const addr of addresses) {
+  const fetchPromises = [...addresses].map(async (addr) => {
     const cacheKey = `${chainId}-${addr}`;
     let sourceMapData = SOURCE_MAP_CACHE.get(cacheKey);
 
@@ -719,7 +717,9 @@ async function resolveSourceLinesForTrace(callTrace, chain, chainId) {
         parseSourceMap(sourceMapData.sourceMap),
       );
     }
-  }
+  });
+
+  await Promise.all(fetchPromises);
 
   if (sourceMapsByAddr.size === 0) return;
 
@@ -757,25 +757,27 @@ function resolveSourceLinesForNode(node, sourceMapsByAddr) {
 async function prefetchSourceCodeForTrace(callTrace, chain) {
   if (!callTrace) return;
   const addresses = collectAllCallAddresses(callTrace);
-  for (const addr of addresses) {
-    if (getCachedSource(chain, addr)) continue;
-    try {
-      const res = await fetch(
-        `/api/fetch-source?address=${addr}&chain=${chain}`,
-      );
-      if (res.ok) {
-        const data = await res.json();
-        if (data.sourceCode) {
-          setCachedSource(
-            chain,
-            addr,
-            data.sourceCode,
-            data.compilerVersion || null,
-          );
+  await Promise.all(
+    [...addresses].map(async (addr) => {
+      if (getCachedSource(chain, addr)) return;
+      try {
+        const res = await fetch(
+          `/api/fetch-source?address=${addr}&chain=${chain}`,
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (data.sourceCode) {
+            setCachedSource(
+              chain,
+              addr,
+              data.sourceCode,
+              data.compilerVersion || null,
+            );
+          }
         }
+      } catch {
+        // Background fetch, ignore errors
       }
-    } catch {
-      // Background fetch, ignore errors
-    }
-  }
+    }),
+  );
 }

@@ -144,7 +144,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .codeContainer {
@@ -180,6 +182,13 @@
 
 .codeLineExecuted:hover {
   background-color: #1a3a2a;
+}
+
+.loadingLine {
+  padding: 1rem 0.75rem;
+  color: #808080;
+  font-size: 0.85rem;
+  text-align: center;
 }
 
 .lineNum {
