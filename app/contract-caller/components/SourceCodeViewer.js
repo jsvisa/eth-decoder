@@ -2,7 +2,10 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useSourceCode } from "../hooks/useSourceCode";
-import { findFunctionSource } from "../../utils/solidityParser";
+import {
+  findFunctionSource,
+  buildFunctionNameSet,
+} from "../../utils/solidityParser";
 import { BUILT_IN_CHAIN_IDS } from "../../utils/chains";
 import { getCachedAbi } from "../../utils/abiCache";
 import JSZip from "jszip";
@@ -54,6 +57,21 @@ function highlightSolidity(source) {
 function highlightSearchMatch(htmlLine, isCurrentMatch, styles_) {
   const cls = isCurrentMatch ? styles_.searchMatchCurrent : styles_.searchMatch;
   return `<mark class="${cls}">${htmlLine}</mark>`;
+}
+
+function makeFunctionNamesClickable(html, fnNameSet, callLinkClass) {
+  if (!fnNameSet || fnNameSet.size === 0) return html;
+  const names = [...fnNameSet].sort((a, b) => b.length - a.length);
+  const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const nameRe = new RegExp(`\\b(${escaped.join("|")})\\b`, "g");
+  return html.replace(/(<[^>]*>)|([^<]+)/g, (match, tag, text) => {
+    if (tag) return tag;
+    return text.replace(
+      nameRe,
+      (fnName) =>
+        `<span class="${callLinkClass}" data-fn-name="${fnName}">${fnName}</span>`,
+    );
+  });
 }
 
 export default function SourceCodeViewer({
@@ -157,11 +175,18 @@ export default function SourceCodeViewer({
   }, [open]);
 
   // Highlight the entire file once, then split into lines — avoids per-line regex.
+  const fnNameSet = useMemo(() => buildFunctionNameSet(sources), [sources]);
+
   const highlightedLines = useMemo(() => {
     if (!sourceContent) return [];
     const html = highlightSolidity(sourceContent);
-    return html.split("\n");
-  }, [sourceContent]);
+    const withLinks = makeFunctionNamesClickable(
+      html,
+      fnNameSet,
+      styles.callLink,
+    );
+    return withLinks.split("\n");
+  }, [sourceContent, fnNameSet]);
 
   // Memoize function search via Solidity AST parser — O(1) lookup after first parse.
   const { foundFile, foundLine } = useMemo(() => {
@@ -189,6 +214,33 @@ export default function SourceCodeViewer({
   }, [highlightLine, activeFile]);
 
   const [downloading, setDownloading] = useState(false);
+
+  const handleCodeClick = useCallback(
+    (e) => {
+      const target = e.target.closest("[data-fn-name]");
+      if (!target) return;
+
+      const fnName = target.getAttribute("data-fn-name");
+      if (!fnName || !sources) return;
+
+      const result = findFunctionSource(fnName, sources);
+      if (result) {
+        if (result.file !== activeFile) {
+          setActiveFile(result.file);
+        }
+        setHighlightLine(result.line);
+        setTimeout(() => {
+          if (result.line > 0 && lineRefs.current[result.line]) {
+            lineRefs.current[result.line]?.scrollIntoView?.({
+              block: "center",
+              behavior: "smooth",
+            });
+          }
+        }, 50);
+      }
+    },
+    [sources, activeFile],
+  );
 
   const handleDownload = useCallback(async () => {
     if (!sources || downloading) return;
@@ -415,7 +467,7 @@ export default function SourceCodeViewer({
             <div className={styles.statusError}>{error}</div>
           )}
           {highlightedLines.length > 0 || loading ? (
-            <div className={styles.codeContainer}>
+            <div className={styles.codeContainer} onClick={handleCodeClick}>
               <table className={styles.codeTable}>
                 <tbody>
                   {loading && (

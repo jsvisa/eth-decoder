@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildFunctionMap,
+  buildFunctionNameSet,
   findFunctionSource,
 } from "../../app/utils/solidityParser.js";
 
@@ -86,5 +87,31 @@ describe("findFunctionSource", () => {
 
   it("returns null for null sources", () => {
     expect(findFunctionSource("transfer()", null)).toBeNull();
+  });
+});
+
+describe("buildFunctionNameSet", () => {
+  it("returns empty set for null sources", () => {
+    const s = buildFunctionNameSet(null);
+    expect(s).toBeInstanceOf(Set);
+    expect(s.size).toBe(0);
+  });
+
+  it("builds a set of function names from sources", () => {
+    const sources = {
+      "Token.sol":
+        "contract Token {\n  function transfer(address to, uint256 amount) external {}\n  function balanceOf(address account) external view returns (uint256) {}\n}",
+    };
+    const s = buildFunctionNameSet(sources);
+    expect(s.has("transfer")).toBe(true);
+    expect(s.has("balanceOf")).toBe(true);
+    expect(s.has("unknown")).toBe(false);
+  });
+
+  it("caches results", () => {
+    const sources = { "A.sol": "contract A { function f() external {} }" };
+    const s1 = buildFunctionNameSet(sources);
+    const s2 = buildFunctionNameSet(sources);
+    expect(s1).toBe(s2);
   });
 });

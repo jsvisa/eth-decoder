@@ -342,6 +342,19 @@
   color: #b5cea8;
 }
 
+.callLink {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: #569cd6;
+  text-underline-offset: 2px;
+  color: #d4d4d4;
+  transition: color 0.15s;
+}
+
+.callLink:hover {
+  color: #569cd6;
+}
+
 .hlNatspec {
   color: #6a9955;
   font-style: italic;

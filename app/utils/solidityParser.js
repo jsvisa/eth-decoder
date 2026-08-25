@@ -1,4 +1,5 @@
 const cache = new Map();
+const nameSetCache = new Map();
 
 // Matches a Solidity definition at the start of a (trimmed) line:
 //   function foo(...)  |  event Foo(...)  |  error Foo(...)
@@ -37,4 +38,20 @@ export function findFunctionSource(functionName, sources) {
 
   const map = buildFunctionMap(sources);
   return map.get(baseName) || null;
+}
+
+export function buildFunctionNameSet(sources) {
+  if (!sources) return new Set();
+
+  const cacheKey = Object.keys(sources)
+    .sort()
+    .map((k) => `${k}:${sources[k].length}`)
+    .join(",");
+  const cached = nameSetCache.get(cacheKey);
+  if (cached) return cached;
+
+  const map = buildFunctionMap(sources);
+  const set = new Set(map ? [...map.keys()] : []);
+  nameSetCache.set(cacheKey, set);
+  return set;
 }
