@@ -103,6 +103,22 @@
   gap: 1rem;
 }
 
+.argsToggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.argsToggle:hover {
+  color: var(--text-primary);
+}
+
 .readBlockInline {
   display: flex;
   align-items: center;

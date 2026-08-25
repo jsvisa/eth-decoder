@@ -36,7 +36,7 @@ const functionSelectionState = {
   setArgs: vi.fn(),
   fieldErrors: {},
   setFieldErrors: vi.fn(),
-  pasteCalldataExpanded: false,
+  pasteCalldataExpanded: true,
   setPasteCalldataExpanded: vi.fn(),
   pasteCalldataValue: "",
   setPasteCalldataValue: vi.fn(),
