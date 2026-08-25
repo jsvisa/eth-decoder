@@ -141,9 +141,7 @@ export default function SourceCodeViewer({
                 solc {compilerVersion}
               </span>
             )}
-            <span className={styles.address}>
-              {address?.slice(0, 10)}...{address?.slice(-8)}
-            </span>
+            <span className={styles.address}>{address}</span>
           </div>
           <button className={styles.closeBtn} onClick={onClose} type="button">
             ✕
