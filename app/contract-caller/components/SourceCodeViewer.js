@@ -107,31 +107,30 @@ export default function SourceCodeViewer({
   }, [open]);
 
   const sourceContent = activeFile ? sources?.[activeFile] || "" : "";
-  const lines = useMemo(
-    () => (sourceContent ? sourceContent.split("\n") : []),
-    [sourceContent],
-  );
 
-  useEffect(() => {
-    if (!functionName || !sources) {
-      setHighlightLine(-1);
-      return;
-    }
-    let foundFile = null;
-    let foundLine = -1;
+  // Highlight the entire file once, then split into lines — avoids per-line regex.
+  const highlightedLines = useMemo(() => {
+    if (!sourceContent) return [];
+    const html = highlightSolidity(sourceContent);
+    return html.split("\n");
+  }, [sourceContent]);
+
+  // Memoize function search: only recompute when sources or functionName changes.
+  const { foundFile, foundLine } = useMemo(() => {
+    if (!functionName || !sources) return { foundFile: null, foundLine: -1 };
     for (const [file, content] of Object.entries(sources)) {
       const line = findFunctionLine(content, functionName);
-      if (line > 0) {
-        foundFile = file;
-        foundLine = line;
-        break;
-      }
+      if (line > 0) return { foundFile: file, foundLine: line };
     }
+    return { foundFile: null, foundLine: -1 };
+  }, [sources, functionName]);
+
+  useEffect(() => {
     if (foundFile && foundFile !== activeFile) {
       setActiveFile(foundFile);
     }
     setHighlightLine(foundLine);
-  }, [sources, functionName]);
+  }, [foundFile, foundLine, activeFile]);
 
   useEffect(() => {
     if (highlightLine > 0 && lineRefs.current[highlightLine]) {
@@ -187,10 +186,10 @@ export default function SourceCodeViewer({
         )}
 
         <div className={styles.body}>
-          {error && !lines.length && (
+          {error && !highlightedLines.length && (
             <div className={styles.statusError}>{error}</div>
           )}
-          {lines.length > 0 || loading ? (
+          {highlightedLines.length > 0 || loading ? (
             <div className={styles.codeContainer}>
               <table className={styles.codeTable}>
                 <tbody>
@@ -202,7 +201,7 @@ export default function SourceCodeViewer({
                       </td>
                     </tr>
                   )}
-                  {lines.map((line, i) => {
+                  {highlightedLines.map((htmlLine, i) => {
                     const lineNum = i + 1;
                     const isFunctionLine = lineNum === highlightLine;
                     const isExecutedLine =
@@ -226,7 +225,7 @@ export default function SourceCodeViewer({
                         <td
                           className={styles.lineCode}
                           dangerouslySetInnerHTML={{
-                            __html: line ? highlightSolidity(line) : " ",
+                            __html: htmlLine || " ",
                           }}
                         />
                       </tr>
