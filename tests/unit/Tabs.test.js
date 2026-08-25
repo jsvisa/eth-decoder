@@ -144,16 +144,16 @@ describe("Tabs", () => {
     click(container, addBtn);
     click(container, addBtn);
 
-    // Get the tab IDs in order by looking at the tab elements themselves
-    const getTabIds = () =>
-      Array.from(container.querySelectorAll('[role="tab"]')).map(
-        (tabEl) => tabEl.textContent.trim().split("\n")[0],
-      );
+    // Actual tab IDs in DOM order. Newly added tabs get UUIDs, so capture
+    // them from the rendered panels rather than assuming tab-2/tab-3.
+    const order = () =>
+      Array.from(
+        container.querySelectorAll('[role="tabpanel"] [data-testid]'),
+      ).map((el) => el.textContent.trim());
 
-    // After initial setup: tab-1, [new UUID], [new UUID]
-    const initialIds = getTabIds();
-    expect(initialIds.length).toBe(3);
-    expect(initialIds[0]).toBe("tab-1");
+    const initial = order();
+    expect(initial.length).toBe(3);
+    expect(initial[0]).toBe("tab-1");
 
     const tabEls = () => Array.from(container.querySelectorAll('[role="tab"]'));
 
@@ -176,10 +176,14 @@ describe("Tabs", () => {
         el.dispatchEvent(ev);
       });
     };
-    const dragOver = (el, clientX) => {
+    const dragOver = (el, ratio) => {
+      const rect = el.getBoundingClientRect();
       act(() => {
         el.dispatchEvent(
-          new MouseEvent("dragover", { bubbles: true, clientX }),
+          new MouseEvent("dragover", {
+            bubbles: true,
+            clientX: rect.left + rect.width * ratio,
+          }),
         );
       });
     };
@@ -189,25 +193,19 @@ describe("Tabs", () => {
       });
     };
 
-    // Drag tab at index 2 over the left half of tab at index 0
+    // Drag the last tab over the left half of the first → [c, a, b]
     stubGeometry();
     dragStart(tabEls()[2]);
-    dragOver(tabEls()[0], 0);
+    dragOver(tabEls()[0], 0.1);
     dragEnd(tabEls()[0]);
-    let ids = getTabIds();
-    expect(ids[0]).toBe(initialIds[2]);
-    expect(ids[1]).toBe("tab-1");
-    expect(ids[2]).toBe(initialIds[1]);
+    expect(order()).toEqual([initial[2], initial[0], initial[1]]);
 
-    // Drag tab at current index 1 over the right half of tab at index 0
+    // Drag tab-1 (now index 1) over the right half of the last tab → [c, b, a]
     stubGeometry();
     dragStart(tabEls()[1]);
-    dragOver(tabEls()[0], 100);
-    dragEnd(tabEls()[0]);
-    ids = getTabIds();
-    expect(ids[0]).toBe(initialIds[2]);
-    expect(ids[1]).toBe(initialIds[1]);
-    expect(ids[2]).toBe("tab-1");
+    dragOver(tabEls()[2], 0.9);
+    dragEnd(tabEls()[2]);
+    expect(order()).toEqual([initial[2], initial[1], initial[0]]);
 
     cleanup();
   });
