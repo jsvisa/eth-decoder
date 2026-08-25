@@ -1224,10 +1224,7 @@ describe("resolveTraceSourceLines", () => {
 describe("redecodeCallTrace", () => {
   it("re-decodes revert reasons for nodes with error but no errorReason", () => {
     const abiCache = new Map([
-      [
-        "0x1234567890123456789012345678901234567890",
-        [...UNAUTHORIZED_ABI],
-      ],
+      ["0x1234567890123456789012345678901234567890", [...UNAUTHORIZED_ABI]],
     ]);
     const trace = {
       error: "revert",
