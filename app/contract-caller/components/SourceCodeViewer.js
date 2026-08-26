@@ -254,7 +254,7 @@ export default function SourceCodeViewer({
             fnName,
             file: result.file,
             line: result.line,
-            signature: result.signature,
+            body: result.body,
             x: rect.left + rect.width / 2,
             y: rect.top - 8,
           });
@@ -573,7 +573,7 @@ export default function SourceCodeViewer({
               </span>
             </div>
             <div className={styles.tooltipSignature}>
-              {hoverInfo.signature}
+              {hoverInfo.body}
             </div>
           </div>
         )}

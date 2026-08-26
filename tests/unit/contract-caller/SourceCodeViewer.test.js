@@ -189,4 +189,30 @@ describe("SourceCodeViewer", () => {
     cleanup();
     vi.useRealTimers();
   });
+
+  it("shows the full multi-line function body in the hover tooltip", () => {
+    vi.useFakeTimers();
+    mockHookValue = {
+      sources: {
+        "Token.sol":
+          "contract Token {\n  function transfer(address to, uint256 amount) external {\n    require(to != address(0));\n    balances[to] += amount;\n  }\n}",
+      },
+      compilerVersion: "0.8.19",
+      loading: false,
+      error: null,
+    };
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    const fnSpan = container.querySelector("[data-fn-name]");
+    expect(fnSpan).not.toBeNull();
+    act(() => {
+      fnSpan.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(container.textContent).toContain("require(to != address(0))");
+    expect(container.textContent).toContain("balances[to] += amount");
+    cleanup();
+    vi.useRealTimers();
+  });
 });
