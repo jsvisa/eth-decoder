@@ -572,9 +572,7 @@ export default function SourceCodeViewer({
                 {hoverInfo.file}:{hoverInfo.line}
               </span>
             </div>
-            <div className={styles.tooltipSignature}>
-              {hoverInfo.body}
-            </div>
+            <div className={styles.tooltipSignature} dangerouslySetInnerHTML={{ __html: highlightSolidity(hoverInfo.body) }} />
           </div>
         )}
       </div>

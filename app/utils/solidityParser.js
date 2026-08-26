@@ -22,11 +22,11 @@ export function buildFunctionMap(sources) {
     for (let i = 0; i < lines.length; i++) {
       const m = DEF_RE.exec(lines[i].trim());
       if (m && !map.has(m[1])) {
-        const bodyLines = [lines[i].trim()];
+        const bodyLines = [lines[i]];
         let braceDepth = (lines[i].match(/{/g) || []).length - (lines[i].match(/}/g) || []).length;
         let j = i + 1;
         while (braceDepth > 0 && j < lines.length) {
-          bodyLines.push(lines[j].trim());
+          bodyLines.push(lines[j]);
           braceDepth += (lines[j].match(/{/g) || []).length;
           braceDepth -= (lines[j].match(/}/g) || []).length;
           j++;
