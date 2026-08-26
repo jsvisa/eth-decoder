@@ -297,7 +297,7 @@ export default function SourceCodeViewer({
   );
 
   const handleCodeMouseOut = useCallback(
-    (e) => {
+    (_e) => {
       if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
       if (!hoverInfo) return;
       if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
@@ -317,7 +317,7 @@ export default function SourceCodeViewer({
   }, []);
 
   const handleTooltipClick = useCallback(
-    (e) => {
+    (_e) => {
       if (!hoverInfo || !sources) return;
       const result = findFunctionSource(hoverInfo.fnName, sources);
       if (result) {
