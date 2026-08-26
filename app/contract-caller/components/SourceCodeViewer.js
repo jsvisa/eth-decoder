@@ -217,37 +217,47 @@ export default function SourceCodeViewer({
 
   const [hoverInfo, setHoverInfo] = useState(null);
   const hoverTimerRef = useRef(null);
+  const hoverCloseTimerRef = useRef(null);
   const tooltipRef = useRef(null);
 
   const [navHistory, setNavHistory] = useState([]);
   const [navIndex, setNavIndex] = useState(-1);
+  const navIndexRef = useRef(-1);
+  const navHistoryRef = useRef([]);
 
   const pushNav = useCallback((file, line) => {
-    setNavHistory((prev) => {
-      const next = prev.slice(0, navIndex + 1);
-      next.push({ file, line });
-      return next;
-    });
-    setNavIndex((prev) => prev + 1);
-  }, [navIndex]);
+    const idx = navIndexRef.current;
+    const hist = navHistoryRef.current;
+    const next = hist.slice(0, idx + 1);
+    next.push({ file, line });
+    navHistoryRef.current = next;
+    navIndexRef.current = idx + 1;
+    setNavHistory(next);
+    setNavIndex(idx + 1);
+  }, []);
 
   const goBack = useCallback(() => {
-    if (navIndex <= 0) return;
-    const newIndex = navIndex - 1;
-    const entry = navHistory[newIndex];
+    const idx = navIndexRef.current;
+    if (idx <= 0) return;
+    const newIndex = idx - 1;
+    const entry = navHistoryRef.current[newIndex];
+    navIndexRef.current = newIndex;
     setNavIndex(newIndex);
     if (entry.file !== activeFile) setActiveFile(entry.file);
     setHighlightLine(entry.line);
-  }, [navIndex, navHistory, activeFile]);
+  }, [activeFile]);
 
   const goForward = useCallback(() => {
-    if (navIndex >= navHistory.length - 1) return;
-    const newIndex = navIndex + 1;
-    const entry = navHistory[newIndex];
+    const idx = navIndexRef.current;
+    const hist = navHistoryRef.current;
+    if (idx >= hist.length - 1) return;
+    const newIndex = idx + 1;
+    const entry = hist[newIndex];
+    navIndexRef.current = newIndex;
     setNavIndex(newIndex);
     if (entry.file !== activeFile) setActiveFile(entry.file);
     setHighlightLine(entry.line);
-  }, [navIndex, navHistory, activeFile]);
+  }, [activeFile]);
 
   const handleCodeClick = useCallback(
     (e) => {
@@ -256,8 +266,6 @@ export default function SourceCodeViewer({
 
       const fnName = target.getAttribute("data-fn-name");
       if (!fnName || !sources) return;
-
-      if (!e.ctrlKey && !e.metaKey) return;
 
       const result = findFunctionSource(fnName, sources);
       if (result) {
@@ -280,6 +288,7 @@ export default function SourceCodeViewer({
       if (!fnName || !sources) return;
 
       if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+      if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
       hoverTimerRef.current = setTimeout(() => {
         const result = findFunctionSource(fnName, sources);
         if (result) {
@@ -298,11 +307,20 @@ export default function SourceCodeViewer({
     [sources],
   );
 
-  const handleCodeMouseOut = useCallback((e) => {
-    if (e.target.closest("[data-fn-name]")) {
+  const handleCodeMouseOut = useCallback(
+    (e) => {
       if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-      setHoverInfo(null);
-    }
+      if (!hoverInfo) return;
+      if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
+      hoverCloseTimerRef.current = setTimeout(() => {
+        setHoverInfo(null);
+      }, 200);
+    },
+    [hoverInfo],
+  );
+
+  const handleTooltipMouseEnter = useCallback(() => {
+    if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
   }, []);
 
   const handleTooltipMouseLeave = useCallback(() => {
@@ -638,6 +656,7 @@ export default function SourceCodeViewer({
             ref={tooltipRef}
             className={styles.tooltip}
             style={{ left: hoverInfo.x, top: hoverInfo.y }}
+            onMouseEnter={handleTooltipMouseEnter}
             onMouseLeave={handleTooltipMouseLeave}
             onClick={handleTooltipClick}
           >

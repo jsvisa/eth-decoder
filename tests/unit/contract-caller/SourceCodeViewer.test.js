@@ -217,7 +217,7 @@ describe("SourceCodeViewer", () => {
     vi.useRealTimers();
   });
 
-  it("navigates to definition on Ctrl+click", () => {
+  it("navigates to definition on click", () => {
     mockHookValue = {
       sources: {
         "Token.sol":
@@ -232,29 +232,9 @@ describe("SourceCodeViewer", () => {
     expect(fnSpans.length).toBeGreaterThan(0);
     const transferSpan = fnSpans[0];
     act(() => {
-      transferSpan.dispatchEvent(new MouseEvent("click", { bubbles: true, ctrlKey: true }));
+      transferSpan.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     expect(container.textContent).toContain("transfer");
-    cleanup();
-  });
-
-  it("does not navigate on plain click", () => {
-    mockHookValue = {
-      sources: {
-        "Token.sol":
-          "contract Token {\n  function transfer(address to, uint256 amount) external {}\n  function balanceOf(address account) external view returns (uint256) {}\n}",
-      },
-      compilerVersion: "0.8.19",
-      loading: false,
-      error: null,
-    };
-    const { container, cleanup } = renderComponent(BASE_PROPS);
-    const fnSpans = container.querySelectorAll("[data-fn-name]");
-    expect(fnSpans.length).toBeGreaterThan(0);
-    const transferSpan = fnSpans[0];
-    act(() => {
-      transferSpan.dispatchEvent(new MouseEvent("click", { bubbles: true, ctrlKey: false }));
-    });
     cleanup();
   });
 
@@ -264,5 +244,33 @@ describe("SourceCodeViewer", () => {
     const navBtns = [...buttons].filter((b) => b.textContent === "◀" || b.textContent === "▶");
     expect(navBtns.length).toBe(2);
     cleanup();
+  });
+
+  it("tooltip stays open briefly after mouse leaves code, closes on tooltip mouseleave", () => {
+    vi.useFakeTimers();
+    mockHookValue = {
+      sources: {
+        "Token.sol":
+          "contract Token {\n  function transfer(address to, uint256 amount) external {}\n}",
+      },
+      compilerVersion: "0.8.19",
+      loading: false,
+      error: null,
+    };
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    const fnSpan = container.querySelector("[data-fn-name]");
+    act(() => {
+      fnSpan.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(container.textContent).toContain("Token.sol:2");
+    act(() => {
+      fnSpan.dispatchEvent(new MouseEvent("mouseout", { bubbles: true }));
+    });
+    expect(container.textContent).toContain("Token.sol:2");
+    cleanup();
+    vi.useRealTimers();
   });
 });
