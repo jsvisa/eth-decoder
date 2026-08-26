@@ -2,7 +2,11 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useSourceCode } from "../hooks/useSourceCode";
-import { findFunctionSource } from "../../utils/solidityParser";
+import {
+  findFunctionSource,
+  buildFunctionNameSet,
+  makeFunctionNamesClickable,
+} from "../../utils/solidityParser";
 import { BUILT_IN_CHAIN_IDS } from "../../utils/chains";
 import { getCachedAbi } from "../../utils/abiCache";
 import JSZip from "jszip";
@@ -76,6 +80,7 @@ export default function SourceCodeViewer({
   );
   const [activeFile, setActiveFile] = useState(null);
   const [highlightLine, setHighlightLine] = useState(-1);
+  const [scrollNonce, setScrollNonce] = useState(0);
   const lineRefs = useRef({});
   const searchInputRef = useRef(null);
 
@@ -157,11 +162,19 @@ export default function SourceCodeViewer({
   }, [open]);
 
   // Highlight the entire file once, then split into lines — avoids per-line regex.
+  const fnNameSet = useMemo(() => buildFunctionNameSet(sources), [sources]);
+
   const highlightedLines = useMemo(() => {
     if (!sourceContent) return [];
     const html = highlightSolidity(sourceContent);
-    return html.split("\n");
-  }, [sourceContent]);
+    const withLinks = makeFunctionNamesClickable(
+      html,
+      fnNameSet,
+      styles.callLink,
+      [styles.hlString, styles.hlComment, styles.hlNatspec],
+    );
+    return withLinks.split("\n");
+  }, [sourceContent, fnNameSet]);
 
   // Memoize function search via Solidity AST parser — O(1) lookup after first parse.
   const { foundFile, foundLine } = useMemo(() => {
@@ -173,11 +186,11 @@ export default function SourceCodeViewer({
   }, [sources, functionName]);
 
   useEffect(() => {
-    if (foundFile && foundFile !== activeFile) {
+    if (foundFile) {
       setActiveFile(foundFile);
     }
     setHighlightLine(foundLine);
-  }, [foundFile, foundLine, activeFile]);
+  }, [foundFile, foundLine]);
 
   useEffect(() => {
     if (highlightLine > 0 && lineRefs.current[highlightLine]) {
@@ -186,9 +199,138 @@ export default function SourceCodeViewer({
         behavior: "smooth",
       });
     }
-  }, [highlightLine, activeFile]);
+  }, [highlightLine, activeFile, scrollNonce]);
 
   const [downloading, setDownloading] = useState(false);
+
+  const [hoverInfo, setHoverInfo] = useState(null);
+  const hoverTimerRef = useRef(null);
+  const hoverCloseTimerRef = useRef(null);
+  const tooltipRef = useRef(null);
+
+  const [navHistory, setNavHistory] = useState([]);
+  const [navIndex, setNavIndex] = useState(-1);
+  const navIndexRef = useRef(-1);
+  const navHistoryRef = useRef([]);
+
+  const pushNav = useCallback((file, line) => {
+    const idx = navIndexRef.current;
+    const hist = navHistoryRef.current;
+    const next = hist.slice(0, idx + 1);
+    next.push({ file, line });
+    navHistoryRef.current = next;
+    navIndexRef.current = idx + 1;
+    setNavHistory(next);
+    setNavIndex(idx + 1);
+    setScrollNonce((n) => n + 1);
+  }, []);
+
+  const goBack = useCallback(() => {
+    const idx = navIndexRef.current;
+    if (idx <= 0) return;
+    const newIndex = idx - 1;
+    const entry = navHistoryRef.current[newIndex];
+    navIndexRef.current = newIndex;
+    setNavIndex(newIndex);
+    if (entry.file !== activeFile) setActiveFile(entry.file);
+    setHighlightLine(entry.line);
+  }, [activeFile]);
+
+  const goForward = useCallback(() => {
+    const idx = navIndexRef.current;
+    const hist = navHistoryRef.current;
+    if (idx >= hist.length - 1) return;
+    const newIndex = idx + 1;
+    const entry = hist[newIndex];
+    navIndexRef.current = newIndex;
+    setNavIndex(newIndex);
+    if (entry.file !== activeFile) setActiveFile(entry.file);
+    setHighlightLine(entry.line);
+  }, [activeFile]);
+
+  const handleCodeClick = useCallback(
+    (e) => {
+      const target = e.target.closest("[data-fn-name]");
+      if (!target) return;
+
+      const fnName = target.getAttribute("data-fn-name");
+      if (!fnName || !sources) return;
+
+      const result = findFunctionSource(fnName, sources);
+      if (result) {
+        if (result.file !== activeFile) {
+          setActiveFile(result.file);
+        }
+        setHighlightLine(result.line);
+        pushNav(result.file, result.line);
+      }
+    },
+    [sources, activeFile, pushNav],
+  );
+
+  const handleCodeMouseOver = useCallback(
+    (e) => {
+      const target = e.target.closest("[data-fn-name]");
+      if (!target) return;
+
+      const fnName = target.getAttribute("data-fn-name");
+      if (!fnName || !sources) return;
+
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+      if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
+      hoverTimerRef.current = setTimeout(() => {
+        const result = findFunctionSource(fnName, sources);
+        if (result) {
+          const rect = target.getBoundingClientRect();
+          setHoverInfo({
+            fnName,
+            file: result.file,
+            line: result.line,
+            body: result.body,
+            x: rect.left + rect.width / 2,
+            y: rect.top - 8,
+          });
+        }
+      }, 300);
+    },
+    [sources],
+  );
+
+  const handleCodeMouseOut = useCallback(
+    (_e) => {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+      if (!hoverInfo) return;
+      if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
+      hoverCloseTimerRef.current = setTimeout(() => {
+        setHoverInfo(null);
+      }, 200);
+    },
+    [hoverInfo],
+  );
+
+  const handleTooltipMouseEnter = useCallback(() => {
+    if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
+  }, []);
+
+  const handleTooltipMouseLeave = useCallback(() => {
+    setHoverInfo(null);
+  }, []);
+
+  const handleTooltipClick = useCallback(
+    (_e) => {
+      if (!hoverInfo || !sources) return;
+      const result = findFunctionSource(hoverInfo.fnName, sources);
+      if (result) {
+        if (result.file !== activeFile) {
+          setActiveFile(result.file);
+        }
+        setHighlightLine(result.line);
+        pushNav(result.file, result.line);
+      }
+      setHoverInfo(null);
+    },
+    [hoverInfo, sources, activeFile, pushNav],
+  );
 
   const handleDownload = useCallback(async () => {
     if (!sources || downloading) return;
@@ -389,6 +531,24 @@ export default function SourceCodeViewer({
             >
               {downloading ? "..." : "⬇"}
             </button>
+            <button
+              className={styles.navBtn}
+              onClick={goBack}
+              disabled={navIndex <= 0}
+              type="button"
+              title="Go back"
+            >
+              ◀
+            </button>
+            <button
+              className={styles.navBtn}
+              onClick={goForward}
+              disabled={navIndex >= navHistory.length - 1}
+              type="button"
+              title="Go forward"
+            >
+              ▶
+            </button>
             <button className={styles.closeBtn} onClick={onClose} type="button">
               ✕
             </button>
@@ -415,7 +575,12 @@ export default function SourceCodeViewer({
             <div className={styles.statusError}>{error}</div>
           )}
           {highlightedLines.length > 0 || loading ? (
-            <div className={styles.codeContainer}>
+            <div
+              className={styles.codeContainer}
+              onClick={handleCodeClick}
+              onMouseOver={handleCodeMouseOver}
+              onMouseOut={handleCodeMouseOut}
+            >
               <table className={styles.codeTable}>
                 <tbody>
                   {loading && (
@@ -480,6 +645,29 @@ export default function SourceCodeViewer({
             )
           )}
         </div>
+        {hoverInfo && (
+          <div
+            ref={tooltipRef}
+            className={styles.tooltip}
+            style={{ left: hoverInfo.x, top: hoverInfo.y }}
+            onMouseEnter={handleTooltipMouseEnter}
+            onMouseLeave={handleTooltipMouseLeave}
+            onClick={handleTooltipClick}
+          >
+            <div className={styles.tooltipHeader}>
+              <span className={styles.tooltipName}>{hoverInfo.fnName}</span>
+              <span className={styles.tooltipLocation}>
+                {hoverInfo.file}:{hoverInfo.line}
+              </span>
+            </div>
+            <div
+              className={styles.tooltipSignature}
+              dangerouslySetInnerHTML={{
+                __html: highlightSolidity(hoverInfo.body),
+              }}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
