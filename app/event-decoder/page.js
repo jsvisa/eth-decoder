@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import yaml from "js-yaml";
+import { dump } from "js-yaml";
 import styles from "./page.module.css";
 
 const STORAGE_KEY = "evm_event_decoder_history";
@@ -141,7 +141,7 @@ export default function EventDecoder() {
   const getDisplayContent = () => {
     if (!result) return "";
     if (isYaml) {
-      return yaml.dump(result, { indent: 2, lineWidth: -1, noRefs: true });
+      return dump(result, { indent: 2, lineWidth: -1, noRefs: true });
     }
     return syntaxHighlight(result);
   };
@@ -149,7 +149,7 @@ export default function EventDecoder() {
   const handleCopy = async () => {
     try {
       const text = isYaml
-        ? yaml.dump(result, { indent: 2, lineWidth: -1, noRefs: true })
+        ? dump(result, { indent: 2, lineWidth: -1, noRefs: true })
         : JSON.stringify(result, null, 2);
       await navigator.clipboard.writeText(text);
       setCopied(true);

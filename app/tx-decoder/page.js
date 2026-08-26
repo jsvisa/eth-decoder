@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import yaml from "js-yaml";
+import { dump } from "js-yaml";
 import styles from "./page.module.css";
 import Tabs from "../components/Tabs";
 import { useTabState } from "../components/useTabState";
@@ -271,7 +271,7 @@ function DecoderWorkspace({ tabId, hydrateFromUrl, onRename }) {
 
     // Process line by line
     const lines = yamlStr.split("\n").map((line) => {
-      let result = "";
+      let result;
 
       // Comments
       if (line.trim().startsWith("#")) {
@@ -473,7 +473,7 @@ function DecoderWorkspace({ tabId, hydrateFromUrl, onRename }) {
       if (isYaml) {
         // For YAML, convert the object first then dump
         const converted = convertLargeNumbers(result);
-        let yamlStr = yaml.dump(converted, {
+        let yamlStr = dump(converted, {
           indent: 2,
           lineWidth: -1,
           noRefs: true,
@@ -516,7 +516,7 @@ function DecoderWorkspace({ tabId, hydrateFromUrl, onRename }) {
   const getDisplayContent = () => {
     if (isYaml) {
       const converted = convertLargeNumbers(result);
-      let yamlStr = yaml.dump(converted, {
+      let yamlStr = dump(converted, {
         indent: 2,
         lineWidth: -1,
         noRefs: true,

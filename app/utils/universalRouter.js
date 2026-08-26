@@ -115,7 +115,7 @@ function decodeV3Path(pathHex) {
     pathHex.startsWith("0x") ? pathHex.slice(2) : pathHex
   ).toLowerCase();
   const hops = [];
-  let i = 0;
+  let i;
   if (hex.length < 40) return hops;
   hops.push("0x" + hex.slice(0, 40));
   i = 40;

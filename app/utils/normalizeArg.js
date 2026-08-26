@@ -53,7 +53,7 @@ export function normalizeArg(value, type, components) {
   const arrayMatch = type.match(/^(.+)\[(\d*)\]$/);
   if (arrayMatch) {
     const baseType = arrayMatch[1];
-    let arr = value;
+    let arr;
     try {
       arr = typeof value === "string" ? JSON.parse(value) : value;
     } catch {
