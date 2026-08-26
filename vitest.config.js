@@ -30,9 +30,9 @@ export default defineConfig({
     },
     projects: [
       {
-        name: "unit",
         plugins: [jsxInJsPlugin],
         test: {
+          name: "unit",
           include: ["tests/unit/**"],
           exclude: ["tests/unit/setup.js"],
           environment: "jsdom",
@@ -40,18 +40,16 @@ export default defineConfig({
         },
       },
       {
-        name: "api",
         test: {
+          name: "api",
           include: ["tests/api/**"],
-          exclude: [
-            "tests/api/__fixtures__/**",
-          ],
+          exclude: ["tests/api/__fixtures__/**"],
           environment: "node",
         },
       },
       {
-        name: "integration",
         test: {
+          name: "integration",
           include: ["tests/integration/**"],
           environment: "node",
         },
