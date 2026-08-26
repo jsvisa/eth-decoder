@@ -17,7 +17,7 @@ jobs:
     name: CI (lint, unit, e2e)
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.58.2-noble
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
       options: --user 1001
     timeout-minutes: 30
     steps:
