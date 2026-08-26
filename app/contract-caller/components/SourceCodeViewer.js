@@ -5,6 +5,7 @@ import { useSourceCode } from "../hooks/useSourceCode";
 import {
   findFunctionSource,
   buildFunctionNameSet,
+  makeFunctionNamesClickable,
 } from "../../utils/solidityParser";
 import { BUILT_IN_CHAIN_IDS } from "../../utils/chains";
 import { getCachedAbi } from "../../utils/abiCache";
@@ -57,21 +58,6 @@ function highlightSolidity(source) {
 function highlightSearchMatch(htmlLine, isCurrentMatch, styles_) {
   const cls = isCurrentMatch ? styles_.searchMatchCurrent : styles_.searchMatch;
   return `<mark class="${cls}">${htmlLine}</mark>`;
-}
-
-function makeFunctionNamesClickable(html, fnNameSet, callLinkClass) {
-  if (!fnNameSet || fnNameSet.size === 0) return html;
-  const names = [...fnNameSet].sort((a, b) => b.length - a.length);
-  const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  const nameRe = new RegExp(`\\b(${escaped.join("|")})\\b`, "g");
-  return html.replace(/(<[^>]*>)|([^<]+)/g, (match, tag, text) => {
-    if (tag) return tag;
-    return text.replace(
-      nameRe,
-      (fnName) =>
-        `<span class="${callLinkClass}" data-fn-name="${fnName}">${fnName}</span>`,
-    );
-  });
 }
 
 export default function SourceCodeViewer({
@@ -185,6 +171,7 @@ export default function SourceCodeViewer({
       html,
       fnNameSet,
       styles.callLink,
+      [styles.hlString, styles.hlComment, styles.hlNatspec],
     );
     return withLinks.split("\n");
   }, [sourceContent, fnNameSet]);
