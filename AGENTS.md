@@ -42,3 +42,7 @@ CI order (must pass in this order): `prettier --check` → `npm run lint` → `n
 - ABI/decoding uses `viem`; tevm for in-browser simulation.
 - Public versioned API under `app/api/v1/`. Multicall auto-detection is driven by a hardcoded selector table (README lists all selectors) — extend there when adding multicall variants.
 - Merging PRs: `/sgtm`/`/lgtm`/`/approve`/`/merge` comment auto-merges (squash); add `/deploy` to trigger production deploy after merge.
+
+## Pre-push checklist
+
+- Run `npm test` with `.env` (not `.env.example`) sourced before every `git push` — tests require environment variables from `.env`.
