@@ -123,6 +123,29 @@
   cursor: not-allowed;
 }
 
+.navBtn {
+  background: none;
+  border: 1px solid #444;
+  color: #808080;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  line-height: 1;
+  transition: all 0.15s;
+}
+
+.navBtn:hover:not(:disabled) {
+  background-color: #333;
+  color: #d4d4d4;
+  border-color: #666;
+}
+
+.navBtn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
 .fileTabs {
   display: flex;
   gap: 0;
@@ -342,7 +365,60 @@
   color: #b5cea8;
 }
 
+.callLink {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: #569cd6;
+  text-underline-offset: 2px;
+  color: #d4d4d4;
+  transition: color 0.15s;
+}
+
+.callLink:hover {
+  color: #569cd6;
+}
+
 .hlNatspec {
   color: #6a9955;
   font-style: italic;
+}
+
+.tooltip {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  z-index: 3000;
+  background: #252526;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  max-width: 500px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+
+.tooltipHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.tooltipName {
+  color: #dcdcaa;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.tooltipLocation {
+  color: #808080;
+  font-size: 0.7rem;
+}
+
+.tooltipSignature {
+  color: #d4d4d4;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-size: 0.75rem;
+  white-space: pre;
+  max-height: 300px;
+  overflow-y: auto;
 }
