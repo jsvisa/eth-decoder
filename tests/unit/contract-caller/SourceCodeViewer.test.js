@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import SourceCodeViewer from "../../../app/contract-caller/components/SourceCodeViewer.js";
@@ -162,5 +162,31 @@ describe("SourceCodeViewer", () => {
     expect(container.textContent).toContain("4");
     expect(container.textContent).toContain("5");
     cleanup();
+  });
+
+  it("shows a hover tooltip with function signature on mouseover", () => {
+    vi.useFakeTimers();
+    mockHookValue = {
+      sources: {
+        "Token.sol":
+          "contract Token {\n  function transfer(address to, uint256 amount) external {}\n}",
+      },
+      compilerVersion: "0.8.19",
+      loading: false,
+      error: null,
+    };
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    const fnSpan = container.querySelector("[data-fn-name]");
+    expect(fnSpan).not.toBeNull();
+    act(() => {
+      fnSpan.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(container.textContent).toContain("transfer");
+    expect(container.textContent).toContain("function transfer(address to, uint256 amount) external {}");
+    cleanup();
+    vi.useRealTimers();
   });
 });

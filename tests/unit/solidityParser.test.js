@@ -20,11 +20,13 @@ describe("buildFunctionMap", () => {
       name: "transfer",
       file: "Token.sol",
       line: 2,
+      signature: "function transfer(address to, uint256 amount) external {}",
     });
     expect(map.get("balanceOf")).toEqual({
       name: "balanceOf",
       file: "Token.sol",
       line: 3,
+      signature: "function balanceOf(address account) external view returns (uint256) {}",
     });
   });
 
@@ -74,7 +76,7 @@ describe("findFunctionSource", () => {
 
   it("finds a function by full signature", () => {
     const result = findFunctionSource("transfer(address,uint256)", sources);
-    expect(result).toEqual({ name: "transfer", file: "Token.sol", line: 2 });
+    expect(result).toEqual({ name: "transfer", file: "Token.sol", line: 2, signature: "function transfer(address to, uint256 amount) external {}" });
   });
 
   it("returns null for unknown function", () => {

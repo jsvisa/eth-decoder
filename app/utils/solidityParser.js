@@ -22,7 +22,7 @@ export function buildFunctionMap(sources) {
     for (let i = 0; i < lines.length; i++) {
       const m = DEF_RE.exec(lines[i].trim());
       if (m && !map.has(m[1])) {
-        map.set(m[1], { name: m[1], file, line: i + 1 });
+        map.set(m[1], { name: m[1], file, line: i + 1, signature: lines[i].trim() });
       }
     }
   }

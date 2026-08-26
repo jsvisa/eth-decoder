@@ -215,6 +215,9 @@ export default function SourceCodeViewer({
 
   const [downloading, setDownloading] = useState(false);
 
+  const [hoverInfo, setHoverInfo] = useState(null);
+  const hoverTimerRef = useRef(null);
+
   const handleCodeClick = useCallback(
     (e) => {
       const target = e.target.closest("[data-fn-name]");
@@ -233,6 +236,40 @@ export default function SourceCodeViewer({
     },
     [sources, activeFile],
   );
+
+  const handleCodeMouseOver = useCallback(
+    (e) => {
+      const target = e.target.closest("[data-fn-name]");
+      if (!target) return;
+
+      const fnName = target.getAttribute("data-fn-name");
+      if (!fnName || !sources) return;
+
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = setTimeout(() => {
+        const result = findFunctionSource(fnName, sources);
+        if (result) {
+          const rect = target.getBoundingClientRect();
+          setHoverInfo({
+            fnName,
+            file: result.file,
+            line: result.line,
+            signature: result.signature,
+            x: rect.left + rect.width / 2,
+            y: rect.top - 8,
+          });
+        }
+      }, 300);
+    },
+    [sources],
+  );
+
+  const handleCodeMouseOut = useCallback((e) => {
+    if (e.target.closest("[data-fn-name]")) {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+      setHoverInfo(null);
+    }
+  }, []);
 
   const handleDownload = useCallback(async () => {
     if (!sources || downloading) return;
@@ -459,7 +496,7 @@ export default function SourceCodeViewer({
             <div className={styles.statusError}>{error}</div>
           )}
           {highlightedLines.length > 0 || loading ? (
-            <div className={styles.codeContainer} onClick={handleCodeClick}>
+            <div className={styles.codeContainer} onClick={handleCodeClick} onMouseOver={handleCodeMouseOver} onMouseOut={handleCodeMouseOut}>
               <table className={styles.codeTable}>
                 <tbody>
                   {loading && (
@@ -524,6 +561,22 @@ export default function SourceCodeViewer({
             )
           )}
         </div>
+        {hoverInfo && (
+          <div
+            className={styles.tooltip}
+            style={{ left: hoverInfo.x, top: hoverInfo.y }}
+          >
+            <div className={styles.tooltipHeader}>
+              <span className={styles.tooltipName}>{hoverInfo.fnName}</span>
+              <span className={styles.tooltipLocation}>
+                {hoverInfo.file}:{hoverInfo.line}
+              </span>
+            </div>
+            <div className={styles.tooltipSignature}>
+              {hoverInfo.signature}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
