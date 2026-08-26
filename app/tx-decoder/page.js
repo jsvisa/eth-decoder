@@ -271,7 +271,7 @@ function DecoderWorkspace({ tabId, hydrateFromUrl, onRename }) {
 
     // Process line by line
     const lines = yamlStr.split("\n").map((line) => {
-      let result = "";
+      let result;
 
       // Comments
       if (line.trim().startsWith("#")) {

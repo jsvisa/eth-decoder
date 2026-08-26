@@ -66,6 +66,7 @@
     "@tevm/webpack-plugin": "1.0.0-next.148"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@next/eslint-plugin-next": "^16.2.7",
     "@playwright/test": "^1.58.2",
     "@testing-library/react": "^16.3.2",
