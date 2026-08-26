@@ -33,6 +33,24 @@ describe("GET /api/get-logs (integration)", () => {
     expect(body.error).toMatch(/invalid address/i);
   });
 
+  it("returns 400 when no API key is available", async () => {
+    const originalKey = process.env.ETHERSCAN_API_KEY;
+    delete process.env.ETHERSCAN_API_KEY;
+    try {
+      const res = await GET(
+        makeRequest({
+          address: USDC_ADDRESS,
+          chain: "ethereum",
+        }),
+      );
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toMatch(/api key/i);
+    } finally {
+      if (originalKey) process.env.ETHERSCAN_API_KEY = originalKey;
+    }
+  }, 15000);
+
   describe("with Etherscan key", () => {
     it.skipIf(!hasEtherscanKey)(
       "fetches Transfer event logs for USDC",
@@ -56,28 +74,6 @@ describe("GET /api/get-logs (integration)", () => {
         const log = body.result[0];
         expect(log.address.toLowerCase()).toBe(USDC_ADDRESS.toLowerCase());
         expect(log.topics).toBeDefined();
-      },
-      15000,
-    );
-
-    it.skipIf(!hasEtherscanKey)(
-      "returns 400 when no API key is available",
-      async () => {
-        const originalKey = process.env.ETHERSCAN_API_KEY;
-        delete process.env.ETHERSCAN_API_KEY;
-        try {
-          const res = await GET(
-            makeRequest({
-              address: USDC_ADDRESS,
-              chain: "ethereum",
-            }),
-          );
-          expect(res.status).toBe(400);
-          const body = await res.json();
-          expect(body.error).toMatch(/api key/i);
-        } finally {
-          process.env.ETHERSCAN_API_KEY = originalKey;
-        }
       },
       15000,
     );

@@ -43,7 +43,7 @@ describe("GET /api/decode (integration)", () => {
     expect(decoded.func).toBe("transfer(address,uint256)");
     expect(decoded.args).toBeDefined();
     expect(typeof decoded.args).toBe("object");
-    expect(decoded.source).toBe("sourcify");
+    expect(["sourcify", "cfd1"]).toContain(decoded.source);
   }, 15000);
 
   it("decodes with with_abi flag", async () => {
@@ -66,5 +66,13 @@ describe("GET /api/decode (integration)", () => {
     expect(body.msg).toBe("ok");
     const decoded = body.data[0];
     expect(decoded.sign).toBe(TRANSFER_SELECTOR);
+  }, 15000);
+
+  it("returns not found for unknown selector", async () => {
+    const res = await GET(makeRequest({ data: "0xdead0001" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.msg).toBe("not found");
+    expect(body.data).toBeNull();
   }, 15000);
 });

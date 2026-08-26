@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { promises as fs } from "fs";
 import { join } from "path";
+import { tmpdir } from "os";
 import { GET } from "../../app/api/query/route.js";
-import { getServerCacheBaseDir } from "../../app/utils/serverCacheDir.js";
 
 const TRANSFER_SELECTOR = "0xa9059cbb";
 const TRANSFER_EVENT_TOPIC =
@@ -16,8 +16,10 @@ function makeRequest(params) {
   return { url: url.toString() };
 }
 
+const cacheDir = join(tmpdir(), `query-integration-test-${process.pid}`);
+
 async function clearSigCache(...selectors) {
-  const dir = join(getServerCacheBaseDir(), "signatures");
+  const dir = join(cacheDir, "signatures");
   for (const sel of selectors) {
     try {
       await fs.unlink(join(dir, `${sel.toLowerCase()}.json`));
@@ -28,9 +30,17 @@ async function clearSigCache(...selectors) {
 }
 
 describe("GET /api/query (integration)", () => {
-  beforeAll(() =>
-    clearSigCache(TRANSFER_SELECTOR, TRANSFER_EVENT_TOPIC, "0xdead0001"),
-  );
+  beforeAll(async () => {
+    process.env.CACHE_DIR = cacheDir;
+    await fs.mkdir(join(cacheDir, "signatures"), { recursive: true });
+    await clearSigCache(TRANSFER_SELECTOR, TRANSFER_EVENT_TOPIC, "0xdead0001");
+  });
+
+  afterAll(async () => {
+    delete process.env.CACHE_DIR;
+    await fs.rm(cacheDir, { recursive: true, force: true });
+  });
+
   it("returns 400 when sign is missing", async () => {
     const res = await GET(makeRequest({}));
     expect(res.status).toBe(400);

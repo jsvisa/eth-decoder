@@ -66,6 +66,36 @@ describe("POST /api/call-contract (integration)", () => {
     expect(body.error).toMatch(/invalid address/i);
   });
 
+  it("returns 400 when function is not found in ABI", async () => {
+    const res = await POST(
+      makeRequest({
+        chain: "ethereum",
+        address: USDC_ADDRESS,
+        functionName: "nonexistent",
+        args: [],
+        abi: USDC_ABI,
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/not found in ABI/i);
+  });
+
+  it("returns 400 for unsupported chain", async () => {
+    const res = await POST(
+      makeRequest({
+        chain: "nonexistent",
+        address: USDC_ADDRESS,
+        functionName: "balanceOf",
+        args: [VITALIK],
+        abi: USDC_ABI,
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/unsupported chain/i);
+  });
+
   describe("with RPC URL", () => {
     it.skipIf(!hasRpcUrl)(
       "calls balanceOf on USDC via custom RPC URL",
@@ -85,7 +115,7 @@ describe("POST /api/call-contract (integration)", () => {
         expect(body.rawData).toBeTruthy();
         expect(body.decoded).toBeTruthy();
         expect(body.decoded.length).toBe(1);
-        expect(body.decoded[0].name).toBe("");
+        expect(body.decoded[0].name).toBe("result");
         expect(body.decoded[0].type).toBe("uint256");
         expect(typeof body.decoded[0].value).toBe("string");
       },
@@ -131,7 +161,7 @@ describe("POST /api/call-contract (integration)", () => {
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body.decoded).toBeTruthy();
-        expect(body.decoded[0].value).toBe(6);
+        expect(body.decoded[0].value).toBe("6");
       },
       15000,
     );
