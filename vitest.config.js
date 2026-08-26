@@ -1,5 +1,10 @@
 import { defineConfig } from "vitest/config";
-import { transformWithEsbuild } from "vite";
+import { loadEnv, transformWithEsbuild } from "vite";
+
+// Load `.env` into process.env so test workers inherit INTEGRATION_RPC_URL,
+// INTEGRATION_ETHERSCAN_API_KEY, etc. when running integration tests locally.
+const envDir = new URL(".", import.meta.url).pathname;
+Object.assign(process.env, loadEnv("", envDir, ""));
 
 // Transform JSX in .js files (components) before vite:import-analysis runs
 const jsxInJsPlugin = {
