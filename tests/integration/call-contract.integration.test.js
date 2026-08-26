@@ -161,7 +161,7 @@ describe("POST /api/call-contract (integration)", () => {
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body.decoded).toBeTruthy();
-        expect(body.decoded[0].value).toBe("6");
+        expect(body.decoded[0].value).toBe(6);
       },
       15000,
     );
