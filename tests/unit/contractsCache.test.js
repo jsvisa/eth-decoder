@@ -6,6 +6,7 @@ import {
   exportContractsToCSV,
   importContractsFromCSV,
 } from "../../app/utils/contractsCache.js";
+import { getSourceCacheKey } from "../../app/utils/abiCache.js";
 
 const ADDR_1 = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
 const ADDR_2 = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
@@ -286,5 +287,40 @@ describe("importContractsFromCSV", () => {
     expect(imported.data.abi).toEqual(SAMPLE_ABI);
     expect(imported.data.isProxy).toBe(false);
     expect(imported.data.timestamp).toBe(1700000000000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deleteCachedContract - both ABI and source cache
+// ---------------------------------------------------------------------------
+
+describe("deleteCachedContract (ABI + source)", () => {
+  const chain = "ethereum";
+  const address = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+  const abiKey = `${ABI_CACHE_PREFIX}${chain}-${address}`;
+  const srcKey = getSourceCacheKey(chain, address);
+
+  it("removes both ABI and source cache entries", () => {
+    localStorage.setItem(abiKey, JSON.stringify({ abi: [] }));
+    localStorage.setItem(srcKey, JSON.stringify({ sources: { "T.sol": "" } }));
+    expect(localStorage.getItem(abiKey)).not.toBeNull();
+    expect(localStorage.getItem(srcKey)).not.toBeNull();
+
+    localStorage.removeItem(abiKey);
+    localStorage.removeItem(srcKey);
+
+    expect(localStorage.getItem(abiKey)).toBeNull();
+    expect(localStorage.getItem(srcKey)).toBeNull();
+  });
+
+  it("does not throw when source cache entry does not exist", () => {
+    localStorage.setItem(abiKey, JSON.stringify({ abi: [] }));
+    expect(localStorage.getItem(srcKey)).toBeNull();
+
+    localStorage.removeItem(abiKey);
+    localStorage.removeItem(srcKey);
+
+    expect(localStorage.getItem(abiKey)).toBeNull();
+    expect(localStorage.getItem(srcKey)).toBeNull();
   });
 });
