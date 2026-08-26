@@ -9,7 +9,7 @@
     "lint": "eslint app tests",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --coverage --project unit --project api",
     "test:e2e": "playwright test",
     "format": "prettier --write \"app/**/*.{js,json}\" \"tests/**/*.js\" \"**/*.md\" \"*.json\""
   },
