@@ -94,6 +94,7 @@ export default function SourceCodeViewer({
   );
   const [activeFile, setActiveFile] = useState(null);
   const [highlightLine, setHighlightLine] = useState(-1);
+  const [scrollNonce, setScrollNonce] = useState(0);
   const lineRefs = useRef({});
   const searchInputRef = useRef(null);
 
@@ -211,7 +212,7 @@ export default function SourceCodeViewer({
         behavior: "smooth",
       });
     }
-  }, [highlightLine, activeFile]);
+  }, [highlightLine, activeFile, scrollNonce]);
 
   const [downloading, setDownloading] = useState(false);
 
@@ -234,6 +235,7 @@ export default function SourceCodeViewer({
     navIndexRef.current = idx + 1;
     setNavHistory(next);
     setNavIndex(idx + 1);
+    setScrollNonce((n) => n + 1);
   }, []);
 
   const goBack = useCallback(() => {
@@ -586,7 +588,12 @@ export default function SourceCodeViewer({
             <div className={styles.statusError}>{error}</div>
           )}
           {highlightedLines.length > 0 || loading ? (
-            <div className={styles.codeContainer} onClick={handleCodeClick} onMouseOver={handleCodeMouseOver} onMouseOut={handleCodeMouseOut}>
+            <div
+              className={styles.codeContainer}
+              onClick={handleCodeClick}
+              onMouseOver={handleCodeMouseOver}
+              onMouseOut={handleCodeMouseOut}
+            >
               <table className={styles.codeTable}>
                 <tbody>
                   {loading && (
@@ -666,7 +673,12 @@ export default function SourceCodeViewer({
                 {hoverInfo.file}:{hoverInfo.line}
               </span>
             </div>
-            <div className={styles.tooltipSignature} dangerouslySetInnerHTML={{ __html: highlightSolidity(hoverInfo.body) }} />
+            <div
+              className={styles.tooltipSignature}
+              dangerouslySetInnerHTML={{
+                __html: highlightSolidity(hoverInfo.body),
+              }}
+            />
           </div>
         )}
       </div>

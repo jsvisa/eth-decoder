@@ -186,7 +186,9 @@ describe("SourceCodeViewer", () => {
     });
     expect(container.textContent).toContain("transfer");
     expect(container.textContent).toContain("Token.sol:2");
-    expect(container.textContent).toContain("function transfer(address to, uint256 amount) external {}");
+    expect(container.textContent).toContain(
+      "function transfer(address to, uint256 amount) external {}",
+    );
     cleanup();
     vi.useRealTimers();
   });
@@ -217,6 +219,41 @@ describe("SourceCodeViewer", () => {
     vi.useRealTimers();
   });
 
+  it("re-navigates to definition when clicking a call to the already-highlighted function", () => {
+    mockHookValue = {
+      sources: {
+        "Pool.sol":
+          "contract Pool {\n" +
+          "  function uniswapV3SwapCallback(int256 a, int256 b, bytes calldata d) external override {}\n" +
+          "  function swap() external {}\n" +
+          '  function doIt() external { uniswapV3SwapCallback(1, 2, hex""); }\n' +
+          "}\n",
+      },
+      compilerVersion: "0.8.19",
+      loading: false,
+      error: null,
+    };
+    const { container, cleanup } = renderComponent({
+      ...BASE_PROPS,
+      functionName: "uniswapV3SwapCallback",
+    });
+    const scrollCalls = Element.prototype.scrollIntoView.mock.calls.length;
+    const callSpan = [
+      ...container.querySelectorAll('[data-fn-name="uniswapV3SwapCallback"]'),
+    ].find(
+      (s) => s.closest("tr").querySelector(".lineNum").textContent === "4",
+    );
+    expect(callSpan).toBeTruthy();
+    act(() => {
+      callSpan.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    // highlightLine is already on line 2; navigation must still scroll there.
+    expect(Element.prototype.scrollIntoView.mock.calls.length).toBeGreaterThan(
+      scrollCalls,
+    );
+    cleanup();
+  });
+
   it("navigates to definition on click", () => {
     mockHookValue = {
       sources: {
@@ -241,7 +278,9 @@ describe("SourceCodeViewer", () => {
   it("renders nav back/forward buttons", () => {
     const { container, cleanup } = renderComponent(BASE_PROPS);
     const buttons = container.querySelectorAll("button");
-    const navBtns = [...buttons].filter((b) => b.textContent === "◀" || b.textContent === "▶");
+    const navBtns = [...buttons].filter(
+      (b) => b.textContent === "◀" || b.textContent === "▶",
+    );
     expect(navBtns.length).toBe(2);
     cleanup();
   });
