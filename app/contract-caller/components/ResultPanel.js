@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import yaml from "js-yaml";
+import { dump } from "js-yaml";
 import { formatEther } from "viem";
 import { formatTokenAmount } from "../../utils/tokenFormatting";
 import {
@@ -490,7 +490,7 @@ export default function ResultPanel({
   const getDisplayContent = () => {
     if (!result) return "";
     if (isYaml) {
-      return yaml.dump(result, { indent: 2, lineWidth: -1, noRefs: true });
+      return dump(result, { indent: 2, lineWidth: -1, noRefs: true });
     }
     return syntaxHighlight(result, {
       jsonNumber: styles.jsonNumber,
@@ -504,7 +504,7 @@ export default function ResultPanel({
   const handleCopy = async () => {
     try {
       const text = isYaml
-        ? yaml.dump(result, { indent: 2, lineWidth: -1, noRefs: true })
+        ? dump(result, { indent: 2, lineWidth: -1, noRefs: true })
         : JSON.stringify(result, null, 2);
       await navigator.clipboard.writeText(text);
       setCopied(true);

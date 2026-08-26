@@ -22,9 +22,7 @@ function renderComponent(ui) {
 
 // Mock js-yaml
 vi.mock("js-yaml", () => ({
-  default: {
-    dump: (obj) => JSON.stringify(obj),
-  },
+  dump: (obj) => JSON.stringify(obj),
 }));
 
 // Mock CSS modules — identity proxy so className lookups resolve to strings
