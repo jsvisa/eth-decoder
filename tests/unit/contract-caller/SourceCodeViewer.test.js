@@ -185,6 +185,7 @@ describe("SourceCodeViewer", () => {
       vi.advanceTimersByTime(300);
     });
     expect(container.textContent).toContain("transfer");
+    expect(container.textContent).toContain("Token.sol:2");
     expect(container.textContent).toContain("function transfer(address to, uint256 amount) external {}");
     cleanup();
     vi.useRealTimers();
@@ -214,5 +215,54 @@ describe("SourceCodeViewer", () => {
     expect(container.textContent).toContain("balances[to] += amount");
     cleanup();
     vi.useRealTimers();
+  });
+
+  it("navigates to definition on Ctrl+click", () => {
+    mockHookValue = {
+      sources: {
+        "Token.sol":
+          "contract Token {\n  function transfer(address to, uint256 amount) external {}\n  function balanceOf(address account) external view returns (uint256) {}\n}",
+      },
+      compilerVersion: "0.8.19",
+      loading: false,
+      error: null,
+    };
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    const fnSpans = container.querySelectorAll("[data-fn-name]");
+    expect(fnSpans.length).toBeGreaterThan(0);
+    const transferSpan = fnSpans[0];
+    act(() => {
+      transferSpan.dispatchEvent(new MouseEvent("click", { bubbles: true, ctrlKey: true }));
+    });
+    expect(container.textContent).toContain("transfer");
+    cleanup();
+  });
+
+  it("does not navigate on plain click", () => {
+    mockHookValue = {
+      sources: {
+        "Token.sol":
+          "contract Token {\n  function transfer(address to, uint256 amount) external {}\n  function balanceOf(address account) external view returns (uint256) {}\n}",
+      },
+      compilerVersion: "0.8.19",
+      loading: false,
+      error: null,
+    };
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    const fnSpans = container.querySelectorAll("[data-fn-name]");
+    expect(fnSpans.length).toBeGreaterThan(0);
+    const transferSpan = fnSpans[0];
+    act(() => {
+      transferSpan.dispatchEvent(new MouseEvent("click", { bubbles: true, ctrlKey: false }));
+    });
+    cleanup();
+  });
+
+  it("renders nav back/forward buttons", () => {
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    const buttons = container.querySelectorAll("button");
+    const navBtns = [...buttons].filter((b) => b.textContent === "◀" || b.textContent === "▶");
+    expect(navBtns.length).toBe(2);
+    cleanup();
   });
 });

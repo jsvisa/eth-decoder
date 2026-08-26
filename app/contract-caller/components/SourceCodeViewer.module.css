@@ -123,6 +123,29 @@
   cursor: not-allowed;
 }
 
+.navBtn {
+  background: none;
+  border: 1px solid #444;
+  color: #808080;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  line-height: 1;
+  transition: all 0.15s;
+}
+
+.navBtn:hover:not(:disabled) {
+  background-color: #333;
+  color: #d4d4d4;
+  border-color: #666;
+}
+
+.navBtn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
 .fileTabs {
   display: flex;
   gap: 0;
@@ -370,7 +393,7 @@
   padding: 0.5rem 0.75rem;
   max-width: 500px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-  pointer-events: none;
+  cursor: pointer;
 }
 
 .tooltipHeader {

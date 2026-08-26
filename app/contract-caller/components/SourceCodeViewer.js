@@ -217,6 +217,37 @@ export default function SourceCodeViewer({
 
   const [hoverInfo, setHoverInfo] = useState(null);
   const hoverTimerRef = useRef(null);
+  const tooltipRef = useRef(null);
+
+  const [navHistory, setNavHistory] = useState([]);
+  const [navIndex, setNavIndex] = useState(-1);
+
+  const pushNav = useCallback((file, line) => {
+    setNavHistory((prev) => {
+      const next = prev.slice(0, navIndex + 1);
+      next.push({ file, line });
+      return next;
+    });
+    setNavIndex((prev) => prev + 1);
+  }, [navIndex]);
+
+  const goBack = useCallback(() => {
+    if (navIndex <= 0) return;
+    const newIndex = navIndex - 1;
+    const entry = navHistory[newIndex];
+    setNavIndex(newIndex);
+    if (entry.file !== activeFile) setActiveFile(entry.file);
+    setHighlightLine(entry.line);
+  }, [navIndex, navHistory, activeFile]);
+
+  const goForward = useCallback(() => {
+    if (navIndex >= navHistory.length - 1) return;
+    const newIndex = navIndex + 1;
+    const entry = navHistory[newIndex];
+    setNavIndex(newIndex);
+    if (entry.file !== activeFile) setActiveFile(entry.file);
+    setHighlightLine(entry.line);
+  }, [navIndex, navHistory, activeFile]);
 
   const handleCodeClick = useCallback(
     (e) => {
@@ -226,15 +257,18 @@ export default function SourceCodeViewer({
       const fnName = target.getAttribute("data-fn-name");
       if (!fnName || !sources) return;
 
+      if (!e.ctrlKey && !e.metaKey) return;
+
       const result = findFunctionSource(fnName, sources);
       if (result) {
         if (result.file !== activeFile) {
           setActiveFile(result.file);
         }
         setHighlightLine(result.line);
+        pushNav(result.file, result.line);
       }
     },
-    [sources, activeFile],
+    [sources, activeFile, pushNav],
   );
 
   const handleCodeMouseOver = useCallback(
@@ -270,6 +304,26 @@ export default function SourceCodeViewer({
       setHoverInfo(null);
     }
   }, []);
+
+  const handleTooltipMouseLeave = useCallback(() => {
+    setHoverInfo(null);
+  }, []);
+
+  const handleTooltipClick = useCallback(
+    (e) => {
+      if (!hoverInfo || !sources) return;
+      const result = findFunctionSource(hoverInfo.fnName, sources);
+      if (result) {
+        if (result.file !== activeFile) {
+          setActiveFile(result.file);
+        }
+        setHighlightLine(result.line);
+        pushNav(result.file, result.line);
+      }
+      setHoverInfo(null);
+    },
+    [hoverInfo, sources, activeFile, pushNav],
+  );
 
   const handleDownload = useCallback(async () => {
     if (!sources || downloading) return;
@@ -470,6 +524,24 @@ export default function SourceCodeViewer({
             >
               {downloading ? "..." : "⬇"}
             </button>
+            <button
+              className={styles.navBtn}
+              onClick={goBack}
+              disabled={navIndex <= 0}
+              type="button"
+              title="Go back"
+            >
+              ◀
+            </button>
+            <button
+              className={styles.navBtn}
+              onClick={goForward}
+              disabled={navIndex >= navHistory.length - 1}
+              type="button"
+              title="Go forward"
+            >
+              ▶
+            </button>
             <button className={styles.closeBtn} onClick={onClose} type="button">
               ✕
             </button>
@@ -563,8 +635,11 @@ export default function SourceCodeViewer({
         </div>
         {hoverInfo && (
           <div
+            ref={tooltipRef}
             className={styles.tooltip}
             style={{ left: hoverInfo.x, top: hoverInfo.y }}
+            onMouseLeave={handleTooltipMouseLeave}
+            onClick={handleTooltipClick}
           >
             <div className={styles.tooltipHeader}>
               <span className={styles.tooltipName}>{hoverInfo.fnName}</span>
