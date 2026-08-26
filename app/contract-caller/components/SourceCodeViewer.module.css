@@ -395,5 +395,7 @@
   color: #d4d4d4;
   font-family: "Consolas", "Monaco", "Courier New", monospace;
   font-size: 0.75rem;
-  word-break: break-all;
+  white-space: pre;
+  max-height: 300px;
+  overflow-y: auto;
 }
