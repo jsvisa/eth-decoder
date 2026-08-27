@@ -628,12 +628,8 @@ export function useCallExecution({
         params.set("chain", chain);
         params.set("address", address);
 
-        if (selectedFunction) {
-          params.set("function", selectedFunction);
-        }
-
-        if (args?.length > 0 && args.some((a) => a !== "")) {
-          params.set("args", JSON.stringify(args));
+        if (rawCalldata?.startsWith("0x") && rawCalldata.length >= 10) {
+          params.set("calldata", rawCalldata);
         }
 
         if (fromAddress) {

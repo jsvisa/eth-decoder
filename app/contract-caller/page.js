@@ -381,9 +381,12 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     const params = new URLSearchParams();
     params.set("chain", chain);
     params.set("address", address);
-    if (fn.selectedFunction) {
-      params.set("function", fn.selectedFunction);
-      params.set("args", JSON.stringify(fn.args));
+    if (
+      fn.pasteCalldataValue &&
+      fn.pasteCalldataValue.startsWith("0x") &&
+      fn.pasteCalldataValue.length >= 10
+    ) {
+      params.set("calldata", fn.pasteCalldataValue);
     }
     if (simOpts.fromAddress) {
       params.set("from", simOpts.fromAddress);
@@ -403,8 +406,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     isActive,
     chain,
     address,
-    fn.selectedFunction,
-    fn.args,
+    fn.pasteCalldataValue,
     simOpts.fromAddress,
     simOpts.ethValue,
     fn.blockNumber,

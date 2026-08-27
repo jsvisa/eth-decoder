@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { encodeFunctionData, decodeFunctionData } from "viem";
+import { decodeFunctionData } from "viem";
 import {
   getDefaultArgValue,
   getFunctionSelector,
   getFunctionSig,
-  normalizeInputValue,
+  encodeFunctionArgs,
   viemDecodedToArgValue,
 } from "../utils/functionArgs";
 
@@ -121,6 +121,12 @@ export function useFunctionSelection({
           setArgs(pendingArgs);
           return;
         }
+      } else if (pendingCalldata) {
+        // Calldata whose selector matches nothing in this ABI (or whose
+        // function is missing): stop waiting — the calldata already sits in
+        // the paste-calldata field and can be executed raw.
+        pendingHistoryRef.current = null;
+        return;
       }
       // Still waiting for the right ABI — leave args alone
       return;
@@ -152,17 +158,10 @@ export function useFunctionSelection({
     );
     if (!func) return;
     try {
-      const parsedArgs = func.inputs.map((input, i) =>
-        normalizeInputValue(args[i], input),
-      );
-      const encoded = encodeFunctionData({
-        abi: [func],
-        functionName: func.name,
-        args: parsedArgs,
-      });
+      const encoded = encodeFunctionArgs(func, args);
       setPasteCalldataValue(encoded);
     } catch {
-      // args incomplete or invalid — leave current value
+      // args invalid — leave current value
     }
   }, [selectedFunction, args, parsedAbi]);
 
@@ -224,15 +223,7 @@ export function useFunctionSelection({
     if (!func) return;
 
     try {
-      const parsedArgs = func.inputs.map((input, index) =>
-        normalizeInputValue(args[index], input),
-      );
-
-      const calldata = encodeFunctionData({
-        abi: [func],
-        functionName: func.name,
-        args: parsedArgs,
-      });
+      const calldata = encodeFunctionArgs(func, args);
 
       await navigator.clipboard.writeText(calldata);
       setCalldataCopied(true);

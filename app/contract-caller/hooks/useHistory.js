@@ -102,6 +102,7 @@ export function useHistory({
     const urlAddress = params.get("address");
     const urlFunction = params.get("function");
     const urlArgs = params.get("args");
+    const urlCalldata = params.get("calldata");
     const urlFrom = params.get("from");
     const urlValue = params.get("value");
     const urlBlock = params.get("block");
@@ -144,7 +145,19 @@ export function useHistory({
     if (urlAddress) {
       setAddress(checksumAddress(urlAddress));
 
-      if (urlFunction) {
+      if (urlCalldata?.startsWith("0x") && urlCalldata.length >= 10) {
+        // Share links carry the ABI-encoded calldata; the matching function
+        // is resolved from its 4-byte selector once the ABI loads.
+        const pendingSelection = {
+          functionSig: urlCalldata.slice(0, 10).toLowerCase(),
+          calldata: urlCalldata,
+          timestamp: Date.now(),
+        };
+        setPendingHistory(pendingSelection);
+        if (typeof applyPendingArgs === "function") {
+          applyPendingArgs(pendingSelection);
+        }
+      } else if (urlFunction) {
         let parsedArgs = [];
         if (urlArgs) {
           try {

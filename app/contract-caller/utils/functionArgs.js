@@ -1,4 +1,4 @@
-import { toFunctionSelector } from "viem";
+import { toFunctionSelector, encodeFunctionData } from "viem";
 import { normalizeArg } from "../../utils/normalizeArg";
 
 export const getFunctionSig = (func) => {
@@ -74,6 +74,49 @@ export const normalizeInputValue = (value, input) => {
     }
   }
   return normalizeArg(nextValue, input.type, input.components);
+};
+
+// Zero value for a Solidity input type, used to preview calldata while some
+// args are still empty (viem's encoder rejects empty strings).
+export const placeholderArgValue = (input) => {
+  const type = input.type || "";
+  const arrayMatch = type.match(/^(.*)\[(\d*)\]$/);
+  if (arrayMatch) {
+    const [, baseType, size] = arrayMatch;
+    const baseInput = { ...input, type: baseType };
+    if (size === "") return [];
+    return Array.from({ length: Number(size) }, () =>
+      placeholderArgValue(baseInput),
+    );
+  }
+  if (type === "address") return "0x0000000000000000000000000000000000000000";
+  if (type.startsWith("uint") || type.startsWith("int")) return 0;
+  if (type === "bool") return false;
+  if (type === "string") return "";
+  if (type === "bytes") return "0x";
+  const fixedBytes = type.match(/^bytes(\d+)$/);
+  if (fixedBytes) return `0x${"00".repeat(Number(fixedBytes[1]))}`;
+  if (type === "tuple" && input.components) {
+    return input.components.map((component) => placeholderArgValue(component));
+  }
+  return "";
+};
+
+// Encode function + args into calldata. Empty args are replaced by zero
+// placeholders so partial input still produces a live preview.
+export const encodeFunctionArgs = (func, args) => {
+  const parsedArgs = func.inputs.map((input, i) => {
+    const raw = args[i];
+    if (raw === undefined || raw === null || raw === "") {
+      return placeholderArgValue(input);
+    }
+    return normalizeInputValue(raw, input);
+  });
+  return encodeFunctionData({
+    abi: [func],
+    functionName: func.name,
+    args: parsedArgs,
+  });
 };
 
 export const isReadOnly = (func) =>
