@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage --project unit --project api",
+    "test:coverage:readme": "npm run test:coverage && node scripts/update-coverage-readme.js",
     "test:e2e": "playwright test",
     "format": "prettier --write \"app/**/*.{js,json}\" \"tests/**/*.js\" \"**/*.md\" \"*.json\""
   },
