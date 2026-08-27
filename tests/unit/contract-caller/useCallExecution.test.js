@@ -210,6 +210,45 @@ describe("useCallExecution – handleCall API error", () => {
 });
 
 describe("useCallExecution – handleShareUrl", () => {
+  it("includes value and read block in the fallback share URL (fork block excluded)", async () => {
+    const writeMode = renderHook(() =>
+      useCallExecution({
+        ...baseParams,
+        fromAddress: "0x1111111111111111111111111111111111111111",
+        ethValue: "1.5",
+        forkBlockNumber: "19000000",
+        blockNumber: "",
+      }),
+    );
+
+    await act(async () => {
+      await writeMode.result.current.handleShareUrl();
+    });
+
+    const writeUrl = new URL(navigator.clipboard.writeText.mock.calls[0][0]);
+    expect(writeUrl.searchParams.get("chain")).toBe("ethereum");
+    expect(writeUrl.searchParams.get("from")).toBe(
+      "0x1111111111111111111111111111111111111111",
+    );
+    expect(writeUrl.searchParams.get("value")).toBe("1.5");
+    expect(writeUrl.searchParams.get("block")).toBeNull();
+
+    const readMode = renderHook(() =>
+      useCallExecution({
+        ...baseParams,
+        forkBlockNumber: "",
+        blockNumber: "18000000",
+      }),
+    );
+
+    await act(async () => {
+      await readMode.result.current.handleShareUrl();
+    });
+
+    const readUrl = new URL(navigator.clipboard.writeText.mock.calls[1][0]);
+    expect(readUrl.searchParams.get("block")).toBe("18000000");
+  });
+
   it("stores enriched balanceChanges outside token metadata when saving a simulation", async () => {
     const enrichedBalanceChanges = [
       {

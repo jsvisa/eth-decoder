@@ -41,8 +41,11 @@ const abiHookState = {
 };
 
 const simulationOptionsState = {
-  forkBlockNumber: "",
-  setForkBlockNumber: vi.fn(),
+  blockNumber: "",
+  // Behaves like a state setter so the rendered fork field reflects updates.
+  setBlockNumber: vi.fn((value) => {
+    simulationOptionsState.blockNumber = value;
+  }),
   fromAddress: "",
   setFromAddress: vi.fn(),
   cheatcodes: {},
@@ -249,7 +252,12 @@ vi.mock("../../../app/contract-caller/components/CalldataSection.js", () => ({
     }),
 }));
 vi.mock("../../../app/contract-caller/components/SimulationOptions.js", () => ({
-  default: () => React.createElement("div"),
+  default: (props) =>
+    React.createElement("input", {
+      "data-testid": "fork-block",
+      value: props.forkBlockNumber ?? "",
+      onChange: (e) => props.onForkBlockChange(e.target.value),
+    }),
 }));
 vi.mock("../../../app/contract-caller/components/ArgsInput.js", () => ({
   default: (props) =>
@@ -404,5 +412,47 @@ describe("ContractCallerPage – calldata URL sync (real useFunctionSelection)",
       "calldata=0xdd62ed3e0000000000000000000000000000000000000000000000000000000000000001",
     );
     page.unmount();
+  });
+
+  it("syncs the simulation fork block into the shared block URL param", () => {
+    simulationOptionsState.blockNumber = "19000000";
+    const page = renderPage();
+
+    const setInput = (el, value) => {
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value",
+      ).set;
+      setter.call(el, value);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+
+    act(() => {
+      setInput(
+        page.q("address-input"),
+        "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      );
+    });
+
+    expect(page.q("fork-block").value).toBe("19000000");
+    expect(window.location.search).toContain("block=19000000");
+    expect(window.location.search).not.toContain("fork=");
+
+    page.unmount();
+    simulationOptionsState.blockNumber = "";
+  });
+
+  it("hydrates the simulation fork field with the block URL param", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/?chain=ethereum&address=0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48&block=19000000",
+    );
+    const page = renderPage();
+
+    expect(page.q("fork-block").value).toBe("19000000");
+
+    page.unmount();
+    simulationOptionsState.blockNumber = "";
   });
 });
