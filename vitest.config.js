@@ -59,6 +59,19 @@ export default defineConfig({
           environment: "node",
         },
       },
+      {
+        test: {
+          name: "benchmark",
+          include: ["tests/benchmark/**"],
+          exclude: [
+            "tests/benchmark/__fixtures__/**",
+            // worker entry points, not test files
+            "tests/benchmark/sim-worker.mjs",
+            "tests/benchmark/sim-worker-hooks.mjs",
+          ],
+          environment: "node",
+        },
+      },
     ],
   },
 });

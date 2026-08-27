@@ -9,6 +9,7 @@ const STATE_METHODS = new Set([
   "eth_getStorageAt",
   "eth_getBalance",
   "eth_createAccessList",
+  "eth_estimateGas",
   "eth_getProof",
   "eth_getTransactionCount",
 ]);
