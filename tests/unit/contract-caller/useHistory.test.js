@@ -37,7 +37,6 @@ function makeParams(overrides = {}) {
     setResult: vi.fn(),
     setError: vi.fn(),
     setEthValue: vi.fn(),
-    setForkBlockNumber: vi.fn(),
     applyPendingArgs: vi.fn(),
     ...overrides,
   };
@@ -155,7 +154,7 @@ describe("initial state", () => {
     expect(applyPendingArgs).not.toHaveBeenCalled();
   });
 
-  it("hydrates eth value and block number into read/fork fields on mount", () => {
+  it("hydrates eth value and read block number from URL params on mount", () => {
     window.history.replaceState(
       null,
       "",
@@ -164,16 +163,10 @@ describe("initial state", () => {
 
     const setEthValue = vi.fn();
     const setBlockNumber = vi.fn();
-    const setForkBlockNumber = vi.fn();
-    renderHook(() =>
-      useHistory(
-        makeParams({ setEthValue, setBlockNumber, setForkBlockNumber }),
-      ),
-    );
+    renderHook(() => useHistory(makeParams({ setEthValue, setBlockNumber })));
 
     expect(setEthValue).toHaveBeenCalledWith("1.5");
     expect(setBlockNumber).toHaveBeenCalledWith("19000000");
-    expect(setForkBlockNumber).toHaveBeenCalledWith("19000000");
   });
 
   it("preserves simulationId share URLs during state sync", () => {

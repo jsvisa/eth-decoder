@@ -42,7 +42,10 @@ const abiHookState = {
 
 const simulationOptionsState = {
   forkBlockNumber: "",
-  setForkBlockNumber: vi.fn(),
+  // Behaves like a state setter so the rendered fork field reflects updates.
+  setForkBlockNumber: vi.fn((value) => {
+    simulationOptionsState.forkBlockNumber = value;
+  }),
   fromAddress: "",
   setFromAddress: vi.fn(),
   cheatcodes: {},
@@ -249,7 +252,12 @@ vi.mock("../../../app/contract-caller/components/CalldataSection.js", () => ({
     }),
 }));
 vi.mock("../../../app/contract-caller/components/SimulationOptions.js", () => ({
-  default: () => React.createElement("div"),
+  default: (props) =>
+    React.createElement("input", {
+      "data-testid": "fork-block",
+      value: props.forkBlockNumber ?? "",
+      onChange: (e) => props.onForkBlockChange(e.target.value),
+    }),
 }));
 vi.mock("../../../app/contract-caller/components/ArgsInput.js", () => ({
   default: (props) =>
@@ -426,8 +434,23 @@ describe("ContractCallerPage – calldata URL sync (real useFunctionSelection)",
       );
     });
 
+    expect(page.q("fork-block").value).toBe("19000000");
     expect(window.location.search).toContain("block=19000000");
     expect(window.location.search).not.toContain("fork=");
+
+    page.unmount();
+    simulationOptionsState.forkBlockNumber = "";
+  });
+
+  it("hydrates the simulation fork field with the block URL param", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/?chain=ethereum&address=0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48&block=19000000",
+    );
+    const page = renderPage();
+
+    expect(page.q("fork-block").value).toBe("19000000");
 
     page.unmount();
     simulationOptionsState.forkBlockNumber = "";

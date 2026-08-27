@@ -357,10 +357,17 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     setError: exec.setError,
     setEthValue: simOpts.setEthValue,
     setBlockNumber: fn.setBlockNumber,
-    setForkBlockNumber: simOpts.setForkBlockNumber,
     applyPendingArgs: fn.applyPendingArgs,
     skipUrlHydration: !hydrateFromUrl,
   });
+
+  // Restore the simulation fork block from ?block= (useHistory hydrates the
+  // read-call block number from the same param).
+  useEffect(() => {
+    if (!hydrateFromUrl) return;
+    const urlBlock = new URLSearchParams(window.location.search).get("block");
+    if (urlBlock) simOpts.setForkBlockNumber(urlBlock);
+  }, [hydrateFromUrl]);
 
   // Wire remaining deferred refs
   saveBundleRef.current = history.saveSessionBundle;
