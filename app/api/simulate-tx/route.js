@@ -38,6 +38,39 @@ function isCreateCall(call) {
   return call.to === undefined || call.to === null || call.to === "";
 }
 
+const REDACTED_RPC = "[redacted]";
+
+/**
+ * Prepare a simulation payload for persistence. Share-link viewers can read
+ * saved simulations, so stored copies must not disclose RPC endpoints
+ * (user-supplied rpcUrl or server-side pro/fork URLs that viem/tevm embed in
+ * error messages). The live response to the requesting client is unchanged.
+ */
+function sanitizeSimulationForSave(data, rpcUrls) {
+  const urls = (rpcUrls || []).filter(Boolean);
+  const scrub = (text) =>
+    urls.reduce((acc, url) => acc.split(url).join(REDACTED_RPC), text);
+
+  if (!data || typeof data !== "object") return data;
+
+  if (Array.isArray(data.results)) {
+    return {
+      ...data,
+      results: data.results.map((r) => sanitizeSimulationForSave(r, urls)),
+    };
+  }
+
+  const clone = { ...data };
+  if (clone.requestBody && typeof clone.requestBody === "object") {
+    clone.requestBody = { ...clone.requestBody };
+    if (clone.requestBody.rpcUrl) clone.requestBody.rpcUrl = REDACTED_RPC;
+  }
+  if (typeof clone.error === "string" && urls.length > 0) {
+    clone.error = scrub(clone.error);
+  }
+  return clone;
+}
+
 /**
  * Validate the per-call fields shared by single-call and session modes.
  * Returns { error } on failure, or { error: null }.
@@ -390,7 +423,11 @@ async function runSingleSimulation({
     }
     if (save) {
       try {
-        const simulationId = await saveSimulationResult(resultWithRequest);
+        const saved = sanitizeSimulationForSave(resultWithRequest, [
+          rpcUrl,
+          chain?.forkRpcUrl,
+        ]);
+        const simulationId = await saveSimulationResult(saved);
         responseData.simulationId = simulationId;
         responseData.simulationLink = buildSimulationLink(
           request,
@@ -411,7 +448,11 @@ async function runSingleSimulation({
     let responseData = { ...errorResult };
     if (save) {
       try {
-        const simulationId = await saveSimulationResult(errorResult);
+        const saved = sanitizeSimulationForSave(errorResult, [
+          rpcUrl,
+          chain?.forkRpcUrl,
+        ]);
+        const simulationId = await saveSimulationResult(saved);
         responseData.simulationId = simulationId;
         responseData.simulationLink = buildSimulationLink(
           request,
@@ -610,7 +651,11 @@ export async function POST(request) {
 
     if (save) {
       try {
-        const simulationId = await saveSimulationResult(sessionResponse);
+        const saved = sanitizeSimulationForSave(sessionResponse, [
+          singleCallContext.rpcUrl,
+          chain.forkRpcUrl,
+        ]);
+        const simulationId = await saveSimulationResult(saved);
         sessionResponse.simulationId = simulationId;
         sessionResponse.simulationLink = buildSimulationLink(
           request,
