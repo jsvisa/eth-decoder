@@ -58,10 +58,6 @@ export function useSimulationOptions() {
     setFromAddress,
     blockNumber,
     setBlockNumber,
-    // Backward-compatible aliases: write-mode consumers (SimulationOptions
-    // fork field, tevm session) read the same single block number.
-    forkBlockNumber: blockNumber,
-    setForkBlockNumber: setBlockNumber,
     cheatcodes,
     setCheatcodes,
     balanceOverrides,
