@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import { join } from "path";
 import { getServerCacheBaseDir } from "./serverCacheDir";
+import { atomicWriteFile } from "./atomicWriteFile";
 
 // Cache paths are built from user-controlled values; enforce shape here so
 // a future caller that forgets to validate cannot trigger path traversal.
@@ -46,10 +47,9 @@ export async function setAbiInCache(
   try {
     const dir = join(cacheDir, String(chainId));
     await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(
+    await atomicWriteFile(
       cachePath(chainId, address, cacheDir),
       JSON.stringify(entry),
-      "utf-8",
     );
   } catch (e) {
     console.warn(

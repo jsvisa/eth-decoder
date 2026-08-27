@@ -2,6 +2,7 @@ import { promises as fs } from "fs";
 import { join } from "path";
 import { getServerCacheBaseDir } from "./serverCacheDir";
 import { shouldUseVercelBlob, blobPut, blobGet } from "./blobCache";
+import { atomicWriteFile } from "./atomicWriteFile";
 
 const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const VERCEL_BLOB_ID_PREFIX = "vb1_";
@@ -101,7 +102,7 @@ export async function saveSimulationResult(data) {
   const id = randomUUID();
   const cacheDir = getCacheDir();
   await fs.mkdir(cacheDir, { recursive: true });
-  await fs.writeFile(resultPath(id, cacheDir), serialized, "utf-8");
+  await atomicWriteFile(resultPath(id, cacheDir), serialized);
   return id;
 }
 

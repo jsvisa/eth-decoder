@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import { join } from "path";
 import { getServerCacheBaseDir } from "./serverCacheDir";
+import { atomicWriteFile } from "./atomicWriteFile";
 
 // Signature-cache keys are filesystem components built from user input, so
 // only well-formed selectors/topic0 hashes may ever reach the disk layer.
@@ -45,10 +46,9 @@ export async function setSignaturesInCache(
   try {
     const dir = join(cacheDir, "signatures");
     await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(
+    await atomicWriteFile(
       sigPath(selector, cacheDir),
       JSON.stringify(signatures),
-      "utf-8",
     );
   } catch (e) {
     console.warn(
