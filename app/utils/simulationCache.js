@@ -6,9 +6,18 @@ import { atomicWriteFile } from "./atomicWriteFile";
 
 const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const VERCEL_BLOB_ID_PREFIX = "vb1_";
+const DEFAULT_MAX_RESULT_BYTES = 2 * 1024 * 1024;
 
 // Refuse unauthenticated saves above this size to prevent storage abuse.
-export const MAX_SIMULATION_RESULT_BYTES = 2 * 1024 * 1024;
+// Override with MAX_SIMULATION_RESULT_BYTES (in bytes).
+export function getMaxSimulationResultBytes() {
+  const raw = process.env.MAX_SIMULATION_RESULT_BYTES;
+  if (raw) {
+    const parsed = parseInt(raw, 10);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+  return DEFAULT_MAX_RESULT_BYTES;
+}
 
 export class SimulationPayloadTooLargeError extends Error {
   constructor(maxBytes) {
@@ -90,8 +99,9 @@ async function getVercelBlobSimulationResult(id) {
 export async function saveSimulationResult(data) {
   const entry = buildEntry(data);
   const serialized = JSON.stringify(entry);
-  if (Buffer.byteLength(serialized, "utf-8") > MAX_SIMULATION_RESULT_BYTES) {
-    throw new SimulationPayloadTooLargeError(MAX_SIMULATION_RESULT_BYTES);
+  const maxBytes = getMaxSimulationResultBytes();
+  if (Buffer.byteLength(serialized, "utf-8") > maxBytes) {
+    throw new SimulationPayloadTooLargeError(maxBytes);
   }
 
   if (shouldUseVercelBlob()) {
