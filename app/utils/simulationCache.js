@@ -6,6 +6,20 @@ import { shouldUseVercelBlob, blobPut, blobGet } from "./blobCache";
 const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const VERCEL_BLOB_ID_PREFIX = "vb1_";
 
+// Refuse unauthenticated saves above this size to prevent storage abuse.
+export const MAX_SIMULATION_RESULT_BYTES = 2 * 1024 * 1024;
+
+export class SimulationPayloadTooLargeError extends Error {
+  constructor(maxBytes) {
+    super(
+      `Simulation payload exceeds the maximum allowed size (${Math.floor(
+        maxBytes / (1024 * 1024),
+      )}MB)`,
+    );
+    this.name = "SimulationPayloadTooLargeError";
+  }
+}
+
 function getCacheDir() {
   return (
     process.env.SIMULATION_CACHE_DIR ||
@@ -73,16 +87,21 @@ async function getVercelBlobSimulationResult(id) {
 }
 
 export async function saveSimulationResult(data) {
+  const entry = buildEntry(data);
+  const serialized = JSON.stringify(entry);
+  if (Buffer.byteLength(serialized, "utf-8") > MAX_SIMULATION_RESULT_BYTES) {
+    throw new SimulationPayloadTooLargeError(MAX_SIMULATION_RESULT_BYTES);
+  }
+
   if (shouldUseVercelBlob()) {
     return saveToVercelBlob(data);
   }
 
   const { randomUUID } = await import("crypto");
   const id = randomUUID();
-  const entry = buildEntry(data);
   const cacheDir = getCacheDir();
   await fs.mkdir(cacheDir, { recursive: true });
-  await fs.writeFile(resultPath(id, cacheDir), JSON.stringify(entry), "utf-8");
+  await fs.writeFile(resultPath(id, cacheDir), serialized, "utf-8");
   return id;
 }
 

@@ -86,6 +86,22 @@ describe("simulationCache", () => {
     expect(retrieved).toBe(false);
   });
 
+  it("rejects results above the 2MB size cap", async () => {
+    const huge = { success: true, blob: "x".repeat(2 * 1024 * 1024 + 256) };
+    await expect(
+      withCacheDir(() => saveSimulationResult(huge)),
+    ).rejects.toMatchObject({ name: "SimulationPayloadTooLargeError" });
+    // nothing must have been persisted
+    await expect(withCacheDir(() => pruneExpiredResults())).resolves.toBe(0);
+  });
+
+  it("accepts results just under the 2MB cap", async () => {
+    const big = { success: true, blob: "x".repeat(1024 * 1024) };
+    await expect(
+      withCacheDir(() => saveSimulationResult(big)),
+    ).resolves.toMatch(/^[0-9a-f-]{36}$/);
+  });
+
   it("returns null for an unknown ID", async () => {
     const result = await withCacheDir(() =>
       getSimulationResult("00000000-0000-0000-0000-000000000000"),

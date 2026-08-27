@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   saveSimulationResult,
   pruneExpiredResults,
+  SimulationPayloadTooLargeError,
 } from "../../utils/simulationCache";
 import { buildSimulationLink } from "../../utils/simulationLinks";
 
@@ -31,8 +32,12 @@ export async function POST(request) {
       simulationLink: buildSimulationLink(request, simulationId),
     });
   } catch (error) {
+    if (error instanceof SimulationPayloadTooLargeError) {
+      return NextResponse.json({ error: error.message }, { status: 413 });
+    }
+    console.error("Failed to save simulation:", error);
     return NextResponse.json(
-      { error: `Failed to save simulation: ${error.message}` },
+      { error: "Failed to save simulation" },
       { status: 500 },
     );
   }

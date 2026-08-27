@@ -1058,3 +1058,17 @@ describe("POST /api/simulate-tx — session mode", () => {
     expect(getAbiFromCache).toHaveBeenCalledOnce();
   });
 });
+
+describe("POST /api/simulate-tx — save failure handling", () => {
+  it("returns the simulation result without simulationId when the save is rejected (e.g. oversize)", async () => {
+    saveSimulationResult.mockRejectedValueOnce(
+      new Error("Simulation payload exceeds the maximum allowed size (2MB)"),
+    );
+    const res = await POST(makeRequest({ ...VALID_BODY, save: true }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.simulationId).toBeUndefined();
+    expect(body.simulationLink).toBeUndefined();
+  });
+});

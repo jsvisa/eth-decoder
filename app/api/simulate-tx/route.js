@@ -389,9 +389,17 @@ async function runSingleSimulation({
       delete responseData.metrics;
     }
     if (save) {
-      const simulationId = await saveSimulationResult(resultWithRequest);
-      responseData.simulationId = simulationId;
-      responseData.simulationLink = buildSimulationLink(request, simulationId);
+      try {
+        const simulationId = await saveSimulationResult(resultWithRequest);
+        responseData.simulationId = simulationId;
+        responseData.simulationLink = buildSimulationLink(
+          request,
+          simulationId,
+        );
+      } catch (saveError) {
+        // Oversized/failed save — return the result without a simulation id
+        console.error("Failed to save simulation result:", saveError);
+      }
     }
     return { status: 200, body: responseData };
   } catch (error) {
@@ -402,9 +410,16 @@ async function runSingleSimulation({
     };
     let responseData = { ...errorResult };
     if (save) {
-      const simulationId = await saveSimulationResult(errorResult);
-      responseData.simulationId = simulationId;
-      responseData.simulationLink = buildSimulationLink(request, simulationId);
+      try {
+        const simulationId = await saveSimulationResult(errorResult);
+        responseData.simulationId = simulationId;
+        responseData.simulationLink = buildSimulationLink(
+          request,
+          simulationId,
+        );
+      } catch (saveError) {
+        console.error("Failed to save error result:", saveError);
+      }
     }
     return { status: 500, body: responseData };
   }

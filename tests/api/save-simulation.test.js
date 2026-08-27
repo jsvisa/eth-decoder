@@ -1,14 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST } from "../../app/api/save-simulation/route.js";
 
-vi.mock("../../app/utils/simulationCache.js", () => ({
-  saveSimulationResult: vi.fn(),
-  pruneExpiredResults: vi.fn(),
-}));
+vi.mock("../../app/utils/simulationCache.js", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    SimulationPayloadTooLargeError: actual.SimulationPayloadTooLargeError,
+    saveSimulationResult: vi.fn(),
+    pruneExpiredResults: vi.fn(),
+  };
+});
 
 import {
   saveSimulationResult,
   pruneExpiredResults,
+  SimulationPayloadTooLargeError,
 } from "../../app/utils/simulationCache.js";
 
 const FAKE_SIMULATION_ID = "vb1_fake-share-token";
@@ -77,5 +82,38 @@ describe("POST /api/save-simulation", () => {
       simulationLink: `https://eth-decoder.vercel.app/?simulationId=${FAKE_SIMULATION_ID}`,
     });
     expect(saveSimulationResult).toHaveBeenCalledWith(SIM_RESULT);
+  });
+});
+
+describe("POST /api/save-simulation — size cap", () => {
+  it("returns 413 when the payload exceeds the 2MB limit", async () => {
+    vi.mocked(saveSimulationResult).mockRejectedValue(
+      new SimulationPayloadTooLargeError(2 * 1024 * 1024),
+    );
+
+    const res = await POST(
+      makeRequest({ success: true, huge: "x".repeat(100) }),
+    );
+    expect(res.status).toBe(413);
+    const body = await res.json();
+    expect(body.error).toMatch(/maximum allowed size \(2MB\)/);
+    expect(body.simulationId).toBeUndefined();
+  });
+
+  it("returns a generic 500 (no internals) when saving fails unexpectedly", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(saveSimulationResult).mockRejectedValue(
+      new Error("disk on fire /tmp secret details"),
+    );
+    try {
+      const res = await POST(makeRequest({ success: true }));
+      expect(res.status).toBe(500);
+      const body = await res.json();
+      expect(body.error).toBe("Failed to save simulation");
+      expect(body.error).not.toMatch(/disk on fire/);
+      errSpy.mockRestore();
+    } finally {
+      errSpy.mockRestore();
+    }
   });
 });
