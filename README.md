@@ -8,7 +8,7 @@ A web application for decoding EVM transaction input data and interacting with s
 
 | Statements | Branches | Functions | Lines  |
 | ---------- | -------- | --------- | ------ |
-| 75.03%     | 73.62%   | 80.85%    | 74.96% |
+| 70.4%      | 59.33%   | 69.63%    | 73.53% |
 
 _Regenerate with_ `npm run test:coverage:readme`.
 <!-- COVERAGE:END -->
