@@ -194,6 +194,29 @@ describe("POST /api/simulate-tx — validation", () => {
     expect((await res.json()).error).toMatch(/unsupported chainid/i);
   });
 
+  it("returns 400 when session-mode calls exceed the 20-call cap", async () => {
+    const manyCalls = Array.from({ length: 21 }, () => ({
+      to: VALID_BODY.to,
+      data: VALID_BODY.data,
+      from: VALID_BODY.from,
+    }));
+    const res = await POST(makeRequest({ ...VALID_BODY, calls: manyCalls }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/at most 20/i);
+  });
+
+  it("accepts 20 session calls (the cap boundary)", async () => {
+    simulateWithClient.mockResolvedValue(SIM_RESULT);
+    const calls = Array.from({ length: 20 }, () => ({
+      to: VALID_BODY.to,
+      data: VALID_BODY.data,
+      from: VALID_BODY.from,
+    }));
+    const res = await POST(makeRequest({ ...VALID_BODY, calls }));
+    expect(res.status).toBe(200);
+  });
+
   it("returns 400 when rpcUrl points at a private address (SSRF)", async () => {
     delete process.env.ALLOW_PRIVATE_RPC;
     const res = await POST(

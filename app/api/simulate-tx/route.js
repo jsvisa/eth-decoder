@@ -516,6 +516,17 @@ export async function POST(request) {
       { status: 400 },
     );
   }
+  // Each session call runs a full fork simulation; without a cap a single
+  // anonymous request could pin the serverless function past its timeout.
+  const MAX_SESSION_CALLS = 20;
+  if (sessionMode && calls.length > MAX_SESSION_CALLS) {
+    return NextResponse.json(
+      {
+        error: `'calls' supports at most ${MAX_SESSION_CALLS} entries per session`,
+      },
+      { status: 400 },
+    );
+  }
 
   if (blockNumber !== "latest") {
     if (!/^(0x[0-9a-fA-F]+|\d+)$/.test(String(blockNumber).trim())) {
