@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
 import {
   lookupFunctionSignatures,
   lookupEventSignatures,
@@ -46,7 +47,9 @@ export async function GET(request) {
   if (backendUrl) {
     try {
       const params = new URLSearchParams({ sign });
-      const response = await fetch(`${backendUrl}/api/v1/query?${params}`);
+      const response = await fetchWithTimeout(
+        `${backendUrl}/api/v1/query?${params}`,
+      );
       if (response.ok) {
         const data = await response.json();
         if (data?.data != null) {

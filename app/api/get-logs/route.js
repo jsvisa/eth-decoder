@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isValidEthAddress } from "../../utils/validation";
 import { BUILT_IN_CHAIN_IDS } from "../../utils/chains";
+import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
 
 const ETHERSCAN_V2_API = "https://api.etherscan.io/v2/api";
 
@@ -47,7 +48,7 @@ export async function GET(request) {
   }
 
   try {
-    const response = await fetch(`${ETHERSCAN_V2_API}?${params}`);
+    const response = await fetchWithTimeout(`${ETHERSCAN_V2_API}?${params}`);
     const data = await response.json();
 
     if (data.status !== "1" && data.message !== "No records found") {

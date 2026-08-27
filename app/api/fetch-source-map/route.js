@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isValidEthAddress } from "../../utils/validation";
+import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
 
 export async function GET(request) {
   try {
@@ -35,7 +36,7 @@ export async function GET(request) {
       );
     }
 
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://sourcify.dev/server/v2/contract/${encodeURIComponent(
         chainId,
       )}/${address}/files`,

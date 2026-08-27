@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GET } from "../../app/api/token-price/route.js";
+import { resetPriceCacheForTests } from "../../app/utils/coingecko.js";
 
 const ETH = "0x0000000000000000000000000000000000000000";
 const USDC = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
@@ -16,6 +17,7 @@ function makeRequest(params) {
 
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn());
+  resetPriceCacheForTests();
 });
 
 afterEach(() => {
@@ -33,6 +35,28 @@ describe("GET /api/token-price", () => {
   it("returns 400 when chainId param is missing", async () => {
     const res = await GET(makeRequest({ token: USDC }));
     expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for a malformed token address", async () => {
+    const res = await GET(makeRequest({ token: "../../evil", chainId: 1 }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/invalid token address/i);
+  });
+
+  it("caches repeated lookups within the TTL window", async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ ethereum: { usd: 2500 } }),
+    });
+    const first = await GET(makeRequest({ token: ETH, chainId: 1 }));
+    expect((await first.json()).price).toBe(2500);
+
+    // Second identical request must be served from cache (no new fetch)
+    global.fetch.mockClear();
+    const second = await GET(makeRequest({ token: ETH, chainId: 1 }));
+    expect((await second.json()).price).toBe(2500);
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it("returns { price: null } for an unsupported chain", async () => {

@@ -1,4 +1,5 @@
 import { getSignaturesFromCache, setSignaturesInCache } from "./serverSigCache";
+import { fetchWithTimeout } from "./fetchWithTimeout";
 
 const SOURCIFY_LOOKUP_URL =
   "https://api.4byte.sourcify.dev/signature-database/v1/lookup";
@@ -8,7 +9,9 @@ export async function lookupFunctionSignatures(selector) {
   if (cached) return cached;
 
   try {
-    const res = await fetch(`${SOURCIFY_LOOKUP_URL}?function=${selector}`);
+    const res = await fetchWithTimeout(
+      `${SOURCIFY_LOOKUP_URL}?function=${selector}`,
+    );
     if (!res.ok) return [];
     const json = await res.json();
     if (!json.ok) return [];
@@ -25,7 +28,9 @@ export async function lookupEventSignatures(topic0) {
   if (cached) return cached;
 
   try {
-    const res = await fetch(`${SOURCIFY_LOOKUP_URL}?event=${topic0}`);
+    const res = await fetchWithTimeout(
+      `${SOURCIFY_LOOKUP_URL}?event=${topic0}`,
+    );
     if (!res.ok) return [];
     const json = await res.json();
     if (!json.ok) return [];

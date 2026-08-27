@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
 
 const BACKEND_WRITE_PATH = "/api/v1/write";
 
@@ -52,7 +53,7 @@ export async function POST(request) {
 
   let response;
   try {
-    response = await fetch(`${backendUrl}${BACKEND_WRITE_PATH}`, {
+    response = await fetchWithTimeout(`${backendUrl}${BACKEND_WRITE_PATH}`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
