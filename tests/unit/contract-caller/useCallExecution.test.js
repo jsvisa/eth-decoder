@@ -210,7 +210,7 @@ describe("useCallExecution – handleCall API error", () => {
 });
 
 describe("useCallExecution – handleShareUrl", () => {
-  it("includes value and block (read or fork) in the fallback share URL", async () => {
+  it("includes value and read block in the fallback share URL (fork block excluded)", async () => {
     const writeMode = renderHook(() =>
       useCallExecution({
         ...baseParams,
@@ -231,7 +231,7 @@ describe("useCallExecution – handleShareUrl", () => {
       "0x1111111111111111111111111111111111111111",
     );
     expect(writeUrl.searchParams.get("value")).toBe("1.5");
-    expect(writeUrl.searchParams.get("block")).toBe("19000000");
+    expect(writeUrl.searchParams.get("block")).toBeNull();
 
     const readMode = renderHook(() =>
       useCallExecution({
