@@ -1,6 +1,5 @@
 .main {
-  min-height: 100vh;
-  padding: 2rem;
+  padding: clamp(1rem, 3vw, 2.5rem) clamp(1rem, 4vw, 2rem);
   background: linear-gradient(
     to bottom,
     var(--bg-primary),
@@ -10,10 +9,13 @@
 
 .container {
   width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
   background: var(--bg-card);
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: var(--shadow);
+  padding: clamp(1.25rem, 3vw, 2rem);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
 .header {
@@ -27,79 +29,93 @@
 
 .title {
   color: var(--text-primary);
-  font-size: 2rem;
+  letter-spacing: -0.02em;
+  font-size: clamp(1.5rem, 3vw, 2rem);
   margin: 0;
+  font-weight: 700;
 }
 
 .headerActions {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.625rem;
   flex-wrap: wrap;
 }
 
 .addButton {
-  padding: 0.625rem 1.25rem;
+  padding: 0.5625rem 1.125rem;
   font-size: 0.9rem;
   font-weight: 600;
   color: white;
   background-color: var(--accent-blue);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, transform 0.15s, box-shadow 0.2s;
+  min-height: 40px;
 }
 
 .addButton:hover {
   background-color: var(--accent-blue-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
 }
 
 .importButton,
 .exportButton {
-  padding: 0.625rem 1.25rem;
+  padding: 0.5625rem 1.125rem;
   font-size: 0.9rem;
   font-weight: 500;
   color: var(--text-secondary);
-  background-color: var(--bg-hover);
+  background-color: transparent;
   border: 1px solid var(--border-primary);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.2s;
+  min-height: 40px;
 }
 
 .importButton:hover,
 .exportButton:hover {
-  background-color: #e8e8e8;
-  border-color: #ccc;
+  color: var(--text-primary);
+  border-color: var(--border-focus);
+  background-color: var(--accent-blue-light);
 }
 
 .exportButton:disabled {
-  color: #999;
+  color: var(--text-muted);
   cursor: not-allowed;
 }
 
 .error,
 .success {
-  padding: 1rem 1.25rem;
-  border-radius: 6px;
+  padding: 0.875rem 1.125rem;
+  border-radius: var(--radius-sm);
   margin-bottom: 1rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.75rem;
 }
 
 .error {
-  background-color: #fee2e2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
+  background-color: var(--accent-red-light);
+  border: 1px solid var(--accent-red);
+  color: var(--accent-red);
 }
 
 .success {
-  background-color: #d1fae5;
-  border: 1px solid #a7f3d0;
-  color: #059669;
+  background-color: var(--accent-green-light);
+  border: 1px solid var(--accent-green);
+  color: var(--accent-green);
 }
 
 .dismissButton {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  min-width: 28px;
+  min-height: 28px;
   background: none;
   border: none;
   font-size: 1.25rem;
@@ -107,6 +123,7 @@
   color: inherit;
   opacity: 0.7;
   padding: 0 0.25rem;
+  border-radius: 6px;
 }
 
 .dismissButton:hover {
@@ -118,13 +135,15 @@
   position: fixed;
   bottom: 2rem;
   right: 2rem;
+  left: auto;
+  max-width: calc(100vw - 2rem);
   padding: 0.75rem 1.25rem;
-  background-color: #1f2937;
-  color: white;
-  border-radius: 8px;
+  background-color: var(--text-primary);
+  color: var(--bg-card);
+  border-radius: var(--radius-md);
   font-size: 0.9rem;
   font-weight: 500;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-lg);
   z-index: 1000;
   animation: slideIn 0.2s ease-out;
 }
@@ -143,26 +162,28 @@
 .filterRow {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
   margin-bottom: 1.5rem;
   flex-wrap: wrap;
 }
 
 .searchInput {
   flex: 1;
-  min-width: 200px;
-  padding: 0.75rem 1rem;
+  min-width: min(220px, 100%);
+  padding: 0.7rem 1rem;
   font-size: 1rem;
-  border: 2px solid var(--border-primary);
-  border-radius: 6px;
-  transition: border-color 0.2s;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.2s, box-shadow 0.2s;
   background-color: var(--bg-input);
   color: var(--text-primary);
+  min-height: 42px;
 }
 
 .searchInput:focus {
   outline: none;
   border-color: var(--border-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .count {
@@ -179,7 +200,6 @@
 
 .emptyIcon {
   font-size: 3rem;
-  color: #f59e0b;
   margin-bottom: 1rem;
 }
 
@@ -195,6 +215,8 @@
 /* Table styles */
 .tableWrapper {
   overflow-x: auto;
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
 }
 
 .table {
@@ -206,13 +228,13 @@
 .table th {
   text-align: left;
   padding: 0.75rem 1rem;
-  background-color: var(--bg-hover);
+  background-color: var(--bg-secondary);
   color: var(--text-secondary);
   font-weight: 600;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-bottom: 2px solid var(--border-primary);
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--border-primary);
   white-space: nowrap;
 }
 
@@ -220,6 +242,10 @@
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border-secondary);
   vertical-align: middle;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
 }
 
 .row:hover {
@@ -260,7 +286,7 @@
 }
 
 .star {
-  color: #f59e0b;
+  color: var(--accent-yellow);
   font-size: 1rem;
 }
 
@@ -276,18 +302,22 @@
 
 /* Address */
 .address {
-  font-family: "Consolas", "Monaco", "Courier New", monospace;
-  font-size: 0.85rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
   color: var(--accent-blue);
   cursor: pointer;
   padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+  border-radius: 6px;
   background-color: var(--accent-blue-light);
   transition: filter 0.2s;
 }
 
 .address:hover {
-  filter: brightness(0.95);
+  filter: brightness(0.93);
+}
+
+[data-theme="dark"] .address:hover {
+  filter: brightness(1.2);
 }
 
 /* Notes */
@@ -306,9 +336,10 @@
   padding: 0.375rem 0.5rem;
   font-size: 0.9rem;
   border: 1px solid var(--border-focus);
-  border-radius: 4px;
+  border-radius: 6px;
   background-color: var(--bg-input);
   color: var(--text-primary);
+  box-shadow: var(--focus-ring);
 }
 
 .inlineInput:focus {
@@ -321,17 +352,25 @@
   white-space: nowrap;
 }
 
-.openButton {
-  display: inline-block;
-  padding: 0.375rem 0.75rem;
+.openButton,
+.editButton,
+.deleteButton,
+.saveButton,
+.cancelButton {
+  padding: 0.4375rem 0.75rem;
   font-size: 0.8rem;
   font-weight: 500;
-  color: var(--accent-blue);
-  background-color: white;
-  border: 1px solid var(--accent-blue);
-  border-radius: 4px;
-  text-decoration: none;
+  background-color: transparent;
+  border-radius: 6px;
+  cursor: pointer;
   transition: all 0.2s;
+}
+
+.openButton {
+  display: inline-block;
+  color: var(--accent-blue);
+  border: 1px solid var(--accent-blue);
+  text-decoration: none;
   margin-right: 0.5rem;
 }
 
@@ -340,49 +379,30 @@
 }
 
 .editButton {
-  padding: 0.375rem 0.75rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: #666;
-  background-color: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-primary);
   margin-right: 0.5rem;
 }
 
 .editButton:hover {
-  background-color: #f5f5f5;
-  border-color: #ccc;
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .deleteButton {
-  padding: 0.375rem 0.75rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: #dc2626;
-  background-color: white;
-  border: 1px solid #fecaca;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
+  color: var(--accent-red);
+  border: 1px solid transparent;
 }
 
 .deleteButton:hover {
-  background-color: #fee2e2;
-  border-color: #dc2626;
+  background-color: var(--accent-red-light);
+  border-color: var(--accent-red);
 }
 
 .saveButton {
-  padding: 0.375rem 0.75rem;
-  font-size: 0.8rem;
-  font-weight: 600;
   color: white;
   background-color: var(--accent-blue);
   border: none;
-  border-radius: 4px;
-  cursor: pointer;
   margin-right: 0.5rem;
 }
 
@@ -391,47 +411,57 @@
 }
 
 .cancelButton {
-  padding: 0.375rem 0.75rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: #666;
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  cursor: pointer;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-primary);
 }
 
 .cancelButton:hover {
-  background-color: #e8e8e8;
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 /* Modal styles */
 .modalOverlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  background-color: rgba(9, 9, 11, 0.55);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: 1rem;
 }
 
 .modal {
-  background: white;
-  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-lg);
   padding: 1.5rem;
-  width: 90%;
+  width: 100%;
   max-width: 500px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-lg);
+  animation: modalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .modalTitle {
-  margin: 0 0 1.5rem 0;
-  font-size: 1.25rem;
-  color: #333;
+  margin: 0 0 1.25rem 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
 }
 
 .modalBody {
@@ -448,36 +478,42 @@
 
 .modalLabel {
   font-weight: 500;
-  color: #555;
+  color: var(--text-secondary);
   font-size: 0.875rem;
 }
 
 .modalInput {
-  padding: 0.75rem 1rem;
+  padding: 0.7rem 0.9rem;
   font-size: 1rem;
-  border: 2px solid #ddd;
-  border-radius: 6px;
-  transition: border-color 0.2s;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .modalInput:focus {
   outline: none;
-  border-color: #0070f3;
+  border-color: var(--border-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .modalTextarea {
-  padding: 0.75rem 1rem;
+  padding: 0.7rem 0.9rem;
   font-size: 0.9rem;
-  border: 2px solid #ddd;
-  border-radius: 6px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-input);
+  color: var(--text-primary);
   resize: vertical;
   min-height: 60px;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .modalTextarea:focus {
   outline: none;
-  border-color: #0070f3;
+  border-color: var(--border-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .modalActions {
@@ -488,56 +524,60 @@
 }
 
 .modalCancelButton {
-  padding: 0.75rem 1.25rem;
+  padding: 0.6875rem 1.25rem;
   font-size: 0.9rem;
   font-weight: 500;
-  color: #666;
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  color: var(--text-secondary);
+  background-color: transparent;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .modalCancelButton:hover {
-  background-color: #e8e8e8;
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .modalSaveButton {
-  padding: 0.75rem 1.25rem;
+  padding: 0.6875rem 1.25rem;
   font-size: 0.9rem;
   font-weight: 600;
   color: white;
-  background-color: #0070f3;
+  background-color: var(--accent-blue);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
   transition: background-color 0.2s;
 }
 
 .modalSaveButton:hover {
-  background-color: #0051cc;
+  background-color: var(--accent-blue-hover);
 }
 
 /* Import modal specific styles */
 .importInfo {
   margin: 0;
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
 .csvFormat {
   display: block;
   padding: 0.75rem 1rem;
-  background-color: #f5f5f5;
-  border-radius: 4px;
-  font-size: 0.85rem;
-  color: #333;
+  background-color: var(--bg-hover);
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  word-break: break-all;
 }
 
 .importNote {
   margin: 0;
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.85rem;
 }
 
@@ -546,13 +586,14 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.9rem;
-  color: #555;
+  color: var(--text-primary);
   cursor: pointer;
 }
 
 .checkboxLabel input {
   width: 1rem;
   height: 1rem;
+  accent-color: var(--accent-blue);
   cursor: pointer;
 }
 
@@ -561,22 +602,12 @@
 }
 
 @media (max-width: 900px) {
-  .container {
-    padding: 1rem;
-  }
-
   .header {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
   }
 
-  .headerActions {
-    width: 100%;
-  }
-
-  .addButton,
-  .importButton,
-  .exportButton {
+  .headerActions > * {
     flex: 1;
   }
 
@@ -587,6 +618,7 @@
 
   .searchInput {
     width: 100%;
+    min-width: 0;
   }
 
   .count {
@@ -595,7 +627,7 @@
 
   .table th,
   .table td {
-    padding: 0.5rem;
+    padding: 0.5rem 0.625rem;
   }
 
   .thNotes,
@@ -613,7 +645,7 @@
   .deleteButton,
   .saveButton,
   .cancelButton {
-    padding: 0.25rem 0.5rem;
+    padding: 0.3125rem 0.5rem;
     font-size: 0.75rem;
   }
 }

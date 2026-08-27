@@ -1,6 +1,5 @@
 .main {
-  min-height: 100vh;
-  padding: 2rem;
+  padding: clamp(1rem, 3vw, 2.5rem) clamp(1rem, 4vw, 2rem);
   background: linear-gradient(
     to bottom,
     var(--bg-primary),
@@ -10,17 +9,22 @@
 
 .container {
   width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
   background: var(--bg-card);
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: var(--shadow);
+  padding: clamp(1.25rem, 3vw, 2rem);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
 .title {
   text-align: center;
   color: var(--text-primary);
-  margin-bottom: 1.5rem;
-  font-size: 2rem;
+  letter-spacing: -0.02em;
+  margin-bottom: 1.75rem;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 700;
 }
 
 .form {
@@ -31,11 +35,13 @@
 }
 
 .input {
-  padding: 0.875rem 1rem;
+  width: 100%;
+  padding: 0.8125rem 1rem;
   font-size: 1rem;
-  border: 2px solid var(--border-primary);
-  border-radius: 6px;
-  transition: border-color 0.3s;
+  font-family: var(--font-mono);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.2s, box-shadow 0.2s;
   min-height: 44px;
   background-color: var(--bg-input);
   color: var(--text-primary);
@@ -44,17 +50,20 @@
 .input:focus {
   outline: none;
   border-color: var(--border-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .input:disabled {
   background-color: var(--bg-hover);
   cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .options {
   display: flex;
   gap: 1.25rem;
-  padding: 0.5rem 0;
+  padding: 0.25rem 0;
+  flex-wrap: wrap;
 }
 
 .checkbox {
@@ -62,14 +71,14 @@
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: 0.95rem;
   color: var(--text-primary);
   user-select: none;
 }
 
 .checkbox input[type="checkbox"] {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.125rem;
+  height: 1.125rem;
   cursor: pointer;
   accent-color: var(--accent-blue);
 }
@@ -85,70 +94,71 @@
 
 .buttonGroup {
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
-.button {
+.button,
+.shareButton {
+  flex: 1 1 200px;
   padding: 0.75rem 1.5rem;
   font-size: 1rem;
   font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.2s, box-shadow 0.2s, transform 0.15s,
+    opacity 0.2s;
+  min-height: 44px;
+}
+
+.button {
   color: white;
   background-color: var(--accent-blue);
   border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 0.3s;
-  flex: 1;
+  box-shadow: var(--shadow-sm);
 }
 
 .button:hover:not(:disabled) {
   background-color: var(--accent-blue-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
 }
 
-.button:disabled {
-  background-color: #ccc;
+.button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.button:disabled,
+.shareButton:disabled {
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
 .shareButton {
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  font-weight: 600;
   color: var(--accent-blue);
-  background-color: var(--bg-card);
-  border: 2px solid var(--accent-blue);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.3s;
-  flex: 1;
+  background-color: transparent;
+  border: 1px solid var(--border-primary);
 }
 
 .shareButton:hover:not(:disabled) {
-  background-color: var(--accent-blue);
-  color: white;
-}
-
-.shareButton:disabled {
-  background-color: var(--bg-hover);
-  border-color: var(--border-primary);
-  color: var(--text-muted);
-  cursor: not-allowed;
+  background-color: var(--accent-blue-light);
+  border-color: var(--accent-blue);
 }
 
 .error {
-  padding: 0.875rem;
+  padding: 0.875rem 1rem;
   background-color: var(--accent-red-light);
   border: 1px solid var(--accent-red);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--accent-red);
-  font-size: 1rem;
+  font-size: 0.95rem;
 }
 
+/* Result */
 .result {
   padding: 1rem;
   background-color: var(--code-bg);
-  border: 1px solid var(--border-primary);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   margin-top: 1rem;
 }
 
@@ -158,44 +168,45 @@
   align-items: center;
   margin-bottom: 1rem;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .result h2 {
   margin: 0;
   color: var(--code-text);
   font-size: 1.25rem;
+  font-weight: 600;
 }
 
 .resultActions {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .actionButton {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+  padding: 0.4375rem 0.875rem;
+  font-size: 0.85rem;
   font-weight: 500;
   color: var(--code-text);
-  background-color: #2d2d2d;
-  border: 1px solid #444;
-  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s;
 }
 
 .actionButton:hover {
-  background-color: #3d3d3d;
+  background-color: rgba(255, 255, 255, 0.13);
   border-color: var(--accent-blue);
 }
 
 .result pre {
   background-color: var(--code-bg);
-  padding: 1rem;
-  border-radius: 6px;
+  padding: 0;
   overflow-x: auto;
-  font-family: "Consolas", "Monaco", "Courier New", monospace;
-  font-size: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
   line-height: 1.6;
   margin: 0;
 }
@@ -253,61 +264,70 @@
   color: var(--code-text);
 }
 
+/* History */
 .historySection {
-  margin-top: 1.5rem;
-  padding-top: 1.25rem;
-  border-top: 2px solid var(--border-secondary);
+  margin-top: 1.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-secondary);
 }
 
 .historyHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
   margin-bottom: 1rem;
 }
 
 .historyHeader h3 {
   margin: 0;
   color: var(--text-primary);
-  font-size: 1.25rem;
+  font-size: 1.125rem;
+  font-weight: 600;
 }
 
 .historyActions {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .historySearch {
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
   border: 1px solid var(--border-primary);
-  border-radius: 4px;
-  background-color: var(--bg-card);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-input);
   color: var(--text-primary);
-  width: 10rem;
+  width: min(11rem, 100%);
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .historySearch:focus {
   outline: none;
   border-color: var(--accent-blue);
+  box-shadow: var(--focus-ring);
 }
 
 .historyToggle,
 .historyClear {
   padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   font-weight: 500;
   border: 1px solid var(--border-primary);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.2s;
-  background-color: var(--bg-card);
-  color: var(--text-primary);
+  transition: border-color 0.2s, background-color 0.2s, color 0.2s;
+  background-color: transparent;
+  color: var(--text-secondary);
+  min-height: 36px;
 }
 
 .historyToggle:hover {
-  background-color: var(--bg-hover);
+  background-color: var(--accent-blue-light);
   border-color: var(--accent-blue);
+  color: var(--accent-blue);
 }
 
 .historyClear {
@@ -323,25 +343,25 @@
 .historyList {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.625rem;
   max-height: 500px;
   overflow-y: auto;
+  padding-right: 0.25rem;
 }
 
 .historyItem {
-  padding: 1rem;
-  background-color: var(--bg-hover);
+  padding: 0.875rem 1rem;
+  background-color: var(--bg-primary);
   border: 1px solid var(--border-secondary);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
 }
 
 .historyItem:hover {
-  background-color: var(--accent-blue-light);
   border-color: var(--accent-blue);
-  transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
 }
 
 .historyTop {
@@ -353,30 +373,31 @@
 }
 
 .historyInput {
-  font-family: "Consolas", "Monaco", "Courier New", monospace;
-  font-size: 0.875rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
   color: var(--text-primary);
   word-break: break-all;
   flex: 1;
 }
 
 .historyFunc {
-  font-family: "Consolas", "Monaco", "Courier New", monospace;
-  font-size: 0.875rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
   color: var(--accent-blue);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 300px;
+  max-width: min(300px, 50%);
 }
 
 .historyMeta {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.75rem;
   font-size: 0.75rem;
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 
 .historyTime {
@@ -384,19 +405,23 @@
 }
 
 .historyOptions {
-  padding: 0.25rem 0.5rem;
+  padding: 0.1875rem 0.5rem;
   background-color: var(--accent-blue);
   color: white;
-  border-radius: 3px;
+  border-radius: var(--radius-full);
   font-weight: 600;
   font-size: 0.7rem;
-  letter-spacing: 1px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
+/* Encode modal */
 .modalBackdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(9, 9, 11, 0.55);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -406,8 +431,9 @@
 
 .modalContent {
   background: var(--bg-card);
-  border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.32);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
   width: 100%;
   max-width: 680px;
   height: min(600px, 85vh);
@@ -416,6 +442,18 @@
   flex-direction: column;
   gap: 0.75rem;
   padding: 1.5rem;
+  animation: modalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .modalHeader {
@@ -432,18 +470,24 @@
 }
 
 .modalClose {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
   background: none;
   border: none;
   font-size: 1.1rem;
   cursor: pointer;
   color: var(--text-secondary, var(--text-primary));
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+  padding: 0;
+  border-radius: var(--radius-sm);
   line-height: 1;
+  transition: background-color 0.15s, color 0.15s;
 }
 
 .modalClose:hover {
   background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .encodeLabel {
@@ -452,35 +496,38 @@
   gap: 0.5rem;
   color: var(--text-primary);
   font-weight: 500;
+  flex-wrap: wrap;
 }
 
 .encodeSelect {
-  padding: 0.5rem;
-  font-size: 0.95rem;
-  border: 2px solid var(--border-primary);
-  border-radius: 6px;
-  background-color: var(--bg-card);
+  padding: 0.4375rem 0.625rem;
+  font-size: 0.9rem;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-input);
   color: var(--text-primary);
 }
 
 .encodeTextarea {
   width: 100%;
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 0.9rem;
   padding: 0.75rem;
-  border: 2px solid var(--border-primary);
-  border-radius: 6px;
-  background-color: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-input);
   color: var(--text-primary);
   resize: none;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .encodeTextarea:focus {
   outline: none;
   border-color: var(--border-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .encodedResult {
@@ -492,10 +539,21 @@
 .encodedHex {
   flex: 1;
   word-break: break-all;
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 0.85rem;
   color: var(--text-primary);
-  background-color: var(--bg-card);
+  background-color: var(--bg-hover);
   padding: 0.75rem;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
+}
+
+@media (max-width: 480px) {
+  .historyFunc {
+    max-width: 100%;
+  }
+
+  .buttonGroup .button,
+  .buttonGroup .shareButton {
+    flex-basis: 100%;
+  }
 }
