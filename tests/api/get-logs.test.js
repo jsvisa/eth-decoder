@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GET } from "../../app/api/get-logs/route.js";
 import { BUILT_IN_CHAIN_IDS } from "../../app/utils/chains.js";
 
@@ -19,8 +19,19 @@ function stubFetchEtherscan(
 }
 
 describe("GET /api/get-logs", () => {
+  const origEnvKey = process.env.ETHERSCAN_API_KEY;
+
+  beforeEach(() => {
+    // Success-path tests below send no etherscanApiKey query param and rely
+    // on the env fallback. Pin it explicitly — the ambient key comes from a
+    // local .env (loaded by vitest.config) that does not exist in CI.
+    process.env.ETHERSCAN_API_KEY = "test-env-key";
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
+    if (origEnvKey === undefined) delete process.env.ETHERSCAN_API_KEY;
+    else process.env.ETHERSCAN_API_KEY = origEnvKey;
   });
 
   describe("address validation", () => {
@@ -103,13 +114,6 @@ describe("GET /api/get-logs", () => {
   });
 
   describe("API key resolution", () => {
-    const origEnvKey = process.env.ETHERSCAN_API_KEY;
-
-    afterEach(() => {
-      if (origEnvKey === undefined) delete process.env.ETHERSCAN_API_KEY;
-      else process.env.ETHERSCAN_API_KEY = origEnvKey;
-    });
-
     it("returns 400 when neither query key nor env key exist", async () => {
       delete process.env.ETHERSCAN_API_KEY;
 

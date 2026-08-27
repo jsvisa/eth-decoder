@@ -20,8 +20,14 @@ jobs:
       image: mcr.microsoft.com/playwright:v1.62.1-noble
       options: --user 1001
     timeout-minutes: 30
+    permissions:
+      contents: write # needed to push the auto-generated README coverage table
     steps:
       - uses: actions/checkout@v4
+        with:
+          # On PRs, check out the branch itself so the bot can push to it.
+          ref: ${{ github.head_ref || github.ref }}
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -47,6 +53,30 @@ jobs:
 
       - name: Run unit and API integration tests with coverage
         run: npm run test:coverage
+
+      - name: Regenerate README coverage table
+        id: coverage-readme
+        run: |
+          node scripts/update-coverage-readme.js
+          npx prettier --write README.md >/dev/null
+          if git diff --quiet README.md; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit updated README coverage table
+        # Forked PRs get read-only tokens, so auto-commit only applies to
+        # same-repo branches.
+        if: >-
+          steps.coverage-readme.outputs.changed == 'true' &&
+          (github.event_name == 'push' || !github.event.pull_request.head.repo.fork)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "docs: regenerate README test-coverage table [skip ci]"
+          git push
 
       - name: Run integration tests
         env:

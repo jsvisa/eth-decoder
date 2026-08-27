@@ -11,10 +11,13 @@ A web application for decoding EVM transaction input data and interacting with s
 | 75.03%     | 73.62%   | 80.85%    | 74.96% |
 
 _Regenerate with_ `npm run test:coverage:readme`.
-
 <!-- COVERAGE:END -->
 
-The table above is regenerated from `coverage/coverage-summary.json` — run `npm run test:coverage:readme` after changing tests and commit the updated README.
+CI regenerates this table automatically after the test-coverage job and commits it (`[skip ci]`). To refresh it locally instead:
+
+```bash
+npm run test:coverage:readme
+```
 
 ## Features
 
