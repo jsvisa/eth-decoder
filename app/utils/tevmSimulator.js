@@ -30,10 +30,21 @@ export { createArbSysPrecompile } from "./precompiles";
 //               format, compatible with all RPCs including those that reject arrays.
 // batchSize>1 → http(url, { batch: {…} }) — packs up to batchSize requests into
 //               one HTTP call as [{…}, {…}, …].
-function makeHttp(url, batchSize = 1) {
-  return batchSize > 1
-    ? http(url, { batch: { batchSize, wait: 0 } })
-    : http(url);
+// Optional per-request decorator for the raw HTTP transport. Used by the
+// benchmark suite to record/replay RPC traffic from a local file so runs are
+// deterministic and network-free. `decorator(request, doFetch)` must call
+// doFetch(request) to reach the network and return its result.
+function makeHttp(url, batchSize = 1, decorator = null) {
+  const base =
+    batchSize > 1 ? http(url, { batch: { batchSize, wait: 0 } }) : http(url);
+  if (!decorator) return base;
+  return (config) => {
+    const inner = base(config);
+    return {
+      ...inner,
+      request: (req) => decorator(req, inner.request),
+    };
+  };
 }
 
 function isUnsupportedTransaction(tx) {
@@ -163,8 +174,13 @@ export function ensureTevmNodeCompat(client) {
 // caller sets the current create sender via factory.setCreateSender() before
 // each call.
 // Storage slots are unaffected since tevm already uses eth_getStorageAt.
-function createProofFreeTransport(rpcUrl, batchSize = 1, collector = null) {
-  const baseHttpFactory = makeHttp(rpcUrl, batchSize);
+function createProofFreeTransport(
+  rpcUrl,
+  batchSize = 1,
+  collector = null,
+  rpcDecorator = null,
+) {
+  const baseHttpFactory = makeHttp(rpcUrl, batchSize, rpcDecorator);
   // If a collector is provided, every request the EVM/tevm makes through this
   // transport is recorded. The wrap is invisible to callers.
   const wrappedFactory = collector
@@ -614,6 +630,7 @@ export async function createTevmClient(
   customChainId = null,
   batchSize = 1,
   collector = null,
+  rpcDecorator = null,
 ) {
   // Get chain config from built-in or use custom chain ID
   let chainConfig = CHAIN_META[chain];
@@ -654,7 +671,12 @@ export async function createTevmClient(
     name: chainConfig.name || chain,
     customCrypto: { kzg: createMockKzg() },
   });
-  const forkTransport = createProofFreeTransport(forkUrl, batchSize, collector);
+  const forkTransport = createProofFreeTransport(
+    forkUrl,
+    batchSize,
+    collector,
+    rpcDecorator,
+  );
   const forkRequest = forkTransport({}).request;
   let forkBlockNumber =
     typeof blockTag === "bigint" ? blockTag : BigInt(chainConfig.chainId);
@@ -752,99 +774,161 @@ async function prefetchAccountsFromAccessList({
   blockTag,
   batchSize = 1,
   collector = null,
+  parallel = false,
+  rpcDecorator = null,
 }) {
-  const baseFactory = makeHttp(forkRpcUrl, batchSize);
+  const baseFactory = makeHttp(forkRpcUrl, batchSize, rpcDecorator);
   const factory = collector ? collector.wrap(baseFactory) : baseFactory;
   const transport = factory({});
   const tag =
     blockTag === "latest" ? "latest" : `0x${BigInt(blockTag).toString(16)}`;
 
+  // Gas used by a server-side execution of this exact tx, as reported by
+  // eth_createAccessList in tier 2 (0n when unavailable). Feeds the
+  // simulation progress bar's denominator.
+  let alEstimatedGas = 0n;
+
   // Tier 1: always prefetch the target contract
-  try {
-    const [code, balance] = await Promise.all([
-      transport.request({
-        method: "eth_getCode",
-        params: [callParams.to, tag],
-      }),
-      transport.request({
-        method: "eth_getBalance",
-        params: [callParams.to, tag],
-      }),
-    ]);
-    await client.tevmSetAccount({
-      address: callParams.to,
-      balance: BigInt(balance),
-      deployedBytecode: code,
-    });
-  } catch {
-    /* will lazy-load */
-  }
+  const tier1 = async () => {
+    try {
+      const [code, balance] = await Promise.all([
+        transport.request({
+          method: "eth_getCode",
+          params: [callParams.to, tag],
+        }),
+        transport.request({
+          method: "eth_getBalance",
+          params: [callParams.to, tag],
+        }),
+      ]);
+      await client.tevmSetAccount({
+        address: callParams.to,
+        balance: BigInt(balance),
+        deployedBytecode: code,
+      });
+    } catch {
+      /* will lazy-load */
+    }
+  };
 
   // Tier 2: eth_createAccessList → batch-fetch all accounts + storage slots
-  try {
-    const alResult = await transport.request({
-      method: "eth_createAccessList",
-      params: [
-        {
-          to: callParams.to,
-          from: callParams.from,
-          data: callParams.data,
-          ...(callParams.value > 0n
-            ? { value: `0x${callParams.value.toString(16)}` }
-            : {}),
-        },
-        tag,
-      ],
-    });
+  const tier2 = async () => {
+    try {
+      const alResult = await transport.request({
+        method: "eth_createAccessList",
+        params: [
+          {
+            to: callParams.to,
+            from: callParams.from,
+            data: callParams.data,
+            ...(callParams.value > 0n
+              ? { value: `0x${callParams.value.toString(16)}` }
+              : {}),
+          },
+          tag,
+        ],
+      });
+      // The RPC executed the exact tx server-side; its gasUsed is the best
+      // available progress denominator (returned to the caller).
+      try {
+        alEstimatedGas = BigInt(alResult?.gasUsed ?? 0);
+      } catch {
+        alEstimatedGas = 0n;
+      }
 
-    // Build address → storageKeys map from access list
-    const addrMap = new Map(); // addr (lowercase) → string[]
-    for (const item of alResult?.accessList ?? []) {
-      const addr = item.address?.toLowerCase();
-      if (!addr) continue;
-      if (!addrMap.has(addr)) addrMap.set(addr, []);
-      for (const slot of item.storageKeys ?? []) addrMap.get(addr).push(slot);
-    }
+      // Build address → storageKeys map from access list
+      const addrMap = new Map(); // addr (lowercase) → string[]
+      for (const item of alResult?.accessList ?? []) {
+        const addr = item.address?.toLowerCase();
+        if (!addr) continue;
+        if (!addrMap.has(addr)) addrMap.set(addr, []);
+        for (const slot of item.storageKeys ?? []) addrMap.get(addr).push(slot);
+      }
 
-    // One Promise.all over all addresses — with batch transport all requests
-    // for all addresses (code, balance, and every storage slot) are packed into
-    // ceil(totalRequests / batchSize) HTTP calls instead of N individual ones.
-    await Promise.all(
-      [...addrMap.entries()].map(async ([addr, slots]) => {
-        try {
-          const [code, balance, ...storageValues] = await Promise.all([
-            transport.request({ method: "eth_getCode", params: [addr, tag] }),
-            transport.request({
-              method: "eth_getBalance",
-              params: [addr, tag],
-            }),
-            ...slots.map((slot) =>
+      // One Promise.all over all addresses — with batch transport all requests
+      // for all addresses (code, balance, and every storage slot) are packed into
+      // ceil(totalRequests / batchSize) HTTP calls instead of N individual ones.
+      await Promise.all(
+        [...addrMap.entries()].map(async ([addr, slots]) => {
+          try {
+            const [code, balance, ...storageValues] = await Promise.all([
+              transport.request({ method: "eth_getCode", params: [addr, tag] }),
               transport.request({
-                method: "eth_getStorageAt",
-                params: [addr, slot, tag],
+                method: "eth_getBalance",
+                params: [addr, tag],
               }),
-            ),
-          ]);
+              ...slots.map((slot) =>
+                transport.request({
+                  method: "eth_getStorageAt",
+                  params: [addr, slot, tag],
+                }),
+              ),
+            ]);
 
-          const state = {};
-          slots.forEach((slot, i) => {
-            state[slot] = storageValues[i];
-          });
+            const state = {};
+            slots.forEach((slot, i) => {
+              state[slot] = storageValues[i];
+            });
 
-          await client.tevmSetAccount({
-            address: checksumAddress(addr),
-            balance: BigInt(balance),
-            deployedBytecode: code,
-            ...(slots.length > 0 ? { state } : {}),
-          });
-        } catch {
-          /* skip this address, lazy-load during execution */
-        }
-      }),
-    );
-  } catch {
-    /* eth_createAccessList unsupported — tier 1 prefetch is still active */
+            await client.tevmSetAccount({
+              address: checksumAddress(addr),
+              balance: BigInt(balance),
+              deployedBytecode: code,
+              ...(slots.length > 0 ? { state } : {}),
+            });
+          } catch {
+            /* skip this address, lazy-load during execution */
+          }
+        }),
+      );
+    } catch {
+      /* eth_createAccessList unsupported — tier 1 prefetch is still active */
+    }
+  };
+
+  // Denominator fallback: some RPCs (e.g. Alchemy on several L2s) don't offer
+  // eth_createAccessList or omit gasUsed — eth_estimateGas executes the same
+  // tx server-side and is equally good for the progress bar. The sender's
+  // balance is overridden for the dry run: unfunded senders (funded only
+  // client-side via balance overrides) would otherwise fail estimateGas with
+  // OutOfFunds. RPCs that reject the overrides shape simply keep the fallback.
+  if (alEstimatedGas === 0n) {
+    try {
+      alEstimatedGas = BigInt(
+        await transport.request({
+          method: "eth_estimateGas",
+          params: [
+            {
+              to: callParams.to,
+              from: callParams.from,
+              data: callParams.data,
+              ...(callParams.value > 0n
+                ? { value: `0x${callParams.value.toString(16)}` }
+                : {}),
+            },
+            tag,
+            callParams.from
+              ? { [callParams.from]: { balance: `0x${10n ** 19n}` } }
+              : undefined,
+          ],
+        }),
+      );
+    } catch {
+      /* estimateGas unsupported — progress falls back to the gas limit */
+    }
   }
+
+  // Sequential (default): tier 1 first, then tier 2 — preserves the original
+  // behaviour. Parallel: fire both at once so eth_createAccessList overlaps
+  // the target contract's code/balance fetches (and the alResult's target
+  // entry is simply a duplicate fetch).
+  if (parallel) {
+    await Promise.all([tier1(), tier2()]);
+  } else {
+    await tier1();
+    await tier2();
+  }
+  return { estimatedGas: alEstimatedGas };
 }
 
 function extractBalanceChangesFromLogs(logs) {
@@ -925,6 +1009,16 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     gas = null,
     prefetch = true,
     isCreate = false,
+    // ── internal perf knobs (used by tests/benchmark) ──────────────────────
+    // stepHookMode: "sync" (default — measured equal on the hot path and its
+    //   abort path properly settles the EVM's dispatch promise) | "async"
+    //   (legacy dispatch; cancelling leaves the EVM parked forever)
+    // parallelPrefetch: run tier-1 + tier-2 prefetch concurrently
+    stepHookMode = "sync",
+    parallelPrefetch = false,
+    // Optional async (request, doFetch) => result decorator applied to every
+    // raw RPC request (fork transport + prefetch). Benchmark-only hook.
+    rpcDecorator = null,
   } = params;
 
   // Validate inputs before the try/catch so callers receive a rejected promise
@@ -1083,8 +1177,9 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
         : String(pinnedBlock).trim();
 
     collector.markPhase("prefetch", "start");
+    let estimatedGas = 0n;
     if (prefetch && !isCreate) {
-      await prefetchAccountsFromAccessList({
+      const { estimatedGas: alGas } = await prefetchAccountsFromAccessList({
         client,
         forkRpcUrl: rpcUrl || FORK_RPC_URLS[chain] || "",
         callParams: {
@@ -1096,7 +1191,10 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
         blockTag: resolvedBlockTag,
         batchSize: rpcBatchSize,
         collector,
+        parallel: parallelPrefetch,
+        rpcDecorator,
       });
+      estimatedGas = alGas;
     }
     collector.markPhase("prefetch", "end");
 
@@ -1110,12 +1208,35 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     let callTraceRoot = null;
     const LOG_OPCODES = new Set(["LOG0", "LOG1", "LOG2", "LOG3", "LOG4"]);
 
-    // Progress tracking: estimate via gas consumed at root depth.
-    // rootGasLimit captured on the first beforeMessage; stepCount throttles updates.
+    // Progress tracking: estimate via gas consumed across all frames.
     let rootGasLimit = 0n;
-    let stepCount = 0;
+
+    // ── progress tracking ──────────────────────────────────────────────────
+    // The old progress model sampled gas only at depth 0 and divided by the
+    // root frame's gas limit. Both are broken for modern proxies: a diamond
+    // pattern DELEGATECALLs immediately, so the root frame executes only a
+    // handful of opcodes (< the 100-step throttle → zero updates), and tevm
+    // sets the root gas limit to the block maximum (~280M here vs ~293K used),
+    // so even a firing bar would sit near 0%.
+    //
+    // New model:
+    //   denominator — the tx's real gas usage from the prefetch
+    //   eth_createAccessList response (the RPC executes the exact tx to build
+    //   the list and reports gasUsed; we were already receiving it and
+    //   discarding it). Falls back to the root gas limit when unavailable.
+    //   numerator — gas consumed across ALL active frames: each frame's
+    //   (limit - lastSeenGasLeft), summed over the call stack. DELEGATECALL /
+    //   CALL deduct forwarded gas from the parent's gasLeft up front, so the
+    //   stack sum tracks true consumption even deep in sub-calls.
+    //   Emissions are time-throttled (~30/s); in a worker they go over
+    //   postMessage (see sim-worker) and the main thread stays smooth.
+    const gasStack = [];
+    let lastProgressEmitAt = 0;
+    let progressClockStep = 0;
 
     const onBeforeMessage = (message, next) => {
+      const frameGas = message.gasLimit ?? 0n;
+      gasStack.push({ limit: frameGas, gasLeft: frameGas });
       let type = "CALL";
       if (message.to === undefined) {
         type = message.salt !== undefined ? "CREATE2" : "CREATE";
@@ -1159,6 +1280,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     };
 
     const onAfterMessage = (result, next) => {
+      gasStack.pop();
       const node = callStack.pop();
       if (!node) {
         next?.();
@@ -1200,35 +1322,53 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     // arguments are still on the stack — same window that geth's OnLog uses.
     // Also handles abort signal and progress reporting.
     //
-    // WHY async + setTimeout yield:
-    // tevm's EVM runs as a microtask chain. The Cancel button click is a
-    // macrotask and cannot interrupt microtasks — so abortSignal.aborted would
-    // never be seen mid-simulation without a periodic yield. Every ~50ms we
-    // schedule a real macrotask break (setTimeout 0) which lets the browser
-    // process the click event and set aborted = true before we resume.
-    let lastYieldAt = Date.now();
-
-    const onStep = async (step, next) => {
-      // Periodically yield to the macrotask queue so the Cancel button click
-      // (a macrotask) can run and set abortSignal.aborted = true.
-      const now = Date.now();
-      if (now - lastYieldAt >= 50) {
-        lastYieldAt = now;
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
-
-      // Check abort after the potential yield
+    // The per-step body lives in trackStep() and is fully synchronous: it runs
+    // for EVERY opcode, so it must stay allocation-free.
+    //
+    // HOW CANCEL WORKS (two dispatch strategies, chosen by stepHookMode):
+    //
+    // "sync" (fast path): EthereumJS's _emit dispatches arity-2 listeners via
+    // `await new Promise(resolve => listener(step, resolve))`. A sync body that
+    // calls next() immediately still pays one promise allocation per step, but
+    // avoids the async-function promise + microtask churn entirely. Yielding is
+    // done by DEFERRING next(): every ~50ms of wall time we hand `next` to
+    // setTimeout(0), parking the interpreter on a real macrotask boundary so a
+    // Cancel click can be processed before we resume. A synchronous throw from
+    // the listener body rejects the dispatch promise, which aborts the whole
+    // EVM run (the interpreter re-throws non-VM errors).
+    //
+    // "async" (legacy): an async listener with an awaited setTimeout yield.
+    // Same macrotask mechanics, but every step pays the full async dispatch
+    // cost (several extra microtask ticks + promise allocations).
+    const trackStep = (step) => {
       if (abortSignal?.aborted) {
         throw new Error("Simulation cancelled");
       }
 
-      // Progress: use gasLeft at root depth as proxy for work done.
-      if (onProgress && rootGasLimit > 0n && step.depth === 0) {
-        stepCount++;
-        if (stepCount % 100 === 0) {
-          const gasConsumed = rootGasLimit - (step.gasLeft ?? 0n);
-          const pct = Number((gasConsumed * 95n) / rootGasLimit);
-          onProgress(Math.max(1, Math.min(95, pct)));
+      // Progress: gas consumed across all active frames vs. the prefetch's
+      // server-reported gasUsed (or the root gas limit as fallback).
+      if (onProgress) {
+        const top = gasStack[gasStack.length - 1];
+        if (top && step.gasLeft !== undefined) {
+          top.gasLeft = step.gasLeft;
+        }
+        // Clock is only sampled every 1024 steps — Date.now() per opcode is
+        // measurable overhead over millions of steps.
+        if (++progressClockStep >= 1024) {
+          progressClockStep = 0;
+          const denom = estimatedGas > 0n ? estimatedGas : rootGasLimit;
+          if (denom > 0n) {
+            let consumed = 0n;
+            for (const frame of gasStack) {
+              consumed += frame.limit - frame.gasLeft;
+            }
+            const now = Date.now();
+            if (now - lastProgressEmitAt >= 33) {
+              lastProgressEmitAt = now;
+              const pct = Number((consumed * 95n) / denom);
+              onProgress(Math.max(1, Math.min(95, pct)));
+            }
+          }
         }
       }
 
@@ -1277,8 +1417,47 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
           }
         }
       }
-      next?.();
     };
+
+    let onStep;
+    if (stepHookMode === "sync") {
+      let lastYieldAt = Date.now();
+      let stepsSinceTimeCheck = 0;
+      onStep = (step, next) => {
+        // Time is only sampled every 4096 steps — Date.now() per opcode adds
+        // up over millions of steps.
+        if (++stepsSinceTimeCheck >= 4096) {
+          stepsSinceTimeCheck = 0;
+          const now = Date.now();
+          if (now - lastYieldAt >= 50) {
+            lastYieldAt = now;
+            if (abortSignal?.aborted) {
+              throw new Error("Simulation cancelled");
+            }
+            // Park the interpreter on a macrotask boundary so the Cancel
+            // click can run; resume via the deferred next().
+            setTimeout(next, 0);
+            return;
+          }
+        }
+        trackStep(step);
+        next();
+      };
+    } else {
+      // Legacy async dispatch — same per-step work, higher per-step overhead.
+      let lastYieldAt = Date.now();
+      onStep = async (step, next) => {
+        // Periodically yield to the macrotask queue so the Cancel button click
+        // (a macrotask) can run and set abortSignal.aborted = true.
+        const now = Date.now();
+        if (now - lastYieldAt >= 50) {
+          lastYieldAt = now;
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+        trackStep(step);
+        next?.();
+      };
+    }
 
     const callParams = {
       from: sender,
@@ -1499,6 +1678,7 @@ export async function simulateWithTevm(params) {
     blockNumber = "latest",
     customChainId = null,
     rpcBatchSize = 1,
+    rpcDecorator = null,
   } = params;
   const { client, blockNumber: actualBlock } = await createTevmClient(
     chain,
@@ -1506,6 +1686,8 @@ export async function simulateWithTevm(params) {
     blockNumber,
     customChainId,
     rpcBatchSize,
+    null,
+    rpcDecorator,
   );
   return _runSimulationOnClient(client, actualBlock, params);
 }
