@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildFunctionMap,
   buildFunctionNameSet,
+  buildFileSymbols,
   findFunctionSource,
   makeFunctionNamesClickable,
 } from "../../app/utils/solidityParser.js";
@@ -209,5 +210,94 @@ describe("makeFunctionNamesClickable", () => {
     expect(out).toBe(
       '<span class="k">function</span> <span class="link" data-fn-name="foo">foo</span>() {}',
     );
+  });
+});
+
+describe("buildFileSymbols", () => {
+  it("returns empty array for empty content", () => {
+    expect(buildFileSymbols("")).toEqual([]);
+    expect(buildFileSymbols(null)).toEqual([]);
+  });
+
+  it("extracts a contract with nested members", () => {
+    const content = [
+      "contract Token {",
+      "  uint256 public totalSupply;",
+      "  mapping(address => uint256) balances;",
+      "  event Transfer(address indexed from, address to);",
+      "  error InsufficientBalance();",
+      "  modifier onlyOwner() { _; }",
+      "  struct Point { uint256 x; uint256 y; }",
+      "  function transfer(address to, uint256 amount) external {}",
+      "  constructor() {}",
+      "}",
+    ].join("\n");
+    const symbols = buildFileSymbols(content);
+    expect(symbols.length).toBe(1);
+    const contract = symbols[0];
+    expect(contract.kind).toBe("contract");
+    expect(contract.name).toBe("Token");
+    expect(contract.line).toBe(1);
+    const kinds = contract.children.map((c) => `${c.kind}:${c.name}`);
+    expect(kinds).toEqual([
+      "var:totalSupply",
+      "var:balances",
+      "event:Transfer",
+      "error:InsufficientBalance",
+      "modifier:onlyOwner",
+      "struct:Point",
+      "function:transfer",
+      "constructor:constructor",
+    ]);
+    expect(contract.children[0].line).toBe(2);
+    expect(contract.children[6].line).toBe(8);
+  });
+
+  it("separates multiple top-level definitions", () => {
+    const content = [
+      "interface IToken {",
+      "  function transfer(address to) external;",
+      "}",
+      "library Math {",
+      "  function add(uint256 a) internal pure {}",
+      "}",
+      "error TopLevelError();",
+      "contract Impl is IToken {}",
+    ].join("\n");
+    const symbols = buildFileSymbols(content);
+    expect(symbols.map((s) => `${s.kind}:${s.name}`)).toEqual([
+      "interface:IToken",
+      "library:Math",
+      "error:TopLevelError",
+      "contract:Impl",
+    ]);
+    expect(symbols[0].children.map((c) => c.name)).toEqual(["transfer"]);
+  });
+
+  it("ignores definitions inside comments and strings", () => {
+    const content = [
+      "contract A {",
+      "  /* function fakeOne() external {} */",
+      "  // function fakeTwo() external {}",
+      '  string public constant NOTE = "function fakeThree";',
+      "  /* multi",
+      "     line { brace",
+      "  */",
+      "  function real() external {}",
+      "}",
+    ].join("\n");
+    const symbols = buildFileSymbols(content);
+    expect(symbols.length).toBe(1);
+    const children = symbols[0].children.map((c) => c.name);
+    expect(children).toContain("NOTE");
+    expect(children).toContain("real");
+    expect(children).not.toContain("fakeOne");
+    expect(children).not.toContain("fakeTwo");
+    expect(children).not.toContain("fakeThree");
+  });
+
+  it("caches results for identical content", () => {
+    const content = "contract C { function f() external {} }";
+    expect(buildFileSymbols(content)).toBe(buildFileSymbols(content));
   });
 });

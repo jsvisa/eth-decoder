@@ -17,6 +17,15 @@ function renderComponent(props) {
   };
 }
 
+function setNativeValue(input, value) {
+  const setter = Object.getOwnPropertyDescriptor(
+    window.HTMLInputElement.prototype,
+    "value",
+  ).set;
+  setter.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
 const BASE_PROPS = {
   open: true,
   address: "0x1234567890abcdef1234567890abcdef12345678",
@@ -311,5 +320,166 @@ describe("SourceCodeViewer", () => {
     expect(container.textContent).toContain("Token.sol:2");
     cleanup();
     vi.useRealTimers();
+  });
+});
+
+describe("SourceCodeViewer enhanced viewer", () => {
+  it("shows an outline panel with contract symbols", () => {
+    mockHookValue = {
+      sources: {
+        "Token.sol":
+          "contract Token {\n  uint256 public supply;\n  event Transfer(address from);\n  function transfer(address to) external {}\n}",
+      },
+      compilerVersion: "0.8.19",
+      loading: false,
+      error: null,
+    };
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    const outline = container.textContent;
+    expect(outline).toContain("Outline");
+    expect(outline).toContain("Token");
+    expect(outline).toContain("supply");
+    expect(outline).toContain("Transfer");
+    expect(outline).toContain("transfer");
+    cleanup();
+  });
+
+  it("navigates to a symbol's line when clicked in the outline", () => {
+    mockHookValue = {
+      sources: {
+        "Token.sol":
+          "contract Token {\n  function alpha() external {}\n  function beta() external {}\n}",
+      },
+      compilerVersion: "0.8.19",
+      loading: false,
+      error: null,
+    };
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    const scrollBefore = Element.prototype.scrollIntoView.mock.calls.length;
+    const betaItem = [...container.querySelectorAll("button")].find((b) =>
+      b.textContent.includes("beta"),
+    );
+    expect(betaItem).toBeTruthy();
+    act(() => {
+      betaItem.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(Element.prototype.scrollIntoView.mock.calls.length).toBeGreaterThan(
+      scrollBefore,
+    );
+    cleanup();
+  });
+
+  it("searches across files and jumps to a result in another file", () => {
+    mockHookValue = {
+      sources: {
+        "A.sol": "nothing here\nor here",
+        "B.sol": "needle in B",
+      },
+      compilerVersion: null,
+      loading: false,
+      error: null,
+    };
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    // enable all-files search
+    const allFilesBtn = [...container.querySelectorAll("button")].find(
+      (b) => b.title === "Search all files",
+    );
+    expect(allFilesBtn).toBeTruthy();
+    act(() => {
+      allFilesBtn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    // type query
+    const searchInput = container.querySelector("." + "searchInput");
+    expect(searchInput).toBeTruthy();
+    act(() => {
+      setNativeValue(searchInput, "needle");
+    });
+    // results list should show B.sol group
+    expect(container.textContent).toContain("1 result");
+    const resultBtn = [...container.querySelectorAll("button")].find((b) =>
+      b.className.includes("resultItem"),
+    );
+    expect(resultBtn).toBeTruthy();
+    act(() => {
+      resultBtn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    // B.sol becomes active: its content is rendered and marked
+    expect(container.textContent).toContain("needle in B");
+    expect(container.querySelector("mark")).not.toBeNull();
+    cleanup();
+  });
+
+  it("marks the exact match range instead of the whole line", () => {
+    mockHookValue = {
+      sources: { "Token.sol": "uint256 balance = 100;" },
+      compilerVersion: null,
+      loading: false,
+      error: null,
+    };
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    const searchInput = container.querySelector("." + "searchInput");
+    act(() => {
+      setNativeValue(searchInput, "balance");
+    });
+    const mark = container.querySelector("mark");
+    expect(mark).not.toBeNull();
+    expect(mark.textContent).toBe("balance");
+    cleanup();
+  });
+
+  it("opens goto input with Ctrl+G and jumps to a line", () => {
+    mockHookValue = {
+      sources: { "Token.sol": "one\ntwo\nthree" },
+      compilerVersion: null,
+      loading: false,
+      error: null,
+    };
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    const overlay = container.querySelector("." + "overlay");
+    act(() => {
+      overlay.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "g",
+          ctrlKey: true,
+          bubbles: true,
+        }),
+      );
+    });
+    const gotoInput = container.querySelector("." + "gotoInput");
+    expect(gotoInput).not.toBeNull();
+    act(() => {
+      setNativeValue(gotoInput, "3");
+    });
+    act(() => {
+      gotoInput.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+    });
+    expect(container.textContent).toContain("three");
+    cleanup();
+  });
+
+  it("shows vyper and json highlighting without crashing", () => {
+    mockHookValue = {
+      sources: {
+        "Vault.vy": "@external\ndef get() -> uint256:",
+        "meta.json": '{"name": "vault"}',
+      },
+      compilerVersion: null,
+      loading: false,
+      error: null,
+    };
+    const { container, cleanup } = renderComponent(BASE_PROPS);
+    expect(container.textContent).toContain("Vault.vy");
+    expect(container.textContent).toContain("@external");
+    // switch to json file via file tree
+    const jsonBtn = [...container.querySelectorAll("button")].find(
+      (b) => b.textContent === "meta.json",
+    );
+    act(() => {
+      jsonBtn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(container.textContent).toContain('"name"');
+    cleanup();
   });
 });
