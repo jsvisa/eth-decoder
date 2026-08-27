@@ -32,6 +32,8 @@ const ENTRY = {
   fetchedAt: 1719360000000,
 };
 
+const VALID_ADDR = `0x${"beef".repeat(10)}`;
+
 describe("serverAbiCache", () => {
   async function importWithEnv() {
     vi.resetModules();
@@ -44,11 +46,22 @@ describe("serverAbiCache", () => {
   });
 
   it("returns null for corrupt JSON without throwing", async () => {
+    const addr = "0x00000000000000000000000000000000000000ff";
     const dir = join(TEST_DIR, "1");
     await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(join(dir, "0xcorrupt.json"), "not-json", "utf-8");
-    const result = await getAbiFromCache(1, "0xcorrupt", TEST_DIR);
+    await fs.writeFile(join(dir, `${addr}.json`), "not-json", "utf-8");
+    const result = await getAbiFromCache(1, addr, TEST_DIR);
     expect(result).toBeNull();
+  });
+
+  it("rejects malformed addresses at the disk boundary (traversal-safe)", async () => {
+    expect(await getAbiFromCache(1, "../evil", TEST_DIR)).toBeNull();
+    await setAbiInCache(1, "../evil", ENTRY, TEST_DIR);
+    // No file for the rejected key may exist anywhere in the cache dir
+    const chainDirEntries = await fs
+      .readdir(join(TEST_DIR, "1"))
+      .catch(() => []);
+    expect(chainDirEntries.filter((f) => f.includes("evil"))).toEqual([]);
   });
 
   it("stores and retrieves a cache entry", async () => {
@@ -67,14 +80,28 @@ describe("serverAbiCache", () => {
   });
 
   it("lowercases the address before writing", async () => {
-    await setAbiInCache(1, "0xDEAD", ENTRY, TEST_DIR);
-    const filePath = join(TEST_DIR, "1", "0xdead.json");
+    await setAbiInCache(
+      1,
+      "0xDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF",
+      ENTRY,
+      TEST_DIR,
+    );
+    const filePath = join(
+      TEST_DIR,
+      "1",
+      "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef.json",
+    );
     const raw = await fs.readFile(filePath, "utf-8");
     expect(JSON.parse(raw)).toEqual(ENTRY);
   });
 
   it("creates the chain directory if it does not exist", async () => {
-    await setAbiInCache(8453, "0xbase", ENTRY, TEST_DIR);
+    await setAbiInCache(
+      8453,
+      "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      ENTRY,
+      TEST_DIR,
+    );
     const stat = await fs.stat(join(TEST_DIR, "8453"));
     expect(stat.isDirectory()).toBe(true);
   });
@@ -92,7 +119,7 @@ describe("serverAbiCache", () => {
 
     try {
       const cache = await importWithEnv();
-      await cache.setAbiInCache(1, "0xDEAD", ENTRY);
+      await cache.setAbiInCache(1, VALID_ADDR, ENTRY);
 
       await expect(
         fs.access(
@@ -102,7 +129,7 @@ describe("serverAbiCache", () => {
             ".cache",
             "eth-decoder",
             "1",
-            "0xdead.json",
+            `${VALID_ADDR.toLowerCase()}.json`,
           ),
         ),
       ).resolves.toBeUndefined();
@@ -113,11 +140,13 @@ describe("serverAbiCache", () => {
             "tmp",
             "eth-decoder",
             "1",
-            "0xdead.json",
+            `${VALID_ADDR.toLowerCase()}.json`,
           ),
         ),
       ).rejects.toThrow();
-      await expect(cache.getAbiFromCache(1, "0xDEAD")).resolves.toEqual(ENTRY);
+      await expect(cache.getAbiFromCache(1, VALID_ADDR)).resolves.toEqual(
+        ENTRY,
+      );
     } finally {
       if (oldCacheDir) process.env.CACHE_DIR = oldCacheDir;
       else delete process.env.CACHE_DIR;
@@ -144,7 +173,7 @@ describe("serverAbiCache", () => {
 
     try {
       const cache = await importWithEnv();
-      await cache.setAbiInCache(1, "0xDEAD", ENTRY);
+      await cache.setAbiInCache(1, VALID_ADDR, ENTRY);
 
       await expect(
         fs.access(
@@ -153,7 +182,7 @@ describe("serverAbiCache", () => {
             "vercel-tmp",
             "eth-decoder",
             "1",
-            "0xdead.json",
+            `${VALID_ADDR.toLowerCase()}.json`,
           ),
         ),
       ).resolves.toBeUndefined();
@@ -165,11 +194,13 @@ describe("serverAbiCache", () => {
             ".cache",
             "eth-decoder",
             "1",
-            "0xdead.json",
+            `${VALID_ADDR.toLowerCase()}.json`,
           ),
         ),
       ).rejects.toThrow();
-      await expect(cache.getAbiFromCache(1, "0xDEAD")).resolves.toEqual(ENTRY);
+      await expect(cache.getAbiFromCache(1, VALID_ADDR)).resolves.toEqual(
+        ENTRY,
+      );
     } finally {
       if (oldCacheDir) process.env.CACHE_DIR = oldCacheDir;
       else delete process.env.CACHE_DIR;
@@ -190,12 +221,20 @@ describe("serverAbiCache", () => {
 
     try {
       const cache = await importWithEnv();
-      await cache.setAbiInCache(1, "0xBEEF", ENTRY);
+      await cache.setAbiInCache(1, VALID_ADDR, ENTRY);
 
       await expect(
-        fs.access(join(OVERRIDE_CACHE_TEST_DIR, "1", "0xbeef.json")),
+        fs.access(
+          join(
+            OVERRIDE_CACHE_TEST_DIR,
+            "1",
+            `${VALID_ADDR.toLowerCase()}.json`,
+          ),
+        ),
       ).resolves.toBeUndefined();
-      await expect(cache.getAbiFromCache(1, "0xBEEF")).resolves.toEqual(ENTRY);
+      await expect(cache.getAbiFromCache(1, VALID_ADDR)).resolves.toEqual(
+        ENTRY,
+      );
     } finally {
       if (oldCacheDir) process.env.CACHE_DIR = oldCacheDir;
       else delete process.env.CACHE_DIR;

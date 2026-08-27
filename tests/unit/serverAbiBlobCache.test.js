@@ -149,9 +149,12 @@ describe("serverAbiBlobCache", () => {
       const abiEntry = makeAbiEntry();
       const { getAbiFromCache, setAbiInCache } =
         await import("../../app/utils/serverAbiBlobCache.js");
-      await setAbiInCache(1, "0xdead", abiEntry);
+      await setAbiInCache(1, "0xDeaDBEEFDeaDBEEFDeaDBEEFDeaDBEEFDeaDBEEF", abiEntry);
 
-      const result = await getAbiFromCache(1, "0xdead");
+      const result = await getAbiFromCache(
+        1,
+        "0xDeaDBEEFDeaDBEEFDeaDBEEFDeaDBEEFDeaDBEEF",
+      );
       expect(result).toEqual(abiEntry);
     });
 

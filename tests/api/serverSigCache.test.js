@@ -32,9 +32,21 @@ describe("serverSigCache", () => {
   it("returns null for corrupt JSON without throwing", async () => {
     const dir = join(TEST_DIR, "signatures");
     await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(join(dir, "0xcorrupt.json"), "not-json", "utf-8");
-    const result = await getSignaturesFromCache("0xcorrupt", TEST_DIR);
+    await fs.writeFile(join(dir, "0xdeadbeef.json"), "not-json", "utf-8");
+    const result = await getSignaturesFromCache("0xdeadbeef", TEST_DIR);
     expect(result).toBeNull();
+  });
+
+  it("rejects non-selector keys at the disk boundary (traversal-safe)", async () => {
+    expect(
+      await getSignaturesFromCache("../../etc/passwd", TEST_DIR),
+    ).toBeNull();
+    await setSignaturesInCache("../escape", SIGS, TEST_DIR);
+    await setSignaturesInCache("not-a-selector", SIGS, TEST_DIR);
+    const entries = await fs
+      .readdir(join(TEST_DIR, "signatures"))
+      .catch(() => []);
+    expect(entries.filter((f) => f !== "0xdeadbeef.json")).toEqual([]);
   });
 
   it("stores and retrieves cached signatures", async () => {
