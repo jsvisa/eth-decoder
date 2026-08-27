@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { defineChain } from "viem";
-import { isValidEthAddress, isValidHttpUrl } from "../../utils/validation";
+import { isValidEthAddress } from "../../utils/validation";
 import { isSafeRpcUrl } from "../../utils/ssrfGuard";
 import {
   BUILT_IN_CHAIN_IDS,
