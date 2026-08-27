@@ -19,8 +19,19 @@ const commitSha = getCommitSha();
 const appVersion = commitSha === "dev" ? "dev" : `v-${commitSha.slice(0, 7)}`;
 
 /** @type {import('next').NextConfig} */
+const ignoreInTraces = [
+  "./tests/**",
+  "./docs/**",
+  "./coverage/**",
+  "./test-results/**",
+];
+
 const nextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
+  outputFileTracingExcludes: {
+    "/api/**": ignoreInTraces,
+    "/**": ignoreInTraces,
+  },
   env: {
     NEXT_PUBLIC_APP_VERSION: appVersion,
     NEXT_PUBLIC_APP_COMMIT_SHA: commitSha,
