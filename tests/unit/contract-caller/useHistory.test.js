@@ -110,6 +110,50 @@ describe("initial state", () => {
     });
   });
 
+  it("hydrates calldata share links into pending selection on mount", () => {
+    const applyPendingArgs = vi.fn();
+    const calldata =
+      "0xdd62ed3e000000000000000000000000fc44011b887a8824a708d7271e15c9ac79bb1132000000000000000000000000888888888889758f76e7103c6cbf23abbf58f946";
+    window.history.replaceState(
+      null,
+      "",
+      `/contract-caller?chain=ethereum&address=0xabc&calldata=${calldata}`,
+    );
+
+    renderHook(() =>
+      useHistory(
+        makeParams({
+          applyPendingArgs,
+        }),
+      ),
+    );
+
+    expect(applyPendingArgs).toHaveBeenCalledWith({
+      functionSig: "0xdd62ed3e",
+      calldata,
+      timestamp: expect.any(Number),
+    });
+  });
+
+  it("ignores calldata params shorter than a 4-byte selector", () => {
+    const applyPendingArgs = vi.fn();
+    window.history.replaceState(
+      null,
+      "",
+      "/contract-caller?chain=ethereum&address=0xabc&calldata=0x1234",
+    );
+
+    renderHook(() =>
+      useHistory(
+        makeParams({
+          applyPendingArgs,
+        }),
+      ),
+    );
+
+    expect(applyPendingArgs).not.toHaveBeenCalled();
+  });
+
   it("preserves simulationId share URLs during state sync", () => {
     window.history.replaceState(
       null,

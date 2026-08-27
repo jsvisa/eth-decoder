@@ -272,6 +272,27 @@ describe("useCallExecution – handleShareUrl", () => {
       "http://localhost:3000/?simulationId=vb1_saved",
     );
   });
+
+  it("builds a calldata share URL when there is no saved simulation", async () => {
+    const { result } = renderHook(() =>
+      useCallExecution({
+        ...baseParams,
+        rawCalldata:
+          "0xdd62ed3e000000000000000000000000fc44011b887a8824a708d7271e15c9ac79bb1132000000000000000000000000888888888889758f76e7103c6cbf23abbf58f946",
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleShareUrl();
+    });
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
+    const url = navigator.clipboard.writeText.mock.calls[0][0];
+    expect(url).toContain("chain=ethereum");
+    expect(url).toContain("calldata=0xdd62ed3e");
+    expect(url).not.toContain("function=");
+    expect(url).not.toContain("args=");
+  });
 });
 
 describe("useCallExecution – local sim populates trace toName labels", () => {

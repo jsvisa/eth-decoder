@@ -121,6 +121,12 @@ export function useFunctionSelection({
           setArgs(pendingArgs);
           return;
         }
+      } else if (pendingCalldata) {
+        // Calldata whose selector matches nothing in this ABI (or whose
+        // function is missing): stop waiting — the calldata already sits in
+        // the paste-calldata field and can be executed raw.
+        pendingHistoryRef.current = null;
+        return;
       }
       // Still waiting for the right ABI — leave args alone
       return;

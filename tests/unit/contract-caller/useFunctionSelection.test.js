@@ -417,4 +417,60 @@ describe("useFunctionSelection — applyPendingArgs", () => {
       "900",
     ]);
   });
+
+  it("resolves pending calldata by 4-byte selector (URL share links)", async () => {
+    const { encodeFunctionData } = await import("viem");
+    const calldata = encodeFunctionData({
+      abi: TRANSFER_ABI,
+      functionName: "transfer",
+      args: ["0x0000000000000000000000000000000000000006", 123n],
+    });
+
+    const { result } = renderHook(() =>
+      useFunctionSelection({
+        parsedAbi: TRANSFER_ABI,
+        functions: TRANSFER_ABI,
+        address: "0xabc",
+      }),
+    );
+
+    act(() => {
+      result.current.applyPendingArgs({
+        functionSig: calldata.slice(0, 10).toLowerCase(),
+        calldata,
+      });
+    });
+
+    expect(result.current.selectedFunction).toBe("transfer(address,uint256)");
+    expect(result.current.args).toEqual([
+      "0x0000000000000000000000000000000000000006",
+      "123",
+    ]);
+    expect(result.current.pasteCalldataValue).toBe(calldata);
+  });
+
+  it("clears pending calldata whose selector matches no ABI function", async () => {
+    const { result } = renderHook(() =>
+      useFunctionSelection({
+        parsedAbi: TRANSFER_ABI,
+        functions: TRANSFER_ABI,
+        address: "0xabc",
+      }),
+    );
+
+    act(() => {
+      result.current.applyPendingArgs({
+        functionSig: "0xdeadbeef",
+        calldata: "0xdeadbeef",
+      });
+    });
+
+    // Pending is dropped, so a later manual function switch behaves normally
+    act(() => {
+      result.current.setSelectedFunction("transfer(address,uint256)");
+    });
+
+    expect(result.current.selectedFunction).toBe("transfer(address,uint256)");
+    expect(result.current.pasteCalldataError).toBeNull();
+  });
 });
