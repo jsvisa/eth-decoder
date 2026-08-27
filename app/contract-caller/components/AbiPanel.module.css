@@ -25,10 +25,10 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.8rem;
-  color: #666;
-  background-color: #f0f0f0;
+  color: var(--text-secondary);
+  background-color: var(--bg-hover);
   padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--radius-full);
   margin-left: auto;
   position: relative;
 }
@@ -169,42 +169,45 @@
 
 .abiViewToggle {
   display: flex;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
   overflow: hidden;
+  background-color: var(--bg-input);
 }
 
 .abiViewBtn {
   padding: 0.35rem 0.75rem;
   font-size: 0.75rem;
   font-weight: 500;
-  background: #fff;
+  background: transparent;
   border: none;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--text-secondary);
   transition: all 0.15s ease;
 }
 
 .abiViewBtn:first-child {
-  border-right: 1px solid #e5e7eb;
+  border-right: 1px solid var(--border-primary);
 }
 
 .abiViewBtn:hover {
-  background: #f9fafb;
+  background: var(--bg-hover);
 }
 
 .abiViewBtn.active {
-  background: #4f46e5;
+  background: var(--accent-blue);
   color: #fff;
 }
 
 .abiSearchInput {
   flex: 1;
-  min-width: 200px;
+  min-width: min(200px, 100%);
   padding: 0.4rem 0.75rem;
   font-size: 0.85rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
   outline: none;
   transition:
     border-color 0.15s ease,
@@ -212,32 +215,32 @@
 }
 
 .abiSearchInput:focus {
-  border-color: #4f46e5;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  border-color: var(--border-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .abiSearchInput::placeholder {
-  color: #9ca3af;
+  color: var(--text-muted);
 }
 
 /* ABI List View */
 .abiListView {
   max-height: 300px;
   overflow-y: auto;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fafafa;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
 }
 
 .abiEmptyState {
   padding: 2rem;
   text-align: center;
-  color: #9ca3af;
+  color: var(--text-muted);
   font-size: 0.9rem;
 }
 
 .abiCategory {
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .abiCategory:last-child {
@@ -249,10 +252,10 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.5rem 0.75rem;
-  background: #f3f4f6;
+  background: var(--bg-secondary);
   font-size: 0.75rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-secondary);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -264,10 +267,10 @@
 }
 
 .abiCategoryCount {
-  background: #e5e7eb;
-  color: #6b7280;
-  padding: 0.1rem 0.4rem;
-  border-radius: 10px;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--radius-full);
   font-size: 0.7rem;
 }
 
@@ -283,7 +286,7 @@
   padding: 0.4rem 0.75rem;
   font-size: 0.8rem;
   font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--border-secondary);
   transition: background-color 0.1s ease;
 }
 
@@ -332,7 +335,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #374151;
+  color: var(--text-primary);
 }
 
 .abiClickable {
@@ -340,7 +343,7 @@
 }
 
 .abiClickable:hover {
-  background: #f3f4f6;
+  background: var(--bg-hover);
 }
 
 .abiCopied {
@@ -364,12 +367,12 @@
 .textarea {
   padding: 1rem;
   font-size: 0.9rem;
-  font-family: "Consolas", "Monaco", "Courier New", monospace;
-  border: 2px solid var(--border-primary);
-  border-radius: 6px;
+  font-family: var(--font-mono);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
   resize: vertical;
   min-height: 120px;
-  transition: border-color 0.3s;
+  transition: border-color 0.2s, box-shadow 0.2s;
   background-color: var(--bg-input);
   color: var(--text-primary);
 }
@@ -377,9 +380,23 @@
 .textarea:focus {
   outline: none;
   border-color: var(--border-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .textarea:disabled {
   background-color: var(--bg-hover);
   cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .facetList,
+  .facetList li {
+    white-space: normal;
+    word-break: break-all;
+  }
+
+  .abiSourceTooltip {
+    max-width: min(320px, 80vw);
+    white-space: normal;
+  }
 }

@@ -299,8 +299,8 @@
 .payableBadge {
   font-size: 0.65rem;
   font-weight: 600;
-  color: #7c3aed;
-  background-color: #ede9fe;
+  color: var(--accent-purple);
+  background-color: var(--accent-purple-light);
   padding: 0.15rem 0.4rem;
   border-radius: 4px;
   text-transform: uppercase;

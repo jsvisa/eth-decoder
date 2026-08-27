@@ -4,23 +4,39 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(9, 9, 11, 0.55);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: 1rem;
 }
 
 .chainModal {
   background: var(--bg-card);
+  border: 1px solid var(--border-secondary);
   padding: 1.5rem;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   max-width: 550px;
-  width: 90%;
+  width: 100%;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-lg);
+  animation: modalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .chainModal .modalBody {
@@ -29,9 +45,11 @@
 }
 
 .modalTitle {
-  margin: 0 0 1.5rem 0;
-  font-size: 1.25rem;
-  color: #333;
+  margin: 0 0 1.25rem 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
 }
 
 .modalBody {
@@ -80,21 +98,24 @@
 
 .modalLabel {
   font-weight: 500;
-  color: #555;
+  color: var(--text-secondary);
   font-size: 0.875rem;
 }
 
 .modalInput {
-  padding: 0.75rem 1rem;
+  padding: 0.7rem 0.9rem;
   font-size: 1rem;
-  border: 2px solid #ddd;
-  border-radius: 6px;
-  transition: border-color 0.2s;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .modalInput:focus {
   outline: none;
-  border-color: #0070f3;
+  border-color: var(--border-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .modalActions {
@@ -105,19 +126,20 @@
 }
 
 .modalCancelButton {
-  padding: 0.75rem 1.25rem;
+  padding: 0.6875rem 1.25rem;
   font-size: 0.9rem;
   font-weight: 500;
-  color: #666;
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  color: var(--text-secondary);
+  background-color: transparent;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .modalCancelButton:hover {
-  background-color: #e8e8e8;
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 /* Added chains section */
@@ -197,8 +219,8 @@
 }
 
 .removeChainButton:hover {
-  color: #dc2626;
-  background-color: #fef2f2;
+  color: var(--accent-red);
+  background-color: var(--accent-red-light);
 }
 
 /* Chain icons */
@@ -303,10 +325,10 @@
 .chainlistError {
   padding: 1rem;
   text-align: center;
-  color: #dc2626;
+  color: var(--accent-red);
   font-size: 0.9rem;
-  background-color: #fef2f2;
-  border-radius: 6px;
+  background-color: var(--accent-red-light);
+  border-radius: var(--radius-sm);
 }
 
 .loadingText {

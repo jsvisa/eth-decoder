@@ -27,15 +27,17 @@
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
   border: 1px solid var(--border-primary);
-  border-radius: 4px;
-  background-color: var(--bg-card);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-input);
   color: var(--text-primary);
-  width: 10rem;
+  width: min(10rem, 100%);
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .historySearch:focus {
   outline: none;
   border-color: var(--accent-blue);
+  box-shadow: var(--focus-ring);
 }
 
 .historyToggle,
@@ -43,27 +45,28 @@
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
   font-weight: 500;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.2s;
-  background-color: white;
-  color: #333;
+  background-color: transparent;
+  color: var(--text-secondary);
 }
 
 .historyToggle:hover {
-  background-color: #f5f5f5;
-  border-color: #0070f3;
+  background-color: var(--accent-blue-light);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
 }
 
 .historyClear {
-  color: #c33;
-  border-color: #fcc;
+  color: var(--accent-red);
+  border-color: var(--accent-red);
 }
 
 .historyClear:hover {
-  background-color: #fee;
-  border-color: #c33;
+  background-color: var(--accent-red-light);
+  border-color: var(--accent-red);
 }
 
 .historyList {
@@ -76,9 +79,9 @@
 
 .historyItem {
   padding: 1rem;
-  background-color: var(--bg-code);
+  background-color: var(--bg-primary);
   border: 1px solid var(--border-secondary);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -99,19 +102,20 @@
 }
 
 .historyChain {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: white;
-  background-color: #0070f3;
-  padding: 0.25rem 0.5rem;
-  border-radius: 3px;
+  background-color: var(--accent-blue);
+  padding: 0.1875rem 0.5rem;
+  border-radius: var(--radius-full);
   text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .historyFunc {
-  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 0.9rem;
-  color: #0070f3;
+  color: var(--accent-blue);
   font-weight: 600;
   flex: 1;
   min-width: 0;
@@ -122,32 +126,32 @@
 .historyWriteBadge {
   font-size: 0.65rem;
   font-weight: 700;
-  padding: 0.15rem 0.35rem;
-  border-radius: 3px;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-full);
   text-transform: uppercase;
 }
 
 .historyReadBadge {
-  color: #059669;
-  background-color: #d1fae5;
+  color: var(--accent-green);
+  background-color: var(--accent-green-light);
 }
 
 .historyWriteBadge {
-  color: #d97706;
-  background-color: #fef3c7;
+  color: var(--accent-orange);
+  background-color: var(--accent-orange-light);
 }
 
 .historyAddress {
-  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 0.85rem;
-  color: #666;
+  color: var(--text-secondary);
   margin-bottom: 0.25rem;
   overflow-wrap: anywhere;
 }
 
 .historyContract {
   font-size: 0.85rem;
-  color: #333;
+  color: var(--text-primary);
   margin-bottom: 0.25rem;
   white-space: nowrap;
   overflow: hidden;
@@ -156,7 +160,7 @@
 
 .historyTime {
   font-size: 0.75rem;
-  color: #999;
+  color: var(--text-muted);
   font-style: italic;
 }
 
