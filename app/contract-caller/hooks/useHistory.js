@@ -203,7 +203,8 @@ export function useHistory({
       const callKey = `${chain}-${address.toLowerCase()}-${selectedFunction}-${JSON.stringify(args)}`;
 
       const existingIndex = history.findIndex((item) => {
-        const itemKey = `${item.chain}-${item.address.toLowerCase()}-${item.functionSig || item.functionName}-${JSON.stringify(item.args)}`;
+        if (item.type === "session") return false;
+        const itemKey = `${item.chain}-${(item.address ?? "").toLowerCase()}-${item.functionSig || item.functionName}-${JSON.stringify(item.args)}`;
         return itemKey === callKey;
       });
 

@@ -163,6 +163,27 @@ describe("saveToHistory", () => {
     expect(result.current.history[0].output).toBe("second");
   });
 
+  it("does not crash when history contains a session bundle", () => {
+    const { result } = renderHook(() => useHistory(makeParams()));
+
+    act(() => {
+      result.current.saveSessionBundle(
+        [{ id: 1, functionName: "mint", success: true }],
+        "123",
+      );
+    });
+
+    expect(() => {
+      act(() => {
+        result.current.saveToHistory({}, "42", false);
+      });
+    }).not.toThrow();
+    expect(result.current.history).toHaveLength(2);
+    // Newest item goes first; the untouched session bundle stays behind it
+    expect(result.current.history[0].output).toBe("42");
+    expect(result.current.history[1].type).toBe("session");
+  });
+
   it("caps history at MAX_HISTORY_ITEMS (50)", () => {
     // Pre-fill localStorage with 50 items
     const existing = Array.from({ length: 50 }, (_, i) => ({
