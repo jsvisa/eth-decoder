@@ -167,6 +167,39 @@ describe("useFunctionSelection — function selection and arg reset", () => {
     expect(result.current.pasteCalldataValue.slice(0, 10)).toBe("0xa9059cbb");
   });
 
+  it("backfills calldata with zero placeholders while args are empty", async () => {
+    const { result } = renderHook(() =>
+      useFunctionSelection({
+        parsedAbi: TRANSFER_ABI,
+        functions: TRANSFER_ABI,
+        address: "0x1234567890123456789012345678901234567890",
+      }),
+    );
+
+    act(() => {
+      result.current.setSelectedFunction("transfer(address,uint256)");
+    });
+    await act(async () => {});
+
+    // Empty args encode with zero placeholders so the field/URL stay live
+    expect(result.current.pasteCalldataValue).toBe(
+      "0xa9059cbb00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    );
+
+    // Typing a partial arg re-encodes live
+    act(() => {
+      result.current.setArgs([
+        "0x0000000000000000000000000000000000000001",
+        "",
+      ]);
+    });
+    await act(async () => {});
+
+    expect(result.current.pasteCalldataValue).toBe(
+      "0xa9059cbb00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000",
+    );
+  });
+
   it("encodes comma-separated address array calldata", async () => {
     const { result } = renderHook(() =>
       useFunctionSelection({
