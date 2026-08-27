@@ -30,10 +30,21 @@ export { createArbSysPrecompile } from "./precompiles";
 //               format, compatible with all RPCs including those that reject arrays.
 // batchSize>1 → http(url, { batch: {…} }) — packs up to batchSize requests into
 //               one HTTP call as [{…}, {…}, …].
-function makeHttp(url, batchSize = 1) {
-  return batchSize > 1
-    ? http(url, { batch: { batchSize, wait: 0 } })
-    : http(url);
+// Optional per-request decorator for the raw HTTP transport. Used by the
+// benchmark suite to record/replay RPC traffic from a local file so runs are
+// deterministic and network-free. `decorator(request, doFetch)` must call
+// doFetch(request) to reach the network and return its result.
+function makeHttp(url, batchSize = 1, decorator = null) {
+  const base =
+    batchSize > 1 ? http(url, { batch: { batchSize, wait: 0 } }) : http(url);
+  if (!decorator) return base;
+  return (config) => {
+    const inner = base(config);
+    return {
+      ...inner,
+      request: (req) => decorator(req, inner.request),
+    };
+  };
 }
 
 function isUnsupportedTransaction(tx) {
@@ -163,8 +174,13 @@ export function ensureTevmNodeCompat(client) {
 // caller sets the current create sender via factory.setCreateSender() before
 // each call.
 // Storage slots are unaffected since tevm already uses eth_getStorageAt.
-function createProofFreeTransport(rpcUrl, batchSize = 1, collector = null) {
-  const baseHttpFactory = makeHttp(rpcUrl, batchSize);
+function createProofFreeTransport(
+  rpcUrl,
+  batchSize = 1,
+  collector = null,
+  rpcDecorator = null,
+) {
+  const baseHttpFactory = makeHttp(rpcUrl, batchSize, rpcDecorator);
   // If a collector is provided, every request the EVM/tevm makes through this
   // transport is recorded. The wrap is invisible to callers.
   const wrappedFactory = collector
@@ -614,6 +630,7 @@ export async function createTevmClient(
   customChainId = null,
   batchSize = 1,
   collector = null,
+  rpcDecorator = null,
 ) {
   // Get chain config from built-in or use custom chain ID
   let chainConfig = CHAIN_META[chain];
@@ -654,7 +671,12 @@ export async function createTevmClient(
     name: chainConfig.name || chain,
     customCrypto: { kzg: createMockKzg() },
   });
-  const forkTransport = createProofFreeTransport(forkUrl, batchSize, collector);
+  const forkTransport = createProofFreeTransport(
+    forkUrl,
+    batchSize,
+    collector,
+    rpcDecorator,
+  );
   const forkRequest = forkTransport({}).request;
   let forkBlockNumber =
     typeof blockTag === "bigint" ? blockTag : BigInt(chainConfig.chainId);
@@ -753,8 +775,9 @@ async function prefetchAccountsFromAccessList({
   batchSize = 1,
   collector = null,
   parallel = false,
+  rpcDecorator = null,
 }) {
-  const baseFactory = makeHttp(forkRpcUrl, batchSize);
+  const baseFactory = makeHttp(forkRpcUrl, batchSize, rpcDecorator);
   const factory = collector ? collector.wrap(baseFactory) : baseFactory;
   const transport = factory({});
   const tag =
@@ -993,6 +1016,9 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     // parallelPrefetch: run tier-1 + tier-2 prefetch concurrently
     stepHookMode = "sync",
     parallelPrefetch = false,
+    // Optional async (request, doFetch) => result decorator applied to every
+    // raw RPC request (fork transport + prefetch). Benchmark-only hook.
+    rpcDecorator = null,
   } = params;
 
   // Validate inputs before the try/catch so callers receive a rejected promise
@@ -1166,6 +1192,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
         batchSize: rpcBatchSize,
         collector,
         parallel: parallelPrefetch,
+        rpcDecorator,
       });
       estimatedGas = alGas;
     }
@@ -1651,6 +1678,7 @@ export async function simulateWithTevm(params) {
     blockNumber = "latest",
     customChainId = null,
     rpcBatchSize = 1,
+    rpcDecorator = null,
   } = params;
   const { client, blockNumber: actualBlock } = await createTevmClient(
     chain,
@@ -1658,6 +1686,8 @@ export async function simulateWithTevm(params) {
     blockNumber,
     customChainId,
     rpcBatchSize,
+    null,
+    rpcDecorator,
   );
   return _runSimulationOnClient(client, actualBlock, params);
 }

@@ -12,6 +12,7 @@
     "test:coverage": "vitest run --coverage --project unit --project api",
     "test:coverage:readme": "npm run test:coverage && node scripts/update-coverage-readme.js",
     "test:e2e": "playwright test",
+    "benchmark": "vitest run --project benchmark",
     "format": "prettier --write \"app/**/*.{js,json}\" \"tests/**/*.js\" \"**/*.md\" \"*.json\""
   },
   "dependencies": {

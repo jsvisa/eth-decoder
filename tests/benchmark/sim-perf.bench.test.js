@@ -1,13 +1,23 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterAll } from "vitest";
+import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 import { simulateWithTevm } from "../../app/utils/tevmSimulator.js";
+import { createFileRpcCache } from "./rpcCache.mjs";
 
 // Simulation performance benchmark — decides between step-hook / prefetch /
 // worker execution strategies on a real fork.
 //
-// Run with:
-//   SIM_BENCH_RPC_URL=<worldchain rpc> npx vitest run --project benchmark
+// Run modes:
+//   npm run benchmark
+//     → offline replay from the committed RPC cache (tests/benchmark/
+//       __fixtures__/rpc-cache.json). Fully deterministic: no network, and
+//       quote-deadline expiry is irrelevant because every RPC response is
+//       served from the file.
+//   SIM_BENCH_RPC_URL=<worldchain rpc> npm run benchmark
+//     → recording mode: cache misses hit the live RPC and are appended to
+//       the cache file (commit the updated file afterwards).
 //
 // Uses the pinned calldata in ./__fixtures__/worldchain-swap.json (see
 // generate-fixture.test.js). Every variant replays the SAME call at the SAME
@@ -17,6 +27,15 @@ import { simulateWithTevm } from "../../app/utils/tevmSimulator.js";
 
 const RPC = process.env.SIM_BENCH_RPC_URL;
 const RUNS = Math.max(1, Number(process.env.SIM_BENCH_RUNS || 3));
+// Plain string path — URL objects can't cross the worker boundary.
+const CACHE_PATH = fileURLToPath(
+  new URL("./__fixtures__/rpc-cache.json", import.meta.url),
+);
+const HAS_CACHE = existsSync(CACHE_PATH);
+
+const rpcCache = createFileRpcCache(CACHE_PATH, { rpcUrl: RPC });
+
+afterAll(() => rpcCache.flush());
 
 const fixture = JSON.parse(
   await readFile(
@@ -28,7 +47,9 @@ const fixture = JSON.parse(
 const baseParams = (over = {}) => ({
   chain: fixture.chainName,
   customChainId: fixture.chainId,
-  rpcUrl: RPC,
+  // In replay mode no real endpoint is contacted (the decorator serves every
+  // request from the cache), but viem's transport still needs a URL string.
+  rpcUrl: RPC || "http://rpc-cache.invalid",
   blockNumber: fixture.block,
   address: fixture.to,
   fromAddress: fixture.from,
@@ -39,6 +60,7 @@ const baseParams = (over = {}) => ({
   rpcBatchSize: 1,
   // Mirror the UI's sender-funding override; the real wallet is unfunded.
   balanceOverrides: [{ address: fixture.from, balance: "10" }],
+  rpcDecorator: rpcCache.decorator,
   ...over,
 });
 
@@ -79,9 +101,17 @@ async function runOnce(params) {
 
 function runInWorker(params) {
   const sab = new SharedArrayBuffer(4);
+  // The decorator is a function and cannot be structured-cloned — the worker
+  // rebuilds its own cache instance from the same file.
+  const { rpcDecorator: _omit, ...cloneableParams } = baseParams(params);
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL("./sim-worker.mjs", import.meta.url), {
-      workerData: { params: baseParams(params), sab },
+      workerData: {
+        params: cloneableParams,
+        sab,
+        cacheFilePath: CACHE_PATH,
+        cacheRpcUrl: RPC,
+      },
     });
     const t0 = performance.now();
     worker.on("message", (msg) => {
@@ -112,7 +142,7 @@ const median = (xs) => {
 const min = (xs) => Math.min(...xs);
 
 describe("simulation performance benchmark", () => {
-  it.skipIf(!RPC)(
+  it.skipIf(!RPC && !HAS_CACHE)(
     "compares hook / prefetch / worker strategies on the pinned fixture",
     async () => {
       const summary = [];
