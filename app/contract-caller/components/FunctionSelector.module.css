@@ -7,7 +7,7 @@
 .label {
   font-weight: 500;
   font-size: 0.9rem;
-  color: var(--text-secondary, #555);
+  color: var(--text-secondary);
 }
 
 .functionLabelRow {
@@ -19,28 +19,28 @@
 .readBadge {
   font-size: 0.7rem;
   font-weight: 600;
-  color: #059669;
-  background-color: #d1fae5;
+  color: var(--accent-green);
+  background-color: var(--accent-green-light);
   padding: 0.2rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--radius-full);
   text-transform: uppercase;
 }
 
 .writeBadge {
   font-size: 0.7rem;
   font-weight: 600;
-  color: #d97706;
-  background-color: #fef3c7;
+  color: var(--accent-orange);
+  background-color: var(--accent-orange-light);
   padding: 0.2rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--radius-full);
   text-transform: uppercase;
 }
 
 .funcSelector {
-  font-family: "Menlo", "Consolas", "Monaco", "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
-  color: #6366f1;
-  background-color: #eef2ff;
+  color: var(--accent-blue);
+  background-color: var(--accent-blue-light);
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
   cursor: pointer;
@@ -49,13 +49,13 @@
 }
 
 .funcSelector:hover {
-  background-color: #c7d2fe;
-  color: #4338ca;
+  filter: brightness(0.95);
+  color: var(--accent-blue-hover);
 }
 
 .funcSelector.copied {
-  background-color: #d1fae5;
-  color: #059669;
+  background-color: var(--accent-green-light);
+  color: var(--accent-green);
 }
 
 .functionSelectWrapper {
@@ -67,21 +67,22 @@
   width: 100%;
   padding: 0.875rem 1rem;
   font-size: 1rem;
-  border: 2px solid var(--border-primary, #ddd);
-  border-radius: 6px;
-  transition: border-color 0.3s;
-  background-color: var(--bg-input, #fff);
-  color: var(--text-primary, #333);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
   box-sizing: border-box;
 }
 
 .input:focus {
   outline: none;
-  border-color: var(--border-focus, #0070f3);
+  border-color: var(--border-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .input:disabled {
-  background-color: var(--bg-hover, #f5f5f5);
+  background-color: var(--bg-hover);
   cursor: not-allowed;
 }
 
@@ -90,92 +91,87 @@
   align-items: center;
   width: 100%;
   padding: 0.75rem 1rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  background-color: #f8f9fa;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-hover);
   gap: 0.5rem;
   box-sizing: border-box;
 }
 
 .selectedFunctionText {
   flex: 1;
-  font-family: "Menlo", "Consolas", "Monaco", "Courier New", monospace;
+  min-width: 0;
+  font-family: var(--font-mono);
   font-size: 0.9rem;
-  color: #333;
+  color: var(--text-primary);
   cursor: pointer;
   word-break: break-all;
 }
 
 .selectedFunctionText:hover {
-  color: #0070f3;
+  color: var(--accent-blue);
 }
 
 .selectedFunctionText.copiedText {
-  color: #059669;
+  color: var(--accent-green);
 }
 
 .clearFunctionBtn {
   background: none;
   border: none;
   font-size: 1.2rem;
-  color: #999;
+  color: var(--text-muted);
   cursor: pointer;
   padding: 0 5px;
   flex-shrink: 0;
+  transition: color 0.15s;
 }
 
 .clearFunctionBtn:hover {
-  color: #666;
+  color: var(--accent-red);
 }
 
-.changeFunctionBtn {
-  background: none;
-  border: none;
-  font-size: 0.8rem;
-  color: #999;
-  cursor: pointer;
-  padding: 0 5px;
-  flex-shrink: 0;
-}
-
-.changeFunctionBtn:hover {
-  color: #666;
-}
-
+.changeFunctionBtn,
 .changeFunctionBtnLeft {
   background: none;
   border: none;
   font-size: 0.8rem;
-  color: #999;
+  color: var(--text-muted);
   cursor: pointer;
   padding: 0 5px;
   flex-shrink: 0;
+  transition: color 0.15s;
 }
 
+.changeFunctionBtn:hover,
 .changeFunctionBtnLeft:hover {
-  color: #666;
+  color: var(--accent-blue);
 }
 
 .functionListSearch {
   padding: 0.5rem;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--border-secondary);
   position: sticky;
   top: 0;
-  background: white;
+  background: var(--bg-card);
 }
 
 .functionSearchInput {
   width: 100%;
   padding: 0.5rem 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
   font-size: 0.875rem;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
   box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .functionSearchInput:focus {
   outline: none;
-  border-color: #0070f3;
+  border-color: var(--border-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .functionList {
@@ -185,10 +181,10 @@
   right: 0;
   max-height: 300px;
   overflow-y: auto;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
   z-index: 100;
   margin-top: 4px;
 }
@@ -199,7 +195,7 @@
   gap: 0.5rem;
   padding: 0.6rem 0.8rem;
   cursor: pointer;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-secondary);
   transition: background-color 0.15s;
 }
 
@@ -208,17 +204,17 @@
 }
 
 .functionItem:hover {
-  background-color: #f5f5f5;
+  background-color: var(--bg-hover);
 }
 
 .functionItemSelected {
-  background-color: #eef2ff;
+  background-color: var(--accent-blue-light);
 }
 
 .functionItemEmpty {
   padding: 1rem;
   text-align: center;
-  color: #999;
+  color: var(--text-muted);
   font-style: italic;
 }
 
@@ -227,27 +223,28 @@
   font-size: 0.65rem;
   font-weight: 600;
   padding: 0.15rem 0.4rem;
-  border-radius: 3px;
+  border-radius: var(--radius-full);
   flex-shrink: 0;
+  text-transform: uppercase;
 }
 
 .funcReadTag {
-  color: #059669;
-  background-color: #d1fae5;
+  color: var(--accent-green);
+  background-color: var(--accent-green-light);
 }
 
 .funcWriteTag {
-  color: #d97706;
-  background-color: #fef3c7;
+  color: var(--accent-orange);
+  background-color: var(--accent-orange-light);
 }
 
 .funcName {
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .funcParams {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.85rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -255,7 +252,7 @@
 }
 
 .funcReturns {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.85rem;
   margin-left: 0.25rem;
   flex-shrink: 0;
