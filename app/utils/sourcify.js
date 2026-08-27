@@ -16,7 +16,9 @@ export async function lookupFunctionSignatures(selector) {
     const json = await res.json();
     if (!json.ok) return [];
     const sigs = (json.result?.function?.[selector] ?? []).map((e) => e.name);
-    setSignaturesInCache(selector, sigs).catch(() => {});
+    // Awaited so concurrent test cleanup (or process freeze on serverless)
+    // can't race an in-flight atomic write. setSignaturesInCache never throws.
+    await setSignaturesInCache(selector, sigs);
     return sigs;
   } catch {
     return [];
@@ -35,7 +37,8 @@ export async function lookupEventSignatures(topic0) {
     const json = await res.json();
     if (!json.ok) return [];
     const sigs = (json.result?.event?.[topic0] ?? []).map((e) => e.name);
-    setSignaturesInCache(topic0, sigs).catch(() => {});
+    // See lookupFunctionSignatures — awaited to avoid cleanup/freezing races.
+    await setSignaturesInCache(topic0, sigs);
     return sigs;
   } catch {
     return [];

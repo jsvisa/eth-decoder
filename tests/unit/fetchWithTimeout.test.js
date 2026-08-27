@@ -36,23 +36,36 @@ describe("fetchWithTimeout", () => {
   });
 
   it("aborts the request after the timeout elapses", async () => {
-    vi.useFakeTimers();
-    try {
-      const { fetchWithTimeout } =
-        await import("../../app/utils/fetchWithTimeout.js");
-      global.fetch.mockImplementation(
-        (_url, options) =>
-          new Promise((_resolve, reject) => {
-            options.signal.addEventListener("abort", () => {
-              reject(new Error("The operation was aborted"));
-            });
-          }),
-      );
-      const promise = fetchWithTimeout("https://slow.test", {}, 50);
-      await vi.advanceTimersByTimeAsync(60);
-      await expect(promise).rejects.toThrow(/abort/i);
-    } finally {
-      vi.useRealTimers();
-    }
+    // Real timers: vi.useFakeTimers() doesn't govern jsdom's internal
+    // AbortSignal.timeout scheduler, so the abort can land in a task queued
+    // after this test finishes, rejecting an unconsumed promise (unhandled
+    // rejection). Waiting on the signal itself keeps everything ordered.
+    const { fetchWithTimeout } =
+      await import("../../app/utils/fetchWithTimeout.js");
+    let capturedOptions;
+    global.fetch.mockImplementation((_url, options) => {
+      capturedOptions = options;
+      return new Promise((_resolve, reject) => {
+        options.signal.addEventListener("abort", () => {
+          reject(new Error("The operation was aborted"));
+        });
+      });
+    });
+
+    const promise = fetchWithTimeout("https://slow.test", {}, 20);
+    await new Promise((resolve) => {
+      if (capturedOptions.signal.aborted) {
+        resolve();
+        return;
+      }
+      capturedOptions.signal.addEventListener("abort", resolve, {
+        once: true,
+      });
+      // Safety cap so a broken signal fails the test instead of hanging it.
+      setTimeout(resolve, 2000);
+    });
+
+    expect(capturedOptions.signal.aborted).toBe(true);
+    await expect(promise).rejects.toThrow(/abort/i);
   });
 });
