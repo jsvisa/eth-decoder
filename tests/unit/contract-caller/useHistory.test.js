@@ -37,6 +37,7 @@ function makeParams(overrides = {}) {
     setResult: vi.fn(),
     setError: vi.fn(),
     setEthValue: vi.fn(),
+    setForkBlockNumber: vi.fn(),
     applyPendingArgs: vi.fn(),
     ...overrides,
   };
@@ -152,6 +153,27 @@ describe("initial state", () => {
     );
 
     expect(applyPendingArgs).not.toHaveBeenCalled();
+  });
+
+  it("hydrates eth value and block number into read/fork fields on mount", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/contract-caller?chain=ethereum&address=0xabc&value=1.5&block=19000000",
+    );
+
+    const setEthValue = vi.fn();
+    const setBlockNumber = vi.fn();
+    const setForkBlockNumber = vi.fn();
+    renderHook(() =>
+      useHistory(
+        makeParams({ setEthValue, setBlockNumber, setForkBlockNumber }),
+      ),
+    );
+
+    expect(setEthValue).toHaveBeenCalledWith("1.5");
+    expect(setBlockNumber).toHaveBeenCalledWith("19000000");
+    expect(setForkBlockNumber).toHaveBeenCalledWith("19000000");
   });
 
   it("preserves simulationId share URLs during state sync", () => {

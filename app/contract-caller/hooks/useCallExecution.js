@@ -640,8 +640,8 @@ export function useCallExecution({
           params.set("value", ethValue);
         }
 
-        if (blockNumber) {
-          params.set("block", blockNumber);
+        if (blockNumber || forkBlockNumber) {
+          params.set("block", blockNumber || forkBlockNumber);
         }
 
         shareUrl = `${window.location.origin}${window.location.pathname}?${params}`;

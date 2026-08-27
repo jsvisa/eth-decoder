@@ -357,6 +357,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     setError: exec.setError,
     setEthValue: simOpts.setEthValue,
     setBlockNumber: fn.setBlockNumber,
+    setForkBlockNumber: simOpts.setForkBlockNumber,
     applyPendingArgs: fn.applyPendingArgs,
     skipUrlHydration: !hydrateFromUrl,
   });
@@ -394,8 +395,11 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     if (simOpts.ethValue) {
       params.set("value", simOpts.ethValue);
     }
-    if (fn.blockNumber) {
-      params.set("block", fn.blockNumber);
+    // One `block` param serves both modes: read-call block number and the
+    // write-mode simulation fork block.
+    const blockParam = fn.blockNumber || simOpts.forkBlockNumber;
+    if (blockParam) {
+      params.set("block", blockParam);
     }
     window.history.replaceState(
       null,
@@ -409,6 +413,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     fn.pasteCalldataValue,
     simOpts.fromAddress,
     simOpts.ethValue,
+    simOpts.forkBlockNumber,
     fn.blockNumber,
   ]);
 

@@ -28,6 +28,8 @@ const MAX_HISTORY_ITEMS = 50;
  * @param {Function} params.setError          – setter for error state
  * @param {Function} params.setEthValue         – setter for ETH value input
  * @param {Function} params.setBlockNumber  – setter for read block number
+ * @param {Function} params.setForkBlockNumber – setter for simulation fork block number (set
+ *                                  together with setBlockNumber from the `block` param)
  * @param {Function} params.applyPendingArgs    – queue pending function/args in selection state
  * @param {boolean}  params.skipUrlHydration    – skip URL-param hydration on mount
  *                                                (used for non-initial tabs)
@@ -49,6 +51,7 @@ export function useHistory({
   setError,
   setEthValue,
   setBlockNumber,
+  setForkBlockNumber,
   applyPendingArgs,
   skipUrlHydration = false,
 }) {
@@ -187,7 +190,10 @@ export function useHistory({
       }
 
       if (urlBlock) {
+        // One param serves both modes: read-call block number and the
+        // write-mode simulation fork block.
         setBlockNumber?.(urlBlock);
+        setForkBlockNumber?.(urlBlock);
       }
 
       // Auto-fetch ABI after a short delay

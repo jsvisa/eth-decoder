@@ -405,4 +405,31 @@ describe("ContractCallerPage – calldata URL sync (real useFunctionSelection)",
     );
     page.unmount();
   });
+
+  it("syncs the simulation fork block into the shared block URL param", () => {
+    simulationOptionsState.forkBlockNumber = "19000000";
+    const page = renderPage();
+
+    const setInput = (el, value) => {
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value",
+      ).set;
+      setter.call(el, value);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+
+    act(() => {
+      setInput(
+        page.q("address-input"),
+        "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      );
+    });
+
+    expect(window.location.search).toContain("block=19000000");
+    expect(window.location.search).not.toContain("fork=");
+
+    page.unmount();
+    simulationOptionsState.forkBlockNumber = "";
+  });
 });
