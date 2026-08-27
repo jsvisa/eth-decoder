@@ -2,9 +2,10 @@
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  padding: 0 0 0.25rem;
+  padding: 0.25rem;
   margin-bottom: 1.5rem;
-  border-bottom: 1px solid var(--border-secondary);
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-md);
   flex-wrap: nowrap;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -15,8 +16,8 @@
 }
 
 .tabBar::-webkit-scrollbar-thumb {
-  background: var(--border-secondary);
-  border-radius: 3px;
+  background: var(--border-primary);
+  border-radius: var(--radius-full);
 }
 
 .tabBar::-webkit-scrollbar-track {
@@ -28,16 +29,21 @@
   align-items: center;
   gap: 0.5rem;
   max-width: 240px;
-  padding: 0.4rem 0.9rem;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
+  padding: 0.4375rem 0.875rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   white-space: nowrap;
   user-select: none;
   flex-shrink: 0;
+  transition:
+    box-shadow 0.2s,
+    color 0.2s,
+    background-color 0.2s;
 }
 
 .tab[draggable="true"] {
@@ -45,13 +51,15 @@
 }
 
 .tab:hover {
-  background: var(--bg-hover);
   color: var(--text-primary);
+  filter: brightness(0.97);
 }
 
 .active {
-  background: var(--accent-blue-light);
-  border-color: var(--accent-blue);
+  background: var(--bg-card) !important;
+  box-shadow:
+    var(--shadow-sm),
+    0 0 0 1px var(--border-primary);
   color: var(--accent-blue);
   font-weight: 600;
 }
@@ -64,10 +72,10 @@
 .tabInput {
   width: 140px;
   padding: 0.1rem 0.3rem;
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   font-family: inherit;
   color: var(--text-primary);
-  background: var(--bg-surface);
+  background: var(--bg-card);
   border: 1px solid var(--accent-blue);
   border-radius: 4px;
   outline: none;
@@ -75,15 +83,22 @@
 
 .tabClose {
   flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   line-height: 1;
   color: inherit;
   opacity: 0.6;
-  padding: 0.15rem 0.3rem;
-  border-radius: 3px;
+  padding: 0;
+  border-radius: 4px;
+  transition:
+    opacity 0.15s,
+    background-color 0.15s;
 }
 
 .tabClose:hover {
@@ -93,25 +108,30 @@
 
 .dragging {
   opacity: 0.6;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow);
 }
 
 .addTab {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.4rem 0.9rem;
-  font-size: 0.875rem;
+  padding: 0.4375rem 0.875rem;
+  font-size: 0.85rem;
   font-weight: 500;
-  color: var(--accent-blue);
+  color: var(--text-secondary);
   background: transparent;
-  border: 1px dashed var(--accent-blue);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--radius-sm);
   cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
 }
 
 .addTab:hover {
   background: var(--accent-blue-light);
+  color: var(--accent-blue);
 }
 
 .tabBody {
