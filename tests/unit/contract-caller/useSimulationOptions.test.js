@@ -7,6 +7,8 @@ describe("useSimulationOptions – initial state", () => {
     const { result } = renderHook(() => useSimulationOptions());
 
     expect(result.current.fromAddress).toBe("");
+    expect(result.current.blockNumber).toBe("");
+    // forkBlockNumber is an alias of the single shared blockNumber state
     expect(result.current.forkBlockNumber).toBe("");
     expect(result.current.cheatcodes).toEqual({
       deal: { enabled: false, address: "", amount: "" },
@@ -36,6 +38,13 @@ describe("useSimulationOptions – happy path", () => {
       result.current.setForkBlockNumber("19000000");
     });
     expect(result.current.forkBlockNumber).toBe("19000000");
+    expect(result.current.blockNumber).toBe("19000000");
+
+    act(() => {
+      result.current.setBlockNumber("18000001");
+    });
+    expect(result.current.blockNumber).toBe("18000001");
+    expect(result.current.forkBlockNumber).toBe("18000001");
 
     // Enable deal cheatcode
     act(() => {

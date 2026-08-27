@@ -79,7 +79,6 @@ describe("useFunctionSelection — initial state", () => {
     expect(result.current.pasteCalldataExpanded).toBe(true);
     expect(result.current.pasteCalldataValue).toBe("");
     expect(result.current.pasteCalldataError).toBeNull();
-    expect(result.current.blockNumber).toBe("");
     expect(result.current.copiedItem).toBeNull();
     expect(result.current.calldataCopied).toBe(false);
   });
@@ -104,8 +103,6 @@ describe("useFunctionSelection — initial state", () => {
       "setPasteCalldataValue",
       "pasteCalldataError",
       "setPasteCalldataError",
-      "blockNumber",
-      "setBlockNumber",
       "calldataCopied",
       "copiedItem",
       "setCopiedItem",

@@ -5,7 +5,10 @@ import { parseEther, formatEther } from "viem";
 
 export function useSimulationOptions() {
   const [fromAddress, setFromAddress] = useState("");
-  const [forkBlockNumber, setForkBlockNumber] = useState("");
+  // Single block number for both modes: read calls execute at this block,
+  // write simulations fork from it. A function is either read or write, so
+  // one value serves both.
+  const [blockNumber, setBlockNumber] = useState("");
   const [cheatcodes, setCheatcodes] = useState({
     deal: { enabled: false, address: "", amount: "" },
     prank: { enabled: false, address: "" },
@@ -38,7 +41,7 @@ export function useSimulationOptions() {
 
   const resetWriteOptions = () => {
     setFromAddress("");
-    setForkBlockNumber("");
+    setBlockNumber("");
     setCheatcodes({
       deal: { enabled: false, address: "", amount: "" },
       prank: { enabled: false, address: "" },
@@ -53,8 +56,12 @@ export function useSimulationOptions() {
   return {
     fromAddress,
     setFromAddress,
-    forkBlockNumber,
-    setForkBlockNumber,
+    blockNumber,
+    setBlockNumber,
+    // Backward-compatible aliases: write-mode consumers (SimulationOptions
+    // fork field, tevm session) read the same single block number.
+    forkBlockNumber: blockNumber,
+    setForkBlockNumber: setBlockNumber,
     cheatcodes,
     setCheatcodes,
     balanceOverrides,

@@ -41,10 +41,10 @@ const abiHookState = {
 };
 
 const simulationOptionsState = {
-  forkBlockNumber: "",
+  blockNumber: "",
   // Behaves like a state setter so the rendered fork field reflects updates.
-  setForkBlockNumber: vi.fn((value) => {
-    simulationOptionsState.forkBlockNumber = value;
+  setBlockNumber: vi.fn((value) => {
+    simulationOptionsState.blockNumber = value;
   }),
   fromAddress: "",
   setFromAddress: vi.fn(),
@@ -415,7 +415,7 @@ describe("ContractCallerPage – calldata URL sync (real useFunctionSelection)",
   });
 
   it("syncs the simulation fork block into the shared block URL param", () => {
-    simulationOptionsState.forkBlockNumber = "19000000";
+    simulationOptionsState.blockNumber = "19000000";
     const page = renderPage();
 
     const setInput = (el, value) => {
@@ -439,7 +439,7 @@ describe("ContractCallerPage – calldata URL sync (real useFunctionSelection)",
     expect(window.location.search).not.toContain("fork=");
 
     page.unmount();
-    simulationOptionsState.forkBlockNumber = "";
+    simulationOptionsState.blockNumber = "";
   });
 
   it("hydrates the simulation fork field with the block URL param", () => {
@@ -453,6 +453,6 @@ describe("ContractCallerPage – calldata URL sync (real useFunctionSelection)",
     expect(page.q("fork-block").value).toBe("19000000");
 
     page.unmount();
-    simulationOptionsState.forkBlockNumber = "";
+    simulationOptionsState.blockNumber = "";
   });
 });

@@ -292,7 +292,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
   const session = useTevmSession({
     chain,
     rpcUrl: rpcSettings?.[chain] || undefined,
-    forkBlockNumber: simOpts.forkBlockNumber,
+    forkBlockNumber: simOpts.blockNumber,
     rpcBatchSize,
     chainId: getChainId(chain),
     saveBundle: (...args) => saveBundleRef.current?.(...args),
@@ -310,8 +310,8 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     fromAddress: simOpts.fromAddress,
     ethValue: simOpts.ethValue,
     ethValueUnit: simOpts.ethValueUnit,
-    forkBlockNumber: simOpts.forkBlockNumber,
-    blockNumber: fn.blockNumber,
+    forkBlockNumber: simOpts.blockNumber,
+    blockNumber: simOpts.blockNumber,
     apiKeys,
     rpcSettings,
     rpcBatchSize,
@@ -356,18 +356,10 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     setResult: exec.setResult,
     setError: exec.setError,
     setEthValue: simOpts.setEthValue,
-    setBlockNumber: fn.setBlockNumber,
+    setBlockNumber: simOpts.setBlockNumber,
     applyPendingArgs: fn.applyPendingArgs,
     skipUrlHydration: !hydrateFromUrl,
   });
-
-  // Restore the simulation fork block from ?block= (useHistory hydrates the
-  // read-call block number from the same param).
-  useEffect(() => {
-    if (!hydrateFromUrl) return;
-    const urlBlock = new URLSearchParams(window.location.search).get("block");
-    if (urlBlock) simOpts.setForkBlockNumber(urlBlock);
-  }, [hydrateFromUrl]);
 
   // Wire remaining deferred refs
   saveBundleRef.current = history.saveSessionBundle;
@@ -402,11 +394,8 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     if (simOpts.ethValue) {
       params.set("value", simOpts.ethValue);
     }
-    // One `block` param serves both modes: read-call block number and the
-    // write-mode simulation fork block.
-    const blockParam = fn.blockNumber || simOpts.forkBlockNumber;
-    if (blockParam) {
-      params.set("block", blockParam);
+    if (simOpts.blockNumber) {
+      params.set("block", simOpts.blockNumber);
     }
     window.history.replaceState(
       null,
@@ -420,8 +409,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     fn.pasteCalldataValue,
     simOpts.fromAddress,
     simOpts.ethValue,
-    simOpts.forkBlockNumber,
-    fn.blockNumber,
+    simOpts.blockNumber,
   ]);
 
   const tokens = useTokenMetadata(chain, rpcSettings);
@@ -636,7 +624,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
       }
       if (s.fromAddress) simOpts.setFromAddress(checksumAddress(s.fromAddress));
       if (s.ethValue) simOpts.setEthValue(s.ethValue);
-      if (s.blockNumber) fn.setBlockNumber(s.blockNumber);
+      if (s.blockNumber) simOpts.setBlockNumber(s.blockNumber);
     }
     setBooted(true);
     if (s && !hydrateFromUrl && s.address) {
@@ -657,7 +645,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
       args: fn.args,
       fromAddress: simOpts.fromAddress,
       ethValue: simOpts.ethValue,
-      blockNumber: fn.blockNumber,
+      blockNumber: simOpts.blockNumber,
     });
   }, [
     booted,
@@ -667,7 +655,7 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
     fn.args,
     simOpts.fromAddress,
     simOpts.ethValue,
-    fn.blockNumber,
+    simOpts.blockNumber,
     setSavedTabState,
   ]);
 
@@ -706,8 +694,8 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
         hideDecodeAndFill={deployMode}
       />
       <SimulationOptions
-        forkBlockNumber={simOpts.forkBlockNumber}
-        onForkBlockChange={simOpts.setForkBlockNumber}
+        forkBlockNumber={simOpts.blockNumber}
+        onForkBlockChange={simOpts.setBlockNumber}
         fromAddress={simOpts.fromAddress}
         onFromAddressChange={simOpts.setFromAddress}
         cheatcodes={simOpts.cheatcodes}
@@ -853,8 +841,8 @@ function CallerWorkspace({ tabId, isActive, hydrateFromUrl, onRename }) {
                   fieldErrors={fn.fieldErrors}
                   addressBook={bookmark.addressBook}
                   onOpenBookmarkModal={bookmark.openBookmarkModal}
-                  blockNumber={fn.blockNumber}
-                  onReadBlockNumberChange={fn.setBlockNumber}
+                  blockNumber={simOpts.blockNumber}
+                  onBlockNumberChange={simOpts.setBlockNumber}
                   disabled={exec.loading}
                   expanded={argsExpanded}
                   onToggle={() => setArgsExpanded((v) => !v)}
