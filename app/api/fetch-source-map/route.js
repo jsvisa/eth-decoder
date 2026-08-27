@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { isValidEthAddress } from "../../utils/validation";
+import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
 
 export async function GET(request) {
   try {
@@ -13,6 +15,13 @@ export async function GET(request) {
       );
     }
 
+    if (!isValidEthAddress(address)) {
+      return NextResponse.json(
+        { error: "Invalid address format" },
+        { status: 400 },
+      );
+    }
+
     if (!chainId) {
       return NextResponse.json(
         { error: "Missing chainId parameter" },
@@ -20,8 +29,17 @@ export async function GET(request) {
       );
     }
 
-    const response = await fetch(
-      `https://sourcify.dev/server/v2/contract/${chainId}/${address}/files`,
+    if (!/^\d{1,12}$/.test(chainId)) {
+      return NextResponse.json(
+        { error: "Invalid chainId format" },
+        { status: 400 },
+      );
+    }
+
+    const response = await fetchWithTimeout(
+      `https://sourcify.dev/server/v2/contract/${encodeURIComponent(
+        chainId,
+      )}/${address}/files`,
     );
 
     if (!response.ok) {

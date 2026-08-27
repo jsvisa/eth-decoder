@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchCoinGeckoPrice } from "../../utils/coingecko";
+import { isValidEthAddress } from "../../utils/validation";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -9,6 +10,13 @@ export async function GET(request) {
   if (!tokenAddress || !chainId) {
     return NextResponse.json(
       { error: "Missing token or chainId" },
+      { status: 400 },
+    );
+  }
+
+  if (!isValidEthAddress(tokenAddress)) {
+    return NextResponse.json(
+      { error: "Invalid token address format" },
       { status: 400 },
     );
   }

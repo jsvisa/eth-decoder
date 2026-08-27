@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { defineChain } from "viem";
-import { isValidEthAddress, isValidHttpUrl } from "../../utils/validation";
+import { isValidEthAddress } from "../../utils/validation";
+import { isSafeRpcUrl } from "../../utils/ssrfGuard";
 import {
   BUILT_IN_CHAIN_IDS,
   VIEM_CHAINS,
@@ -35,10 +36,11 @@ export async function POST(request) {
       );
     }
 
-    // Only allow http(s) URLs for user-supplied RPC endpoints
-    if (customRpcUrl && !isValidHttpUrl(customRpcUrl)) {
+    // Only allow http(s) URLs for user-supplied RPC endpoints and reject
+    // hosts that point at loopback/private networks (SSRF guard)
+    if (customRpcUrl && !(await isSafeRpcUrl(customRpcUrl))) {
       return NextResponse.json(
-        { error: "Invalid rpcUrl — must be an http:// or https:// URL" },
+        { error: "Invalid rpcUrl — must be a public http:// or https:// URL" },
         { status: 400 },
       );
     }

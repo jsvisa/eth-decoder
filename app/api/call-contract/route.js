@@ -5,11 +5,8 @@ import {
   decodeFunctionResult,
   encodeFunctionData,
 } from "viem";
-import {
-  isValidEthAddress,
-  isValidHttpUrl,
-  checksumAddress,
-} from "../../utils/validation";
+import { isValidEthAddress, checksumAddress } from "../../utils/validation";
+import { isSafeRpcUrl } from "../../utils/ssrfGuard";
 import { normalizeArg, ArgValidationError } from "../../utils/normalizeArg";
 import {
   VIEM_CHAINS,
@@ -69,10 +66,11 @@ export async function POST(request) {
     let chainConfig = VIEM_CHAINS[chain];
     let rpcUrl = customRpcUrl || DEFAULT_RPC_URLS[chain];
 
-    // Only allow http(s) URLs for user-supplied RPC endpoints
-    if (customRpcUrl && !isValidHttpUrl(customRpcUrl)) {
+    // Only allow http(s) URLs for user-supplied RPC endpoints and reject
+    // hosts that point at loopback/private networks (SSRF guard)
+    if (customRpcUrl && !(await isSafeRpcUrl(customRpcUrl))) {
       return NextResponse.json(
-        { error: "Invalid rpcUrl — must be an http:// or https:// URL" },
+        { error: "Invalid rpcUrl — must be a public http:// or https:// URL" },
         { status: 400 },
       );
     }

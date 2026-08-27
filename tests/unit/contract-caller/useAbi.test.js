@@ -461,4 +461,58 @@ describe("useAbi — fetch race", () => {
 
     unmount();
   });
+
+  it("clears fetchingAbi when the address changes mid-fetch (no refetch)", async () => {
+    // Fetch that stays pending until we release it
+    let resolveFirst;
+    const pendingResponse = new Promise((resolve) => {
+      resolveFirst = resolve;
+    });
+
+    const capturedSignals = [];
+    global.fetch = vi.fn().mockImplementation((_url, options = {}) => {
+      capturedSignals.push(options.signal);
+      return pendingResponse.then(() => ({
+        ok: true,
+        json: async () => ({ abi: SIMPLE_ABI }),
+      }));
+    });
+
+    const { result, rerender, unmount } = renderHook((args) => useAbi(args), {
+      initialProps: {
+        chain: "ethereum",
+        address: VALID_ADDRESS,
+        getChainId: () => 1,
+      },
+    });
+
+    let firstFetch;
+    act(() => {
+      firstFetch = result.current.fetchAbi(true);
+    });
+    await act(async () => {});
+    expect(result.current.fetchingAbi).toBe(true);
+
+    // Switch to another address WITHOUT starting a new fetch:
+    // the in-flight request is superseded and must be torn down cleanly.
+    const OTHER_ADDRESS = "0x9876543210987654321098765432109876543210";
+    rerender({
+      chain: "ethereum",
+      address: OTHER_ADDRESS,
+      getChainId: () => 1,
+    });
+    expect(result.current.fetchingAbi).toBe(false);
+    // The superseded request was aborted instead of left running
+    expect(capturedSignals[0]?.aborted).toBe(true);
+
+    await act(async () => {
+      resolveFirst({});
+      await firstFetch;
+    });
+    // Stale response arriving afterwards must not resurrect the spinner
+    expect(result.current.fetchingAbi).toBe(false);
+    expect(result.current.contractName).toBeNull();
+
+    unmount();
+  });
 });

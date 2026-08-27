@@ -37,11 +37,10 @@ export function ThemeProvider({ children }) {
     setTheme((prev) => (prev === "light" ? "dark" : "light"));
   };
 
-  // Prevent flash of wrong theme
-  if (!mounted) {
-    return null;
-  }
-
+  // Always render: returning null pre-mount made the SSR HTML and first
+  // client paint completely empty because layout nests everything inside
+  // this provider. The pre-hydration script in layout.js prevents a flash
+  // of the wrong theme before this effect applies data-theme.
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
       {children}

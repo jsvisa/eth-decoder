@@ -194,19 +194,51 @@ describe("POST /api/simulate-tx — validation", () => {
     expect((await res.json()).error).toMatch(/unsupported chainid/i);
   });
 
+  it("returns 400 when session-mode calls exceed the 20-call cap", async () => {
+    const manyCalls = Array.from({ length: 21 }, () => ({
+      to: VALID_BODY.to,
+      data: VALID_BODY.data,
+      from: VALID_BODY.from,
+    }));
+    const res = await POST(makeRequest({ ...VALID_BODY, calls: manyCalls }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/at most 20/i);
+  });
+
+  it("accepts 20 session calls (the cap boundary)", async () => {
+    simulateWithClient.mockResolvedValue(SIM_RESULT);
+    const calls = Array.from({ length: 20 }, () => ({
+      to: VALID_BODY.to,
+      data: VALID_BODY.data,
+      from: VALID_BODY.from,
+    }));
+    const res = await POST(makeRequest({ ...VALID_BODY, calls }));
+    expect(res.status).toBe(200);
+  });
+
+  it("returns 400 when rpcUrl points at a private address (SSRF)", async () => {
+    delete process.env.ALLOW_PRIVATE_RPC;
+    const res = await POST(
+      makeRequest({ ...VALID_BODY, rpcUrl: "http://127.0.0.1:8545" }),
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/rpcUrl/i);
+  });
+
   it("returns 200 for non-builtin chainId when rpcUrl is provided", async () => {
     const res = await POST(
       makeRequest({
         ...VALID_BODY,
         chainId: 999999,
-        rpcUrl: "https://custom-rpc.example.com",
+        rpcUrl: "https://203.0.113.10",
       }),
     );
     expect(res.status).toBe(200);
   });
 
   it("passes custom rpcUrl and customChainId to simulateWithTevm for non-builtin chain", async () => {
-    const customRpc = "https://custom-rpc.example.com";
+    const customRpc = "https://203.0.113.10";
     await POST(
       makeRequest({ ...VALID_BODY, chainId: 999999, rpcUrl: customRpc }),
     );
@@ -219,7 +251,7 @@ describe("POST /api/simulate-tx — validation", () => {
   });
 
   it("passes custom rpcUrl to simulateWithTevm when provided", async () => {
-    const customRpc = "https://custom-rpc.example.com";
+    const customRpc = "https://203.0.113.10";
     await POST(makeRequest({ ...VALID_BODY, rpcUrl: customRpc }));
     expect(simulateWithTevm).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -918,7 +950,7 @@ describe("POST /api/simulate-tx — session mode", () => {
   });
 
   it("passes the fork RPC and customChainId when rpcUrl is provided", async () => {
-    const rpcUrl = "https://custom-rpc.example.com";
+    const rpcUrl = "https://203.0.113.10";
     await POST(makeRequest({ ...SESSION_BODY, chainId: 999999, rpcUrl }));
     expect(createTevmClient).toHaveBeenCalledWith(
       "chain-999999",
@@ -1047,5 +1079,72 @@ describe("POST /api/simulate-tx — session mode", () => {
     await POST(makeRequest(SESSION_BODY));
     expect(fetchAbi).toHaveBeenCalledOnce();
     expect(getAbiFromCache).toHaveBeenCalledOnce();
+  });
+});
+
+describe("POST /api/simulate-tx — save failure handling", () => {
+  it("redacts rpcUrl from the SAVED result while keeping it in the live response", async () => {
+    const customRpc = "https://203.0.113.10";
+    const res = await POST(
+      makeRequest({ ...VALID_BODY, rpcUrl: customRpc, save: true }),
+    );
+    const body = await res.json();
+    // Live response still echoes the caller's own URL
+    expect(body.requestBody.rpcUrl).toBe(customRpc);
+    // Stored copy shared via link must not disclose it
+    const saved = saveSimulationResult.mock.calls[0][0];
+    expect(saved.requestBody.rpcUrl).toBe("[redacted]");
+  });
+
+  it("scrubs fork RPC URLs embedded in saved error messages", async () => {
+    simulateWithTevm.mockRejectedValueOnce(
+      new Error("fork request to https://203.0.113.10/v2/key failed"),
+    );
+    await POST(
+      makeRequest({
+        ...VALID_BODY,
+        rpcUrl: "https://203.0.113.10",
+        save: true,
+      }),
+    );
+    const saved = saveSimulationResult.mock.calls[0][0];
+    expect(saved.success).toBe(false);
+    expect(saved.error).not.toContain("https://203.0.113.10");
+    expect(saved.error).toContain("[redacted]");
+  });
+
+  it("redacts rpcUrl in every entry of a saved session bundle", async () => {
+    const SESSION_SAVE_BODY = {
+      ...VALID_BODY,
+      chainId: 1,
+      blockNumber: "latest",
+      calls: [
+        { to: VALID_BODY.to, data: VALID_BODY.data, from: VALID_BODY.from },
+        { to: VALID_BODY.to, data: VALID_BODY.data, from: VALID_BODY.from },
+      ],
+      rpcUrl: "https://203.0.113.10",
+      save: true,
+    };
+    await POST(makeRequest(SESSION_SAVE_BODY));
+    const savedCalls = saveSimulationResult.mock.calls.filter(
+      ([arg]) => arg && arg.session === true,
+    );
+    expect(savedCalls.length).toBeGreaterThan(0);
+    const savedSession = savedCalls[0][0];
+    for (const r of savedSession.results) {
+      expect(r.requestBody.rpcUrl).toBe("[redacted]");
+    }
+  });
+
+  it("returns the simulation result without simulationId when the save is rejected (e.g. oversize)", async () => {
+    saveSimulationResult.mockRejectedValueOnce(
+      new Error("Simulation payload exceeds the maximum allowed size (2MB)"),
+    );
+    const res = await POST(makeRequest({ ...VALID_BODY, save: true }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.simulationId).toBeUndefined();
+    expect(body.simulationLink).toBeUndefined();
   });
 });

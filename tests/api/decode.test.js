@@ -184,3 +184,26 @@ describe("GET /api/decode", () => {
     expect(body.data[0].abi).toBeUndefined();
   });
 });
+
+describe("GET /api/decode error handling", () => {
+  it("returns a JSON 500 error when decoding throws unexpectedly", async () => {
+    const mod = await import("../../app/utils/decodeWithCandidates.js");
+    const spy = vi
+      .spyOn(mod, "decodeFunctionWithCandidates")
+      .mockRejectedValue(new Error("boom"));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const res = await GET(makeRequest({ data: TRANSFER_CALLDATA }));
+      expect(res.status).toBe(500);
+      const body = await res.json();
+      expect(body.error).toBe("Failed to decode calldata");
+      // Internal error detail must not leak to the client
+      expect(body.error).not.toMatch(/boom/);
+      expect(spy).toHaveBeenCalled();
+      expect(errSpy).toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+      errSpy.mockRestore();
+    }
+  });
+});

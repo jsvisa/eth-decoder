@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createPublicClient, http, defineChain } from "viem";
 import { isValidEthAddress } from "../../utils/validation";
+import { isSafeRpcUrl } from "../../utils/ssrfGuard";
+import { mapWithConcurrency } from "../../utils/fetchContract";
 import { VIEM_CHAINS, DEFAULT_RPC_URLS } from "../../utils/chains";
 import {
   fetchContractInfoFromEtherscan,
@@ -85,6 +87,15 @@ export async function POST(request) {
       );
     }
 
+    // Only allow http(s) URLs for user-supplied RPC endpoints and reject
+    // hosts that point at loopback/private networks (SSRF guard)
+    if (customRpcUrl && !(await isSafeRpcUrl(customRpcUrl))) {
+      return NextResponse.json(
+        { error: "Invalid rpcUrl — must be a public http:// or https:// URL" },
+        { status: 400 },
+      );
+    }
+
     const chainParams = new URLSearchParams();
     if (customChainIdParam) chainParams.set("chainId", customChainIdParam);
     const chainId = await resolveChainId(chain, chainParams);
@@ -130,13 +141,20 @@ export async function POST(request) {
       if (facetAddresses.length > 0) {
         const facetSources = {};
         let facetCompilerVersion = null;
-        for (const facet of facetAddresses) {
-          const facetResult = await fetchSourceForAddress(
-            facet,
-            chainId,
-            etherscanApiKey,
-            routescanApiKey,
-          );
+        // Fetch facets concurrently — up to 3 providers per facet adds up
+        // fast and sequential fetching blows through function timeouts.
+        const facetResults = await mapWithConcurrency(
+          facetAddresses,
+          4,
+          (facet) =>
+            fetchSourceForAddress(
+              facet,
+              chainId,
+              etherscanApiKey,
+              routescanApiKey,
+            ),
+        );
+        for (const facetResult of facetResults) {
           if (facetResult?.sourceCode) {
             Object.assign(facetSources, facetResult.sourceCode);
             if (!facetCompilerVersion)

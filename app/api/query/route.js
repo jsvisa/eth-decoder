@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
 import {
   lookupFunctionSignatures,
   lookupEventSignatures,
 } from "../../utils/sourcify.js";
+import { isValidSelector, isValidTopic0 } from "../../utils/serverSigCache";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -11,6 +13,16 @@ export async function GET(request) {
   if (!sign) {
     return NextResponse.json(
       { error: "Missing sign parameter" },
+      { status: 400 },
+    );
+  }
+
+  if (!isValidSelector(sign) && !isValidTopic0(sign)) {
+    return NextResponse.json(
+      {
+        error:
+          "Invalid sign parameter — must be a 4-byte selector (0x + 8 hex chars) or a topic0 hash (0x + 64 hex chars)",
+      },
       { status: 400 },
     );
   }
@@ -35,7 +47,9 @@ export async function GET(request) {
   if (backendUrl) {
     try {
       const params = new URLSearchParams({ sign });
-      const response = await fetch(`${backendUrl}/api/v1/query?${params}`);
+      const response = await fetchWithTimeout(
+        `${backendUrl}/api/v1/query?${params}`,
+      );
       if (response.ok) {
         const data = await response.json();
         if (data?.data != null) {

@@ -55,6 +55,20 @@ describe("GET /api/query", () => {
     expect(body.error).toMatch(/missing sign/i);
   });
 
+  it("returns 400 for a malformed sign parameter", async () => {
+    const res = await GET(makeRequest({ sign: "../../etc/passwd" }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/invalid sign/i);
+  });
+
+  it("returns 400 for a wrong-length hex sign parameter", async () => {
+    const res = await GET(makeRequest({ sign: "0xa9059c" }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/invalid sign/i);
+  });
+
   describe("Sourcify primary path", () => {
     it("returns Sourcify results for function selectors", async () => {
       global.fetch.mockResolvedValueOnce(

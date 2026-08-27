@@ -14,7 +14,8 @@ import {
   redecodeCallTrace,
   collectAllCallAddresses,
 } from "../../utils/tevmSimulator";
-import { isValidEthAddress, isValidHttpUrl } from "../../utils/validation";
+import { isValidEthAddress } from "../../utils/validation";
+import { isSafeRpcUrl } from "../../utils/ssrfGuard";
 import { getProRpcUrl } from "../../utils/proKeys";
 import {
   saveSimulationResult,
@@ -35,6 +36,39 @@ import {
 
 function isCreateCall(call) {
   return call.to === undefined || call.to === null || call.to === "";
+}
+
+const REDACTED_RPC = "[redacted]";
+
+/**
+ * Prepare a simulation payload for persistence. Share-link viewers can read
+ * saved simulations, so stored copies must not disclose RPC endpoints
+ * (user-supplied rpcUrl or server-side pro/fork URLs that viem/tevm embed in
+ * error messages). The live response to the requesting client is unchanged.
+ */
+function sanitizeSimulationForSave(data, rpcUrls) {
+  const urls = (rpcUrls || []).filter(Boolean);
+  const scrub = (text) =>
+    urls.reduce((acc, url) => acc.split(url).join(REDACTED_RPC), text);
+
+  if (!data || typeof data !== "object") return data;
+
+  if (Array.isArray(data.results)) {
+    return {
+      ...data,
+      results: data.results.map((r) => sanitizeSimulationForSave(r, urls)),
+    };
+  }
+
+  const clone = { ...data };
+  if (clone.requestBody && typeof clone.requestBody === "object") {
+    clone.requestBody = { ...clone.requestBody };
+    if (clone.requestBody.rpcUrl) clone.requestBody.rpcUrl = REDACTED_RPC;
+  }
+  if (typeof clone.error === "string" && urls.length > 0) {
+    clone.error = scrub(clone.error);
+  }
+  return clone;
 }
 
 /**
@@ -388,9 +422,21 @@ async function runSingleSimulation({
       delete responseData.metrics;
     }
     if (save) {
-      const simulationId = await saveSimulationResult(resultWithRequest);
-      responseData.simulationId = simulationId;
-      responseData.simulationLink = buildSimulationLink(request, simulationId);
+      try {
+        const saved = sanitizeSimulationForSave(resultWithRequest, [
+          rpcUrl,
+          chain?.forkRpcUrl,
+        ]);
+        const simulationId = await saveSimulationResult(saved);
+        responseData.simulationId = simulationId;
+        responseData.simulationLink = buildSimulationLink(
+          request,
+          simulationId,
+        );
+      } catch (saveError) {
+        // Oversized/failed save — return the result without a simulation id
+        console.error("Failed to save simulation result:", saveError);
+      }
     }
     return { status: 200, body: responseData };
   } catch (error) {
@@ -401,9 +447,20 @@ async function runSingleSimulation({
     };
     let responseData = { ...errorResult };
     if (save) {
-      const simulationId = await saveSimulationResult(errorResult);
-      responseData.simulationId = simulationId;
-      responseData.simulationLink = buildSimulationLink(request, simulationId);
+      try {
+        const saved = sanitizeSimulationForSave(errorResult, [
+          rpcUrl,
+          chain?.forkRpcUrl,
+        ]);
+        const simulationId = await saveSimulationResult(saved);
+        responseData.simulationId = simulationId;
+        responseData.simulationLink = buildSimulationLink(
+          request,
+          simulationId,
+        );
+      } catch (saveError) {
+        console.error("Failed to save error result:", saveError);
+      }
     }
     return { status: 500, body: responseData };
   }
@@ -459,6 +516,17 @@ export async function POST(request) {
       { status: 400 },
     );
   }
+  // Each session call runs a full fork simulation; without a cap a single
+  // anonymous request could pin the serverless function past its timeout.
+  const MAX_SESSION_CALLS = 20;
+  if (sessionMode && calls.length > MAX_SESSION_CALLS) {
+    return NextResponse.json(
+      {
+        error: `'calls' supports at most ${MAX_SESSION_CALLS} entries per session`,
+      },
+      { status: 400 },
+    );
+  }
 
   if (blockNumber !== "latest") {
     if (!/^(0x[0-9a-fA-F]+|\d+)$/.test(String(blockNumber).trim())) {
@@ -472,10 +540,11 @@ export async function POST(request) {
     }
   }
 
-  // Only allow http(s) URLs for user-supplied RPC endpoints
-  if (rpcUrl && !isValidHttpUrl(rpcUrl)) {
+  // Only allow http(s) URLs for user-supplied RPC endpoints and reject
+  // hosts that point at loopback/private networks (SSRF guard)
+  if (rpcUrl && !(await isSafeRpcUrl(rpcUrl))) {
     return NextResponse.json(
-      { error: "Invalid rpcUrl — must be an http:// or https:// URL" },
+      { error: "Invalid rpcUrl — must be a public http:// or https:// URL" },
       { status: 400 },
     );
   }
@@ -593,7 +662,11 @@ export async function POST(request) {
 
     if (save) {
       try {
-        const simulationId = await saveSimulationResult(sessionResponse);
+        const saved = sanitizeSimulationForSave(sessionResponse, [
+          singleCallContext.rpcUrl,
+          chain.forkRpcUrl,
+        ]);
+        const simulationId = await saveSimulationResult(saved);
         sessionResponse.simulationId = simulationId;
         sessionResponse.simulationLink = buildSimulationLink(
           request,

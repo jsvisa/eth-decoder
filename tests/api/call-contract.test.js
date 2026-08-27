@@ -78,6 +78,24 @@ describe("POST /api/call-contract", () => {
     expect(body.error).toMatch(/invalid address/i);
   });
 
+  it("returns 400 when rpcUrl points at a loopback address (SSRF)", async () => {
+    delete process.env.ALLOW_PRIVATE_RPC;
+    const res = await POST(
+      makeRequest({
+        chain: "custom-chain",
+        chainId: "100",
+        address: VALID_ADDRESS,
+        functionName: "balanceOf",
+        abi: BALANCE_OF_ABI,
+        args: [VALID_ADDRESS],
+        rpcUrl: "http://127.0.0.1:8545",
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/rpcUrl/i);
+  });
+
   it("returns 400 when the chain is not supported and no custom chainId/rpcUrl provided", async () => {
     const res = await POST(
       makeRequest({

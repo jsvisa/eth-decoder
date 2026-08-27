@@ -16,6 +16,16 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
+        {/* Apply the saved/system theme before hydration to avoid a flash
+            of the wrong theme now that content renders during SSR */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var t=localStorage.getItem('theme_preference');" +
+              "if(t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches))" +
+              "document.documentElement.setAttribute('data-theme','dark');}catch(e){}",
+          }}
+        />
         <ThemeProvider>
           <SettingsProvider>
             <Nav />

@@ -14,10 +14,18 @@ export async function GET(request) {
     );
   }
 
-  const decoded = await decodeEventWithCandidates(sign, topics, data);
-  if (!decoded) {
-    return NextResponse.json({ msg: "not found", data: null });
-  }
+  try {
+    const decoded = await decodeEventWithCandidates(sign, topics, data);
+    if (!decoded) {
+      return NextResponse.json({ msg: "not found", data: null });
+    }
 
-  return NextResponse.json({ msg: "ok", data: decoded });
+    return NextResponse.json({ msg: "ok", data: decoded });
+  } catch (err) {
+    console.error("Failed to decode event:", err);
+    return NextResponse.json(
+      { error: "Failed to decode event" },
+      { status: 500 },
+    );
+  }
 }

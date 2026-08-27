@@ -2,9 +2,33 @@ import { promises as fs } from "fs";
 import { join } from "path";
 import { getServerCacheBaseDir } from "./serverCacheDir";
 import { shouldUseVercelBlob, blobPut, blobGet } from "./blobCache";
+import { atomicWriteFile } from "./atomicWriteFile";
 
 const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const VERCEL_BLOB_ID_PREFIX = "vb1_";
+const DEFAULT_MAX_RESULT_BYTES = 2 * 1024 * 1024;
+
+// Refuse unauthenticated saves above this size to prevent storage abuse.
+// Override with MAX_SIMULATION_RESULT_BYTES (in bytes).
+export function getMaxSimulationResultBytes() {
+  const raw = process.env.MAX_SIMULATION_RESULT_BYTES;
+  if (raw) {
+    const parsed = parseInt(raw, 10);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+  return DEFAULT_MAX_RESULT_BYTES;
+}
+
+export class SimulationPayloadTooLargeError extends Error {
+  constructor(maxBytes) {
+    super(
+      `Simulation payload exceeds the maximum allowed size (${Math.floor(
+        maxBytes / (1024 * 1024),
+      )}MB)`,
+    );
+    this.name = "SimulationPayloadTooLargeError";
+  }
+}
 
 function getCacheDir() {
   return (
@@ -73,16 +97,22 @@ async function getVercelBlobSimulationResult(id) {
 }
 
 export async function saveSimulationResult(data) {
+  const entry = buildEntry(data);
+  const serialized = JSON.stringify(entry);
+  const maxBytes = getMaxSimulationResultBytes();
+  if (Buffer.byteLength(serialized, "utf-8") > maxBytes) {
+    throw new SimulationPayloadTooLargeError(maxBytes);
+  }
+
   if (shouldUseVercelBlob()) {
     return saveToVercelBlob(data);
   }
 
   const { randomUUID } = await import("crypto");
   const id = randomUUID();
-  const entry = buildEntry(data);
   const cacheDir = getCacheDir();
   await fs.mkdir(cacheDir, { recursive: true });
-  await fs.writeFile(resultPath(id, cacheDir), JSON.stringify(entry), "utf-8");
+  await atomicWriteFile(resultPath(id, cacheDir), serialized);
   return id;
 }
 

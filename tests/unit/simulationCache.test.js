@@ -6,6 +6,7 @@ import {
   saveSimulationResult,
   getSimulationResult,
   pruneExpiredResults,
+  getMaxSimulationResultBytes,
 } from "../../app/utils/simulationCache.js";
 
 const TEST_DIR = join(tmpdir(), `simulationCache-test-${process.pid}`);
@@ -84,6 +85,51 @@ describe("simulationCache", () => {
     const id = await withCacheDir(() => saveSimulationResult(false));
     const retrieved = await withCacheDir(() => getSimulationResult(id));
     expect(retrieved).toBe(false);
+  });
+
+  it("rejects results above the 2MB size cap", async () => {
+    const huge = { success: true, blob: "x".repeat(2 * 1024 * 1024 + 256) };
+    await expect(
+      withCacheDir(() => saveSimulationResult(huge)),
+    ).rejects.toMatchObject({ name: "SimulationPayloadTooLargeError" });
+    // nothing must have been persisted
+    await expect(withCacheDir(() => pruneExpiredResults())).resolves.toBe(0);
+  });
+
+  it("accepts results just under the 2MB cap", async () => {
+    const big = { success: true, blob: "x".repeat(1024 * 1024) };
+    await expect(
+      withCacheDir(() => saveSimulationResult(big)),
+    ).resolves.toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it("defaults the cap to 2MB", () => {
+    const old = process.env.MAX_SIMULATION_RESULT_BYTES;
+    delete process.env.MAX_SIMULATION_RESULT_BYTES;
+    try {
+      expect(getMaxSimulationResultBytes()).toBe(2 * 1024 * 1024);
+    } finally {
+      if (old !== undefined) process.env.MAX_SIMULATION_RESULT_BYTES = old;
+    }
+  });
+
+  it("honours a MAX_SIMULATION_RESULT_BYTES env override", async () => {
+    const old = process.env.MAX_SIMULATION_RESULT_BYTES;
+    process.env.MAX_SIMULATION_RESULT_BYTES = String(64 * 1024);
+    try {
+      const small = { success: true, blob: "x".repeat(65 * 1024) };
+      await expect(
+        withCacheDir(() => saveSimulationResult(small)),
+      ).rejects.toMatchObject({ name: "SimulationPayloadTooLargeError" });
+      // A payload under the overridden cap still saves fine
+      const tiny = { success: true, blob: "y".repeat(32 * 1024) };
+      await expect(
+        withCacheDir(() => saveSimulationResult(tiny)),
+      ).resolves.toMatch(/^[0-9a-f-]{36}$/);
+    } finally {
+      if (old === undefined) delete process.env.MAX_SIMULATION_RESULT_BYTES;
+      else process.env.MAX_SIMULATION_RESULT_BYTES = old;
+    }
   });
 
   it("returns null for an unknown ID", async () => {

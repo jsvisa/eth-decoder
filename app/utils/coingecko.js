@@ -7,6 +7,43 @@ import {
 import { NATIVE_TOKEN_ADDRESS } from "./tokenTransfers";
 
 export async function fetchCoinGeckoPrice(tokenAddress, chainId) {
+  // Small in-process TTL cache: CoinGecko's free tier is heavily
+  // rate-limited and identical (token, chain) requests often arrive in
+  // bursts (e.g. one per balance-change row).
+  const key = `${String(tokenAddress).toLowerCase()}:${chainId}`;
+  const now = Date.now();
+  const cached = PRICE_CACHE.get(key);
+  if (cached && now < cached.expiresAt) {
+    return cached.price;
+  }
+
+  const price = await fetchCoinGeckoPriceUncached(tokenAddress, chainId);
+
+  PRICE_CACHE.set(key, { price, expiresAt: now + PRICE_TTL_MS });
+  if (PRICE_CACHE.size > MAX_PRICE_CACHE_ENTRIES) {
+    // Drop the oldest entries to keep the map bounded
+    const excess = PRICE_CACHE.size - MAX_PRICE_CACHE_ENTRIES;
+    let dropped = 0;
+    for (const k of PRICE_CACHE.keys()) {
+      if (dropped >= excess) break;
+      PRICE_CACHE.delete(k);
+      dropped++;
+    }
+  }
+
+  return price;
+}
+
+const PRICE_TTL_MS = 60_000;
+const MAX_PRICE_CACHE_ENTRIES = 500;
+const PRICE_CACHE = new Map();
+
+/** Test-only: clear the in-process price cache between tests. */
+export function resetPriceCacheForTests() {
+  PRICE_CACHE.clear();
+}
+
+async function fetchCoinGeckoPriceUncached(tokenAddress, chainId) {
   try {
     const addr = tokenAddress.toLowerCase();
 

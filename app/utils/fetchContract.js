@@ -13,12 +13,13 @@ import {
   parseEtherscanSourceCode,
 } from "./etherscan";
 import { fetchContractInfoFromSourcify } from "./sourcify";
+import { fetchWithTimeout } from "./fetchWithTimeout";
 export { fetchContractInfoFromSourcify };
 
 // Fetch source code from Sourcify (no ABI required, unlike fetchContractInfoFromSourcify)
 export async function fetchSourceFromSourcify(address, chainId) {
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://sourcify.dev/server/v2/contract/${chainId}/${address}?fields=sources,metadata`,
     );
     if (!response.ok) return null;
@@ -85,7 +86,7 @@ export async function fetchContractInfoFromEtherscan(address, chainId, apiKey) {
     apikey: key,
   });
 
-  const response = await fetch(`${ETHERSCAN_V2_API}?${params}`);
+  const response = await fetchWithTimeout(`${ETHERSCAN_V2_API}?${params}`);
 
   if (!response.ok) {
     return null;
@@ -125,7 +126,7 @@ export async function fetchContractInfoFromRouteScan(address, chainId, apiKey) {
   if (key) params.set("apikey", key);
 
   const url = `${ROUTESCAN_API_BASE}/${chainId}/etherscan/api?${params}`;
-  const response = await fetch(url);
+  const response = await fetchWithTimeout(url);
 
   if (!response.ok) {
     return null;

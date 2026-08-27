@@ -153,6 +153,14 @@ export function useAbi({
   // -------------------------------------------------------------------------
   useEffect(() => {
     fetchAbiRequestId.current += 1;
+    // Supersede any in-flight fetch: without an abort its guarded `finally`
+    // would skip setFetchingAbi(false), leaving the spinner stuck forever,
+    // and the request would keep burning API quota in the background.
+    if (fetchAbiController.current) {
+      fetchAbiController.current.abort();
+      fetchAbiController.current = null;
+    }
+    setFetchingAbi(false);
     if (!isValidEthAddress(address)) {
       setAbi("");
       setParsedAbi(null);
