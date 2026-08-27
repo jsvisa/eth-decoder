@@ -15,6 +15,18 @@ export async function GET(request) {
     );
   }
 
+  try {
+    return await handleDecode(data, searchParams);
+  } catch (err) {
+    console.error("Failed to decode calldata:", err);
+    return NextResponse.json(
+      { error: "Failed to decode calldata" },
+      { status: 500 },
+    );
+  }
+}
+
+async function handleDecode(data, searchParams) {
   const withAbi = searchParams.get("with_abi") === "true";
   const withSign = searchParams.get("with_sign") === "true";
 

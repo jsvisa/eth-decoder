@@ -191,3 +191,31 @@ describe("GET /api/decode-event", () => {
     expect(body.data).toBeNull();
   });
 });
+
+describe("GET /api/decode-event error handling", () => {
+  it("returns a JSON 500 error when decoding throws unexpectedly", async () => {
+    const mod = await import("../../app/utils/decodeWithCandidates.js");
+    const spy = vi
+      .spyOn(mod, "decodeEventWithCandidates")
+      .mockRejectedValue(new Error("boom"));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const res = await GET(
+        makeRequest({
+          sign: TRANSFER_TOPIC0,
+          topics: ALL_TOPICS,
+          data: TRANSFER_DATA,
+        }),
+      );
+      expect(res.status).toBe(500);
+      const body = await res.json();
+      expect(body.error).toBe("Failed to decode event");
+      expect(body.error).not.toMatch(/boom/);
+      expect(spy).toHaveBeenCalled();
+      expect(errSpy).toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+      errSpy.mockRestore();
+    }
+  });
+});
