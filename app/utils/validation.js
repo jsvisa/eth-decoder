@@ -30,11 +30,11 @@ export const checksumAddress = (address) => {
 };
 
 /**
- * Check if a value is a valid fork block (empty, 'latest', or a positive integer)
+ * Check if a value is a valid block number (empty, 'latest', or a positive integer)
  * @param {string} value - The value to validate
  * @returns {boolean} - True if valid, false otherwise
  */
-export const isValidForkBlock = (value) => {
+export const isValidBlock = (value) => {
   if (!value || value === "") return true; // empty is valid (means latest)
   if (value.toLowerCase() === "latest") return true;
   return /^\d+$/.test(value); // valid positive integer

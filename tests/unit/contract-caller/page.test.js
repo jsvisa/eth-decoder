@@ -42,12 +42,6 @@ const functionSelectionState = {
   setPasteCalldataValue: vi.fn(),
   pasteCalldataError: null,
   setPasteCalldataError: vi.fn(),
-  ethValue: "",
-  setEthValue: vi.fn(),
-  ethValueUnit: "ETH",
-  setEthValueUnit: vi.fn(),
-  blockNumber: "",
-  setBlockNumber: vi.fn(),
   calldataCopied: false,
   handleDecodeAndFill: vi.fn(),
   handleCopyCalldata: vi.fn(),
@@ -55,8 +49,8 @@ const functionSelectionState = {
 };
 
 const simulationOptionsState = {
-  forkBlockNumber: "",
-  setForkBlockNumber: vi.fn(),
+  blockNumber: "",
+  setBlockNumber: vi.fn(),
   fromAddress: "",
   setFromAddress: vi.fn(),
   cheatcodes: {},

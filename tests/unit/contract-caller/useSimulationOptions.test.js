@@ -7,7 +7,7 @@ describe("useSimulationOptions – initial state", () => {
     const { result } = renderHook(() => useSimulationOptions());
 
     expect(result.current.fromAddress).toBe("");
-    expect(result.current.forkBlockNumber).toBe("");
+    expect(result.current.blockNumber).toBe("");
     expect(result.current.cheatcodes).toEqual({
       deal: { enabled: false, address: "", amount: "" },
       prank: { enabled: false, address: "" },
@@ -33,9 +33,9 @@ describe("useSimulationOptions – happy path", () => {
     );
 
     act(() => {
-      result.current.setForkBlockNumber("19000000");
+      result.current.setBlockNumber("19000000");
     });
-    expect(result.current.forkBlockNumber).toBe("19000000");
+    expect(result.current.blockNumber).toBe("19000000");
 
     // Enable deal cheatcode
     act(() => {
@@ -80,7 +80,7 @@ describe("useSimulationOptions – resetWriteOptions", () => {
       result.current.setFromAddress(
         "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
       );
-      result.current.setForkBlockNumber("18000000");
+      result.current.setBlockNumber("18000000");
       result.current.setBalanceOverrides([{ address: "0x1", balance: "5" }]);
       result.current.setStorageOverrides([
         { address: "0x2", slot: "0x1", value: "0xff" },
@@ -102,7 +102,7 @@ describe("useSimulationOptions – resetWriteOptions", () => {
     });
 
     expect(result.current.fromAddress).toBe("");
-    expect(result.current.forkBlockNumber).toBe("");
+    expect(result.current.blockNumber).toBe("");
     expect(result.current.cheatcodes).toEqual({
       deal: { enabled: false, address: "", amount: "" },
       prank: { enabled: false, address: "" },
@@ -120,7 +120,7 @@ describe("useSimulationOptions – resetWriteOptions", () => {
     });
 
     expect(result.current.fromAddress).toBe("");
-    expect(result.current.forkBlockNumber).toBe("");
+    expect(result.current.blockNumber).toBe("");
     expect(result.current.cheatcodes).toEqual({
       deal: { enabled: false, address: "", amount: "" },
       prank: { enabled: false, address: "" },

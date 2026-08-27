@@ -22,7 +22,7 @@ import {
 import { parseSourceMap } from "../../utils/sourceMap";
 import {
   isValidEthAddress,
-  isValidForkBlock,
+  isValidBlock,
   isValidNumber,
   isValidPositiveInteger,
 } from "../../utils/validation";
@@ -173,7 +173,7 @@ export function useCallExecution({
       errors.fromAddress = true;
     }
 
-    if (isWrite && forkBlockNumber && !isValidForkBlock(forkBlockNumber)) {
+    if (isWrite && forkBlockNumber && !isValidBlock(forkBlockNumber)) {
       errors.forkBlockNumber = true;
     }
 

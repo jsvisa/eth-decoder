@@ -31,7 +31,6 @@ export function useFunctionSelection({
   const [pasteCalldataExpanded, setPasteCalldataExpanded] = useState(true);
   const [pasteCalldataValue, setPasteCalldataValue] = useState("");
   const [pasteCalldataError, setPasteCalldataError] = useState(null);
-  const [blockNumber, setBlockNumber] = useState("");
   const [copiedItem, setCopiedItem] = useState(null); // 'selector' | 'signature' | null
   const [calldataCopied, setCalldataCopied] = useState(false);
 
@@ -269,8 +268,6 @@ export function useFunctionSelection({
     setPasteCalldataValue,
     pasteCalldataError,
     setPasteCalldataError,
-    blockNumber,
-    setBlockNumber,
     calldataCopied,
     copiedItem,
     setCopiedItem,

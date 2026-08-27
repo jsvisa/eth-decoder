@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   isValidEthAddress,
-  isValidForkBlock,
+  isValidBlock,
   isValidNumber,
   isValidPositiveInteger,
   isValidHttpUrl,
@@ -39,31 +39,31 @@ describe("isValidEthAddress", () => {
   });
 });
 
-describe("isValidForkBlock", () => {
+describe("isValidBlock", () => {
   it("accepts an empty string (means latest)", () => {
-    expect(isValidForkBlock("")).toBe(true);
+    expect(isValidBlock("")).toBe(true);
   });
 
   it("accepts null and undefined", () => {
-    expect(isValidForkBlock(null)).toBe(true);
-    expect(isValidForkBlock(undefined)).toBe(true);
+    expect(isValidBlock(null)).toBe(true);
+    expect(isValidBlock(undefined)).toBe(true);
   });
 
   it('accepts "latest" (case-insensitive)', () => {
-    expect(isValidForkBlock("latest")).toBe(true);
-    expect(isValidForkBlock("LATEST")).toBe(true);
+    expect(isValidBlock("latest")).toBe(true);
+    expect(isValidBlock("LATEST")).toBe(true);
   });
 
   it("accepts a positive integer string", () => {
-    expect(isValidForkBlock("12345678")).toBe(true);
+    expect(isValidBlock("12345678")).toBe(true);
   });
 
   it("rejects a negative number string", () => {
-    expect(isValidForkBlock("-1")).toBe(false);
+    expect(isValidBlock("-1")).toBe(false);
   });
 
   it("rejects a non-numeric string", () => {
-    expect(isValidForkBlock("abc")).toBe(false);
+    expect(isValidBlock("abc")).toBe(false);
   });
 });
 

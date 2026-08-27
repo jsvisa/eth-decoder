@@ -91,7 +91,7 @@ function makeProps(overrides = {}) {
     addressBook: [],
     onOpenBookmarkModal: vi.fn(),
     blockNumber: "",
-    onReadBlockNumberChange: vi.fn(),
+    onBlockNumberChange: vi.fn(),
     disabled: false,
     expanded: true,
     onToggle: vi.fn(),

@@ -154,6 +154,21 @@ describe("initial state", () => {
     expect(applyPendingArgs).not.toHaveBeenCalled();
   });
 
+  it("hydrates eth value and read block number from URL params on mount", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/contract-caller?chain=ethereum&address=0xabc&value=1.5&block=19000000",
+    );
+
+    const setEthValue = vi.fn();
+    const setBlockNumber = vi.fn();
+    renderHook(() => useHistory(makeParams({ setEthValue, setBlockNumber })));
+
+    expect(setEthValue).toHaveBeenCalledWith("1.5");
+    expect(setBlockNumber).toHaveBeenCalledWith("19000000");
+  });
+
   it("preserves simulationId share URLs during state sync", () => {
     window.history.replaceState(
       null,
