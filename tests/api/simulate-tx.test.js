@@ -194,19 +194,28 @@ describe("POST /api/simulate-tx — validation", () => {
     expect((await res.json()).error).toMatch(/unsupported chainid/i);
   });
 
+  it("returns 400 when rpcUrl points at a private address (SSRF)", async () => {
+    delete process.env.ALLOW_PRIVATE_RPC;
+    const res = await POST(
+      makeRequest({ ...VALID_BODY, rpcUrl: "http://127.0.0.1:8545" }),
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/rpcUrl/i);
+  });
+
   it("returns 200 for non-builtin chainId when rpcUrl is provided", async () => {
     const res = await POST(
       makeRequest({
         ...VALID_BODY,
         chainId: 999999,
-        rpcUrl: "https://custom-rpc.example.com",
+        rpcUrl: "https://203.0.113.10",
       }),
     );
     expect(res.status).toBe(200);
   });
 
   it("passes custom rpcUrl and customChainId to simulateWithTevm for non-builtin chain", async () => {
-    const customRpc = "https://custom-rpc.example.com";
+    const customRpc = "https://203.0.113.10";
     await POST(
       makeRequest({ ...VALID_BODY, chainId: 999999, rpcUrl: customRpc }),
     );
@@ -219,7 +228,7 @@ describe("POST /api/simulate-tx — validation", () => {
   });
 
   it("passes custom rpcUrl to simulateWithTevm when provided", async () => {
-    const customRpc = "https://custom-rpc.example.com";
+    const customRpc = "https://203.0.113.10";
     await POST(makeRequest({ ...VALID_BODY, rpcUrl: customRpc }));
     expect(simulateWithTevm).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -918,7 +927,7 @@ describe("POST /api/simulate-tx — session mode", () => {
   });
 
   it("passes the fork RPC and customChainId when rpcUrl is provided", async () => {
-    const rpcUrl = "https://custom-rpc.example.com";
+    const rpcUrl = "https://203.0.113.10";
     await POST(makeRequest({ ...SESSION_BODY, chainId: 999999, rpcUrl }));
     expect(createTevmClient).toHaveBeenCalledWith(
       "chain-999999",

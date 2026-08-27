@@ -115,6 +115,38 @@ describe("POST /api/fetch-abi", () => {
     expect(body.error).toMatch(/rpcUrl/i);
   });
 
+  it("returns 400 when the custom rpcUrl points at a loopback address (SSRF)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    delete process.env.ALLOW_PRIVATE_RPC;
+    const res = await POST(
+      makeRequest({
+        address: VALID_ADDRESS,
+        chain: "custom-chain",
+        chainId: "100",
+        rpcUrl: "http://127.0.0.1:8545",
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/rpcUrl/i);
+    // The upstream fetch must never be attempted
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for a cloud-metadata rpcUrl (SSRF)", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const res = await POST(
+      makeRequest({
+        address: VALID_ADDRESS,
+        chain: "custom-chain",
+        chainId: "100",
+        rpcUrl: "http://169.254.169.254/latest/meta-data/",
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it("falls back to RouteScan without a key when Etherscan is skipped and Sourcify has no match", async () => {
     // No apiKey → Etherscan is skipped; Sourcify fails; RouteScan (keyless) succeeds
     mockFetch([

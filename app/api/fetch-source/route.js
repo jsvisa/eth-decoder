@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createPublicClient, http, defineChain } from "viem";
 import { isValidEthAddress } from "../../utils/validation";
+import { isSafeRpcUrl } from "../../utils/ssrfGuard";
 import { VIEM_CHAINS, DEFAULT_RPC_URLS } from "../../utils/chains";
 import {
   fetchContractInfoFromEtherscan,
@@ -81,6 +82,15 @@ export async function POST(request) {
     if (!isValidEthAddress(address)) {
       return NextResponse.json(
         { error: "Invalid address format" },
+        { status: 400 },
+      );
+    }
+
+    // Only allow http(s) URLs for user-supplied RPC endpoints and reject
+    // hosts that point at loopback/private networks (SSRF guard)
+    if (customRpcUrl && !(await isSafeRpcUrl(customRpcUrl))) {
+      return NextResponse.json(
+        { error: "Invalid rpcUrl — must be a public http:// or https:// URL" },
         { status: 400 },
       );
     }

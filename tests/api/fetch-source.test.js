@@ -39,6 +39,21 @@ afterEach(() => {
 });
 
 describe("POST /api/fetch-source", () => {
+  it("returns 400 when rpcUrl points at a loopback address (SSRF)", async () => {
+    delete process.env.ALLOW_PRIVATE_RPC;
+    const res = await POST(
+      makeRequest({
+        address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        chain: "custom-chain",
+        chainId: "100",
+        rpcUrl: "http://127.0.0.1:8545",
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/rpcUrl/i);
+  });
+
   it("returns 400 when address is missing", async () => {
     const res = await POST(makeRequest({}));
     expect(res.status).toBe(400);
