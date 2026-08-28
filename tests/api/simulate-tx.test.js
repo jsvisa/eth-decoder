@@ -92,6 +92,10 @@ vi.mock("../../app/utils/simulationCache.js");
 vi.mock("../../app/utils/coingecko.js", () => ({
   fetchCoinGeckoPrice: vi.fn().mockResolvedValue(null),
 }));
+vi.mock("../../app/utils/traceSourceLines.js", async (importOriginal) => ({
+  ...(await importOriginal()),
+  resolveTraceSourceLinesForSave: vi.fn(),
+}));
 
 import { POST } from "../../app/api/simulate-tx/route.js";
 
@@ -109,6 +113,7 @@ import {
   saveSimulationResult,
   pruneExpiredResults,
 } from "../../app/utils/simulationCache.js";
+import { resolveTraceSourceLinesForSave } from "../../app/utils/traceSourceLines.js";
 import { fetchCoinGeckoPrice } from "../../app/utils/coingecko.js";
 
 function makeRequest(body) {
@@ -1146,5 +1151,105 @@ describe("POST /api/simulate-tx — save failure handling", () => {
     expect(body.success).toBe(true);
     expect(body.simulationId).toBeUndefined();
     expect(body.simulationLink).toBeUndefined();
+  });
+});
+
+describe("POST /api/simulate-tx — pcs stripping and source-line resolution", () => {
+  const TRACE_TO = "0x99161ba892ecae335616624c84faa418f64ff9a6";
+  const SESSION_BODY = {
+    chainId: 1,
+    blockNumber: "latest",
+    calls: [
+      { to: VALID_BODY.to, data: VALID_BODY.data, from: VALID_BODY.from },
+      { to: VALID_BODY.to, data: VALID_BODY.data, from: VALID_BODY.from },
+    ],
+  };
+  const SIM_WITH_TRACE = {
+    ...SIM_RESULT,
+    callTrace: {
+      type: "CALL",
+      to: TRACE_TO,
+      pcs: [10, 20],
+      calls: [{ type: "CALL", to: null, pcs: [30], calls: [] }],
+    },
+  };
+
+  beforeEach(() => {
+    resolveTraceSourceLinesForSave.mockImplementation(async (trace) => {
+      trace.sourceLines = [1, 2, 3];
+      trace.sourceFile = "a.sol";
+    });
+  });
+
+  // Regression guard: raw pcs arrays once made up ~43% of the API payload
+  // (see #155). No `pcs` key may appear anywhere in the response or in the
+  // saved copy, at any depth of the trace tree.
+  function expectNoPcs(value, path = "$") {
+    if (Array.isArray(value)) {
+      value.forEach((v, i) => expectNoPcs(v, `${path}[${i}]`));
+    } else if (value && typeof value === "object") {
+      expect(value, `pcs leaked at ${path}`).not.toHaveProperty("pcs");
+      for (const [k, v] of Object.entries(value)) {
+        expectNoPcs(v, `${path}.${k}`);
+      }
+    }
+  }
+
+  it("regression: no pcs key anywhere in the response or the saved copy", async () => {
+    simulateWithTevm.mockResolvedValueOnce(SIM_WITH_TRACE);
+    const res = await POST(makeRequest({ ...VALID_BODY, save: true }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expectNoPcs(body);
+    expectNoPcs(saveSimulationResult.mock.calls[0][0]);
+    // Source lines replaced the pcs for shared-result rendering
+    expect(body.callTrace.sourceLines).toEqual([1, 2, 3]);
+  });
+
+  it("strips pcs from the response when save is omitted", async () => {
+    simulateWithTevm.mockResolvedValueOnce(SIM_WITH_TRACE);
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.callTrace.pcs).toBeUndefined();
+    expect(body.callTrace.calls[0].pcs).toBeUndefined();
+    expect(resolveTraceSourceLinesForSave).not.toHaveBeenCalled();
+  });
+
+  it("resolves source lines and strips pcs in both response and saved copy when save: true", async () => {
+    simulateWithTevm.mockResolvedValueOnce(SIM_WITH_TRACE);
+    const res = await POST(makeRequest({ ...VALID_BODY, save: true }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(resolveTraceSourceLinesForSave).toHaveBeenCalledOnce();
+    expect(body.callTrace.sourceLines).toEqual([1, 2, 3]);
+    expect(body.callTrace.pcs).toBeUndefined();
+    const saved = saveSimulationResult.mock.calls[0][0];
+    expect(saved.callTrace.sourceLines).toEqual([1, 2, 3]);
+    expect(saved.callTrace.pcs).toBeUndefined();
+    expect(saved.callTrace.calls[0].pcs).toBeUndefined();
+  });
+
+  it("strips pcs and skips resolution when the trace is null", async () => {
+    simulateWithTevm.mockResolvedValueOnce(SIM_RESULT);
+    const res = await POST(makeRequest(VALID_BODY));
+    const body = await res.json();
+    expect(body.callTrace).toBeNull();
+    expect(resolveTraceSourceLinesForSave).not.toHaveBeenCalled();
+  });
+
+  it("resolves source lines and strips pcs in every entry of a saved session bundle", async () => {
+    simulateWithClient.mockResolvedValue(SIM_WITH_TRACE);
+    const res = await POST(makeRequest({ ...SESSION_BODY, save: true }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(resolveTraceSourceLinesForSave).toHaveBeenCalledTimes(2);
+    for (const r of body.results) {
+      expect(r.callTrace.pcs).toBeUndefined();
+    }
+    const saved = saveSimulationResult.mock.calls[0][0];
+    expect(saved.session).toBe(true);
+    expect(saved.results[0].callTrace.sourceLines).toEqual([1, 2, 3]);
+    expect(saved.results[1].callTrace.pcs).toBeUndefined();
   });
 });
