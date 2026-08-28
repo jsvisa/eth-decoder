@@ -8,36 +8,57 @@ struct SignatureView: View {
     @State private var errorMessage: String?
     @State private var result: (QueryResponse, JSONValue)?
 
-    private var trimmedSign: String { sign.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var trimmedSign: String {
+        sign.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 16) {
                 queryCard
-                if let errorMessage { ErrorView(message: errorMessage) { self.errorMessage = nil } }
-                if let (response, raw) = result { resultCard(response, raw) }
-                if result == nil && errorMessage == nil && !isLoading {
-                    EmptyState(icon: "text.magnifyingglass", title: "Signature Lookup",
-                               message: "Enter a 4-byte function selector or 32-byte event topic0 hex string.")
+                if let errorMessage {
+                    ErrorView(message: errorMessage) { self.errorMessage = nil }
+                }
+                if let (response, raw) = result {
+                    resultCard(response, raw)
                 }
             }
-            .padding(24)
+            .padding(20)
+        }
+        .frame(maxHeight: .infinity)
+        .overlay {
+            if result == nil && errorMessage == nil && !isLoading {
+                EmptyState(
+                    icon: "text.magnifyingglass",
+                    title: "Signature lookup",
+                    message: "Enter a 4-byte function selector or 32-byte event topic0."
+                )
+                .offset(y: -40)
+                .allowsHitTesting(false)
+            }
         }
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var queryCard: some View {
-        Card(title: "Signature Lookup", subtitle: "4-byte selector or 32-byte topic0") {
+        Card(title: "Lookup", subtitle: "4-byte selector or topic0") {
             HStack(spacing: 10) {
-                MonoField(placeholder: "0xa9059cbb", text: $sign, font: 14)
-                    .frame(maxHeight: 36)
+                TextField("0xa9059cbb", text: $sign)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, design: .monospaced))
+                    .padding(8)
+                    .background(Color(nsColor: .textBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator.opacity(0.7)))
+                    .disabled(isLoading)
+
                 Button {
                     Task { await lookup() }
                 } label: {
-                    Label("Lookup", systemImage: "magnifyingglass")
+                    Label(isLoading ? "Looking up…" : "Look up", systemImage: "magnifyingglass")
+                        .frame(minWidth: 74)
                 }
                 .buttonStyle(.borderedProminent)
-                .controlSize(.small)
                 .disabled(isLoading || trimmedSign.isEmpty)
                 .keyboardShortcut(.return, modifiers: .command)
             }
@@ -45,41 +66,67 @@ struct SignatureView: View {
         .loading(isLoading)
     }
 
+    @ViewBuilder
     private func resultCard(_ response: QueryResponse, _ raw: JSONValue) -> some View {
         Card(title: "Result", subtitle: response.msg) {
             VStack(alignment: .leading, spacing: 12) {
                 if let data = response.data {
-                    if case .object(let obj) = data {
-                        if let text = obj["text_sign"]?.display, !text.isEmpty, text != "null" {
-                            MonoText(text: text, size: 14)
-                                .padding(10)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color(nsColor: .textBackgroundColor))
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.separator))
-                                .overlay(alignment: .topTrailing) { CopyButton(text: text).padding(6) }
-                        }
-                        KVTable(rows: obj.keys.sorted().map { ($0, obj[$0]!.display) })
-                    } else {
-                        KVTable(rows: [("data", data.display)])
-                    }
+                    canonicalBanner(data)
+                    detailTable(data)
                 } else {
-                    Text("No matching signature found.").font(.callout).foregroundStyle(.secondary)
+                    Text("No matching signature found.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
-                JSONView(title: "Raw Response", json: raw)
+                CollapsibleJSON(title: "Raw response", json: raw)
             }
         }
     }
 
+    /// Big highlighted signature banner, like the web's `text_sign` display.
+    @ViewBuilder
+    private func canonicalBanner(_ data: JSONValue) -> some View {
+        if case .object(let obj) = data,
+           case .string(let text)? = obj["text_sign"], !text.isEmpty {
+            HStack(spacing: 8) {
+                Text(text)
+                    .font(.system(size: 14, weight: .medium, design: .monospaced))
+                    .foregroundStyle(CodeColors.key)
+                    .textSelection(.enabled)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+                Spacer()
+                CopyButton(text: text)
+            }
+            .padding(12)
+            .background(CodeColors.panel)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    @ViewBuilder
+    private func detailTable(_ data: JSONValue) -> some View {
+        if case .object(let obj) = data {
+            KVTable(rows: obj.keys.sorted().map { ($0, $0 == "text_sign" ? "" : obj[$0]!.display) }
+                .filter { !$1.isEmpty })
+        } else {
+            KVTable(rows: [("data", data.display)])
+        }
+    }
+
+    // MARK: - Actions
+
     private func lookup() async {
         guard !trimmedSign.isEmpty else { return }
-        isLoading = true; errorMessage = nil
+        isLoading = true
+        errorMessage = nil
         do {
             let api = DecoderAPI(client: settings.client)
             let raw = try await api.client.getJSON("/api/v1/query", query: ["sign": trimmedSign])
-            let typed = try APIClient.typed(QueryResponse.self, from: raw)
-            result = (typed, raw)
-        } catch { errorMessage = error.localizedDescription }
+            result = (try APIClient.typed(QueryResponse.self, from: raw), raw)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
         isLoading = false
     }
 }

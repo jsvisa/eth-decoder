@@ -358,10 +358,16 @@ public struct CallContractResponse: Decodable, Encodable {
     }
 }
 
-public struct DecodedOutput: Decodable {
+public struct DecodedOutput: Decodable, Equatable {
     public let name: String?
     public let type: String?
     public let value: JSONValue?
+
+    public init(name: String?, type: String?, value: JSONValue?) {
+        self.name = name
+        self.type = type
+        self.value = value
+    }
 }
 
 extension DecodedOutput: Encodable {

@@ -6,11 +6,17 @@ struct SimulationResultView: View {
     let rawJSON: JSONValue?
 
     var body: some View {
-        Card(title: "Simulation Result") {
-            VStack(alignment: .leading, spacing: 16) {
+        Card(title: "Simulation", subtitle: result.isFailure ? "reverted" : "success") {
+            VStack(alignment: .leading, spacing: 14) {
                 statusHeader
-                if let error = result.error, result.isFailure { ErrorView(message: error) }
-                if let results = result.results { sessionBody(results) } else { singleBody }
+                if let error = result.error, result.isFailure {
+                    ErrorView(message: error)
+                }
+                if let results = result.results {
+                    sessionBody(results)
+                } else {
+                    singleBody
+                }
             }
         }
     }
@@ -18,159 +24,230 @@ struct SimulationResultView: View {
     // MARK: - Status
 
     private var statusHeader: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             Image(systemName: result.isFailure ? "xmark.octagon.fill" : "checkmark.seal.fill")
-                .font(.title3).foregroundStyle(result.isFailure ? .red : .green)
-            Badge(text: result.isFailure ? "Reverted" : "Success", color: result.isFailure ? .red : .green, icon: result.isFailure ? "exclamationmark" : "checkmark")
-            if result.simulated == true { Badge(text: "Simulated", color: .teal, icon: "bolt.fill") }
-            if result.session == true { Badge(text: "Session", color: .indigo, icon: "square.stack.3d.down.right") }
+                .foregroundStyle(result.isFailure ? Color.red : Color.green)
+                .font(.title3)
+            Text(result.isFailure ? "Transaction reverted" : "Simulation succeeded")
+                .font(.headline)
             Spacer()
-            if let block = result.blockNumber { Badge(text: "Block \(block)", color: .gray) }
+            metricsRow
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill((result.isFailure ? Color.red : Color.green).opacity(0.08))
+        )
+    }
+
+    @ViewBuilder
+    private var metricsRow: some View {
+        HStack(spacing: 6) {
+            if let gas = result.gasUsed {
+                Badge(text: "gas \(gas.display)", color: .blue)
+            }
+            if let block = result.blockNumber {
+                Badge(text: "block \(block)", color: .gray)
+            }
+            if let id = result.simulationId {
+                Badge(text: "\(id.prefix(10))…", color: .orange, icon: "link")
+                    .help("Web link: ?simulationId=\(id)")
+                CopyButton(text: shareURL(id)).help("Copy web link for this result")
+            }
         }
     }
 
-    // MARK: - Single result
+    private func shareURL(_ id: String?) -> String {
+        let base = UserDefaults.standard.string(forKey: "apiBaseURL") ?? ""
+        return "\(base)/contract-caller?simulationId=\(id ?? "")"
+    }
+
+    // MARK: - Single call
 
     private var singleBody: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            metricsRow
-
+        VStack(alignment: .leading, spacing: 14) {
             if let decoded = result.decoded, !decoded.isEmpty {
-                SectionHeader(title: "Decoded Return")
-                DecodedTable(outputs: decoded)
+                section("Decoded Return") { DecodedTable(outputs: decoded) }
             }
 
             if let logs = result.logs, !logs.isEmpty {
-                SectionHeader(title: "Event Logs", count: logs.count)
-                ForEach(Array(logs.enumerated()), id: \.offset) { _, log in logRow(log) }
+                section("Event Logs", count: logs.count) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(logs.enumerated()), id: \.offset) { _, log in
+                            logRow(log)
+                        }
+                    }
+                }
             }
 
             if let changes = result.balanceChanges, !changes.isEmpty {
-                SectionHeader(title: "Balance Changes", count: changes.count)
-                balanceTable(changes)
+                section("Balance Changes", count: changes.count) {
+                    balanceTable(changes)
+                }
             }
 
             if let trace = result.callTrace {
-                SectionHeader(title: "Call Trace")
-                CallFrameCard(frame: trace)
+                section("Call Trace") { CallFrameCard(frame: trace) }
             }
 
             if let state = result.stateChanges, !state.isEmpty {
-                SectionHeader(title: "State Changes")
-                MonoText(text: JSONValue.object(state).prettyJSON, size: 10, color: .secondary)
-            }
-
-            if let extra = nonEmptyExtra {
-                SectionHeader(title: "Other Fields")
-                KVTable(rows: extra.keys.sorted().map { ($0, extra[$0]!.display) })
-            }
-
-            JSONView(title: "Raw Response", json: rawJSON)
-        }
-    }
-
-    private var nonEmptyExtra: [String: JSONValue]? {
-        let filtered = result.extra.filter { k, _ in !k.hasPrefix("_") || k == "_tokenMeta" }
-        return filtered.isEmpty ? nil : filtered
-    }
-
-    private var metricsRow: some View {
-        HStack(spacing: 6) {
-            if let gas = result.gasUsed { Badge(text: "Gas \(gas.display)", color: .blue) }
-            if let raw = result.rawData, !raw.isEmpty, raw != "0x" {
-                HStack(spacing: 4) {
-                    Badge(text: raw.truncatedHex, color: .gray)
-                    CopyButton(text: raw)
+                section("State Changes") {
+                    CodeBlock(json: .object(state), maxHeight: 220)
                 }
             }
-            if let id = result.simulationId { Badge(text: id, color: .orange, icon: "link") }
+
+            CollapsibleJSON(title: "Raw response", json: rawJSON)
         }
     }
 
-    // MARK: - Log
+    // MARK: - Session (multi-call)
+
+    private func sessionBody(_ calls: [SimulateResponse]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(calls.enumerated()), id: \.offset) { index, call in
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: call.isFailure ? "xmark.circle.fill" : "checkmark.circle.fill")
+                            .foregroundStyle(call.isFailure ? Color.red : Color.green)
+                        Text("Call \(index + 1)").font(.callout.weight(.semibold))
+                        if let gas = call.gasUsed { Badge(text: "gas \(gas.display)", color: .blue) }
+                        if let error = call.error {
+                            Text(error).font(.caption).foregroundStyle(.red).lineLimit(2)
+                        }
+                        Spacer()
+                    }
+                    if let decoded = call.decoded, !decoded.isEmpty {
+                        DecodedTable(outputs: decoded)
+                    }
+                    if let logs = call.logs, !logs.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(Array(logs.enumerated()), id: \.offset) { _, log in
+                                logRow(log)
+                            }
+                        }
+                    }
+                    if let changes = call.balanceChanges, !changes.isEmpty {
+                        balanceTable(changes)
+                    }
+                    if let trace = call.callTrace {
+                        CallFrameCard(frame: trace)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(nsColor: .textBackgroundColor).opacity(0.6))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.separator.opacity(0.3)))
+            }
+        }
+    }
+
+    // MARK: - Building blocks
+
+    private func section<Content: View>(
+        _ title: String,
+        count: Int? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            SectionHeader(title: title, count: count)
+            content()
+        }
+    }
 
     private func logRow(_ log: SimLog) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Badge(text: log.name ?? "Log", color: .purple, icon: "list.bullet.rectangle")
-                if let addr = log.address { MonoText(text: addr, size: 10, color: .secondary) }
+                Spacer()
+                if let addr = log.address {
+                    MonoText(text: addr.truncatedHexShort, size: 9.5, color: .secondary)
+                }
             }
-            if let inputs = log.inputs, !inputs.isEmpty { DecodedTable(outputs: inputs).padding(.leading, 8) }
-            if !log.extra.isEmpty { KVTable(rows: log.extra.keys.sorted().map { ($0, log.extra[$0]!.display) }).padding(.leading, 8) }
+            if let inputs = log.inputs, !inputs.isEmpty {
+                DecodedTable(outputs: inputs)
+                    .padding(.leading, 6)
+            }
         }
-        .padding(10)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .textBackgroundColor).opacity(0.55))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator.opacity(0.25)))
     }
-
-    // MARK: - Balance changes
 
     private func balanceTable(_ changes: [BalanceChange]) -> some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 12) {
-                Text("Token").font(.caption2).foregroundStyle(.tertiary).frame(width: 80, alignment: .leading)
-                Text("Amount").font(.caption2).foregroundStyle(.tertiary).frame(width: 100, alignment: .trailing)
-                Text("USD").font(.caption2).foregroundStyle(.tertiary).frame(width: 80, alignment: .trailing)
-                Text("Holder").font(.caption2).foregroundStyle(.tertiary)
+                Text("Token").frame(width: 90, alignment: .leading)
+                Text("Δ Amount").frame(width: 130, alignment: .trailing)
+                Text("USD").frame(width: 90, alignment: .trailing)
+                Text("Holder").frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, 8).padding(.vertical, 4)
-            Divider()
-            ForEach(changes, id: \.tokenAddress) { change in
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.tertiary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+
+            ForEach(Array(changes.enumerated()), id: \.offset) { i, change in
+                Divider().opacity(0.35)
                 HStack(spacing: 12) {
-                    MonoText(text: change.symbol ?? change.name ?? change.tokenAddress ?? "?", size: 11)
-                        .frame(width: 80, alignment: .leading)
+                    MonoText(
+                        text: change.symbol ?? change.name
+                            ?? change.tokenAddress.map { String($0.prefix(10)) } ?? "?",
+                        size: 11)
+                    .frame(width: 90, alignment: .leading)
                     MonoText(text: change.amount ?? "", size: 11)
-                        .frame(width: 100, alignment: .trailing)
-                    MonoText(text: change.valueUsd?.display ?? "", size: 11)
-                        .frame(width: 80, alignment: .trailing)
-                    MonoText(text: (change.address ?? "").truncatedHex, size: 10, color: .secondary)
+                        .frame(width: 130, alignment: .trailing)
+                    MonoText(text: change.valueUsd.map(usdString) ?? "", size: 11)
+                        .frame(width: 90, alignment: .trailing)
+                    MonoText(text: (change.address ?? "").truncatedHexShort, size: 9.5, color: .secondary)
+                        .lineLimit(1)
                 }
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                Divider().opacity(0.3)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(i % 2 == 1 ? Color.primary.opacity(0.02) : Color.clear)
             }
         }
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(Color(nsColor: .textBackgroundColor).opacity(0.6))
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(.separator.opacity(0.5)))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator.opacity(0.3)))
     }
 
-    // MARK: - Session
-
-    private func sessionBody(_ results: [SimulateResponse]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                if let block = result.blockNumber { Badge(text: "Block \(block)", color: .gray) }
-                if let id = result.simulationId { Badge(text: id, color: .orange, icon: "link") }
+    private func usdString(_ v: JSONValue) -> String {
+        switch v {
+        case .string(let s):
+            if let d = Double(s) { return d.formatted(.number.precision(.fractionLength(2))) }
+            return s
+        case .number(let n):
+            let raw: String
+            switch n {
+            case .int(let i): raw = String(i)
+            case .text(let t): raw = t
             }
-            ForEach(Array(results.enumerated()), id: \.offset) { index, call in
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 6) {
-                        Badge(text: "Call \(index + 1)", color: .indigo, icon: "play.fill")
-                        Image(systemName: call.isFailure ? "xmark.circle.fill" : "checkmark.circle.fill")
-                            .foregroundStyle(call.isFailure ? .red : .green)
-                        if let gas = call.gasUsed { Badge(text: "Gas \(gas.display)", color: .blue) }
-                        if let error = call.error { Text(error).font(.caption).foregroundStyle(.red) }
-                        Spacer()
-                    }
-                    if let decoded = call.decoded, !decoded.isEmpty { DecodedTable(outputs: decoded) }
-                    if let logs = call.logs, !logs.isEmpty { ForEach(Array(logs.enumerated()), id: \.offset) { _, log in logRow(log) } }
-                    if let changes = call.balanceChanges, !changes.isEmpty { balanceTable(changes) }
-                    if let trace = call.callTrace { CallFrameCard(frame: trace) }
-                }
-                .padding(12)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(.separator.opacity(0.5)))
+            if let d = Double(raw) {
+                return d.formatted(.number.precision(.fractionLength(2)))
             }
+            return raw
+        default:
+            return ""
         }
     }
 }
 
-// MARK: - Call Trace
+// MARK: - Call trace tree
 
 struct CallFrameCard: View {
     let frame: CallFrame
-    @State private var expanded = true
+    private let depth: Int
+    @State private var expanded: Bool
+
+    init(frame: CallFrame, depth: Int = 0) {
+        self.frame = frame
+        self.depth = depth
+        _expanded = State(initialValue: depth < 2)
+    }
 
     var body: some View {
         DisclosureGroup(isExpanded: $expanded) {
@@ -185,30 +262,38 @@ struct CallFrameCard: View {
                 }
                 if let logs = frame.logs, !logs.isEmpty {
                     SectionHeader(title: "Logs", count: logs.count)
-                    ForEach(Array(logs.enumerated()), id: \.offset) { _, log in
-                        Badge(text: log.name ?? "log", color: .purple)
+                    HStack(spacing: 4) {
+                        ForEach(Array(logs.prefix(8).enumerated()), id: \.offset) { _, log in
+                            Badge(text: log.name ?? "log", color: .purple)
+                        }
+                        if logs.count > 8 {
+                            Text("+\(logs.count - 8)")
+                                .font(.caption2)
+                                .foregroundStyle(.quaternary)
+                        }
                     }
                 }
                 if let calls = frame.calls, !calls.isEmpty {
                     SectionHeader(title: "Sub-calls", count: calls.count)
-                    ForEach(Array(calls.enumerated()), id: \.offset) { _, child in
-                        CallFrameCard(frame: child)
-                            .padding(.leading, 8)
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(Array(calls.enumerated()), id: \.offset) { _, child in
+                            CallFrameCard(frame: child, depth: depth + 1)
+                                .padding(.leading, CGFloat(10 * min(depth + 1, 5)))
+                        }
                     }
                 }
-                if !frame.extra.isEmpty {
-                    KVTable(rows: frame.extra.keys.sorted().map { ($0, frame.extra[$0]!.display) })
-                }
             }
+            .padding(.top, 4)
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: "arrow.triangle.branch").font(.caption).foregroundStyle(.teal)
-                MonoText(text: frame.functionName ?? "call", size: 12)
-                if let to = frame.to { MonoText(text: to, size: 10, color: .secondary) }
+                Image(systemName: "arrow.triangle.branch")
+                    .font(.caption)
+                    .foregroundStyle(.teal)
+                MonoText(text: frame.functionName ?? "call", size: 11.5, color: Theme.accent)
+                if let to = frame.to {
+                    MonoText(text: to.truncatedHexShort, size: 9.5, color: .secondary)
+                }
             }
         }
-        .padding(8)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }

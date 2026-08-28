@@ -4,6 +4,7 @@ import SwiftUI
 struct ContractCallerView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var history: HistoryStore
+
     @State private var chain: Chain = Chains.all[0]
     @State private var address = ""
     @State private var abi: [ABIItem]?
@@ -18,7 +19,6 @@ struct ContractCallerView: View {
     @State private var actionError: String?
     @State private var readResult: CallContractResponse?
     @State private var simulateResult: (SimulateResponse, JSONValue)?
-    @State private var rawResultJSON: JSONValue?
 
     private var functions: [ABIItem] { (abi ?? []).filter { $0.isFunction } }
     private var selectedFunction: ABIItem? {
@@ -27,40 +27,60 @@ struct ContractCallerView: View {
     }
     private var validAddress: String { address.trimmingCharacters(in: .whitespaces) }
 
+    // MARK: - Body
+
     var body: some View {
-        HStack(spacing: 0) {
-            CallerHistorySidebar(currentChain: chain.id) { item in
-                loadFromHistory(item)
-            }
+        VStack(spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 16) {
                     contractCard
                     if let abi { functionCard(abi) }
-                    if let actionError { ErrorView(message: actionError) { self.actionError = nil } }
-                    if let readResult { resultCard("Read Result", readResult) }
-                    if let (sim, raw) = simulateResult { SimulationResultView(result: sim, rawJSON: raw) }
-                    if abi == nil && actionError == nil && !isLoadingAbi {
-                        EmptyState(icon: "phone.badge.checkmark", title: "Contract Caller",
-                                   message: "Enter a contract address and fetch its ABI to get started.")
+                    if let actionError {
+                        ErrorView(message: actionError) { self.actionError = nil }
+                    }
+                    if let readResult { readResultCard(readResult) }
+                    if let (sim, raw) = simulateResult {
+                        SimulationResultView(result: sim, rawJSON: raw)
                     }
                 }
-                .padding(24)
+                .padding(20)
+            }
+            .frame(maxHeight: .infinity)
+            Divider()
+            CallerHistoryStrip(currentChain: chain.id) { item in
+                loadFromHistory(item)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
+        }
+        .overlay(alignment: .center) {
+            if abi == nil && actionError == nil && !isLoadingAbi && !isRunning {
+                EmptyState(
+                    icon: "phone.badge.checkmark",
+                    title: "Contract caller",
+                    message: "Pick a network, enter a contract address and fetch its ABI."
+                )
+                .offset(y: -60)
+                .allowsHitTesting(false)
             }
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .onChange(of: selectedFunctionID) { newID in
+        .onChange(of: selectedFunctionID) { _, newID in
             guard let newID, let fn = functions.first(where: { $0.id == newID }) else {
-                argTexts = []; return
+                argTexts = []
+                return
             }
             argTexts = (fn.inputs ?? []).map { defaultArgValue(for: $0) }
-            readResult = nil; simulateResult = nil; actionError = nil
+            readResult = nil
+            simulateResult = nil
+            actionError = nil
         }
     }
 
-    // MARK: - Contract
+    // MARK: - Contract card
 
     private var contractCard: some View {
-        Card(title: "Contract", subtitle: "Select network and enter address") {
+        Card(title: "Contract") {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 10) {
                     Picker("Network", selection: $chain) {
@@ -68,115 +88,180 @@ struct ContractCallerView: View {
                             Text(c.name).tag(c)
                         }
                     }
+                    .labelsHidden()
                     .frame(width: 150)
-                    MonoField(placeholder: "0x…", text: $address, font: 13)
+
+                    MonoField(placeholder: "0x…", text: $address)
+
                     Button {
                         Task { await fetchAbi() }
                     } label: {
                         if isLoadingAbi {
                             ProgressView().controlSize(.small)
                         } else {
-                            Label("Fetch ABI", systemImage: "doc.text")
+                            Label("Fetch ABI", systemImage: "arrow.triangle.2.circlepath")
+                                .frame(minWidth: 70)
                         }
                     }
                     .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
                     .disabled(isLoadingAbi || validAddress.isEmpty)
                     .keyboardShortcut(.return, modifiers: .command)
                 }
-                if let contractName {
+
+                if let name = contractName {
                     HStack(spacing: 6) {
-                        Badge(text: contractName, color: .indigo, icon: "building.2")
+                        Badge(text: name, color: .indigo, icon: "building.2")
                         Badge(text: "\(abi?.count ?? 0) items", color: .gray)
                     }
                 }
-                if let abiError { Text(abiError).font(.caption).foregroundStyle(.red) }
+                if let abiError {
+                    Text(abiError).font(.caption).foregroundStyle(.red)
+                }
             }
         }
         .loading(isLoadingAbi)
     }
 
-    // MARK: - Function
+    // MARK: - Function card
 
     private func functionCard(_ loaded: [ABIItem]) -> some View {
-        Card(title: "Function", subtitle: "Select a function and fill arguments") {
-            VStack(alignment: .leading, spacing: 12) {
-                Picker("Function", selection: $selectedFunctionID) {
-                    Text("Select a function").tag(nil as String?)
-                    Divider()
-                    ForEach(functions) { fn in
-                        HStack(spacing: 6) {
-                            Badge(text: fn.isConstant ? "R" : "W", color: fn.isConstant ? .blue : .orange)
-                            Text(fn.canonicalSignature).tag(fn.id as String?)
-                        }
-                    }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
+        Card(title: "Call", subtitle: selectedFunction.map(\.canonicalSignature)) {
+            VStack(alignment: .leading, spacing: 14) {
+                functionPicker(loaded)
 
                 if let fn = selectedFunction, let inputs = fn.inputs, !inputs.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        SectionHeader(title: "Arguments")
-                        ForEach(Array(inputs.enumerated()), id: \.offset) { index, input in
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 4) {
-                                    Text(input.name ?? "arg\(index)").font(.caption).foregroundStyle(.primary)
-                                    Text(input.type).font(.caption2).foregroundStyle(.tertiary)
-                                }
-                                MonoField(placeholder: defaultPlaceholder(for: input), text: bindingForArg(at: index), font: 12)
-                            }
-                        }
-                    }
+                    argsSection(inputs)
                 }
 
                 if selectedFunction != nil {
-                    HStack(spacing: 10) {
-                        MonoField(placeholder: "From address (0x…)", text: $fromAddress, font: 12)
-                        if selectedFunction?.isPayable == true {
-                            MonoField(placeholder: "Value (wei hex, e.g. 0x0)", text: $ethValue, font: 12)
-                        }
-                    }
+                    contextRow
 
                     if let calldata = calldataPreview {
-                        HStack(alignment: .top, spacing: 8) {
-                            Text("Calldata").font(.caption).foregroundStyle(.tertiary).padding(.top, 4)
-                            MonoText(text: calldata, size: 10, color: .secondary)
-                            CopyButton(text: calldata)
-                        }
-                        .padding(10)
-                        .background(Color(nsColor: .textBackgroundColor))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(.separator.opacity(0.5)))
+                        calldataPreviewRow(calldata)
                     }
 
-                    HStack(spacing: 10) {
-                        ToolbarAction(title: "Read", icon: "arrow.down.circle", action: { Task { await read() } }, disabled: isRunning)
-                        ToolbarAction(title: "Simulate", icon: "play.circle", action: { Task { await simulate() } }, disabled: isRunning)
-                        Spacer()
-                        Button("Clear") { readResult = nil; simulateResult = nil; actionError = nil }
-                            .buttonStyle(.plain).font(.caption).foregroundStyle(.secondary)
-                    }
+                    actionBar
                 }
             }
         }
         .loading(isRunning)
     }
 
-    // MARK: - Result
+    private func functionPicker(_ loaded: [ABIItem]) -> some View {
+        Picker("Function", selection: $selectedFunctionID) {
+            Text("Select a function…").tag(nil as String?)
+            Divider()
+            ForEach(functions.filter { $0.isConstant }) { fn in
+                Text("\(marker(for: fn)) \(fn.canonicalSignature)")
+                    .tag(fn.id as String?)
+            }
+            Divider()
+            ForEach(functions.filter { !$0.isConstant }) { fn in
+                Text("\(marker(for: fn)) \(fn.canonicalSignature)")
+                    .tag(fn.id as String?)
+            }
+        }
+        .labelsHidden()
+    }
 
-    private func resultCard(_ title: String, _ result: CallContractResponse) -> some View {
-        Card(title: title) {
-            VStack(alignment: .leading, spacing: 10) {
-                if let decoded = result.decoded { DecodedTable(outputs: decoded) }
-                if let rawData = result.rawData {
-                    HStack(spacing: 6) {
-                        Text("Return data").font(.caption).foregroundStyle(.tertiary)
-                        MonoText(text: rawData.truncatedHex, size: 10, color: .secondary)
-                        CopyButton(text: rawData)
+    private func marker(for fn: ABIItem) -> String {
+        fn.isPayable ? "💰" : (fn.isConstant ? "👁" : "✍️")
+    }
+
+    private func argsSection(_ inputs: [ABIInput]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionHeader(title: "Arguments")
+            ForEach(Array(inputs.enumerated()), id: \.offset) { index, input in
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    VStack(alignment: .trailing, spacing: 1) {
+                        Text(input.name ?? "arg\(index)")
+                            .font(.caption.monospaced().weight(.semibold))
+                        Text(input.type)
+                            .font(.system(size: 9.5, design: .monospaced))
+                            .foregroundStyle(.teal.opacity(0.85))
                     }
-                    .padding(8)
-                    .background(Color(nsColor: .textBackgroundColor))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .frame(width: 128, alignment: .trailing)
+                    MonoField(placeholder: placeholderText(for: input),
+                              text: bindingForArg(at: index), font: 12)
+                }
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .textBackgroundColor).opacity(0.6))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var contextRow: some View {
+        HStack(spacing: 10) {
+            MonoField(placeholder: "From address (optional)", text: $fromAddress, font: 12)
+            if selectedFunction?.isPayable == true {
+                MonoField(placeholder: "Value (wei hex e.g. 0x0)", text: $ethValue, font: 12)
+            }
+        }
+    }
+
+    private func calldataPreviewRow(_ calldata: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("Calldata")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 128, alignment: .trailing)
+            MonoText(text: calldata.truncatedHexShort, size: 10, color: CodeColors.argValue)
+                .lineLimit(2)
+            CopyButton(text: calldata)
+        }
+        .padding(10)
+        .background(Color(nsColor: .textBackgroundColor).opacity(0.6))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var actionBar: some View {
+        HStack(spacing: 10) {
+            Button {
+                Task { await read() }
+            } label: {
+                Label("Read", systemImage: "arrow.down.circle")
+                    .frame(minWidth: 54)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.teal)
+            .disabled(isRunning)
+
+            Button {
+                Task { await simulate() }
+            } label: {
+                Label("Simulate", systemImage: "play.fill")
+                    .frame(minWidth: 62)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(isRunning || fromAddress.trimmingCharacters(in: .whitespaces).isEmpty)
+            .help("Simulation requires a from address")
+
+            Spacer()
+
+            Button(role: .destructive) {
+                readResult = nil
+                simulateResult = nil
+                actionError = nil
+            } label: {
+                Label("Clear results", systemImage: "xmark.circle")
+            }
+            .controlSize(.small)
+            .disabled(isRunning)
+        }
+    }
+
+    // MARK: - Read result
+
+    private func readResultCard(_ result: CallContractResponse) -> some View {
+        Card(title: "Read Result", subtitle: selectedFunction?.name) {
+            VStack(alignment: .leading, spacing: 12) {
+                if let decoded = result.decoded, !decoded.isEmpty {
+                    DecodedTable(outputs: decoded)
+                }
+                if let rawData = result.rawData {
+                    KVRow(key: "raw data", value: rawData.truncatedHexShort)
                 }
             }
         }
@@ -185,46 +270,77 @@ struct ContractCallerView: View {
     // MARK: - Actions
 
     private func fetchAbi() async {
-        guard isValidAddress(validAddress) else { abi = nil; abiError = "Invalid address."; return }
-        isLoadingAbi = true; abiError = nil
+        guard isValidAddress(validAddress) else {
+            abi = nil
+            abiError = "Invalid address."
+            return
+        }
+        isLoadingAbi = true
+        abiError = nil
         do {
-            let response = try await DecoderAPI(client: settings.client).fetchAbi(address: validAddress, chain: chain.id)
-            abi = response.abi; contractName = response.contractName
-            selectedFunctionID = nil; argTexts = []; readResult = nil; simulateResult = nil; actionError = nil
-        } catch { abiError = error.localizedDescription; abi = nil }
+            let response = try await DecoderAPI(client: settings.client)
+                .fetchAbi(address: validAddress, chain: chain.id)
+            abi = response.abi
+            contractName = response.contractName ?? response.implContractName
+            selectedFunctionID = nil
+            argTexts = []
+            readResult = nil
+            simulateResult = nil
+            actionError = nil
+        } catch {
+            abiError = error.localizedDescription
+            abi = nil
+        }
         isLoadingAbi = false
     }
 
     private func read() async {
         guard let fn = selectedFunction, let abi else { return }
-        isRunning = true; actionError = nil; simulateResult = nil
+        isRunning = true
+        actionError = nil
+        simulateResult = nil
         do {
-            let req = CallContractRequest(chain: chain.id, address: validAddress, functionName: fn.canonicalSignature, args: argTexts, abi: abi, fromAddress: fromAddress.isEmpty ? nil : fromAddress)
+            let req = CallContractRequest(
+                chain: chain.id, address: validAddress,
+                functionName: fn.canonicalSignature, args: argTexts, abi: abi,
+                fromAddress: fromAddress.isEmpty ? nil : fromAddress)
             let res = try await DecoderAPI(client: settings.client).callContract(req)
             readResult = res
-            // Build JSON output for history
             let out = try? JSONEncoder().encode(res)
             let json = out.flatMap { try? JSONDecoder().decode(JSONValue.self, from: $0) }
-            history.saveCaller(chain: chain.id, address: validAddress, functionSig: fn.canonicalSignature,
-                               args: argTexts, fromAddress: fromAddress.isEmpty ? nil : fromAddress,
-                               output: json, contractName: contractName, isWrite: false)
-        } catch { actionError = error.localizedDescription }
+            history.saveCaller(
+                chain: chain.id, address: validAddress, functionSig: fn.canonicalSignature,
+                args: argTexts, fromAddress: fromAddress.isEmpty ? nil : fromAddress,
+                output: json, contractName: contractName, isWrite: false)
+        } catch {
+            actionError = error.localizedDescription
+        }
         isRunning = false
     }
 
     private func simulate() async {
         guard let fn = selectedFunction else { return }
-        isRunning = true; actionError = nil; readResult = nil
+        isRunning = true
+        actionError = nil
+        readResult = nil
         do {
             let calldata = try ABIEncoder.encodeCalldata(function: fn, args: argTexts)
             let valueHex = try valueToHex(ethValue)
-            let req = SimulateRequest(chainId: chain.chainId, to: validAddress, data: calldata, from: fromAddress.isEmpty ? "0x0000000000000000000000000000000000000000" : fromAddress, value: valueHex, gas: nil, blockNumber: nil, apiKeys: settings.etherscanApiKey.isEmpty ? nil : ["etherscan": settings.etherscanApiKey], price: true)
+            let req = SimulateRequest(
+                chainId: chain.chainId, to: validAddress, data: calldata,
+                from: fromAddress.isEmpty ? "0x0000000000000000000000000000000000000000" : fromAddress,
+                value: valueHex, gas: nil, blockNumber: nil,
+                apiKeys: settings.etherscanApiKey.isEmpty ? nil : ["etherscan": settings.etherscanApiKey],
+                price: true)
             let (sim, raw) = try await DecoderAPI(client: settings.client).simulate(req)
             simulateResult = (sim, raw)
-            history.saveCaller(chain: chain.id, address: validAddress, functionSig: fn.canonicalSignature,
-                               args: argTexts, fromAddress: fromAddress.isEmpty ? nil : fromAddress,
-                               output: raw, contractName: contractName, isWrite: true)
-        } catch { actionError = error.localizedDescription }
+            history.saveCaller(
+                chain: chain.id, address: validAddress, functionSig: fn.canonicalSignature,
+                args: argTexts, fromAddress: fromAddress.isEmpty ? nil : fromAddress,
+                output: raw, contractName: contractName, isWrite: true)
+        } catch {
+            actionError = error.localizedDescription
+        }
         isRunning = false
     }
 
@@ -236,20 +352,16 @@ struct ContractCallerView: View {
             selectedFunctionID = functions.first(where: { $0.canonicalSignature == sig })?.id
             if let args = item.args { argTexts = args }
         }
-        // Re-fetch ABI if needed
         if address != validAddress || abi == nil {
             Task { await fetchAbi() }
         }
-        // Restore result
+        readResult = nil
+        simulateResult = nil
         if let output = item.output {
-            if item.isWrite == true {
-                if let sim = try? APIClient.typed(SimulateResponse.self, from: output) {
-                    simulateResult = (sim, output)
-                }
-            } else {
-                if let res = try? APIClient.typed(CallContractResponse.self, from: output) {
-                    readResult = res
-                }
+            if item.isWrite == true, let sim = try? APIClient.typed(SimulateResponse.self, from: output) {
+                simulateResult = (sim, output)
+            } else if item.isWrite != true, let res = try? APIClient.typed(CallContractResponse.self, from: output) {
+                readResult = res
             }
         }
     }
@@ -264,17 +376,22 @@ struct ContractCallerView: View {
     private func valueToHex(_ text: String) throws -> String {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if t.lowercased().hasPrefix("0x") {
-            guard !t.dropFirst(2).isEmpty, t.dropFirst(2).allSatisfy({ $0.isHexDigit }) else { throw ABIEncodeError.invalidHex(text) }
+            guard !t.dropFirst(2).isEmpty, t.dropFirst(2).allSatisfy({ $0.isHexDigit }) else {
+                throw ABIEncodeError.invalidHex(text)
+            }
             return t
         }
-        guard t.allSatisfy({ $0.isNumber }), !t.isEmpty else { throw ABIEncodeError.invalidNumber(text) }
+        guard t.allSatisfy({ $0.isNumber }), !t.isEmpty else {
+            throw ABIEncodeError.invalidNumber(text)
+        }
         let bytes = ABIEncoder.decimalToBinaryBytes(t)
         return "0x" + bytes.map { String(format: "%02x", $0) }.joined()
     }
 
     private func bindingForArg(at index: Int) -> Binding<String> {
-        Binding(get: { argTexts.indices.contains(index) ? argTexts[index] : "" },
-                set: { if argTexts.indices.contains(index) { argTexts[index] = $0 } })
+        Binding(
+            get: { argTexts.indices.contains(index) ? argTexts[index] : "" },
+            set: { if argTexts.indices.contains(index) { argTexts[index] = $0 } })
     }
 
     private func defaultArgValue(for input: ABIInput) -> String {
@@ -293,10 +410,10 @@ struct ContractCallerView: View {
         return ""
     }
 
-    private func defaultPlaceholder(for input: ABIInput) -> String {
+    private func placeholderText(for input: ABIInput) -> String {
         let t = input.type
         if t.hasPrefix("uint") || t.hasPrefix("int") { return "decimal or 0x hex" }
-        if t == "bool" { return "true or false" }
+        if t == "bool" { return "true / false" }
         if t == "address" || t.hasPrefix("bytes") { return "0x…" }
         if t == "string" { return "text" }
         if t.hasSuffix("]") || t == "tuple" { return "JSON e.g. [1, 2]" }

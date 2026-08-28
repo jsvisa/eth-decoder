@@ -26,7 +26,7 @@ macos-build:
 	plutil -insert CFBundleIdentifier  -string "com.ethdecodmac.app" EthDecodeMac.app/Contents/Info.plist && \
 	plutil -insert CFBundleVersion     -string "1" EthDecodeMac.app/Contents/Info.plist && \
 	plutil -insert CFBundlePackageType -string "APPL" EthDecodeMac.app/Contents/Info.plist && \
-	plutil -insert LSMinimumSystemVersion -string "13.0" EthDecodeMac.app/Contents/Info.plist && \
+	plutil -insert LSMinimumSystemVersion -string "14.0" EthDecodeMac.app/Contents/Info.plist && \
 	plutil -insert CFBundleIconFile    -string "AppIcon" EthDecodeMac.app/Contents/Info.plist && \
 	plutil -insert CFBundleIconName    -string "AppIcon" EthDecodeMac.app/Contents/Info.plist && \
 	echo "Built: macos/EthDecodeMac.app"

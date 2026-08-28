@@ -310,6 +310,78 @@ func testModels() {
     }
 }
 
+// MARK: - HistoryDatabase (SQLite)
+
+func testHistoryDatabase() {
+    let path = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("ethdecode-test-\(UUID().uuidString)")
+        .appendingPathComponent("history.sqlite")
+        .path
+
+    do {
+        let db = try HistoryDatabase(path: path)
+
+        // Decoder round-trip
+        try db.saveDecoder([
+            DecodeHistoryItem(id: 2, input: "0xbb", output: .string("approve"),
+                              options: .init(withAbi: true, withSign: false),
+                              timestamp: "2026-01-02T00:00:00.000Z"),
+            DecodeHistoryItem(id: 1, input: "0xaa", output: nil,
+                              options: nil, timestamp: "2026-01-01T00:00:00.000Z"),
+        ])
+        var loaded = try db.loadDecoder()
+        check(loaded.count == 2, "sqlite decoder count")
+        check(loaded.first?.id == 2, "sqlite decoder newest-first")
+        check(loaded.first?.output == .string("approve"), "sqlite decoder output json")
+
+        // Whole-array write-back replaces previous rows
+        try db.saveDecoder([loaded[0]])
+        loaded = try db.loadDecoder()
+        check(loaded.count == 1, "sqlite decoder replace-all")
+        check(loaded[0] == DecodeHistoryItem(
+            id: 2, input: "0xbb", output: .string("approve"),
+            options: .init(withAbi: true, withSign: false),
+            timestamp: "2026-01-02T00:00:00.000Z"), "sqlite decoder round-trip equality")
+        try db.clearDecoder()
+        check(try db.loadDecoder().isEmpty, "sqlite decoder cleared")
+
+        // Caller round-trip (nulls, args array, session bundle)
+        let callerItem = CallHistoryItem(
+            id: 7, chain: "ethereum", address: "0xabc",
+            functionName: nil, functionSig: "transfer(address,uint256)",
+            args: ["0xdef", "100"], fromAddress: nil,
+            output: .object(["success": .bool(true)]),
+            contractName: "Token", isWrite: true,
+            timestamp: "2026-01-03T12:30:45.123Z",
+            type: "session",
+            txs: [CallHistoryItem.SessionCall(id: "s1", type: "call",
+                                              functionName: "transfer",
+                                              contractName: "Token",
+                                              inputs: [DecodedOutput(name: "to", type: "address", value: .string("0xdef"))],
+                                              outputs: nil, success: true)])
+        try db.saveCaller([callerItem])
+        let callers = try db.loadCaller()
+        check(callers.first == callerItem, "sqlite caller round-trip equality")
+        check(callers.first?.args?.count == 2, "sqlite caller args")
+        check(callers.first?.fromAddress == nil, "sqlite caller null column")
+        check(callers.first?.txs?.first?.inputs?.first?.name == "to", "sqlite session bundle")
+        try db.clearCaller()
+        check(try db.loadCaller().isEmpty, "sqlite caller cleared")
+    } catch {
+        failures += 1
+        print("FAIL  sqlite history threw: \(error)")
+    }
+
+    // Reopening an existing database file must work (idempotent schema).
+    do {
+        _ = try HistoryDatabase(path: path)
+        check(true, "sqlite reopen existing file")
+    } catch {
+        failures += 1
+        print("FAIL  sqlite reopen threw: \(error)")
+    }
+}
+
 // MARK: - Runner
 
 @main
@@ -319,6 +391,7 @@ struct TestRunner {
         testABIEncoding()
         testJSONValue()
         testModels()
+        testHistoryDatabase()
         if failures > 0 {
             print("\(failures) test(s) FAILED")
             exit(1)

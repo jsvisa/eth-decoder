@@ -1,62 +1,35 @@
 import EthDecodeCore
 import Foundation
 
-// MARK: - History items (matching web app format)
-
-struct DecodeHistoryItem: Codable, Identifiable {
-    var id: Int
-    let input: String
-    let output: JSONValue?
-    let options: DecodeOptions?
-    let timestamp: String
-
-    struct DecodeOptions: Codable {
-        let withAbi: Bool
-        let withSign: Bool
-    }
-}
-
-struct CallHistoryItem: Codable, Identifiable {
-    var id: Int
-    let chain: String
-    let address: String
-    let functionName: String?
-    let functionSig: String?
-    let args: [String]?
-    var fromAddress: String?
-    var output: JSONValue?
-    let contractName: String?
-    var isWrite: Bool?
-    var timestamp: String
-    let type: String? // nil for single, "session" for session bundles
-
-    struct SessionCall: Codable {
-        let id: String
-        let type: String?
-        let functionName: String?
-        let contractName: String?
-        let inputs: [DecodedOutput]?
-        let outputs: [DecodedOutput]?
-        let success: Bool?
-    }
-
-    var txs: [SessionCall]?
-}
-
-// MARK: - Persistent store
+// In-memory history + SQLite persistence.
+//
+// The views observe @Published arrays; every mutation rewrites the whole
+// (capped) array to the database in one transaction. On first launch any
+// legacy UserDefaults history is imported once and then removed.
 
 @MainActor
 final class HistoryStore: ObservableObject {
-    static let decoderKey = "evm_decoder_history"
-    static let callerKey = "contract_caller_history"
+    static let legacyDecoderKey = "evm_decoder_history"
+    static let legacyCallerKey = "contract_caller_history"
     static let decoderMax = 100
     static let callerMax = 50
 
     @Published var decoderHistory: [DecodeHistoryItem] = []
     @Published var callerHistory: [CallHistoryItem] = []
 
+    private let db: HistoryDatabase?
+
     init() {
+        var store: HistoryDatabase?
+        do {
+            store = try HistoryDatabase(path: HistoryDatabase.defaultPath())
+        } catch {
+            // Disk problems must not take the app down; degrade to session-only history.
+            store = nil
+        }
+        db = store
         load()
+        migrateLegacyUserDefaults()
     }
 
     // MARK: - Tx Decoder
@@ -73,7 +46,7 @@ final class HistoryStore: ObservableObject {
         list.removeAll { $0.input.lowercased() == input.lowercased() }
         list.insert(item, at: 0)
         decoderHistory = Array(list.prefix(Self.decoderMax))
-        saveDecoder()
+        persistDecoder()
     }
 
     func loadDecoderFromHistory(_ item: DecodeHistoryItem) -> (input: String, options: (Bool, Bool)) {
@@ -82,7 +55,12 @@ final class HistoryStore: ObservableObject {
 
     func clearDecoder() {
         decoderHistory = []
-        UserDefaults.standard.removeObject(forKey: Self.decoderKey)
+        try? db?.clearDecoder()
+    }
+
+    func deleteDecoder(_ item: DecodeHistoryItem) {
+        decoderHistory.removeAll { $0.id == item.id }
+        persistDecoder()
     }
 
     // MARK: - Contract Caller
@@ -96,7 +74,7 @@ final class HistoryStore: ObservableObject {
             chain: chain, address: address, functionName: functionSig,
             functionSig: functionSig, args: args, fromAddress: fromAddress,
             output: output, contractName: contractName, isWrite: isWrite,
-            timestamp: isoNow(), type: nil
+            timestamp: isoNow()
         )
         var list = callerHistory
         if let existing = list.firstIndex(where: { h in
@@ -113,74 +91,75 @@ final class HistoryStore: ObservableObject {
             list.insert(item, at: 0)
         }
         callerHistory = Array(list.prefix(Self.callerMax))
-        saveCaller()
+        persistCaller()
     }
 
     func clearCaller() {
         callerHistory = []
-        UserDefaults.standard.removeObject(forKey: Self.callerKey)
+        try? db?.clearCaller()
+    }
+
+    func deleteCaller(_ item: CallHistoryItem) {
+        callerHistory.removeAll { $0.id == item.id }
+        persistCaller()
     }
 
     // MARK: - Persistence
 
     private func load() {
-        if let data = UserDefaults.standard.data(forKey: Self.decoderKey),
-           let items = try? JSONDecoder().decode([DecodeHistoryItem].self, from: data) {
+        if let items = try? db?.loadDecoder() {
             decoderHistory = items
         }
-        if let data = UserDefaults.standard.data(forKey: Self.callerKey),
-           let items = try? JSONDecoder().decode([CallHistoryItem].self, from: data) {
+        if let items = try? db?.loadCaller() {
             callerHistory = items
         }
     }
 
-    private func saveDecoder() {
-        if let data = try? JSONEncoder().encode(decoderHistory) {
-            UserDefaults.standard.set(data, forKey: Self.decoderKey)
-        }
+    private func persistDecoder() {
+        try? db?.saveDecoder(decoderHistory)
     }
 
-    private func saveCaller() {
-        if let data = try? JSONEncoder().encode(callerHistory) {
-            UserDefaults.standard.set(data, forKey: Self.callerKey)
+    private func persistCaller() {
+        try? db?.saveCaller(callerHistory)
+    }
+
+    /// One-time import of pre-SQLite history stored in UserDefaults.
+    private func migrateLegacyUserDefaults() {
+        let defaults = UserDefaults.standard
+
+        if let data = defaults.data(forKey: Self.legacyDecoderKey),
+           let items = try? JSONDecoder().decode([DecodeHistoryItem].self, from: data),
+           !items.isEmpty {
+            var merged = decoderHistory.filter { existing in
+                !items.contains { $0.input.lowercased() == existing.input.lowercased() }
+            }
+            merged.append(contentsOf: items)
+            merged.sort { $0.id > $1.id }
+            decoderHistory = Array(merged.prefix(Self.decoderMax))
+            persistDecoder()
         }
+
+        if let data = defaults.data(forKey: Self.legacyCallerKey),
+           let items = try? JSONDecoder().decode([CallHistoryItem].self, from: data),
+           !items.isEmpty {
+            var seen = Set(callerHistory.map { "\($0.chain)-\($0.address.lowercased())-\($0.functionSig ?? "")-\($0.args?.joined() ?? "")" })
+            var merged = callerHistory
+            for item in items where !seen.contains("\(item.chain)-\(item.address.lowercased())-\(item.functionSig ?? "")-\(item.args?.joined() ?? "")") {
+                seen.insert("\(item.chain)-\(item.address.lowercased())-\(item.functionSig ?? "")-\(item.args?.joined() ?? "")")
+                merged.append(item)
+            }
+            merged.sort { $0.id > $1.id }
+            callerHistory = Array(merged.prefix(Self.callerMax))
+            persistCaller()
+        }
+
+        defaults.removeObject(forKey: Self.legacyDecoderKey)
+        defaults.removeObject(forKey: Self.legacyCallerKey)
     }
 
     private func isoNow() -> String {
         let df = ISO8601DateFormatter()
         df.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return df.string(from: Date())
-    }
-}
-
-// MARK: - JSONValue Codable conformance for history
-
-extension JSONValue: Codable {
-    public func encode(to encoder: Encoder) throws {
-        var c = encoder.singleValueContainer()
-        switch self {
-        case .null: try c.encodeNil()
-        case .bool(let b): try c.encode(b)
-        case .number(.int(let i)): try c.encode(i)
-        case .number(.text(let t)): try c.encode(t)
-        case .string(let s): try c.encode(s)
-        case .array(let a): try c.encode(a)
-        case .object(let o): try c.encode(o)
-        }
-    }
-}
-
-// MARK: - DecodedOutput Codable conformance
-
-extension DecodedOutput: Codable {
-    enum CodingKeys: String, CodingKey {
-        case name, type, value
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encodeIfPresent(name, forKey: .name)
-        try c.encodeIfPresent(type, forKey: .type)
-        try c.encodeIfPresent(value, forKey: .value)
     }
 }

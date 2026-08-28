@@ -20,40 +20,111 @@ final class AppSettings: ObservableObject {
     }
 }
 
+// MARK: - Theme
+
+enum Theme {
+    /// Web app accent (#0070f3 light / #3b9eff dark).
+    static let accent = Color(nsColor: NSColor(name: nil) { appearance in
+        let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        return dark
+            ? NSColor(srgbRed: 0x3b / 255, green: 0x9e / 255, blue: 0xff / 255, alpha: 1)
+            : NSColor(srgbRed: 0x00 / 255, green: 0x70 / 255, blue: 0xf3 / 255, alpha: 1)
+    })
+}
+
 // MARK: - Card
 
-struct Card<Content: View>: View {
+struct Card<Trailing: View, Content: View>: View {
     let title: String?
     let subtitle: String?
-    @ViewBuilder let content: Content
+    var trailing: () -> Trailing
+    var content: Content
 
-    init(title: String? = nil, subtitle: String? = nil, @ViewBuilder content: () -> Content) {
+    init(title: String? = nil, subtitle: String? = nil,
+         trailing: @escaping () -> Trailing = { EmptyView() },
+         @ViewBuilder content: () -> Content) {
         self.title = title
         self.subtitle = subtitle
+        self.trailing = trailing
         self.content = content()
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if let title {
-                HStack {
-                    Text(title).font(.headline).foregroundStyle(.primary)
-                    if let subtitle {
-                        Text(subtitle).font(.caption).foregroundStyle(.tertiary)
-                    }
-                    Spacer()
+            HStack(spacing: 8) {
+                Text(title ?? "")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
+                Spacer(minLength: 12)
+                trailing()
             }
+            .opacity((title ?? subtitle) == nil ? 0 : 1)
             content
         }
         .padding(16)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(.separator, lineWidth: 0.5))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(nsColor: .controlBackgroundColor))
+                .shadow(color: .black.opacity(0.08), radius: 5, x: 0, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(.separator.opacity(0.4), lineWidth: 0.5)
+        )
     }
 }
 
-// MARK: - Monospaced
+// MARK: - Code block
+
+/// Dark code panel like the web result area — scrollable, selectable, and
+/// dark in both color schemes.
+struct CodeBlock: View {
+    private let content: AttributedString
+    private let copyText: String
+    var maxHeight: CGFloat = 420
+
+    /// Syntax-highlighted JSON value.
+    init(json value: JSONValue?, maxHeight: CGFloat = 420) {
+        let pretty = value?.prettyJSON ?? "null"
+        content = JSONSyntax.attributed(pretty)
+        copyText = pretty
+        self.maxHeight = maxHeight
+    }
+
+    /// Preformatted text (already highlighted or intentionally plain).
+    init(text: AttributedString, plainCopy: String, maxHeight: CGFloat = 420) {
+        content = text
+        copyText = plainCopy
+        self.maxHeight = maxHeight
+    }
+
+    var body: some View {
+        ScrollView([.horizontal, .vertical]) {
+            Text(content)
+                .font(.system(size: 11.5, weight: .regular, design: .monospaced))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+        }
+        .frame(maxHeight: maxHeight)
+        .background(CodeColors.panel)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(alignment: .topTrailing) {
+            CopyButton(text: copyText)
+                .padding(6)
+        }
+    }
+}
+
+// MARK: - Monospaced helpers
 
 struct MonoText: View {
     let text: String
@@ -65,7 +136,6 @@ struct MonoText: View {
             .font(.system(size: size, weight: .regular, design: .monospaced))
             .foregroundStyle(color)
             .textSelection(.enabled)
-            .lineLimit(nil)
     }
 }
 
@@ -78,10 +148,10 @@ struct MonoField: View {
         TextField(placeholder, text: $text)
             .textFieldStyle(.plain)
             .font(.system(size: font, design: .monospaced))
-            .padding(10)
+            .padding(8)
             .background(Color(nsColor: .textBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(.separator))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator.opacity(0.7)))
     }
 }
 
@@ -95,14 +165,15 @@ struct Badge: View {
     var body: some View {
         HStack(spacing: 4) {
             if let icon {
-                Image(systemName: icon).font(.system(size: 9, weight: .semibold))
+                Image(systemName: icon).font(.system(size: 8.5, weight: .bold))
             }
             Text(text)
                 .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .lineLimit(1)
         }
-        .padding(.horizontal, 7)
+        .padding(.horizontal, 8)
         .padding(.vertical, 3)
-        .background(color.opacity(0.12))
+        .background(color.opacity(0.14))
         .foregroundStyle(color)
         .clipShape(Capsule())
     }
@@ -123,10 +194,14 @@ struct CopyButton: View {
         } label: {
             Image(systemName: copied ? "checkmark" : "doc.on.doc")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(copied ? .green : .secondary)
+                .frame(width: 22, height: 22)
+                .background(Color.white.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 5))
         }
         .buttonStyle(.plain)
         .help("Copy")
+        .animation(.easeOut(duration: 0.15), value: copied)
     }
 }
 
@@ -138,24 +213,28 @@ struct ErrorView: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill")
+            Image(systemName: "exclamationmark.octagon.fill")
                 .foregroundStyle(.red)
                 .font(.callout)
             Text(message)
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
                 .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer()
             if let dismiss {
                 Button { dismiss() } label: {
-                    Image(systemName: "xmark").font(.caption).foregroundStyle(.tertiary)
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.callout)
+                        .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(12)
-        .background(.red.opacity(0.08))
+        .background(Color.red.opacity(0.09))
         .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.red.opacity(0.25)))
     }
 }
 
@@ -167,18 +246,12 @@ struct EmptyState: View {
     let message: String
 
     var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 36))
-                .foregroundStyle(.quaternary)
-            Text(title)
-                .font(.headline).foregroundStyle(.secondary)
+        ContentUnavailableView {
+            Label(title, systemImage: icon)
+        } description: {
             Text(message)
-                .font(.caption).foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity)
-        .padding(40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -193,7 +266,7 @@ struct LoadingOverlay: ViewModifier {
                 ProgressView()
                     .controlSize(.large)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(.ultraThinMaterial)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
             }
         }
     }
@@ -212,13 +285,14 @@ struct KVRow: View {
     let value: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text(key)
                 .font(.caption)
-                .foregroundStyle(.tertiary)
-                .frame(width: 100, alignment: .trailing)
-            MonoText(text: value, size: 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .fontWeight(.medium)
+                .foregroundStyle(.secondary)
+                .frame(width: 120, alignment: .trailing)
+            MonoText(text: value, size: 12, color: .primary.opacity(0.85))
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -227,7 +301,7 @@ struct KVTable: View {
     let rows: [(String, String)]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             ForEach(rows, id: \.0) { key, value in
                 KVRow(key: key, value: value)
             }
@@ -235,7 +309,7 @@ struct KVTable: View {
     }
 }
 
-// MARK: - Decoded value table
+// MARK: - Decoded args/outputs table
 
 struct DecodedTable: View {
     struct Row: Identifiable {
@@ -247,8 +321,7 @@ struct DecodedTable: View {
 
     let rows: [Row]
 
-    init(args: [String: JSONValue]? = nil, outputs: [DecodedOutput]? = nil) {
-        var result: [Row] = []
+    init(args: [String: JSONValue]? = nil, outputs: [DecodedOutput]? = nil) {        var result: [Row] = []
         if let args {
             for key in args.keys.sorted() {
                 result.append(Row(name: key, type: "", value: args[key]!.display))
@@ -266,53 +339,30 @@ struct DecodedTable: View {
         rows = result
     }
 
+    init(rows: [Row]) {
+        self.rows = rows
+    }
+
     var body: some View {
         if rows.isEmpty {
             Text("—").foregroundStyle(.tertiary).font(.caption)
         } else {
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 6) {
                 ForEach(rows) { row in
-                    HStack(alignment: .top, spacing: 10) {
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
                         Text(row.name)
-                            .font(.caption)
-                            .foregroundStyle(.primary)
-                            .frame(width: 100, alignment: .trailing)
+                            .font(.caption.monospaced().weight(.semibold))
+                            .frame(width: 110, alignment: .trailing)
                         if !row.type.isEmpty {
                             Text(row.type)
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                                .frame(width: 80, alignment: .leading)
+                                .font(.caption2.monospaced())
+                                .foregroundStyle(.teal.opacity(0.85))
+                                .frame(width: 76, alignment: .leading)
                         }
-                        MonoText(text: row.value, size: 12)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        MonoText(text: row.value, size: 12, color: .primary.opacity(0.85))
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-            }
-        }
-    }
-}
-
-// MARK: - Raw JSON
-
-struct JSONView: View {
-    let title: String
-    let json: JSONValue?
-    @State private var expanded = false
-
-    var body: some View {
-        DisclosureGroup(isExpanded: $expanded) {
-            ScrollView([.vertical, .horizontal]) {
-                MonoText(text: json?.prettyJSON ?? "null", size: 11, color: .secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
-            }
-            .frame(maxHeight: 400)
-            .background(Color(nsColor: .textBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "curlybraces").font(.caption).foregroundStyle(.tertiary)
-                Text(title).font(.caption).foregroundStyle(.secondary)
             }
         }
     }
@@ -329,34 +379,17 @@ struct SectionHeader: View {
             Text(title.uppercased())
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.tertiary)
-                .tracking(0.5)
+                .tracking(0.6)
             if let count {
-                Text("(\(count))")
-                    .font(.caption2)
-                    .foregroundStyle(.quaternary)
+                Text("\(count)")
+                    .font(.caption2.monospaced().weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(Capsule().fill(Color.secondary.opacity(0.35)))
             }
             Spacer()
         }
-        .padding(.top, 4)
-    }
-}
-
-// MARK: - Toolbar button
-
-struct ToolbarAction: View {
-    let title: String
-    let icon: String
-    let action: () -> Void
-    var disabled: Bool = false
-
-    var body: some View {
-        Button(action: action) {
-            Label(title, systemImage: icon)
-                .font(.subheadline)
-        }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.small)
-        .disabled(disabled)
     }
 }
 
@@ -374,5 +407,59 @@ struct SegmentedPicker: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
+        .controlSize(.small)
+    }
+}
+
+// MARK: - Collapsible raw JSON
+
+struct CollapsibleJSON: View {
+    let title: String
+    let json: JSONValue?
+
+    var body: some View {
+        DisclosureGroup {
+            CodeBlock(json: json)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "curlybraces.square")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                Text(title).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+// MARK: - Timestamp formatting
+
+enum TimeStamp {
+    static func short(_ iso: String) -> String {
+        let parser = ISO8601DateFormatter()
+        parser.formatOptions = [.withInternetDateTime]
+        if let date = parser.date(from: iso) {
+            return date.formatted(date: .omitted, time: .shortened)
+        }
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractional.date(from: iso) {
+            return date.formatted(date: .omitted, time: .shortened)
+        }
+        return ""
+    }
+}
+
+// MARK: - Conveniences shared by multiple views
+
+extension String {
+    var truncatedHex: String {
+        count > 80 ? "\(prefix(40))…\(suffix(36))" : self
+    }
+}
+
+extension JSONValue {
+    var boolValue: Bool {
+        if case .bool(let b) = self { return b }
+        return false
     }
 }
