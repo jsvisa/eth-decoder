@@ -2,6 +2,22 @@ import { NextResponse } from "next/server";
 import { isValidEthAddress } from "../../utils/validation";
 import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
 
+// TODO: Sourcify-only coverage — many verified contracts exist on Etherscan
+// but not Sourcify, and Etherscan's API never serves compile output, so
+// pc -> source line mapping is impossible from it directly. Fallback plan
+// when we need it:
+//   1. Etherscan getsourcecode -> sources + CompilerVersion +
+//      OptimizationUsed/Runs + EVMVersion + libraries + viaIR
+//   2. Recompile with the matching solc-js version (binaries loaded on
+//      demand per version, ~10-30 MB each — needs caching; mind Vercel
+//      serverless bundle-size/timeout limits)
+//   3. Diff the recompiled evm.deployedBytecode.object against on-chain
+//      eth_getCode — only if identical is the recompiled sourceMap valid
+//      for mapping pcs; otherwise discard
+// Applies equally to the server-side resolver in
+// app/utils/traceSourceLines.js (resolveTraceSourceLinesForSave), which
+// shares this Sourcify-only gap.
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);

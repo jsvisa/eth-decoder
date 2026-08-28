@@ -8,7 +8,7 @@ A web application for decoding EVM transaction input data and interacting with s
 
 | Statements | Branches | Functions | Lines  |
 | ---------- | -------- | --------- | ------ |
-| 69.81%     | 59.14%   | 68.97%    | 72.84% |
+| 68.77%     | 58.46%   | 67.84%    | 71.89% |
 
 _Regenerate with_ `npm run test:coverage:readme`.
 <!-- COVERAGE:END -->
@@ -286,25 +286,25 @@ actual deployed address in `createdAddress`.
 
 **Response fields:**
 
-| Field                | Type           | Description                                                                                                                           |
-| -------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `success`            | `boolean`      | `false` if the transaction reverted                                                                                                   |
-| `simulated`          | `boolean`      | Always `true` for simulated results                                                                                                   |
-| `createdAddress`     | `string\|null` | Created contract address for CREATE success; otherwise `null`                                                                         |
-| `blockNumber`        | `string`       | Block height the simulation ran against                                                                                               |
-| `gasUsed`            | `number`       | Gas consumed by the execution                                                                                                         |
-| `logs`               | `Array`        | Decoded event logs (name, topics, data, inputs)                                                                                       |
-| `callTrace`          | `object\|null` | Tree of call frames with decoded inputs/outputs                                                                                       |
-| `balanceChanges`     | `Array`        | Token + native ETH balance changes extracted from logs and trace                                                                      |
-| `stateChanges`       | `Array`        | Storage slot changes (currently always `[]`)                                                                                          |
-| `metrics`            | `object`       | Timing and RPC call counters. Only present when the request sets `includeMetrics: true`                                               |
-| `rawData`            | `string`       | Hex-encoded raw return data from the contract call. `"0x"` for void functions (e.g. `transfer`) or when the call reverted             |
-| `decoded`            | `Array`        | Decoded function return values `[{name, type, value}]`. Empty `[]` for void functions or when the ABI has no outputs                  |
-| `error`              | `string\|null` | Human-readable revert reason or `null`                                                                                                |
-| `accessList`         | `Array`        | Addresses and storage keys accessed                                                                                                   |
-| `undecodedAddresses` | `Array`        | Log-emitting addresses whose ABI wasn't available                                                                                     |
-| `requestBody`        | `object`       | Input params used (`chainId`, `to`, `from`, `value`, `data`, `gas`, `blockNumber`, `functionName`, `args`); `to` is `null` for CREATE |
-| `simulationId`       | `string\|null` | UUID for retrieving a saved result via `?simulationId=`. Only set when the request had `save: true`                                   |
+| Field                | Type           | Description                                                                                                                                                                                                           |
+| -------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `success`            | `boolean`      | `false` if the transaction reverted                                                                                                                                                                                   |
+| `simulated`          | `boolean`      | Always `true` for simulated results                                                                                                                                                                                   |
+| `createdAddress`     | `string\|null` | Created contract address for CREATE success; otherwise `null`                                                                                                                                                         |
+| `blockNumber`        | `string`       | Block height the simulation ran against                                                                                                                                                                               |
+| `gasUsed`            | `number`       | Gas consumed by the execution                                                                                                                                                                                         |
+| `logs`               | `Array`        | Decoded event logs (name, topics, data, inputs)                                                                                                                                                                       |
+| `callTrace`          | `object\|null` | Tree of call frames with decoded inputs/outputs. When the request sets `save: true`, each frame also carries `sourceLines` / `sourceFile` resolved from Sourcify source maps so shared results render the source view |
+| `balanceChanges`     | `Array`        | Token + native ETH balance changes extracted from logs and trace                                                                                                                                                      |
+| `stateChanges`       | `Array`        | Storage slot changes (currently always `[]`)                                                                                                                                                                          |
+| `metrics`            | `object`       | Timing and RPC call counters. Only present when the request sets `includeMetrics: true`                                                                                                                               |
+| `rawData`            | `string`       | Hex-encoded raw return data from the contract call. `"0x"` for void functions (e.g. `transfer`) or when the call reverted                                                                                             |
+| `decoded`            | `Array`        | Decoded function return values `[{name, type, value}]`. Empty `[]` for void functions or when the ABI has no outputs                                                                                                  |
+| `error`              | `string\|null` | Human-readable revert reason or `null`                                                                                                                                                                                |
+| `accessList`         | `Array`        | Addresses and storage keys accessed                                                                                                                                                                                   |
+| `undecodedAddresses` | `Array`        | Log-emitting addresses whose ABI wasn't available                                                                                                                                                                     |
+| `requestBody`        | `object`       | Input params used (`chainId`, `to`, `from`, `value`, `data`, `gas`, `blockNumber`, `functionName`, `args`); `to` is `null` for CREATE                                                                                 |
+| `simulationId`       | `string\|null` | UUID for retrieving a saved result via `?simulationId=`. Only set when the request had `save: true`                                                                                                                   |
 
 **Example with cheatcodes:**
 

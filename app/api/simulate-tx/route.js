@@ -27,6 +27,10 @@ import { serializeBigInts } from "../../contract-caller/utils/functionArgs";
 import { autoFillWarpTimestamp } from "../../utils/cheatcodes";
 import { fetchCoinGeckoPrice } from "../../utils/coingecko";
 import {
+  stripPcsFromTrace,
+  resolveTraceSourceLinesForSave,
+} from "../../utils/traceSourceLines";
+import {
   NATIVE_TOKEN_ADDRESS,
   TOKEN_TRANSFER_TOPICS,
   SYMBOL_ABI,
@@ -150,7 +154,9 @@ async function runSingleSimulation({
   rpcBatchSize = 20,
   price = true,
   save = false,
+  resolveSourceLines = false,
   includeMetrics = false,
+  sourceMapCache = new Map(),
 }) {
   const {
     to,
@@ -416,6 +422,20 @@ async function runSingleSimulation({
       }
     }
 
+    // Raw PCs are only consumed by source-map resolution: for saved/shared
+    // results resolve them to source lines up front, then strip the PCs from
+    // both the response and the saved copy (nothing reads them back).
+    if (result.callTrace) {
+      if (resolveSourceLines) {
+        await resolveTraceSourceLinesForSave(
+          result.callTrace,
+          numericChainId,
+          sourceMapCache,
+        );
+      }
+      stripPcsFromTrace(result.callTrace);
+    }
+
     const resultWithRequest = { ...enrichedResult, requestBody };
     let responseData = { ...enrichedResult, requestBody };
     if (includeMetrics !== true) {
@@ -580,6 +600,7 @@ export async function POST(request) {
 
   const abiCacheMap = new Map();
   const abiEntryCache = new Map();
+  const sourceMapCache = new Map();
   const isBuiltInChain = !!getChainConfigByChainId(numericChainId);
   const customChainId =
     rpcUrl || (proRpcUrl && !isBuiltInChain) ? numericChainId : null;
@@ -597,7 +618,9 @@ export async function POST(request) {
     rpcBatchSize,
     price,
     save,
+    resolveSourceLines: save,
     includeMetrics,
+    sourceMapCache,
   };
 
   if (sessionMode) {
