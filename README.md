@@ -8,10 +8,9 @@ A web application for decoding EVM transaction input data and interacting with s
 
 | Statements | Branches | Functions | Lines  |
 | ---------- | -------- | --------- | ------ |
-| 69.81%     | 59.14%   | 68.97%    | 72.84% |
+| 68.77%     | 58.46%   | 67.84%    | 71.89% |
 
 _Regenerate with_ `npm run test:coverage:readme`.
-
 <!-- COVERAGE:END -->
 
 CI regenerates this table automatically after the test-coverage job and commits it (`[skip ci]`). To refresh it locally instead:
