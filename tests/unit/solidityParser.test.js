@@ -84,6 +84,20 @@ describe("buildFunctionMap", () => {
     expect(map.get("foo")).toBeDefined();
   });
 
+  it("handles modifiers", () => {
+    const sources = {
+      "Ownable.sol":
+        "contract Ownable {\n  address public owner;\n  modifier onlyOwner() {\n    require(msg.sender == owner);\n    _;\n  }\n  function withdraw() external onlyOwner {}\n}",
+    };
+    const map = buildFunctionMap(sources);
+    expect(map.get("onlyOwner")).toEqual({
+      name: "onlyOwner",
+      file: "Ownable.sol",
+      line: 3,
+      body: "  modifier onlyOwner() {\n    require(msg.sender == owner);\n    _;\n  }",
+    });
+  });
+
   it("caches results", () => {
     const sources = { "A.sol": "contract A { function f() external {} }" };
     const map1 = buildFunctionMap(sources);
