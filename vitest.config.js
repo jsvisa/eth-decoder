@@ -57,6 +57,12 @@ export default defineConfig({
           name: "integration",
           include: ["tests/integration/**"],
           environment: "node",
+          // Files share one Etherscan key (rate-limited to 3 calls/sec), so
+          // parallel files intermittently trip "Max calls per sec" and fail.
+          // Run them sequentially in a single worker; retry absorbs residual
+          // transient live-API errors.
+          poolOptions: { forks: { singleFork: true } },
+          retry: 2,
         },
       },
       {
