@@ -2,9 +2,10 @@ const cache = new Map();
 const nameSetCache = new Map();
 
 // Matches a Solidity definition at the start of a (trimmed) line:
-//   function foo(...)  |  event Foo(...)  |  error Foo(...)
+//   function foo(...)  |  event Foo(...)  |  error Foo(...)  |  modifier m(...)
 // Non-global so it can only match once per line — no exec loop, no backtracking risk.
-const DEF_RE = /^(?:function|event|error)\s+([A-Za-z_$][A-Za-z0-9_$]*)/;
+const DEF_RE =
+  /^(?:function|event|error|modifier)\s+([A-Za-z_$][A-Za-z0-9_$]*)/;
 
 // FNV-1a hash of the sorted `filename:content` pairs so the cache key reflects
 // actual content, not just filenames/lengths. Two contracts with the same
