@@ -706,7 +706,7 @@ export async function createTevmClient(
  * Apply cheatcodes to the Tevm client
  */
 export async function applyCheatcodes(client, cheatcodes = {}) {
-  const { deal, prank, warp } = cheatcodes;
+  const { deal, prank, warp, coinbase } = cheatcodes;
 
   // vm.deal - Set ETH balance for an address
   if (deal && deal.address && deal.amount) {
@@ -742,10 +742,20 @@ export async function applyCheatcodes(client, cheatcodes = {}) {
     }
   }
 
+  // vm.coinbase - pin block.coinbase for the call (same blockOverrideSet
+  // mechanism and session-mode limitation as vm.warp). MEV bots pay tips to
+  // block.coinbase and branch on it; without the real block's fee recipient
+  // those transfers go to the zero address or bots take different branches.
+  let coinbaseAddress = null;
+  if (coinbase) {
+    coinbaseAddress = checksumAddress(coinbase);
+  }
+
   // vm.prank is handled by setting the 'from' address in the call
   return {
     prankAddress: prank?.address || null,
     warpTimestamp,
+    coinbaseAddress,
   };
 }
 
@@ -1086,10 +1096,8 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       }
     }
     // Apply cheatcodes
-    const { prankAddress, warpTimestamp } = await applyCheatcodes(
-      client,
-      cheatcodes,
-    );
+    const { prankAddress, warpTimestamp, coinbaseAddress } =
+      await applyCheatcodes(client, cheatcodes);
 
     // Apply balance overrides (additional deal-style balance sets)
     for (const ov of balanceOverrides) {
@@ -1483,10 +1491,16 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       data: callData,
       value: valueInWei,
       ...(gas ? { gasLimit: BigInt(gas) } : {}),
-      // Pin block.timestamp (vm.warp). Only for non-persisted calls: tevm
-      // rejects block overrides when the transaction is added to the chain.
-      ...(warpTimestamp != null && !persistState
-        ? { blockOverrideSet: { time: warpTimestamp } }
+      // Pin block context (vm.warp / vm.coinbase). Only for non-persisted
+      // calls: tevm rejects block overrides when the transaction is added to
+      // the chain.
+      ...(!persistState && (warpTimestamp != null || coinbaseAddress != null)
+        ? {
+            blockOverrideSet: {
+              ...(warpTimestamp != null ? { time: warpTimestamp } : {}),
+              ...(coinbaseAddress != null ? { coinbase: coinbaseAddress } : {}),
+            },
+          }
         : {}),
       createAccessList: true,
       throwOnFail: false, // return errors in result instead of throwing, so rawData is accessible

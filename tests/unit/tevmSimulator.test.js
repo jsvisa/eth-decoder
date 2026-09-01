@@ -1363,6 +1363,23 @@ describe("simulateWithClient — warp blockOverrideSet", () => {
     });
   });
 
+  it("passes warp and coinbase together in blockOverrideSet", async () => {
+    const { client, captured } = createHookDrivingClient();
+    const result = await simulateWithClient(client, "latest", {
+      address: "0x0000000000000000000000000000000000000001",
+      callData: "0x",
+      cheatcodes: {
+        warp: { timestamp: "1700000000" },
+        coinbase: "0xdadb0d80178819f2319190d340ce9a924f783711",
+      },
+    });
+    expect(result.success).toBe(true);
+    expect(captured.callParams.blockOverrideSet).toEqual({
+      time: 1700000000n,
+      coinbase: "0xdadB0d80178819F2319190D340ce9A924f783711",
+    });
+  });
+
   it("does not pass blockOverrideSet for session (persistState) calls", async () => {
     const { client, captured } = createHookDrivingClient();
     const result = await simulateWithClient(client, "latest", {
