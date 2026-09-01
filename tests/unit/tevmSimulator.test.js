@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createMemoryClient } from "tevm";
 import { createCommon, createMockKzg } from "tevm/common";
 import { EvmError } from "tevm/evm";
@@ -10,6 +10,7 @@ import {
   createPrecompilesForChain,
 } from "../../app/utils/precompiles.js";
 import {
+  applyCheatcodes,
   createTevmClient,
   createArbSysPrecompile,
   decodeRevertData,
@@ -1181,5 +1182,255 @@ describe("redecodeCallTrace", () => {
 
   it("returns null trace unchanged", () => {
     expect(redecodeCallTrace(null, new Map())).toBeNull();
+  });
+});
+
+// ── applyCheatcodes ──────────────────────────────────────────────────────────
+
+describe("applyCheatcodes", () => {
+  it("returns the warp timestamp as a bigint and does NOT mine", async () => {
+    const client = { tevmMine: vi.fn(), tevmSetAccount: vi.fn() };
+    const { prankAddress, warpTimestamp } = await applyCheatcodes(client, {
+      warp: { timestamp: "1700000000" },
+    });
+    expect(warpTimestamp).toBe(1700000000n);
+    expect(prankAddress).toBeNull();
+    // Mining would replace the fork head with a wall-clock-timestamped block
+    // (mineHandler ignores the requested timestamp), so it must not be used.
+    expect(client.tevmMine).not.toHaveBeenCalled();
+  });
+
+  it("accepts bigint timestamps", async () => {
+    const client = {};
+    const { warpTimestamp } = await applyCheatcodes(client, {
+      warp: { timestamp: 1234567890n },
+    });
+    expect(warpTimestamp).toBe(1234567890n);
+  });
+
+  it("returns a null warpTimestamp when no warp is given", async () => {
+    const { warpTimestamp, prankAddress } = await applyCheatcodes({}, {});
+    expect(warpTimestamp).toBeNull();
+    expect(prankAddress).toBeNull();
+  });
+
+  it("returns a null warpTimestamp for an unparseable timestamp", async () => {
+    const { warpTimestamp } = await applyCheatcodes(
+      {},
+      { warp: { timestamp: "not-a-number" } },
+    );
+    expect(warpTimestamp).toBeNull();
+  });
+
+  it("resolves the prank address", async () => {
+    const { prankAddress, warpTimestamp } = await applyCheatcodes(
+      {},
+      { prank: { address: "0x1234567890123456789012345678901234567890" } },
+    );
+    expect(prankAddress).toBe("0x1234567890123456789012345678901234567890");
+    expect(warpTimestamp).toBeNull();
+  });
+
+  it("applies deal via tevmSetAccount", async () => {
+    const client = { tevmSetAccount: vi.fn() };
+    await applyCheatcodes(client, {
+      deal: {
+        address: "0x1234567890123456789012345678901234567890",
+        amount: "1.5",
+      },
+    });
+    expect(client.tevmSetAccount).toHaveBeenCalledWith(
+      expect.objectContaining({ balance: 1500000000000000000n }),
+    );
+  });
+});
+
+// ── warp → blockOverrideSet wiring ───────────────────────────────────────────
+
+// Runtime: TIMESTAMP PUSH1 0 MSTORE, PUSH1 0x20 PUSH1 0 RETURN — returns
+// block.timestamp as a uint256, so a sim can assert the executing header's ts.
+const TIMESTAMP_RUNTIME = "0x4260005260206000f3";
+const TIMESTAMP_INIT_CODE = `0x6009600c60003960096000f3${TIMESTAMP_RUNTIME.slice(2)}`;
+
+// A fake client whose tevmCall drives the trace/log hooks through a fixed
+// execution sequence: root frame emits LOG(a), calls a child that emits
+// LOG(b), returns, then the root frame emits LOG(c) after the sub-call.
+function createHookDrivingClient() {
+  const captured = { callParams: null };
+  const root = "0x0000000000000000000000000000000000000001";
+  const child = "0x0000000000000000000000000000000000000002";
+  const from = "0x1111111111111111111111111111111111111111";
+  const client = {
+    setCreateSender: vi.fn(),
+    tevmSetAccount: vi.fn(),
+    tevmCall: vi.fn(async (callParams) => {
+      captured.callParams = callParams;
+      const next = () => {};
+      callParams.onBeforeMessage(
+        {
+          to: root,
+          caller: from,
+          depth: 0,
+          gasLimit: 100000n,
+          data: new Uint8Array(0),
+          value: 0n,
+        },
+        next,
+      );
+      callParams.onStep(
+        {
+          opcode: { name: "LOG1" },
+          stack: [0xa1n, 0n, 0n],
+          pc: 5,
+          memory: new Uint8Array(0),
+          address: root,
+        },
+        next,
+      );
+      callParams.onBeforeMessage(
+        {
+          to: child,
+          caller: root,
+          depth: 1,
+          gasLimit: 50000n,
+          data: new Uint8Array(0),
+          value: 0n,
+        },
+        next,
+      );
+      callParams.onStep(
+        {
+          opcode: { name: "LOG1" },
+          stack: [0xb1n, 0n, 0n],
+          pc: 7,
+          memory: new Uint8Array(0),
+          address: child,
+        },
+        next,
+      );
+      callParams.onAfterMessage(
+        {
+          execResult: {
+            executionGasUsed: 1000n,
+            returnValue: new Uint8Array(0),
+          },
+        },
+        next,
+      );
+      callParams.onStep(
+        {
+          opcode: { name: "LOG1" },
+          stack: [0xc1n, 0n, 0n],
+          pc: 9,
+          memory: new Uint8Array(0),
+          address: root,
+        },
+        next,
+      );
+      callParams.onAfterMessage(
+        {
+          execResult: {
+            executionGasUsed: 22000n,
+            returnValue: new Uint8Array(0),
+          },
+        },
+        next,
+      );
+      return {
+        errors: [],
+        executionGasUsed: 23000n,
+        rawData: "0x1234",
+        accessList: [],
+      };
+    }),
+  };
+  return { client, captured, root, child };
+}
+
+const topicHex = (n) => `0x${n.toString(16).padStart(64, "0")}`;
+
+describe("simulateWithClient — warp blockOverrideSet", () => {
+  it("passes blockOverrideSet.time to tevmCall for non-persisted calls", async () => {
+    const { client, captured } = createHookDrivingClient();
+    const result = await simulateWithClient(client, "latest", {
+      address: "0x0000000000000000000000000000000000000001",
+      callData: "0x",
+      cheatcodes: { warp: { timestamp: "1700000000" } },
+    });
+    expect(result.success).toBe(true);
+    expect(captured.callParams.blockOverrideSet).toEqual({
+      time: 1700000000n,
+    });
+  });
+
+  it("does not pass blockOverrideSet for session (persistState) calls", async () => {
+    const { client, captured } = createHookDrivingClient();
+    const result = await simulateWithClient(client, "latest", {
+      address: "0x0000000000000000000000000000000000000001",
+      callData: "0x",
+      persistState: true,
+      cheatcodes: { warp: { timestamp: "1700000000" } },
+    });
+    expect(result.success).toBe(true);
+    expect(captured.callParams.blockOverrideSet).toBeUndefined();
+  });
+
+  it("does not pass blockOverrideSet without warp", async () => {
+    const { client, captured } = createHookDrivingClient();
+    await simulateWithClient(client, "latest", {
+      address: "0x0000000000000000000000000000000000000001",
+      callData: "0x",
+    });
+    expect(captured.callParams.blockOverrideSet).toBeUndefined();
+  });
+});
+
+describe("simulateWithClient — log execution order", () => {
+  it("returns logs in true execution order, not tree pre-order", async () => {
+    const { client } = createHookDrivingClient();
+    const result = await simulateWithClient(client, "latest", {
+      address: "0x0000000000000000000000000000000000000001",
+      callData: "0x",
+    });
+    expect(result.success).toBe(true);
+    // Execution order: root's pre-call log, child's log, root's post-call log.
+    // A pre-order flatten of the call tree would give [a, c, b] because the
+    // root frame's own logs come before its children's.
+    expect(result.logs.map((l) => l.topics[0])).toEqual([
+      topicHex(0xa1),
+      topicHex(0xb1),
+      topicHex(0xc1),
+    ]);
+    // The per-frame attachment is unchanged.
+    expect(result.callTrace.logs.map((l) => l.topics[0])).toEqual([
+      topicHex(0xa1),
+      topicHex(0xc1),
+    ]);
+    expect(result.callTrace.calls[0].logs.map((l) => l.topics[0])).toEqual([
+      topicHex(0xb1),
+    ]);
+  });
+});
+
+describe("simulateWithClient — warp pins block.timestamp", () => {
+  it("executes with the warped timestamp on a real client", async () => {
+    const client = await createLocalTevmClient();
+    const deployed = await simulateWithClient(client, "latest", {
+      chain: "ethereum",
+      isCreate: true,
+      address: null,
+      callData: TIMESTAMP_INIT_CODE,
+      persistState: true,
+    });
+    expect(deployed.success).toBe(true);
+
+    const warpTs = BigInt(Math.floor(Date.now() / 1000) + 1_000_000);
+    const warped = await simulateWithClient(client, "latest", {
+      address: deployed.createdAddress,
+      callData: "0x",
+      cheatcodes: { warp: { timestamp: warpTs.toString() } },
+    });
+    expect(warped.success).toBe(true);
+    expect(BigInt(warped.rawData)).toBe(warpTs);
   });
 });
