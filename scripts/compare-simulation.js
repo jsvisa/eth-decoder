@@ -291,8 +291,10 @@ async function postSimulate(api, body) {
   return data;
 }
 
-/** Single-tx simulation at the parent block, timestamp warped to the tx's own block. */
-async function simulateSingleTx(api, chainId, rpcUrl, tx, blockTs) {
+/** Single-tx simulation at the parent block, block context pinned to the tx's own block. */
+async function simulateSingleTx(api, chainId, rpcUrl, tx, blockHeader) {
+  const blockTs = blockHeader ? blockHeader.timestamp : null;
+  const blockMiner = blockHeader ? blockHeader.miner : null;
   return postSimulate(api, {
     chainId,
     to: tx.to,
@@ -304,8 +306,15 @@ async function simulateSingleTx(api, chainId, rpcUrl, tx, blockTs) {
     price: false,
     decode: false, // comparison doesn't need decoded labels; skips ABI lookups
     rpcUrl,
-    ...(blockTs
-      ? { cheatcodes: { warp: { timestamp: String(BigInt(blockTs)) } } }
+    ...(blockTs || blockMiner
+      ? {
+          cheatcodes: {
+            ...(blockTs
+              ? { warp: { timestamp: String(BigInt(blockTs)) } }
+              : {}),
+            ...(blockMiner ? { coinbase: blockMiner } : {}),
+          },
+        }
       : {}),
   });
 }
@@ -439,6 +448,21 @@ function judgeResult(result) {
     });
   }
 
+  // 2b. coinbase payout: sim paid the zero-address recipient (block.coinbase
+  // is zero in tevm sessions; the real block paid the builder/miner)
+  const zeroTo = diffs.find(
+    (d) =>
+      d.path.endsWith(".to") &&
+      d.sim === "0x0000000000000000000000000000000000000000",
+  );
+  if (zeroTo) {
+    verdicts.push({
+      kind: "coinbase",
+      detail:
+        "sim paid the zero-address recipient — block.coinbase is the zero address in tevm session replay, so builder-tip payouts (coinbase.transfer) go to 0x0",
+    });
+  }
+
   // 3. log-only diffs: reordered vs different content
   if (logDiffs.length > 0 && treeDiffs.length === 0 && !outcomeDiff) {
     const simLogs = collectLogs(result.simTrace);
@@ -474,24 +498,33 @@ function judgeResult(result) {
     });
   }
 
-  // 5. calldata/returndata divergence
-  const dataDiff = diffs.find(
-    (d) => d.path.endsWith(".input") || d.path.endsWith(".output"),
-  );
-  if (dataDiff) {
-    verdicts.push({
-      kind: "execution-divergence",
-      detail: `${dataDiff.path} differs — execution state diverged upstream of that call`,
-    });
+  // 5. calldata/returndata divergence (structural-only, no outcome flip)
+  if (!outcomeDiff) {
+    const dataDiff = diffs.find(
+      (d) => d.path.endsWith(".input") || d.path.endsWith(".output"),
+    );
+    if (dataDiff) {
+      verdicts.push({
+        kind: "execution-divergence",
+        detail: `${dataDiff.path} differs — execution state diverged upstream of that call`,
+      });
+    }
   }
 
-  // 6. outcome-only flip
-  if (outcomeDiff && verdicts.length === 0) {
-    verdicts.push({
-      kind: "outcome",
-      detail:
-        "outcome only: sim reverted where the chain succeeded (or vice versa) — state-dependent guard or block-context sensitivity",
-    });
+  // 6. outcome flip: sim reverted where the chain succeeded (or vice versa)
+  if (outcomeDiff && !verdicts.some((v) => v.kind === "timestamp")) {
+    if (simError) {
+      verdicts.push({
+        kind: "sim-reverted",
+        detail: `sim reverted: "${simError}" — a guard in the tx's logic failed under simulation (state, block.number or block-context dependent)`,
+      });
+    } else {
+      verdicts.push({
+        kind: "outcome",
+        detail:
+          "outcome only: sim succeeded where the chain reverted (or unclassified outcome flip)",
+      });
+    }
   }
 
   // 7. fallback
@@ -638,7 +671,7 @@ async function main() {
     console.log(`verdicts: ${summary}`);
   };
 
-  const compareIndependently = async (tx, blockTs, i, total) => {
+  const compareIndependently = async (tx, blockHeader, i, total) => {
     let result;
     try {
       const gt = await fetchGroundTruth(args.rpcUrl, tx);
@@ -653,7 +686,7 @@ async function main() {
           args.chain,
           args.rpcUrl,
           tx,
-          blockTs,
+          blockHeader,
         );
         if (!sim.callTrace)
           throw new Error(`simulation returned no callTrace: ${sim.error}`);
@@ -684,7 +717,7 @@ async function main() {
       tx.blockNumber,
       false,
     ]);
-    await compareIndependently(tx, blk ? blk.timestamp : null, 0, 1);
+    await compareIndependently(tx, blk, 0, 1);
     const r = results[0];
     if (r && r.status === "FAIL") {
       for (const v of judgeResult(r)) {
@@ -715,7 +748,7 @@ async function main() {
       if (args.perTx) {
         // independent per-tx simulation at the parent-block state
         await mapLimit(blockTxs, args.concurrency, async (tx, i) => {
-          await compareIndependently(tx, block.timestamp, i, blockTxs.length);
+          await compareIndependently(tx, block, i, blockTxs.length);
         });
         printBlockDiffSection(b);
         continue;
