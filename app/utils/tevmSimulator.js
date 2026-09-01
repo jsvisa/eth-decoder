@@ -516,16 +516,7 @@ export function collectAllCallAddresses(node, result = new Set()) {
   return result;
 }
 
-// Flatten all logs from the entire call trace tree into a single array (for the Logs tab)
-function flattenLogsFromTree(node) {
-  if (!node) return [];
-  return [
-    ...(node.logs || []),
-    ...(node.calls || []).flatMap(flattenLogsFromTree),
-  ];
-}
-
-// Build a map of 4-byte selector (e.g. "0xabcd1234") → functionAbi
+// Build a map of 4-byte selector (e.g. "0xabcd1234") → function ABI
 // from the main ABI and all cached ABIs, so sub-calls can be decoded.
 function buildSelectorMap(abi, abiCache) {
   const map = new Map();
@@ -715,7 +706,7 @@ export async function createTevmClient(
  * Apply cheatcodes to the Tevm client
  */
 export async function applyCheatcodes(client, cheatcodes = {}) {
-  const { deal, prank, warp } = cheatcodes;
+  const { deal, prank, warp, coinbase } = cheatcodes;
 
   // vm.deal - Set ETH balance for an address
   if (deal && deal.address && deal.amount) {
@@ -725,7 +716,16 @@ export async function applyCheatcodes(client, cheatcodes = {}) {
     });
   }
 
-  // vm.warp - Set block timestamp
+  // vm.warp - pin the block timestamp for the call.
+  // Implemented via tevmCall's blockOverrideSet instead of tevmMine:
+  // mineHandler (tevm 1.0.0-next.148) ignores the requested timestamp and
+  // builds blocks with Math.max(Date.now(), parent.timestamp), so mining
+  // would replace the fork head with a wall-clock-timestamped block and the
+  // call would execute with the wrong block.timestamp. The override pins the
+  // executing header directly. In session mode (persistState) tevm rejects
+  // block overrides on chain-added transactions, so warp has no effect there
+  // and the fork head's own timestamp applies.
+  let warpTimestamp = null;
   if (
     warp &&
     warp.timestamp !== undefined &&
@@ -733,22 +733,29 @@ export async function applyCheatcodes(client, cheatcodes = {}) {
     warp.timestamp !== ""
   ) {
     try {
-      const timestamp =
+      warpTimestamp =
         typeof warp.timestamp === "bigint"
           ? warp.timestamp
           : BigInt(warp.timestamp);
-      await client.tevmMine({
-        blockCount: 1,
-        timestamp,
-      });
     } catch (err) {
-      console.warn("Failed to apply warp cheatcode:", err.message);
+      console.warn("Failed to parse warp cheatcode timestamp:", err.message);
     }
+  }
+
+  // vm.coinbase - pin block.coinbase for the call (same blockOverrideSet
+  // mechanism and session-mode limitation as vm.warp). MEV bots pay tips to
+  // block.coinbase and branch on it; without the real block's fee recipient
+  // those transfers go to the zero address or bots take different branches.
+  let coinbaseAddress = null;
+  if (coinbase) {
+    coinbaseAddress = checksumAddress(coinbase);
   }
 
   // vm.prank is handled by setting the 'from' address in the call
   return {
     prankAddress: prank?.address || null,
+    warpTimestamp,
+    coinbaseAddress,
   };
 }
 
@@ -1089,7 +1096,8 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       }
     }
     // Apply cheatcodes
-    const { prankAddress } = await applyCheatcodes(client, cheatcodes);
+    const { prankAddress, warpTimestamp, coinbaseAddress } =
+      await applyCheatcodes(client, cheatcodes);
 
     // Apply balance overrides (additional deal-style balance sets)
     for (const ov of balanceOverrides) {
@@ -1206,6 +1214,11 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     //                      emitting frame (not the root), exactly as geth's OnLog does
     const callStack = [];
     let callTraceRoot = null;
+    // Logs in true execution order (the LOG opcode fires inline). The per-frame
+    // lists above can't reconstruct this: a frame may emit logs AFTER its
+    // sub-calls return (e.g. a Uniswap v3 pool emits Swap after the token
+    // transfer sub-calls), so a tree pre-order flatten gets the order wrong.
+    const orderedLogs = [];
     const LOG_OPCODES = new Set(["LOG0", "LOG1", "LOG2", "LOG3", "LOG4"]);
 
     // Progress tracking: estimate via gas consumed across all frames.
@@ -1245,10 +1258,22 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       } else if (message.isStatic) {
         type = "STATICCALL";
       }
+      // DELEGATECALL frames use geth callTracer conventions: `from` is the
+      // execution context (the proxy/storage address — msg.sender is preserved
+      // under delegatecall, so message.caller is the ORIGINAL outer caller,
+      // which geth does not report) and `to` is the code address actually
+      // executed (the implementation), not the storage address.
+      const isDelegate = type === "DELEGATECALL";
       const node = {
         type,
-        from: message.caller?.toString() || "",
-        to: message.to ? message.to.toString() : null,
+        from: isDelegate
+          ? message.to?.toString() || ""
+          : message.caller?.toString() || "",
+        to: isDelegate
+          ? message.codeAddress?.toString() || message.to?.toString() || null
+          : message.to
+            ? message.to.toString()
+            : null,
         toName: null,
         functionName: null,
         value: (message.value ?? 0n).toString(),
@@ -1406,14 +1431,16 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
             "";
           const currentFrame = callStack[callStack.length - 1];
           if (currentFrame) {
-            currentFrame.logs.push({
+            const logEntry = {
               address: addr,
               topics,
               data,
               name: null,
               decoded: false,
               inputs: [],
-            });
+            };
+            currentFrame.logs.push(logEntry);
+            orderedLogs.push(logEntry);
           }
         }
       }
@@ -1464,6 +1491,17 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       data: callData,
       value: valueInWei,
       ...(gas ? { gasLimit: BigInt(gas) } : {}),
+      // Pin block context (vm.warp / vm.coinbase). Only for non-persisted
+      // calls: tevm rejects block overrides when the transaction is added to
+      // the chain.
+      ...(!persistState && (warpTimestamp != null || coinbaseAddress != null)
+        ? {
+            blockOverrideSet: {
+              ...(warpTimestamp != null ? { time: warpTimestamp } : {}),
+              ...(coinbaseAddress != null ? { coinbase: coinbaseAddress } : {}),
+            },
+          }
+        : {}),
       createAccessList: true,
       throwOnFail: false, // return errors in result instead of throwing, so rawData is accessible
       addToBlockchain: persistState ? "on-success" : undefined,
@@ -1541,8 +1579,10 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     pruneDecodedAddresses(callTraceRoot, undecodedAddressesSet);
     const undecodedAddresses = undecodedAddressesSet;
 
-    // Flat log list for the Logs tab (same set, just flattened)
-    const parsedLogs = flattenLogsFromTree(callTraceRoot);
+    // Flat log list for the Logs tab — true execution order (see orderedLogs).
+    // decodeLogsInTree decoded the entries in place, so these are the same
+    // (now-decoded) objects the tree holds.
+    const parsedLogs = orderedLogs;
 
     // Annotate root frame with decoded function info
     if (callTraceRoot) {

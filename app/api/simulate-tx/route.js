@@ -153,6 +153,7 @@ async function runSingleSimulation({
   rpcUrl = null,
   rpcBatchSize = 20,
   price = true,
+  decode = true,
   save = false,
   resolveSourceLines = false,
   includeMetrics = false,
@@ -180,24 +181,30 @@ async function runSingleSimulation({
 
   let abiEntry = null;
   let toKey = null;
-  if (!isCreate) {
+  if (!isCreate && decode) {
     toKey = to.toLowerCase();
     abiEntry = abiEntryCache.get(toKey);
     if (!abiEntry) {
-      abiEntry = await getAbiFromCache(numericChainId, to);
-      if (!abiEntry) {
-        const fetched = await fetchAbi(to, numericChainId, {
-          etherscanKey,
-          routescanKey,
-          viemChain: chain.viemChain,
-          rpcUrl: chain.rpcUrl,
-          detectProxy: true,
-          concurrency: 1,
-        });
-        if (fetched?.abi) {
-          abiEntry = { ...fetched, fetchedAt: Date.now() };
-          await setAbiInCache(numericChainId, to, abiEntry);
+      try {
+        abiEntry = await getAbiFromCache(numericChainId, to);
+        if (!abiEntry) {
+          const fetched = await fetchAbi(to, numericChainId, {
+            etherscanKey,
+            routescanKey,
+            viemChain: chain.viemChain,
+            rpcUrl: chain.rpcUrl,
+            detectProxy: true,
+            concurrency: 1,
+          });
+          if (fetched?.abi) {
+            abiEntry = { ...fetched, fetchedAt: Date.now() };
+            await setAbiInCache(numericChainId, to, abiEntry);
+          }
         }
+      } catch {
+        // ABI lookup is best-effort (e.g. Etherscan unreachable) — simulate
+        // without it rather than failing the whole request.
+        abiEntry = null;
       }
       abiEntryCache.set(toKey, abiEntry || null);
     }
@@ -278,11 +285,16 @@ async function runSingleSimulation({
       });
     }
 
-    // Collect all addresses needing ABIs, fetch uncached ones in parallel, re-decode
+    // Collect all addresses needing ABIs, fetch uncached ones in parallel,
+    // re-decode. Skipped entirely when decode=false (e.g. the compare script)
+    // — callers that only need execution results (traces/logs/revert data)
+    // don't pay the ABI-lookup latency.
     const neededAddrs = new Set(
-      result.undecodedAddresses?.map((a) => a.toLowerCase()),
+      decode
+        ? (result.undecodedAddresses?.map((a) => a.toLowerCase()) ?? [])
+        : [],
     );
-    if (result.callTrace) {
+    if (decode && result.callTrace) {
       for (const addr of collectAllCallAddresses(result.callTrace)) {
         neededAddrs.add(addr.toLowerCase());
       }
@@ -508,6 +520,7 @@ export async function POST(request) {
     storageOverrides = [],
     cheatcodes = {},
     price = true,
+    decode = true,
     rpcBatchSize = 20,
     save = false,
     includeMetrics = false,
@@ -617,6 +630,7 @@ export async function POST(request) {
     customChainId,
     rpcBatchSize,
     price,
+    decode,
     save,
     resolveSourceLines: save,
     includeMetrics,
