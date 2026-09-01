@@ -459,7 +459,9 @@ function judgeResult(result) {
     verdicts.push({
       kind: "coinbase",
       detail:
-        "sim paid the zero-address recipient — block.coinbase is the zero address in tevm session replay, so builder-tip payouts (coinbase.transfer) go to 0x0",
+        ctx.simMode === "session"
+          ? "sim paid the zero-address recipient — block.coinbase is the zero address in tevm session replay, so builder-tip payouts (coinbase.transfer) go to 0x0"
+          : "sim paid the zero-address recipient — block.coinbase was pinned to the real block's miner, so a zero-address payout points at some other divergence (inspect coinbase-dependent logic)",
     });
   }
 
