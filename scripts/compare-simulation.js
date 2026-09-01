@@ -24,7 +24,9 @@
  *
  * Requires the dev server to be running (npm run dev). If the sim POST is
  * rejected because the RPC URL is a private address, restart the server with
- * ALLOW_PRIVATE_RPC=true.
+ * ALLOW_PRIVATE_RPC=true. Simulations run with decode=false (execution-only:
+ * traces/logs/revert data, no ABI lookups), so no Etherscan/Sourcify access
+ * is needed and sims are faster.
  *
  * Exit code: 0 if every compared tx passed, 1 on any FAIL/ERROR.
  *
@@ -246,14 +248,31 @@ function diffNodes(sim, chain, path, diffs) {
 
 const MAX_SESSION_CALLS = 20; // must match the route's session limit
 
+// Node's built-in fetch (undici) drops responses whose headers/body take
+// > 300s — a 20-tx session chunk of heavy txs can legitimately exceed that
+// (the dev server finishes it anyway). Use undici's own fetch with an
+// unlimited-timeout dispatcher; a foreign undici instance's Agent must not
+// be passed to the BUILT-IN fetch (separate module instances don't mix).
+let undiciFetch = null;
+let longTimeoutDispatcher = null;
+try {
+  const undici = require("undici");
+  undiciFetch = undici.fetch;
+  longTimeoutDispatcher = new undici.Agent({
+    bodyTimeout: 0,
+    headersTimeout: 0,
+  });
+} catch {}
+
 async function postSimulate(api, body) {
   let res;
   try {
-    res = await fetch(`${api}/api/simulate-tx`, {
+    res = await (undiciFetch ?? fetch)(`${api}/api/simulate-tx`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(600_000),
+      ...(longTimeoutDispatcher ? { dispatcher: longTimeoutDispatcher } : {}),
     });
   } catch (err) {
     throw new Error(
@@ -283,6 +302,7 @@ async function simulateSingleTx(api, chainId, rpcUrl, tx, blockTs) {
     gas: tx.gas,
     blockNumber: String(BigInt(tx.blockNumber) - 1n), // parent-block state
     price: false,
+    decode: false, // comparison doesn't need decoded labels; skips ABI lookups
     rpcUrl,
     ...(blockTs
       ? { cheatcodes: { warp: { timestamp: String(BigInt(blockTs)) } } }
@@ -296,6 +316,7 @@ async function simulateSessionChunk(api, chainId, rpcUrl, blockNumber, txs) {
     chainId,
     blockNumber: String(BigInt(blockNumber) - 1n), // parent-block state
     price: false,
+    decode: false, // comparison doesn't need decoded labels; skips ABI lookups
     rpcUrl,
     calls: txs.map((tx) => ({
       to: tx.to || null, // null => contract creation (still replayed for state)
@@ -380,9 +401,115 @@ function diffAgainstChain(sim, gt, ctx) {
     diffs,
     gasDelta,
     note,
+    simError: sim.error || null,
     simTrace,
     chainTrace,
+    ctx,
   };
+}
+
+/**
+ * Judge WHY a comparison failed, from the shape of its diff set.
+ * Returns a list of { kind, detail } — most significant first.
+ */
+function judgeResult(result) {
+  const { diffs, ctx = {}, simError } = result;
+  if (!diffs || diffs.length === 0) return [];
+
+  const paths = diffs.map((d) => d.path);
+  const treeDiffs = paths.filter((p) => p.startsWith("root."));
+  const logDiffs = paths.filter((p) => p.startsWith("receipt.logs"));
+  const verdicts = [];
+  const outcomeDiff = diffs.find((d) => d.path === "outcome");
+
+  // 1. time-guard revert: sim hit a deadline/expiry check
+  if (outcomeDiff && /deadline|expired/i.test(simError || "")) {
+    verdicts.push({
+      kind: "timestamp",
+      detail:
+        "sim reverted on a time guard (deadline/expiry) — session txs are mined by tevm with a wall-clock block.timestamp",
+    });
+  }
+
+  // 2. session chunk boundary: prior-chunk state invisible
+  if (ctx.simMode === "session" && ctx.isChunkStart && ctx.txIndexInBlock > 0) {
+    verdicts.push({
+      kind: "chunk-boundary",
+      detail: `tx #${ctx.txIndexInBlock} starts a new ${MAX_SESSION_CALLS}-tx session chunk — state changes from earlier chunks are missing`,
+    });
+  }
+
+  // 3. log-only diffs: reordered vs different content
+  if (logDiffs.length > 0 && treeDiffs.length === 0 && !outcomeDiff) {
+    const simLogs = collectLogs(result.simTrace);
+    const chainLogs = collectLogs(result.chainTrace);
+    const key = (l) => JSON.stringify([l.address, l.topics, l.data]);
+    const sameSet =
+      simLogs.length === chainLogs.length &&
+      [...simLogs].map(key).sort().join() ===
+        [...chainLogs].map(key).sort().join();
+    verdicts.push(
+      sameSet
+        ? {
+            kind: "log-order",
+            detail: "same logs were emitted but in a different order",
+          }
+        : {
+            kind: "log-content",
+            detail:
+              "sim emitted different events than the chain (execution diverged)",
+          },
+    );
+  }
+
+  // 4. frame-level divergence limited to caller/callee identity
+  if (
+    treeDiffs.length > 0 &&
+    treeDiffs.every((p) => p.endsWith(".from") || p.endsWith(".to"))
+  ) {
+    verdicts.push({
+      kind: "frame-divergence",
+      detail:
+        "extra/missing call frame — sim executed a different code path (state- or block-context-dependent branching, e.g. MEV bot logic or proxy resolution)",
+    });
+  }
+
+  // 5. calldata/returndata divergence
+  const dataDiff = diffs.find(
+    (d) => d.path.endsWith(".input") || d.path.endsWith(".output"),
+  );
+  if (dataDiff) {
+    verdicts.push({
+      kind: "execution-divergence",
+      detail: `${dataDiff.path} differs — execution state diverged upstream of that call`,
+    });
+  }
+
+  // 6. outcome-only flip
+  if (outcomeDiff && verdicts.length === 0) {
+    verdicts.push({
+      kind: "outcome",
+      detail:
+        "outcome only: sim reverted where the chain succeeded (or vice versa) — state-dependent guard or block-context sensitivity",
+    });
+  }
+
+  // 7. fallback
+  if (verdicts.length === 0) {
+    verdicts.push({
+      kind: "mixed",
+      detail: "mixed structural divergence across the call tree",
+    });
+  }
+  return verdicts;
+}
+
+/** Collect a node's logs plus all descendants' logs. */
+function collectLogs(node, out = []) {
+  if (!node) return out;
+  for (const l of node.logs || []) out.push(l);
+  for (const c of node.calls || []) collectLogs(c, out);
+  return out;
 }
 
 // ── runner ──────────────────────────────────────────────────────────────────
@@ -467,19 +594,48 @@ async function main() {
       line += `  ${result.note || ""}`;
     }
     console.log(line);
-    if (result.status === "FAIL") {
-      const shown = args.verbose ? result.diffs : result.diffs.slice(0, 10);
-      for (const d of shown) {
-        console.log(
-          `  - ${d.path}\n      sim:   ${fmt(d.sim)}\n      chain: ${fmt(d.chain)}`,
-        );
-      }
-      if (!args.verbose && result.diffs.length > shown.length) {
-        console.log(`  … ${result.diffs.length - shown.length} more (use -v)`);
-      }
-      if (result.note) console.log(`  ! ${result.note}`);
-    }
     results.push({ ...item, ...result });
+  };
+
+  const printDiffs = (r) => {
+    const shown = args.verbose ? r.diffs : r.diffs.slice(0, 10);
+    for (const d of shown) {
+      console.log(
+        `  - ${d.path}\n      sim:   ${fmt(d.sim)}\n      chain: ${fmt(d.chain)}`,
+      );
+    }
+    if (!args.verbose && r.diffs.length > shown.length) {
+      console.log(`  … ${r.diffs.length - shown.length} more (use -v)`);
+    }
+    if (r.note) console.log(`  ! ${r.note}`);
+  };
+
+  const printBlockDiffSection = (blockNumber) => {
+    const failed = results.filter(
+      (r) =>
+        Number(r.blockNumber) === blockNumber &&
+        r.status === "FAIL" &&
+        r.diffs.length > 0,
+    );
+    if (failed.length === 0) return;
+    console.log(
+      `\n── diffs in block ${blockNumber} (${failed.length} failed) ──`,
+    );
+    const verdictTally = {};
+    for (const r of failed) {
+      console.log(
+        `${shortHash(r.hash)}  FAIL  ${r.diffs.length} diff${r.diffs.length === 1 ? "" : "s"}`,
+      );
+      for (const v of judgeResult(r)) {
+        console.log(`  ⤳ ${v.kind}: ${v.detail}`);
+        verdictTally[v.kind] = (verdictTally[v.kind] || 0) + 1;
+      }
+      printDiffs(r);
+    }
+    const summary = Object.entries(verdictTally)
+      .map(([k, n]) => `${n}× ${k}`)
+      .join(", ");
+    console.log(`verdicts: ${summary}`);
   };
 
   const compareIndependently = async (tx, blockTs, i, total) => {
@@ -529,6 +685,13 @@ async function main() {
       false,
     ]);
     await compareIndependently(tx, blk ? blk.timestamp : null, 0, 1);
+    const r = results[0];
+    if (r && r.status === "FAIL") {
+      for (const v of judgeResult(r)) {
+        console.log(`  ⤳ ${v.kind}: ${v.detail}`);
+      }
+      printDiffs(r);
+    }
   } else {
     for (let b = args.startBlock; b <= args.endBlock; b++) {
       const block = await rpc(args.rpcUrl, "eth_getBlockByNumber", [
@@ -554,6 +717,7 @@ async function main() {
         await mapLimit(blockTxs, args.concurrency, async (tx, i) => {
           await compareIndependently(tx, block.timestamp, i, blockTxs.length);
         });
+        printBlockDiffSection(b);
         continue;
       }
 
@@ -576,21 +740,24 @@ async function main() {
         );
         let simResults = null;
         let chunkError = null;
-        try {
-          const data = await simulateSessionChunk(
-            args.api,
-            args.chain,
-            args.rpcUrl,
-            b,
-            chunk,
-          );
-          if (!Array.isArray(data.results)) {
-            chunkError = `session returned no results: ${data.error || "unknown"}`;
-          } else {
-            simResults = data.results;
+        for (let attempt = 0; attempt < 2 && simResults === null; attempt++) {
+          try {
+            const data = await simulateSessionChunk(
+              args.api,
+              args.chain,
+              args.rpcUrl,
+              b,
+              chunk,
+            );
+            if (!Array.isArray(data.results)) {
+              chunkError = `session returned no results: ${data.error || "unknown"}`;
+            } else {
+              simResults = data.results;
+              chunkError = null;
+            }
+          } catch (err) {
+            chunkError = err.message;
           }
-        } catch (err) {
-          chunkError = err.message;
         }
         for (let i = 0; i < chunk.length; i++) {
           const tx = chunk[i];
@@ -621,6 +788,7 @@ async function main() {
           printResult(tx, c + i, blockTxs.length, result);
         }
       }
+      printBlockDiffSection(b);
     }
   }
 
