@@ -1250,10 +1250,22 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       } else if (message.isStatic) {
         type = "STATICCALL";
       }
+      // DELEGATECALL frames use geth callTracer conventions: `from` is the
+      // execution context (the proxy/storage address — msg.sender is preserved
+      // under delegatecall, so message.caller is the ORIGINAL outer caller,
+      // which geth does not report) and `to` is the code address actually
+      // executed (the implementation), not the storage address.
+      const isDelegate = type === "DELEGATECALL";
       const node = {
         type,
-        from: message.caller?.toString() || "",
-        to: message.to ? message.to.toString() : null,
+        from: isDelegate
+          ? message.to?.toString() || ""
+          : message.caller?.toString() || "",
+        to: isDelegate
+          ? message.codeAddress?.toString() || message.to?.toString() || null
+          : message.to
+            ? message.to.toString()
+            : null,
         toName: null,
         functionName: null,
         value: (message.value ?? 0n).toString(),

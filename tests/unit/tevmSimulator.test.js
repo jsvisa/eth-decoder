@@ -1410,6 +1410,81 @@ describe("simulateWithClient — log execution order", () => {
       topicHex(0xb1),
     ]);
   });
+
+  it("reports DELEGATECALL frames with geth callTracer from/to", async () => {
+    // Under DELEGATECALL, tevm's message carries caller = preserved OUTER
+    // caller, to = proxy/storage address, codeAddress = implementation.
+    // geth's callTracer reports from = execution context (proxy) and
+    // to = code address (implementation) — the tree must match that.
+    const root = "0x0000000000000000000000000000000000000001";
+    const outerCaller = "0x1111111111111111111111111111111111111111";
+    const proxy = "0x2222222222222222222222222222222222222222";
+    const impl = "0x3333333333333333333333333333333333333333";
+    const client = {
+      setCreateSender: vi.fn(),
+      tevmSetAccount: vi.fn(),
+      tevmCall: vi.fn(async (callParams) => {
+        const next = () => {};
+        callParams.onBeforeMessage(
+          {
+            to: root,
+            caller: outerCaller,
+            depth: 0,
+            gasLimit: 100000n,
+            data: new Uint8Array(0),
+            value: 0n,
+          },
+          next,
+        );
+        callParams.onBeforeMessage(
+          {
+            to: proxy,
+            codeAddress: impl,
+            caller: outerCaller, // preserved under delegatecall
+            delegatecall: true,
+            depth: 1,
+            gasLimit: 50000n,
+            data: new Uint8Array(0),
+            value: 0n,
+          },
+          next,
+        );
+        callParams.onAfterMessage(
+          {
+            execResult: {
+              executionGasUsed: 1000n,
+              returnValue: new Uint8Array(0),
+            },
+          },
+          next,
+        );
+        callParams.onAfterMessage(
+          {
+            execResult: {
+              executionGasUsed: 21000n,
+              returnValue: new Uint8Array(0),
+            },
+          },
+          next,
+        );
+        return {
+          errors: [],
+          executionGasUsed: 22000n,
+          rawData: "0x",
+          accessList: [],
+        };
+      }),
+    };
+    const result = await simulateWithClient(client, "latest", {
+      address: root,
+      callData: "0x",
+    });
+    expect(result.success).toBe(true);
+    const frame = result.callTrace.calls[0];
+    expect(frame.type).toBe("DELEGATECALL");
+    expect(frame.from.toLowerCase()).toBe(proxy.toLowerCase());
+    expect(frame.to.toLowerCase()).toBe(impl.toLowerCase());
+  });
 });
 
 describe("simulateWithClient — warp pins block.timestamp", () => {
