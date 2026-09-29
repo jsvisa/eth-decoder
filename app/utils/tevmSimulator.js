@@ -34,9 +34,17 @@ export { createArbSysPrecompile } from "./precompiles";
 // benchmark suite to record/replay RPC traffic from a local file so runs are
 // deterministic and network-free. `decorator(request, doFetch)` must call
 // doFetch(request) to reach the network and return its result.
-function makeHttp(url, batchSize = 1, decorator = null) {
-  const base =
-    batchSize > 1 ? http(url, { batch: { batchSize, wait: 0 } }) : http(url);
+// Optional fetchFn override, applied *below* the batcher. Unlike the decorator
+// (which sees one call per JSON-RPC method) this fires once per actual HTTP
+// round-trip, so a benchmark using it can charge latency per round-trip and
+// observe the effect of batching instead of hiding it.
+function makeHttp(url, batchSize = 1, decorator = null, fetchFn = null) {
+  const batch = batchSize > 1 ? { batch: { batchSize, wait: 0 } } : {};
+  const base = fetchFn
+    ? http(url, { ...batch, fetchFn })
+    : batchSize > 1
+      ? http(url, { batch: { batchSize, wait: 0 } })
+      : http(url);
   if (!decorator) return base;
   return (config) => {
     const inner = base(config);
@@ -165,6 +173,46 @@ export function ensureTevmNodeCompat(client) {
   return client;
 }
 
+// Program counters, per call frame, are accumulated in a bitmap instead of a
+// growing array.
+//
+// The step hook fires once per opcode, so a plain `pcs.push(step.pc)` allocates
+// one array slot per opcode: a multi-million-opcode simulation builds huge
+// arrays that are immediately collapsed by deduplicatePcs() into a handful of
+// unique PCs. A bitmap makes each write O(1) with no growth, caps memory at
+// roughly code size (≤24KB per frame), and yields the final deduplicated,
+// ascending-sorted list directly — no Set, no sort.
+const PC_BITS_INIT = 512; // bytes → 4096 program counters
+
+function addPc(frame, pc) {
+  const byteIndex = pc >>> 3;
+  let bits = frame.pcBits;
+  if (byteIndex >= bits.length) {
+    // Grows once per doubling, so total copying stays O(final size).
+    let size = bits.length;
+    while (byteIndex >= size) size *= 2;
+    const grown = new Uint8Array(size);
+    grown.set(bits);
+    bits = grown;
+    frame.pcBits = grown;
+  }
+  bits[byteIndex] |= 1 << (pc & 7);
+}
+
+// Enumerate set bits in ascending order — the deduplicated, sorted PC list.
+function collectPcs(frame) {
+  const bits = frame.pcBits;
+  const out = [];
+  for (let i = 0; i < bits.length; i++) {
+    const byte = bits[i];
+    if (byte === 0) continue;
+    for (let bit = 0; bit < 8; bit++) {
+      if (byte & (1 << bit)) out.push((i << 3) + bit);
+    }
+  }
+  return out;
+}
+
 // Wraps an HTTP transport to avoid eth_getProof, which is unsupported by many
 // public RPCs. Intercepts eth_getProof and emulates account fields with simpler
 // RPC methods. The nonce is only fetched for the active CREATE sender — it is
@@ -179,16 +227,76 @@ function createProofFreeTransport(
   batchSize = 1,
   collector = null,
   rpcDecorator = null,
+  rpcFetch = null,
 ) {
-  const baseHttpFactory = makeHttp(rpcUrl, batchSize, rpcDecorator);
+  const baseHttpFactory = makeHttp(rpcUrl, batchSize, rpcDecorator, rpcFetch);
   // If a collector is provided, every request the EVM/tevm makes through this
   // transport is recorded. The wrap is invisible to callers.
   const wrappedFactory = collector
     ? collector.wrap(baseHttpFactory)
     : baseHttpFactory;
   let createSender = null;
+
+  // Per-simulation memo of immutable fork reads.
+  //
+  // tevm resolves an account through two independent paths: `getAccount` calls
+  // eth_getProof (which this transport expands into eth_getBalance +
+  // eth_getCode) while `getContractCode` independently calls eth_getCode for
+  // the same address at the same block. That is two identical eth_getCode
+  // round-trips for every account the EVM touches — in a 12-account
+  // simulation, 12 of the 63 round-trips are pure duplicates.
+  //
+  // The fork is pinned to a block, so these values cannot change for the
+  // lifetime of the memo. It is reset at the start of each simulation run, so a
+  // session never serves one call's read from another's; cross-call reuse is
+  // tevm's own fork cache's job. Only scalar string responses are memoized —
+  // eth_getBlockBy* returns objects that callers hold and mutate.
+  const MEMOIZED_METHODS = new Set([
+    "eth_getBalance",
+    "eth_getCode",
+    "eth_getTransactionCount",
+    "eth_getStorageAt",
+  ]);
+  const inFlight = new Map();
+  const memo = new Map();
+
+  // Addresses are case-insensitive, but tevm reaches for the same account
+  // through two paths that spell it differently: getProof's expansion uses
+  // whatever checksummed form the caller had, while getContractCode asks for
+  // the lowercased address. Normalise the leading address param so those two
+  // spellings share one memo entry instead of missing each other.
+  const memoKey = (method, params) => {
+    const [first, ...rest] = params ?? [];
+    const address =
+      typeof first === "string" && /^0x[0-9a-fA-F]{40}$/.test(first)
+        ? first.toLowerCase()
+        : first;
+    return `${method}|${address}|${JSON.stringify(rest)}`;
+  };
+
   const factory = (config) => {
     const base = wrappedFactory(config);
+    // Single funnel for fork reads: coalesces concurrent duplicates (both
+    // await the same promise) and replays ones already answered this run.
+    const read = (method, params) => {
+      if (!MEMOIZED_METHODS.has(method)) {
+        return base.request({ method, params });
+      }
+      const key = memoKey(method, params);
+      const pending = inFlight.get(key);
+      if (pending) return pending;
+      if (memo.has(key)) return Promise.resolve(memo.get(key));
+      const promise = base
+        .request({ method, params })
+        .then((result) => {
+          memo.set(key, result);
+          return result;
+        })
+        .finally(() => inFlight.delete(key));
+      inFlight.set(key, promise);
+      return promise;
+    };
+
     return {
       ...base,
       request: async ({ method, params }) => {
@@ -199,13 +307,10 @@ function createProofFreeTransport(
             createSender &&
             address.toLowerCase() === createSender.toLowerCase();
           const [balance, code, nonce] = await Promise.all([
-            base.request({ method: "eth_getBalance", params: [address, tag] }),
-            base.request({ method: "eth_getCode", params: [address, tag] }),
+            read("eth_getBalance", [address, tag]),
+            read("eth_getCode", [address, tag]),
             needsNonce
-              ? base.request({
-                  method: "eth_getTransactionCount",
-                  params: [address, tag],
-                })
+              ? read("eth_getTransactionCount", [address, tag])
               : "0x0",
           ]);
           return {
@@ -219,6 +324,7 @@ function createProofFreeTransport(
             storageProof: [],
           };
         }
+        if (MEMOIZED_METHODS.has(method)) return read(method, params);
         const result = await base.request({ method, params });
         return sanitizeForkRpcResult(method, result);
       },
@@ -226,6 +332,12 @@ function createProofFreeTransport(
   };
   factory.setCreateSender = (sender) => {
     createSender = sender || null;
+  };
+  // Called at the start of every simulation run so a session's later calls
+  // never read through an earlier call's memo.
+  factory.resetMemo = () => {
+    memo.clear();
+    inFlight.clear();
   };
   return factory;
 }
@@ -399,18 +511,19 @@ function decodeRevertData(hexData, abi = []) {
 export { decodeRevertData };
 
 // Try to decode a single raw log object ({ address, topics, data }) using the event ABI map.
+// `allEventAbis` is the flattened list of every known event, built once by the
+// caller rather than re-flattened for every log.
 // Returns the enriched log with { name, decoded, inputs } fields.
-function tryDecodeLog(log, eventAbisByAddress) {
+function tryDecodeLog(log, eventAbisByAddress, allEventAbis) {
   const topics = log.topics || [];
   const data = log.data || "0x";
   const logAddress = log.address?.toLowerCase();
   const addressAbis = eventAbisByAddress.get(logAddress) || [];
 
   // Try address-specific ABIs first, then all known ABIs (fallback for common events)
-  const candidates = [
-    ...addressAbis,
-    ...[...eventAbisByAddress.values()].flat(),
-  ];
+  const candidates = addressAbis.length
+    ? [...addressAbis, ...allEventAbis]
+    : allEventAbis;
   for (const eventAbi of candidates) {
     try {
       const decoded = decodeEventLog({ abi: [eventAbi], data, topics });
@@ -446,8 +559,12 @@ function tryDecodeLog(log, eventAbisByAddress) {
 function decodeLogsInTree(node, eventAbisByAddress) {
   if (!node) return new Set();
   const undecoded = new Set();
+  // Flattened once per tree. tryDecodeLog used to rebuild and re-flatten this
+  // list for every single log, which made the common fallback path allocate an
+  // array of every known event ABI as many times as there were logs.
+  const allEventAbis = [...eventAbisByAddress.values()].flat();
   node.logs = node.logs.map((log) => {
-    const result = tryDecodeLog(log, eventAbisByAddress);
+    const result = tryDecodeLog(log, eventAbisByAddress, allEventAbis);
     if (!result.decoded && log.address)
       undecoded.add(log.address.toLowerCase());
     return result;
@@ -631,6 +748,7 @@ export async function createTevmClient(
   batchSize = 1,
   collector = null,
   rpcDecorator = null,
+  rpcFetch = null,
 ) {
   // Get chain config from built-in or use custom chain ID
   let chainConfig = CHAIN_META[chain];
@@ -676,6 +794,7 @@ export async function createTevmClient(
     batchSize,
     collector,
     rpcDecorator,
+    rpcFetch,
   );
   const forkRequest = forkTransport({}).request;
   let forkBlockNumber =
@@ -699,6 +818,14 @@ export async function createTevmClient(
   // active CREATE sender for the current call, so the nonce is only fetched
   // when CREATE address derivation needs it.
   client.setCreateSender = forkTransport.setCreateSender;
+
+  // Prefetch reuses this transport instead of building a second one. Two
+  // transports mean two independent batch queues, so prefetch requests and the
+  // EVM's lazy state loads can never share an HTTP round-trip, and round-trips
+  // get counted in two places. Exposed on the client so the simulation body —
+  // and callers that manage a client themselves (session mode) — can reuse it.
+  client.forkRequest = forkRequest;
+  client.resetForkRpcMemo = forkTransport.resetMemo;
 
   await client.tevmReady();
   if (blockTag === "latest") {
@@ -776,10 +903,18 @@ async function prefetchAccountsFromAccessList({
   collector = null,
   parallel = false,
   rpcDecorator = null,
+  rpcFetch = null,
+  sharedRequest = null,
 }) {
-  const baseFactory = makeHttp(forkRpcUrl, batchSize, rpcDecorator);
-  const factory = collector ? collector.wrap(baseFactory) : baseFactory;
-  const transport = factory({});
+  // Prefer the fork transport already in use by the EVM. It shares one
+  // connection and one batch queue, so prefetch requests and the EVM's own
+  // lazy state loads can occupy the same HTTP round-trip, and both are counted
+  // by a single collector. The private-transport path is a fallback for callers
+  // that supply no client-level request, and still needs its own collector wrap.
+  const baseFactory = makeHttp(forkRpcUrl, batchSize, rpcDecorator, rpcFetch);
+  const transport = sharedRequest
+    ? { request: sharedRequest }
+    : (collector ? collector.wrap(baseFactory) : baseFactory)({});
   const tag =
     blockTag === "latest" ? "latest" : `0x${BigInt(blockTag).toString(16)}`;
 
@@ -788,30 +923,43 @@ async function prefetchAccountsFromAccessList({
   // simulation progress bar's denominator.
   let alEstimatedGas = 0n;
 
+  // The target's code + balance are needed by tier 1 unconditionally and by
+  // tier 2 as well (the access list always contains the target). Fetch them
+  // once, up front, and let both tiers await the same promise — otherwise the
+  // target costs four round-trips instead of two.
+  const targetAccount = (async () => {
+    const [code, balance] = await Promise.all([
+      transport.request({
+        method: "eth_getCode",
+        params: [callParams.to, tag],
+      }),
+      transport.request({
+        method: "eth_getBalance",
+        params: [callParams.to, tag],
+      }),
+    ]);
+    return { code, balance };
+  })().catch(() => null); // null → will lazy-load during execution
+
   // Tier 1: always prefetch the target contract
+  let tier2Settled = Promise.resolve();
   const tier1 = async () => {
-    try {
-      const [code, balance] = await Promise.all([
-        transport.request({
-          method: "eth_getCode",
-          params: [callParams.to, tag],
-        }),
-        transport.request({
-          method: "eth_getBalance",
-          params: [callParams.to, tag],
-        }),
-      ]);
-      await client.tevmSetAccount({
-        address: callParams.to,
-        balance: BigInt(balance),
-        deployedBytecode: code,
-      });
-    } catch {
-      /* will lazy-load */
-    }
+    const account = await targetAccount;
+    if (!account) return;
+    // Tier 2 may install access-list storage on the same account. Let it
+    // finish first, then skip this write entirely when it succeeded, so the
+    // narrower (code + balance only) tier 1 write can never clobber a superset.
+    await tier2Settled;
+    if (accessListOk) return;
+    await client.tevmSetAccount({
+      address: callParams.to,
+      balance: BigInt(account.balance),
+      deployedBytecode: account.code,
+    });
   };
 
   // Tier 2: eth_createAccessList → batch-fetch all accounts + storage slots
+  let accessListOk = false;
   const tier2 = async () => {
     try {
       const alResult = await transport.request({
@@ -828,6 +976,7 @@ async function prefetchAccountsFromAccessList({
           tag,
         ],
       });
+      accessListOk = true;
       // The RPC executed the exact tx server-side; its gasUsed is the best
       // available progress denominator (returned to the caller).
       try {
@@ -848,15 +997,29 @@ async function prefetchAccountsFromAccessList({
       // One Promise.all over all addresses — with batch transport all requests
       // for all addresses (code, balance, and every storage slot) are packed into
       // ceil(totalRequests / batchSize) HTTP calls instead of N individual ones.
+      //
+      // The access list always contains the target, whose code and balance were
+      // already fetched above. Reuse that single fetch instead of paying two
+      // more round-trips for it.
+      const targetAddr = callParams.to?.toLowerCase();
       await Promise.all(
         [...addrMap.entries()].map(async ([addr, slots]) => {
           try {
+            const reuseTarget =
+              addr === targetAddr ? await targetAccount : null;
             const [code, balance, ...storageValues] = await Promise.all([
-              transport.request({ method: "eth_getCode", params: [addr, tag] }),
-              transport.request({
-                method: "eth_getBalance",
-                params: [addr, tag],
-              }),
+              reuseTarget
+                ? reuseTarget.code
+                : transport.request({
+                    method: "eth_getCode",
+                    params: [addr, tag],
+                  }),
+              reuseTarget
+                ? reuseTarget.balance
+                : transport.request({
+                    method: "eth_getBalance",
+                    params: [addr, tag],
+                  }),
               ...slots.map((slot) =>
                 transport.request({
                   method: "eth_getStorageAt",
@@ -892,7 +1055,14 @@ async function prefetchAccountsFromAccessList({
   // balance is overridden for the dry run: unfunded senders (funded only
   // client-side via balance overrides) would otherwise fail estimateGas with
   // OutOfFunds. RPCs that reject the overrides shape simply keep the fallback.
-  if (alEstimatedGas === 0n) {
+  //
+  // This must run *after* tier 2: eth_estimateGas makes the node execute the
+  // whole transaction a second time, so on an RPC that does support
+  // eth_createAccessList it is pure duplicated work — one wasted round-trip and
+  // one wasted server-side execution per simulation. The `alEstimatedGas === 0n`
+  // test only means anything once tier 2 has had its chance to set it.
+  const estimateGasFallback = async () => {
+    if (alEstimatedGas !== 0n) return;
     try {
       alEstimatedGas = BigInt(
         await transport.request({
@@ -916,18 +1086,25 @@ async function prefetchAccountsFromAccessList({
     } catch {
       /* estimateGas unsupported — progress falls back to the gas limit */
     }
-  }
+  };
 
   // Sequential (default): tier 1 first, then tier 2 — preserves the original
   // behaviour. Parallel: fire both at once so eth_createAccessList overlaps
-  // the target contract's code/balance fetches (and the alResult's target
-  // entry is simply a duplicate fetch).
+  // the target contract's code/balance fetches.
   if (parallel) {
-    await Promise.all([tier1(), tier2()]);
+    // tier2Settled tracks tier 2 only — tier 1 awaits it, so it must never be
+    // a promise that itself awaits tier 1.
+    const tier2Run = tier2();
+    tier2Settled = tier2Run.then(
+      () => {},
+      () => {},
+    );
+    await Promise.all([tier1(), tier2Run]);
   } else {
     await tier1();
     await tier2();
   }
+  await estimateGasFallback();
   return { estimatedGas: alEstimatedGas };
 }
 
@@ -986,7 +1163,12 @@ function extractNativeChangesFromTrace(trace) {
  * full simulation on it. Not exported — callers use simulateWithTevm or
  * simulateWithClient.
  */
-async function _runSimulationOnClient(client, pinnedBlock, params) {
+async function _runSimulationOnClient(
+  client,
+  pinnedBlock,
+  params,
+  collectorIn,
+) {
   let {
     chain,
     address,
@@ -1013,12 +1195,19 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     // stepHookMode: "sync" (default — measured equal on the hot path and its
     //   abort path properly settles the EVM's dispatch promise) | "async"
     //   (legacy dispatch; cancelling leaves the EVM parked forever)
-    // parallelPrefetch: run tier-1 + tier-2 prefetch concurrently
+    // parallelPrefetch: run tier-1 + tier-2 prefetch concurrently. On by
+    // default: the two tiers only contend for the same account's write, which
+    // is ordered locally, so overlapping them costs nothing and removes a
+    // round-trip of serialisation (measured 5-8% of total simulation wall time).
     stepHookMode = "sync",
-    parallelPrefetch = false,
+    parallelPrefetch = true,
     // Optional async (request, doFetch) => result decorator applied to every
     // raw RPC request (fork transport + prefetch). Benchmark-only hook.
     rpcDecorator = null,
+    // Optional fetch override applied below the JSON-RPC batcher, so it fires
+    // once per HTTP round-trip rather than once per logical request.
+    // Benchmark-only hook; lets a replay cache charge latency per round-trip.
+    rpcFetch = null,
   } = params;
 
   // Validate inputs before the try/catch so callers receive a rejected promise
@@ -1066,7 +1255,12 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
     ov.address ? { ...ov, address: checksumAddress(ov.address) } : ov,
   );
 
-  const collector = createMetricsCollector({ batchSize: rpcBatchSize });
+  // Reuse the caller's collector when one was built before the client (so the
+  // fork transport is instrumented too); otherwise make one for session mode.
+  const collector =
+    collectorIn || createMetricsCollector({ batchSize: rpcBatchSize });
+  // Fork reads are memoized per simulation run, never across one.
+  if (client.resetForkRpcMemo) client.resetForkRpcMemo();
   collector.start();
   const finalize = (payload) => {
     collector.end();
@@ -1193,6 +1387,8 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
         collector,
         parallel: parallelPrefetch,
         rpcDecorator,
+        rpcFetch,
+        sharedRequest: client.forkRequest || null,
       });
       estimatedGas = alGas;
     }
@@ -1263,6 +1459,9 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
         logs: [],
         calls: [],
         pcs: [],
+        // Program counters for source-map mapping, accumulated in a bitmap
+        // rather than a growing array (see addPc).
+        pcBits: new Uint8Array(PC_BITS_INIT),
       };
       if (message.depth === 0) {
         callTraceRoot = node;
@@ -1378,7 +1577,7 @@ async function _runSimulationOnClient(client, pinnedBlock, params) {
       if (callStack.length > 0) {
         const currentFrame = callStack[callStack.length - 1];
         if (step.pc !== undefined) {
-          currentFrame.pcs.push(step.pc);
+          addPc(currentFrame, step.pc);
         }
       }
 
@@ -1679,17 +1878,24 @@ export async function simulateWithTevm(params) {
     customChainId = null,
     rpcBatchSize = 1,
     rpcDecorator = null,
+    rpcFetch = null,
   } = params;
+  // The collector has to exist before the client so it can instrument the fork
+  // transport. Passing null here (as this used to) meant the EVM's own state
+  // reads were invisible to the metrics panel: a 63-round-trip simulation
+  // reported only the 4 prefetch calls, hiding the single dominant cost.
+  const collector = createMetricsCollector({ batchSize: rpcBatchSize });
   const { client, blockNumber: actualBlock } = await createTevmClient(
     chain,
     rpcUrl,
     blockNumber,
     customChainId,
     rpcBatchSize,
-    null,
+    collector,
     rpcDecorator,
+    rpcFetch,
   );
-  return _runSimulationOnClient(client, actualBlock, params);
+  return _runSimulationOnClient(client, actualBlock, params, collector);
 }
 
 /**
@@ -1722,8 +1928,9 @@ export async function simulateWithClient(client, pinnedBlock, params) {
 export function redecodeLogs(logs, abiCache) {
   if (!logs || !Array.isArray(logs)) return logs;
   const eventAbisByAddress = buildEventAbiMap(abiCache);
+  const allEventAbis = [...eventAbisByAddress.values()].flat();
   return logs.map((log) =>
-    log.decoded ? log : tryDecodeLog(log, eventAbisByAddress),
+    log.decoded ? log : tryDecodeLog(log, eventAbisByAddress, allEventAbis),
   );
 }
 
@@ -1736,7 +1943,13 @@ export function redecodeCallTrace(callTrace, abiCache) {
   if (!callTrace) return callTrace;
   const eventAbisByAddress = buildEventAbiMap(abiCache);
   const selectorMap = buildSelectorMap([], abiCache);
-  const tree = redecodeTreeNode(callTrace, eventAbisByAddress, abiCache);
+  const decodeCtx = { allEventAbis: [...eventAbisByAddress.values()].flat() };
+  const tree = redecodeTreeNode(
+    callTrace,
+    eventAbisByAddress,
+    abiCache,
+    decodeCtx,
+  );
   // Re-run sub-call decoding with the updated selector map so newly fetched
   // ABIs can decode function names/inputs that were null on the first pass.
   decodeSubCallNodes(tree, selectorMap);
@@ -1752,7 +1965,7 @@ function buildEventAbiMap(abiCache) {
   return map;
 }
 
-function redecodeTreeNode(node, eventAbisByAddress, abiCache) {
+function redecodeTreeNode(node, eventAbisByAddress, abiCache, decodeCtx) {
   const newNode = { ...node };
   // Re-decode revert reason for nodes that errored but couldn't be decoded
   // on the first pass (sub-call ABI wasn't available yet at simulation time).
@@ -1763,10 +1976,12 @@ function redecodeTreeNode(node, eventAbisByAddress, abiCache) {
     }
   }
   newNode.logs = (node.logs || []).map((log) =>
-    log.decoded ? log : tryDecodeLog(log, eventAbisByAddress),
+    log.decoded
+      ? log
+      : tryDecodeLog(log, eventAbisByAddress, decodeCtx.allEventAbis),
   );
   newNode.calls = (node.calls || []).map((child) =>
-    redecodeTreeNode(child, eventAbisByAddress, abiCache),
+    redecodeTreeNode(child, eventAbisByAddress, abiCache, decodeCtx),
   );
   return newNode;
 }
@@ -1789,13 +2004,18 @@ export function populateTraceToNames(node, resolveName) {
 }
 
 /**
- * Deduplicate and sort PCs on every trace node.
- * PCs are collected raw from onStep and may have duplicates.
+ * Materialise each trace node's program counters.
+ * They are accumulated in a bitmap during execution, so this converts the
+ * bitmap to the deduplicated, ascending-sorted array the rest of the pipeline
+ * expects and drops the bitmap.
  */
 function deduplicatePcs(node) {
   if (!node) return;
-  if (node.pcs && node.pcs.length > 0) {
-    node.pcs = [...new Set(node.pcs)].sort((a, b) => a - b);
+  if (node.pcBits) {
+    node.pcs = collectPcs(node);
+    // Deleted rather than nulled: trace nodes are JSON-serialised into API
+    // responses, and a leftover key would ride along on every node.
+    delete node.pcBits;
   }
   for (const child of node.calls || []) {
     deduplicatePcs(child);
