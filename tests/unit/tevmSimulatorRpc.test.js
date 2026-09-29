@@ -334,3 +334,38 @@ describe("fork read memoisation is scoped to a single simulation", () => {
     }
   });
 });
+
+describe("trace nodes carry only serialisable program counters", () => {
+  it("emits a sorted, deduplicated pcs array and no internal bitmap", async () => {
+    const fork = await createCountingForkRpc({
+      contracts: { [CALLER.toLowerCase()]: STORAGE_READER_CODE },
+    });
+    try {
+      const result = await simulate(fork.url);
+      expect(result.success, result.error).toBe(true);
+
+      const nodes = [];
+      const visit = (node) => {
+        if (!node) return;
+        nodes.push(node);
+        for (const child of node.calls || []) visit(child);
+      };
+      visit(result.callTrace);
+      expect(nodes.length).toBeGreaterThan(0);
+
+      for (const node of nodes) {
+        // The PC bitmap used during execution is internal and must never reach
+        // a JSON-serialised trace node.
+        expect(Object.hasOwn(node, "pcBits")).toBe(false);
+        expect(Array.isArray(node.pcs)).toBe(true);
+        // Deduplicated and ascending, straight out of the bitmap.
+        expect(node.pcs).toEqual([...node.pcs].sort((a, b) => a - b));
+        expect(new Set(node.pcs).size).toBe(node.pcs.length);
+      }
+      // And the whole trace round-trips through JSON without surprises.
+      expect(() => JSON.stringify(result.callTrace)).not.toThrow();
+    } finally {
+      await fork.close();
+    }
+  });
+});

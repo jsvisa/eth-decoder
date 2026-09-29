@@ -173,6 +173,46 @@ export function ensureTevmNodeCompat(client) {
   return client;
 }
 
+// Program counters, per call frame, are accumulated in a bitmap instead of a
+// growing array.
+//
+// The step hook fires once per opcode, so a plain `pcs.push(step.pc)` allocates
+// one array slot per opcode: a multi-million-opcode simulation builds huge
+// arrays that are immediately collapsed by deduplicatePcs() into a handful of
+// unique PCs. A bitmap makes each write O(1) with no growth, caps memory at
+// roughly code size (≤24KB per frame), and yields the final deduplicated,
+// ascending-sorted list directly — no Set, no sort.
+const PC_BITS_INIT = 512; // bytes → 4096 program counters
+
+function addPc(frame, pc) {
+  const byteIndex = pc >>> 3;
+  let bits = frame.pcBits;
+  if (byteIndex >= bits.length) {
+    // Grows once per doubling, so total copying stays O(final size).
+    let size = bits.length;
+    while (byteIndex >= size) size *= 2;
+    const grown = new Uint8Array(size);
+    grown.set(bits);
+    bits = grown;
+    frame.pcBits = grown;
+  }
+  bits[byteIndex] |= 1 << (pc & 7);
+}
+
+// Enumerate set bits in ascending order — the deduplicated, sorted PC list.
+function collectPcs(frame) {
+  const bits = frame.pcBits;
+  const out = [];
+  for (let i = 0; i < bits.length; i++) {
+    const byte = bits[i];
+    if (byte === 0) continue;
+    for (let bit = 0; bit < 8; bit++) {
+      if (byte & (1 << bit)) out.push((i << 3) + bit);
+    }
+  }
+  return out;
+}
+
 // Wraps an HTTP transport to avoid eth_getProof, which is unsupported by many
 // public RPCs. Intercepts eth_getProof and emulates account fields with simpler
 // RPC methods. The nonce is only fetched for the active CREATE sender — it is
@@ -1419,6 +1459,9 @@ async function _runSimulationOnClient(
         logs: [],
         calls: [],
         pcs: [],
+        // Program counters for source-map mapping, accumulated in a bitmap
+        // rather than a growing array (see addPc).
+        pcBits: new Uint8Array(PC_BITS_INIT),
       };
       if (message.depth === 0) {
         callTraceRoot = node;
@@ -1534,7 +1577,7 @@ async function _runSimulationOnClient(
       if (callStack.length > 0) {
         const currentFrame = callStack[callStack.length - 1];
         if (step.pc !== undefined) {
-          currentFrame.pcs.push(step.pc);
+          addPc(currentFrame, step.pc);
         }
       }
 
@@ -1961,13 +2004,18 @@ export function populateTraceToNames(node, resolveName) {
 }
 
 /**
- * Deduplicate and sort PCs on every trace node.
- * PCs are collected raw from onStep and may have duplicates.
+ * Materialise each trace node's program counters.
+ * They are accumulated in a bitmap during execution, so this converts the
+ * bitmap to the deduplicated, ascending-sorted array the rest of the pipeline
+ * expects and drops the bitmap.
  */
 function deduplicatePcs(node) {
   if (!node) return;
-  if (node.pcs && node.pcs.length > 0) {
-    node.pcs = [...new Set(node.pcs)].sort((a, b) => a - b);
+  if (node.pcBits) {
+    node.pcs = collectPcs(node);
+    // Deleted rather than nulled: trace nodes are JSON-serialised into API
+    // responses, and a leftover key would ride along on every node.
+    delete node.pcBits;
   }
   for (const child of node.calls || []) {
     deduplicatePcs(child);
