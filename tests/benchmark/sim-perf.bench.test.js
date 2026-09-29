@@ -4,7 +4,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 import { simulateWithTevm } from "../../app/utils/tevmSimulator.js";
-import { createFileRpcCache } from "./rpcCache.mjs";
+import { assertNoCacheMisses, createFileRpcCache } from "./rpcCache.mjs";
 
 // Simulation performance benchmark — decides between step-hook / prefetch /
 // worker execution strategies on a real fork.
@@ -33,7 +33,12 @@ const CACHE_PATH = fileURLToPath(
 );
 const HAS_CACHE = existsSync(CACHE_PATH);
 
-const rpcCache = createFileRpcCache(CACHE_PATH, { rpcUrl: RPC });
+// This benchmark replays rpc-cache.json, which models an RPC with no
+// eth_createAccessList support.
+const rpcCache = createFileRpcCache(CACHE_PATH, {
+  rpcUrl: RPC,
+  unsupported: ["eth_createAccessList"],
+});
 
 afterAll(() => rpcCache.flush());
 
@@ -64,10 +69,21 @@ const baseParams = (over = {}) => ({
   ...over,
 });
 
+// Prefetch is parallel by default now, so the two prefetch variants below are
+// stated explicitly rather than relying on the default.
 const VARIANTS = [
-  { name: "baseline (async hook, seq prefetch)", params: {} },
-  { name: "A: sync step hook", params: { stepHookMode: "sync" } },
-  { name: "B: parallel prefetch", params: { parallelPrefetch: true } },
+  {
+    name: "baseline (async hook, seq prefetch)",
+    params: { parallelPrefetch: false },
+  },
+  {
+    name: "A: sync step hook",
+    params: { stepHookMode: "sync", parallelPrefetch: false },
+  },
+  {
+    name: "B: parallel prefetch",
+    params: { stepHookMode: "sync", parallelPrefetch: true },
+  },
   {
     name: "A+B: sync hook + parallel prefetch",
     params: { stepHookMode: "sync", parallelPrefetch: true },
@@ -87,9 +103,17 @@ function fingerprint(result) {
 }
 
 async function runOnce(params) {
+  const cache = createFileRpcCache(CACHE_PATH, {
+    rpcUrl: RPC,
+    unsupported: ["eth_createAccessList"],
+  });
   const t0 = performance.now();
-  const result = await simulateWithTevm(baseParams(params));
+  const result = await simulateWithTevm(
+    baseParams({ ...params, rpcDecorator: cache.decorator }),
+  );
   const wallMs = performance.now() - t0;
+  // A stale fixture does not fail loudly on its own — see assertNoCacheMisses.
+  assertNoCacheMisses("sim-perf bench", cache.missKeys);
   return {
     wallMs,
     prefetchMs: result.metrics.phases.prefetchMs,
