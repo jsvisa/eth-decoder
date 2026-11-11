@@ -10,6 +10,7 @@ import {
   createPrecompilesForChain,
 } from "../../app/utils/precompiles.js";
 import {
+  clearSharedForkReadCache,
   createTevmClient,
   createArbSysPrecompile,
   decodeRevertData,
@@ -1184,4 +1185,70 @@ describe("redecodeCallTrace", () => {
   it("returns null trace unchanged", () => {
     expect(redecodeCallTrace(null, new Map())).toBeNull();
   });
+});
+
+describe("shared fork read cache", () => {
+  const CONTRACT = "0x1111111111111111111111111111111111111111";
+  const SENDER = "0x2222222222222222222222222222222222222222";
+  const STATE_READS = ["eth_getBalance", "eth_getCode", "eth_getStorageAt"];
+
+  const readSlot0 = async (fork, block) => {
+    const { client, blockNumber } = await createTevmClient(
+      "ethereum",
+      fork.url,
+      block,
+      null,
+      1,
+    );
+    return simulateWithClient(client, blockNumber, {
+      chain: "ethereum",
+      address: CONTRACT,
+      callData: "0x",
+      abi: null,
+      fromAddress: SENDER,
+      rpcUrl: fork.url,
+    });
+  };
+
+  it("serves a second simulation at the same pinned block from the cache", async () => {
+    clearSharedForkReadCache();
+    const forkValue = "0x" + "0".repeat(63) + "7";
+    const fork = await createForkRpc({
+      code: STORAGE_READER_CODE,
+      balance: "0x0",
+      storage: { [CONTRACT]: { [SLOT0]: forkValue } },
+    });
+    try {
+      const first = await readSlot0(fork, "0x10");
+      expect(first.rawData).toBe(forkValue);
+      expect(fork.requests.some((m) => STATE_READS.includes(m))).toBe(true);
+
+      fork.requests.length = 0;
+      const second = await readSlot0(fork, "0x10");
+      expect(second.rawData).toBe(forkValue);
+      expect(fork.requests.filter((m) => STATE_READS.includes(m))).toEqual([]);
+    } finally {
+      await fork.close();
+    }
+  }, 30000);
+
+  it("pins 'latest' to the concrete fork block number", async () => {
+    clearSharedForkReadCache();
+    const fork = await createForkRpc({
+      code: STORAGE_READER_CODE,
+      balance: "0x0",
+    });
+    try {
+      const { blockNumber } = await createTevmClient(
+        "ethereum",
+        fork.url,
+        "latest",
+        null,
+        1,
+      );
+      expect(blockNumber).toBe("16");
+    } finally {
+      await fork.close();
+    }
+  }, 30000);
 });
