@@ -213,6 +213,41 @@ function collectPcs(frame) {
   return out;
 }
 
+// Process-wide cache of fork reads pinned to a concrete block number.
+//
+// A read at a numeric block can never change, so unlike the per-run memo below
+// it is safe to share across simulations, sessions and requests. This is what
+// lets back-to-back simulations at the same fork block (re-running a call with
+// tweaked args, session replay chunks restarting from the same parent block,
+// warm serverless instances) skip the state they already loaded. Reads at
+// "latest"/"pending" are never cached. Bounded LRU: Map keeps insertion order,
+// so a hit is re-inserted and the oldest entry is evicted first.
+const SHARED_FORK_READ_CACHE_MAX = 200_000;
+const sharedForkReadCache = new Map();
+
+function isPinnedBlockTag(tag) {
+  return typeof tag === "string" && /^0x[0-9a-fA-F]+$/.test(tag);
+}
+
+function sharedCacheGet(key) {
+  if (!sharedForkReadCache.has(key)) return undefined;
+  const value = sharedForkReadCache.get(key);
+  sharedForkReadCache.delete(key);
+  sharedForkReadCache.set(key, value);
+  return value;
+}
+
+function sharedCacheSet(key, value) {
+  sharedForkReadCache.set(key, value);
+  if (sharedForkReadCache.size > SHARED_FORK_READ_CACHE_MAX) {
+    sharedForkReadCache.delete(sharedForkReadCache.keys().next().value);
+  }
+}
+
+export function clearSharedForkReadCache() {
+  sharedForkReadCache.clear();
+}
+
 // Wraps an HTTP transport to avoid eth_getProof, which is unsupported by many
 // public RPCs. Intercepts eth_getProof and emulates account fields with simpler
 // RPC methods. The nonce is only fetched for the active CREATE sender — it is
@@ -274,6 +309,10 @@ function createProofFreeTransport(
     return `${method}|${address}|${JSON.stringify(rest)}`;
   };
 
+  // Benchmarks inject a decorator/fetch to record or replay traffic and count
+  // round-trips per run; a cross-run cache would hide exactly what they measure.
+  const useSharedCache = !rpcDecorator && !rpcFetch;
+
   const factory = (config) => {
     const base = wrappedFactory(config);
     // Single funnel for fork reads: coalesces concurrent duplicates (both
@@ -286,10 +325,22 @@ function createProofFreeTransport(
       const pending = inFlight.get(key);
       if (pending) return pending;
       if (memo.has(key)) return Promise.resolve(memo.get(key));
+      const sharedKey =
+        useSharedCache && isPinnedBlockTag(params?.[params.length - 1])
+          ? `${rpcUrl}|${key}`
+          : null;
+      if (sharedKey) {
+        const cached = sharedCacheGet(sharedKey);
+        if (cached !== undefined) {
+          memo.set(key, cached);
+          return Promise.resolve(cached);
+        }
+      }
       const promise = base
         .request({ method, params })
         .then((result) => {
           memo.set(key, result);
+          if (sharedKey) sharedCacheSet(sharedKey, result);
           return result;
         })
         .finally(() => inFlight.delete(key));
@@ -832,9 +883,12 @@ export async function createTevmClient(
     forkBlockNumber = await client.getBlockNumber();
   }
 
+  // "latest" is resolved to the concrete block tevm forked at, so every later
+  // read (prefetch, precompiles, session calls) targets the same immutable
+  // state as the EVM's own lazy loads instead of a moving head.
   return {
     client,
-    blockNumber: blockTag === "latest" ? "latest" : blockTag.toString(),
+    blockNumber: forkBlockNumber.toString(),
   };
 }
 
