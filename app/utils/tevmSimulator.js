@@ -959,7 +959,14 @@ async function prefetchAccountsFromAccessList({
   rpcDecorator = null,
   rpcFetch = null,
   sharedRequest = null,
+  // "set": write fetched state into tevm with tevmSetAccount (fresh client).
+  // "warm": only issue the reads through the shared fork transport so its
+  // memo/cache holds them; tevm's own lazy loads then resolve locally. Never
+  // touches tevm state, so it is safe on a session client whose state already
+  // carries earlier calls' commits.
+  mode = "set",
 }) {
+  const warmOnly = mode === "warm" && Boolean(sharedRequest);
   // Prefer the fork transport already in use by the EVM. It shares one
   // connection and one batch queue, so prefetch requests and the EVM's own
   // lazy state loads can occupy the same HTTP round-trip, and both are counted
@@ -997,9 +1004,25 @@ async function prefetchAccountsFromAccessList({
 
   // Tier 1: always prefetch the target contract
   let tier2Settled = Promise.resolve();
+  // The sender is always loaded by the EVM (nonce/balance checks) but never
+  // appears in eth_createAccessList; warm it alongside the target.
+  const senderWarm =
+    warmOnly && callParams.from
+      ? Promise.all([
+          transport.request({
+            method: "eth_getBalance",
+            params: [callParams.from, tag],
+          }),
+          transport.request({
+            method: "eth_getCode",
+            params: [callParams.from, tag],
+          }),
+        ]).catch(() => null)
+      : null;
+
   const tier1 = async () => {
     const account = await targetAccount;
-    if (!account) return;
+    if (!account || warmOnly) return;
     // Tier 2 may install access-list storage on the same account. Let it
     // finish first, then skip this write entirely when it succeeded, so the
     // narrower (code + balance only) tier 1 write can never clobber a superset.
@@ -1087,6 +1110,7 @@ async function prefetchAccountsFromAccessList({
               state[slot] = storageValues[i];
             });
 
+            if (warmOnly) return;
             await client.tevmSetAccount({
               address: checksumAddress(addr),
               balance: BigInt(balance),
@@ -1158,6 +1182,7 @@ async function prefetchAccountsFromAccessList({
     await tier1();
     await tier2();
   }
+  await senderWarm;
   await estimateGasFallback();
   return { estimatedGas: alEstimatedGas };
 }
@@ -1244,6 +1269,7 @@ async function _runSimulationOnClient(
     persistState = false,
     gas = null,
     prefetch = true,
+    prefetchMode = "set",
     isCreate = false,
     // ── internal perf knobs (used by tests/benchmark) ──────────────────────
     // stepHookMode: "sync" (default — measured equal on the hot path and its
@@ -1426,7 +1452,11 @@ async function _runSimulationOnClient(
 
     collector.markPhase("prefetch", "start");
     let estimatedGas = 0n;
-    if (prefetch && !isCreate) {
+    // Warm mode needs the client's own fork transport to warm; a client
+    // without one (e.g. a caller-built test double) has nothing to warm.
+    const canPrefetch =
+      prefetch && !isCreate && (prefetchMode !== "warm" || client.forkRequest);
+    if (canPrefetch) {
       const { estimatedGas: alGas } = await prefetchAccountsFromAccessList({
         client,
         forkRpcUrl: rpcUrl || FORK_RPC_URLS[chain] || "",
@@ -1443,6 +1473,7 @@ async function _runSimulationOnClient(
         rpcDecorator,
         rpcFetch,
         sharedRequest: client.forkRequest || null,
+        mode: prefetchMode,
       });
       estimatedGas = alGas;
     }
@@ -1969,7 +2000,10 @@ export async function simulateWithClient(client, pinnedBlock, params) {
   if (!client) throw new Error("client is required");
   return _runSimulationOnClient(client, pinnedBlock, {
     ...params,
-    prefetch: params.prefetch ?? false,
+    // Warm-only prefetch never writes tevm state, so it cannot clobber earlier
+    // session commits; it only pre-loads fork reads into the transport cache.
+    prefetch: params.prefetch ?? true,
+    prefetchMode: params.prefetchMode ?? "warm",
   });
 }
 

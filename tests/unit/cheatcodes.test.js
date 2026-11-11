@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { autoFillWarpTimestamp } from "../../app/utils/cheatcodes.js";
+import {
+  autoFillWarpTimestamp,
+  clearBlockTimestampCache,
+} from "../../app/utils/cheatcodes.js";
 import { createPublicClient, http } from "viem";
 
 vi.mock("viem", () => ({
@@ -19,6 +22,7 @@ function mockClient({ timestamp } = {}) {
 
 describe("autoFillWarpTimestamp", () => {
   beforeEach(() => {
+    clearBlockTimestampCache();
     vi.clearAllMocks();
   });
 
@@ -189,5 +193,33 @@ describe("autoFillWarpTimestamp", () => {
 
     expect(client.getBlock).toHaveBeenCalledWith({ blockNumber: -5n });
     expect(result).toEqual({});
+  });
+});
+
+describe("autoFillWarpTimestamp block cache", () => {
+  beforeEach(() => {
+    clearBlockTimestampCache();
+    vi.clearAllMocks();
+  });
+
+  it("fetches a block's timestamp once per rpc and block", async () => {
+    const getBlock = vi.fn().mockResolvedValue({ timestamp: 1700000000n });
+    createPublicClient.mockReturnValue({ getBlock });
+    const a = await autoFillWarpTimestamp("100", {}, "http://rpc");
+    const b = await autoFillWarpTimestamp("100", {}, "http://rpc");
+    expect(a.warp.timestamp).toBe(1700000000);
+    expect(b.warp.timestamp).toBe(1700000000);
+    expect(getBlock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not cache a failed fetch", async () => {
+    const getBlock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValueOnce({ timestamp: 1700000000n });
+    createPublicClient.mockReturnValue({ getBlock });
+    expect(await autoFillWarpTimestamp("100", {}, "http://rpc")).toEqual({});
+    const ok = await autoFillWarpTimestamp("100", {}, "http://rpc");
+    expect(ok.warp.timestamp).toBe(1700000000);
   });
 });
