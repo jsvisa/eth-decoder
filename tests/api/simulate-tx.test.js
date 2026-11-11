@@ -395,6 +395,17 @@ describe("POST /api/simulate-tx — ABI resolution", () => {
     expect(typeof entry.fetchedAt).toBe("number");
   });
 
+  it("decode: false skips ABI lookups but still simulates", async () => {
+    const res = await POST(makeRequest({ ...VALID_BODY, decode: false }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.simulated).toBe(true);
+    expect(getAbiFromCache).not.toHaveBeenCalled();
+    expect(fetchAbi).not.toHaveBeenCalled();
+    expect(setAbiInCache).not.toHaveBeenCalled();
+    expect(simulateWithTevm).toHaveBeenCalledOnce();
+  });
+
   it("passes apiKeys from the request to fetchAbi", async () => {
     const apiKeys = { etherscan: "MY_KEY", routescan: "MY_RS" };
     await POST(makeRequest({ ...VALID_BODY, apiKeys }));
