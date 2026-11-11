@@ -10,6 +10,7 @@ import {
   createPrecompilesForChain,
 } from "../../app/utils/precompiles.js";
 import {
+  clearSharedForkReadCache,
   createTevmClient,
   createArbSysPrecompile,
   decodeRevertData,
@@ -974,7 +975,7 @@ describe("simulateWithClient — session state vs prefetch (regression)", () => 
   const CONTRACT = "0x1111111111111111111111111111111111111111";
   const SENDER = "0x2222222222222222222222222222222222222222";
 
-  it("does not clobber committed storage with the fork prefetch by default", async () => {
+  it("does not clobber committed storage with the default warm-only prefetch", async () => {
     const forkValue = "0x" + "0".repeat(63) + "1";
     const committedValue = "0x" + "0".repeat(63) + "2";
     const fork = await createForkRpc({
@@ -998,7 +999,8 @@ describe("simulateWithClient — session state vs prefetch (regression)", () => 
         state: { [SLOT0]: committedValue },
       });
 
-      // Default session read: prefetch disabled, committed state must survive.
+      // Default session read: the prefetch only warms the fork transport, so
+      // committed state must survive.
       const read = await simulateWithClient(client, blockNumber, {
         chain: "ethereum",
         address: CONTRACT,
@@ -1010,15 +1012,15 @@ describe("simulateWithClient — session state vs prefetch (regression)", () => 
 
       expect(read.success).toBe(true);
       expect(read.rawData).toBe(committedValue);
-      // eth_createAccessList is only ever issued by the prefetch; its absence
-      // proves the fork-state prefetch was skipped.
-      expect(fork.requests).not.toContain("eth_createAccessList");
+      // eth_createAccessList is only ever issued by the prefetch; its presence
+      // proves the prefetch ran and still left the committed value alone.
+      expect(fork.requests).toContain("eth_createAccessList");
     } finally {
       await fork.close();
     }
   }, 30000);
 
-  it("lets an explicit prefetch: true opt back in (and shows why it must be off by default)", async () => {
+  it("shows why the state-writing prefetch mode must not run on a session", async () => {
     const forkValue = "0x" + "0".repeat(63) + "1";
     const committedValue = "0x" + "0".repeat(63) + "2";
     const fork = await createForkRpc({
@@ -1048,6 +1050,7 @@ describe("simulateWithClient — session state vs prefetch (regression)", () => 
         fromAddress: SENDER,
         rpcUrl: fork.url,
         prefetch: true,
+        prefetchMode: "set",
       });
 
       // The prefetch re-applies the fork's original value (tevmSetAccount with
@@ -1182,4 +1185,70 @@ describe("redecodeCallTrace", () => {
   it("returns null trace unchanged", () => {
     expect(redecodeCallTrace(null, new Map())).toBeNull();
   });
+});
+
+describe("shared fork read cache", () => {
+  const CONTRACT = "0x1111111111111111111111111111111111111111";
+  const SENDER = "0x2222222222222222222222222222222222222222";
+  const STATE_READS = ["eth_getBalance", "eth_getCode", "eth_getStorageAt"];
+
+  const readSlot0 = async (fork, block) => {
+    const { client, blockNumber } = await createTevmClient(
+      "ethereum",
+      fork.url,
+      block,
+      null,
+      1,
+    );
+    return simulateWithClient(client, blockNumber, {
+      chain: "ethereum",
+      address: CONTRACT,
+      callData: "0x",
+      abi: null,
+      fromAddress: SENDER,
+      rpcUrl: fork.url,
+    });
+  };
+
+  it("serves a second simulation at the same pinned block from the cache", async () => {
+    clearSharedForkReadCache();
+    const forkValue = "0x" + "0".repeat(63) + "7";
+    const fork = await createForkRpc({
+      code: STORAGE_READER_CODE,
+      balance: "0x0",
+      storage: { [CONTRACT]: { [SLOT0]: forkValue } },
+    });
+    try {
+      const first = await readSlot0(fork, "0x10");
+      expect(first.rawData).toBe(forkValue);
+      expect(fork.requests.some((m) => STATE_READS.includes(m))).toBe(true);
+
+      fork.requests.length = 0;
+      const second = await readSlot0(fork, "0x10");
+      expect(second.rawData).toBe(forkValue);
+      expect(fork.requests.filter((m) => STATE_READS.includes(m))).toEqual([]);
+    } finally {
+      await fork.close();
+    }
+  }, 30000);
+
+  it("pins 'latest' to the concrete fork block number", async () => {
+    clearSharedForkReadCache();
+    const fork = await createForkRpc({
+      code: STORAGE_READER_CODE,
+      balance: "0x0",
+    });
+    try {
+      const { blockNumber } = await createTevmClient(
+        "ethereum",
+        fork.url,
+        "latest",
+        null,
+        1,
+      );
+      expect(blockNumber).toBe("16");
+    } finally {
+      await fork.close();
+    }
+  }, 30000);
 });
